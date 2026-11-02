@@ -29,3 +29,14 @@ The release workflow requires device tests, local suites, release lint/R8, ABI/n
 No KVM device is attached in this workspace. No real Telegram account or release signing key was supplied. Live authentication, private-channel creation, large uploads through a disconnect, backup under Android process eviction, encrypted streaming and recovery on a second physical phone remain manual acceptance cases. Telegram's dynamic rate limits cannot be disproved by fake-wire timing tests. See [SECURITY.md](SECURITY.md) before relying on encrypted storage.
 
 Final local packaging results are appended after the build completes. GitHub device/signature/publication results must be reported from the actual workflow run, separately from local results.
+
+## Local results, 2026-11-02
+
+- App unit/integration suite: **178 passed**; shared Android host suite: **66 passed**.
+- Release lint: **0 errors**, 72 non-blocking warnings. Debug and instrumented-test APK compilation succeeded; device execution is a separate CI gate.
+- R8/resource-shrunk standalone APKs built for all four ABIs plus universal. Identical DEX/resources/assets and per-ABI native bytes verified across all five outputs.
+- All **40 native library entries** passed ELF alignment; every APK passed ZIP alignment for 16 KB packaging. The Aero Fold launcher check passed.
+- Unsigned local APK sizes: ARM64 **40.03 MiB**, ARM32 about **29 MiB**, x86_64 about **42 MiB**, x86 about **44 MiB**, universal about **137 MiB**. Exact signed sizes are determined by the release workflow.
+- License texts/attribution are packaged in APK assets. The removed upstream launcher bitmap is absent; welcome uses the retained TG Drive vector.
+
+AAB and GitHub device/signature/publication results are recorded separately when available. These local APKs are unsigned; they are not substitutes for the existing signed release identity.
