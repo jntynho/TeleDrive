@@ -7,6 +7,7 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import kotlinx.coroutines.delay
 
 import androidx.compose.foundation.selection.toggleable
@@ -87,7 +88,7 @@ fun SettingsSwitchRow(
             }
         }
         Spacer(Modifier.width(16.dp))
-        DriveSwitch(checked,null)
+        DriveSwitch(checked,null,Modifier.graphicsLayer{alpha=if(enabled)1f else .38f})
     }
 }
 

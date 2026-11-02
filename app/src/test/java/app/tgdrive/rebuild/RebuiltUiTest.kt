@@ -293,6 +293,42 @@ class RebuiltUiTest {
         compose.onNodeWithText("Midnight City",substring=false).assertDoesNotExist()
     }
 
+    @Test fun mediaTabsRestoreFiltersAndSearchAfterSwitching() {
+        compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("navigation-audio").performClick()
+        compose.onNodeWithText("Favorites",substring=false).performClick()
+        compose.onNodeWithTag("navigation-gallery").performClick()
+        compose.onNodeWithText("Photos",substring=false).performClick()
+        compose.onNodeWithTag("navigation-audio").performClick()
+        compose.onNode(hasText("Favorites") and isSelectable()).assertIsSelected()
+        compose.onNodeWithTag("navigation-gallery").performClick()
+        compose.onNode(hasText("Photos") and isSelectable()).assertIsSelected()
+        compose.onNodeWithContentDescription("Search gallery").performClick()
+        compose.onNode(hasSetTextAction()).performTextInput("Photo")
+        compose.onNodeWithTag("navigation-audio").performClick()
+        compose.onNodeWithTag("navigation-gallery").performClick()
+        compose.onNode(hasSetTextAction()).assertTextContains("Photo")
+        compose.onNodeWithContentDescription("Close search").performClick()
+        compose.onNodeWithTag("navigation-home").performClick()
+        compose.onNodeWithText("Your library").assertIsDisplayed()
+    }
+
+    @Test fun audioScrollPositionSurvivesGalleryRoundTrip() {
+        runBlocking {
+            val dao=GlobalContext.get().get<FileDao>()
+            val template=dao.byId("Song.mp3")!!
+            repeat(40){index->val name="Track ${index.toString().padStart(2,'0')}.mp3";dao.upsert(template.copy(id=name,name=name))}
+        }
+        compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("navigation-audio").performClick()
+        compose.waitUntil(10_000){compose.onAllNodesWithText("Song",substring=false).fetchSemanticsNodes().isNotEmpty()}
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Track 25",substring=false))
+        compose.onNodeWithText("Track 25",substring=false).assertIsDisplayed()
+        compose.onNodeWithTag("navigation-gallery").performClick()
+        compose.onNodeWithTag("navigation-audio").performClick()
+        compose.onNodeWithText("Track 25",substring=false).assertIsDisplayed()
+    }
+
     private fun capture(name:String) {
         compose.waitForIdle()
         val file=File("build/design-previews/refreshed-$name.png")

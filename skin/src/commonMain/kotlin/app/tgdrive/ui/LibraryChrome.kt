@@ -35,7 +35,7 @@ fun LibraryFilters(labels:List<String>,selected:Int,onSelect:(Int)->Unit,modifie
             labels.forEachIndexed { item,label->
                 val color by animateColorAsState(if(item==index)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,androidx.compose.animation.core.tween(220),label="filterLabel")
                 Box(Modifier.weight(1f).heightIn(min=48.dp).selectable(selected=item==index,onClick={if(item!=index)onSelect(item)},role=Role.Tab,interactionSource=remember{androidx.compose.foundation.interaction.MutableInteractionSource()},indication=null).padding(horizontal=4.dp,vertical=12.dp),contentAlignment=Alignment.Center) {
-                    Text(label,color=color,style=MaterialTheme.typography.titleSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
+                    Text(label,color=color,style=MaterialTheme.typography.titleSmall,maxLines=2,overflow=TextOverflow.Ellipsis,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
                 }
             }
         }

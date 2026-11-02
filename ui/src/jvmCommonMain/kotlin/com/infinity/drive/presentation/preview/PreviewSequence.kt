@@ -15,6 +15,7 @@ data class PreviewSequence(
     val nameQuery: String? = null,
     val categories: List<FileCategory> = emptyList(),
     val favoritesOnly: Boolean = false,
+    val localCopiesOnly: Boolean = false,
     val hiddenOnly: Boolean = false,
     val archivedOnly: Boolean = false,
     val sortField: FileSortField = FileSortField.NAME,
@@ -29,6 +30,7 @@ data class PreviewSequence(
         categories = categories.takeIf { it.isNotEmpty() }
             ?.joinToString(CATEGORY_SEPARATOR) { it.name },
         favoritesOnly = favoritesOnly,
+        localCopiesOnly = localCopiesOnly,
         hiddenOnly = hiddenOnly,
         archivedOnly = archivedOnly,
         sortField = sortField.name,

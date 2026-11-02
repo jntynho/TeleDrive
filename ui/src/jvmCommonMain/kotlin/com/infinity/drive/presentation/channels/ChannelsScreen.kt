@@ -44,7 +44,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.infinity.drive.presentation.components.PageHeader
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -158,7 +158,7 @@ fun ChannelsScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
+            PageHeader(
                 colors = liftedTopAppBarColors(lifted),
                 title = { Text(stringResource(Res.string.common_storage_channels)) },
                 navigationIcon = {
@@ -203,6 +203,11 @@ fun ChannelsScreen(
             contentPadding = padding.add(horizontal = 16.dp, top = 8.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            item("drive-explanation") {
+                Text("Choose where your files are stored. Each drive uses a private Telegram channel.",
+                    style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier=Modifier.padding(vertical=12.dp))
+            }
             items(channels, key = { it.chatId }) { channel ->
                 ChannelRow(
                     channel = channel,

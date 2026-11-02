@@ -30,6 +30,7 @@ fun SettingsScreen(onBack:(()->Unit)?,onOpenSection:(SettingsSectionType)->Unit,
     var searching by rememberSaveable { mutableStateOf(false) }
     com.infinity.drive.presentation.common.AppBackHandler(searching){searching=false;query=""}
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val authorization by viewModel.authorization.collectAsStateWithLifecycle()
     val capabilities=LocalPlatformCapabilities.current
     val hidden=buildSet {
         if(!capabilities.supportsAutoBackup)add(SettingsSectionType.BACKUP)
@@ -56,7 +57,7 @@ fun SettingsScreen(onBack:(()->Unit)?,onOpenSection:(SettingsSectionType)->Unit,
                         Icon(DriveIcons.AccountCircle,null,Modifier.size(36.dp),tint=MaterialTheme.colorScheme.primary)
                         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
                             Text(state.user?.let{listOf(it.firstName,it.lastName).filter(String::isNotBlank).joinToString(" ")}?.takeIf(String::isNotBlank)?:"Telegram account",style=MaterialTheme.typography.titleMedium)
-                            val connection=when(state.connection){TelegramConnectionState.READY->"Connected";TelegramConnectionState.CONNECTING->"Connecting";TelegramConnectionState.UPDATING->"Syncing";else->"Waiting for network"}
+                            val connection=accountConnectionLabel(authorization,state.connection)
                             Text(connection+if(state.preferences.storageChatId!=null)" · Private drive"else" · Set up your drive",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Icon(DriveIcons.KeyboardArrowRight,null,tint=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -88,4 +89,17 @@ fun SettingsScreen(onBack:(()->Unit)?,onOpenSection:(SettingsSectionType)->Unit,
 @Composable
 private fun SectionRow(section:SettingsSectionType,onClick:()->Unit) {
     SettingsClickRow(stringResource(section.titleRes),onClick,icon=section.icon,trailing={Icon(DriveIcons.KeyboardArrowRight,null,tint=MaterialTheme.colorScheme.onSurfaceVariant)})
+}
+
+internal fun accountConnectionLabel(auth:com.infinity.drive.core.telegram.TelegramAuthState,connection:TelegramConnectionState):String = when(auth){
+    com.infinity.drive.core.telegram.TelegramAuthState.Ready->when(connection){
+        TelegramConnectionState.READY->"Connected"
+        TelegramConnectionState.CONNECTING->"Connecting"
+        TelegramConnectionState.UPDATING->"Syncing"
+        TelegramConnectionState.WAITING_FOR_NETWORK->"Waiting for network"
+    }
+    com.infinity.drive.core.telegram.TelegramAuthState.Initializing->"Connecting"
+    com.infinity.drive.core.telegram.TelegramAuthState.Uninitialized->"Set up Telegram"
+    com.infinity.drive.core.telegram.TelegramAuthState.LoggingOut->"Signing out"
+    else->"Sign-in required"
 }

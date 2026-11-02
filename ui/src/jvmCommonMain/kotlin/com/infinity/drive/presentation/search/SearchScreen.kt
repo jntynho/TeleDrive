@@ -69,35 +69,9 @@ fun SearchScreen(
 
     Scaffold(modifier=modifier,contentWindowInsets=if(showHeader)androidx.compose.material3.ScaffoldDefaults.contentWindowInsets else androidx.compose.foundation.layout.WindowInsets(0),
         topBar = {
-            if(showHeader)TopAppBar(
-                colors = liftedTopAppBarColors(lifted),
-                title = {
-                    OutlinedTextField(
-                        value = state.query,
-                        onValueChange = viewModel::setQuery,
-                        placeholder = { Text(stringResource(Res.string.app_search_files)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        trailingIcon = {
-                            if (state.query.isNotEmpty()) {
-                                IconButton(onClick = { viewModel.setQuery("") }) {
-                                    Icon(
-                                        DriveIcons.Close,
-                                        contentDescription = stringResource(Res.string.common_clear)
-                                    )
-                                }
-                            }
-                        }
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            DriveIcons.ArrowBack,
-                            contentDescription = stringResource(Res.string.common_back)
-                        )
-                    }
-                }
+            if(showHeader)app.tgdrive.ui.ExpandableLibraryHeader(
+                title="Search",query=state.query,onQueryChange=viewModel::setQuery,
+                expanded=true,onExpandedChange={if(!it)onBack()},placeholder=stringResource(Res.string.app_search_files)
             )
         }
     ) { padding ->

@@ -57,7 +57,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
-import androidx.compose.material3.TopAppBar
+import com.infinity.drive.presentation.components.PageHeader
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -146,7 +146,7 @@ fun ProxyScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
+            PageHeader(
                 colors = liftedTopAppBarColors(lifted),
                 title = { Text(stringResource(Res.string.proxy_title)) },
                 navigationIcon = {
@@ -192,6 +192,7 @@ fun ProxyScreen(
                 )
             }
             if (state.loading) {
+                item("loading-proxies"){com.infinity.drive.presentation.components.LoadingState(Modifier.height(160.dp))}
                 return@LazyColumn
             }
             if (state.proxies.isEmpty()) {

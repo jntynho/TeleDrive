@@ -231,7 +231,7 @@ fun HomeScreen(
         snackbarHost = { BottomBarSnackbarHost(snackbarHostState) },
         floatingActionButton={
             androidx.compose.animation.AnimatedVisibility(visible=!searching&&!state.loading,enter=fadeIn(androidx.compose.animation.core.tween(240)),exit=fadeOut(androidx.compose.animation.core.tween(160))){
-                androidx.compose.material3.FloatingActionButton(onClick={showUploadSheet=true},shape=CircleShape,containerColor=app.tgdrive.ui.DriveStyle.ActionBlue,contentColor=androidx.compose.ui.graphics.Color.White,
+                androidx.compose.material3.FloatingActionButton(onClick={showUploadSheet=true},shape=CircleShape,containerColor=MaterialTheme.colorScheme.primary,contentColor=MaterialTheme.colorScheme.onPrimary,
                     modifier=Modifier.padding(bottom=LocalBottomBarInset.current)){
                     Icon(DriveIcons.CloudUpload,"Upload",Modifier.size(26.dp))
                 }

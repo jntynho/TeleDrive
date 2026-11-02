@@ -47,7 +47,7 @@ fun LibraryAudioMiniPlayer(){
                             Text(current.metadata.title?:file.name.substringBeforeLast('.'),style=MaterialTheme.typography.titleSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
                             Text(current.error?:if(current.loading)"Loading audio…"else current.metadata.artist?:file.extension.uppercase(),style=MaterialTheme.typography.bodySmall,color=if(current.error!=null)MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
                         }
-                        FilledIconButton(player::toggle,shape=CircleShape,colors=IconButtonDefaults.filledIconButtonColors(containerColor=DriveStyle.ActionBlue,contentColor=androidx.compose.ui.graphics.Color.White)){
+                        FilledIconButton(player::toggle,shape=CircleShape,colors=IconButtonDefaults.filledIconButtonColors(containerColor=MaterialTheme.colorScheme.primary,contentColor=MaterialTheme.colorScheme.onPrimary)){
                             Icon(if(pause)DriveIcons.Pause else DriveIcons.PlayArrow,if(current.error!=null)"Retry audio"else if(pause)"Pause audio"else"Play audio")
                         }
                         IconButton(player::stop){Icon(DriveIcons.Close,"Close audio player",Modifier.size(20.dp))}
@@ -111,7 +111,7 @@ private fun NowPlayingContent(file:DriveFile,onStop:()->Unit,modifier:Modifier=M
                 }
                 Row(Modifier.fillMaxWidth().padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(24.dp,Alignment.CenterHorizontally)){
                     IconButton(player::previous,enabled=active&&(state.canSkipPrevious||state.positionMs>3000)){Icon(DriveIcons.SkipPrevious,"Previous audio",Modifier.size(28.dp))}
-                    FilledIconButton(onClick={if(!active)player.play(file)else player.toggle()},modifier=Modifier.size(72.dp),shape=CircleShape,colors=IconButtonDefaults.filledIconButtonColors(containerColor=DriveStyle.ActionBlue,contentColor=androidx.compose.ui.graphics.Color.White)){
+                    FilledIconButton(onClick={if(!active)player.play(file)else player.toggle()},modifier=Modifier.size(72.dp),shape=CircleShape,colors=IconButtonDefaults.filledIconButtonColors(containerColor=MaterialTheme.colorScheme.primary,contentColor=MaterialTheme.colorScheme.onPrimary)){
                         Icon(if(pause)DriveIcons.Pause else DriveIcons.PlayArrow,if(pause)"Pause audio"else if(active&&state.error!=null)"Retry audio"else"Play audio",Modifier.size(34.dp))
                     }
                     IconButton(player::next,enabled=active&&state.canSkipNext){Icon(DriveIcons.SkipNext,"Next audio",Modifier.size(28.dp))}

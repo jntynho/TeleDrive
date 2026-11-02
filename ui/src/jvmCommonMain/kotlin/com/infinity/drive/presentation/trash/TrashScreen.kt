@@ -25,7 +25,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.infinity.drive.presentation.components.PageHeader
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -110,7 +110,7 @@ fun TrashScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             if (state.selectionMode) {
-                TopAppBar(
+                PageHeader(
                     colors = liftedTopAppBarColors(lifted),
                     title = {
                         Text(stringResource(Res.string.common_selection_count, state.selection.size))
@@ -157,7 +157,7 @@ fun TrashScreen(
                     }
                 )
             } else {
-                TopAppBar(
+                PageHeader(
                     colors = liftedTopAppBarColors(lifted),
                     title = { Text(stringResource(Res.string.trash)) },
                     navigationIcon = {

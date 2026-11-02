@@ -39,7 +39,10 @@ fun AudioScreen(onOpenFile:(String,PreviewSequence)->Unit,viewModel:AudioViewMod
     com.infinity.drive.presentation.common.AppBackHandler(searching){searching=false;viewModel.search("")}
     var sorting by rememberSaveable{mutableStateOf(false)}
     val listState=rememberLazyListState()
-    LaunchedEffect(query,filter,prefs.audioSortField,prefs.audioSortDirection){listState.scrollToItem(0)}
+    val scopeKey=listOf(query,filter.name,prefs.audioSortField.name,prefs.audioSortDirection.name).joinToString("\u0000")
+    var lastScope by rememberSaveable{mutableStateOf(scopeKey)}
+    LaunchedEffect(scopeKey){if(lastScope!=scopeKey){listState.scrollToItem(0);lastScope=scopeKey}}
+
     Scaffold(topBar={Column{
         ExpandableLibraryHeader("Audio",query,viewModel::search,searching,{searching=it},"Search audio",actions={Box {
             TextButton({sorting=true}){Icon(DriveIcons.Sort,null,Modifier.size(20.dp));Spacer(Modifier.width(6.dp));Text("Sort")}
@@ -53,11 +56,11 @@ fun AudioScreen(onOpenFile:(String,PreviewSequence)->Unit,viewModel:AudioViewMod
             audio.loadState.refresh is LoadState.Error->EmptyState(DriveIcons.Info,"Couldn't load audio","Try loading your library again.",Modifier.padding(top=padding.calculateTopPadding(),bottom=bottom),"Retry",{audio.retry()})
             audio.itemCount==0->EmptyState(DriveIcons.MusicNote,if(query.isNotBlank())"No matching audio"else when(filter){AudioFilter.FAVORITES->"No favorites yet";AudioFilter.ON_DEVICE->"No audio on this device";else->"Your sound, in one place"},if(query.isNotBlank())"Try another filename."else"Audio files in your drive will appear here.",Modifier.padding(top=padding.calculateTopPadding(),bottom=bottom))
             else->LazyColumn(state=listState,modifier=Modifier.fillMaxSize().padding(top=padding.calculateTopPadding()).resultReveal(query to audio.itemSnapshotList.items.take(8).map{it.id}),contentPadding=PaddingValues(start=16.dp,end=16.dp,top=8.dp,bottom=bottom+20.dp)){
-                item("audio-actions") {AudioListHeading()}
+
                 items(audio.itemCount,key=audio.itemKey{it.id}){index->
                     val file=audio[index]?:return@items
                     AudioLibraryRow(file,playback.file?.id==file.id&&playback.playing,playback.metadata.takeIf{playback.file?.id==file.id},modifier=Modifier.animateItem(fadeInSpec=androidx.compose.animation.core.tween(240)),onPlay={viewModel.play(file,player)},onFavorite={viewModel.favorite(file)}){
-                        onOpenFile(file.id,PreviewSequence(categories=listOf(FileCategory.AUDIO),nameQuery=query.trim().takeIf{it.isNotBlank()},favoritesOnly=filter==AudioFilter.FAVORITES,sortField=prefs.audioSortField,sortDirection=prefs.audioSortDirection))
+                        onOpenFile(file.id,PreviewSequence(categories=listOf(FileCategory.AUDIO),nameQuery=query.trim().takeIf{it.isNotBlank()},favoritesOnly=filter==AudioFilter.FAVORITES,localCopiesOnly=filter==AudioFilter.ON_DEVICE,sortField=prefs.audioSortField,sortDirection=prefs.audioSortDirection))
                     }
                 }
                 if(audio.loadState.append is LoadState.Error)item{TextButton({audio.retry()}){Text("Couldn't load more · Retry")}}

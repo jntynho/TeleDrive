@@ -22,8 +22,8 @@ object NavigationTransitions {
 
     private val EmphasizedDecelerate = CubicBezierEasing(0.2f, 0f, 0f, 1f)
     private val EmphasizedAccelerate = CubicBezierEasing(0.2f, 0f, 0f, 1f)
-    private const val ENTER_MS = 320
-    private const val EXIT_MS = 320
+    private const val ENTER_MS = 360
+    private const val EXIT_MS = 360
 
     fun sharedAxisEnter(forward: Boolean): EnterTransition =
         slideInHorizontally(
@@ -45,13 +45,13 @@ object NavigationTransitions {
     fun tabEnter(forward: Boolean): EnterTransition =
         slideInHorizontally(
             animationSpec = tween(ENTER_MS, easing = EmphasizedDecelerate)
-        ) { fullWidth -> if (forward) fullWidth else -fullWidth } +
+        ) { fullWidth -> if (forward) fullWidth / 8 else -fullWidth / 8 } +
                 fadeIn(tween(ENTER_MS / 2))
 
     fun tabExit(forward: Boolean): ExitTransition =
         slideOutHorizontally(
             animationSpec = tween(ENTER_MS, easing = EmphasizedDecelerate)
-        ) { fullWidth -> if (forward) -fullWidth else fullWidth } +
+        ) { fullWidth -> if (forward) -fullWidth / 8 else fullWidth / 8 } +
                 fadeOut(tween(ENTER_MS / 2))
 
     fun previewEnter(): EnterTransition = sharedAxisEnter(true)

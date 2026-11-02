@@ -13,7 +13,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.infinity.drive.presentation.components.PageHeader
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -82,7 +82,7 @@ fun CollectionScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            PageHeader(
                 colors = liftedTopAppBarColors(lifted),
                 title = {
                     Text(
@@ -152,7 +152,11 @@ fun CollectionScreen(
         }
     ) { padding ->
         if (files.isInitialLoad) {
-            LoadingState()
+            LoadingState(Modifier.padding(padding))
+            return@Scaffold
+        }
+        if(files.loadState.refresh is androidx.paging.LoadState.Error && files.itemCount==0){
+            EmptyState(DriveIcons.Info,"Couldn't load this collection","Try loading your library again.",Modifier.padding(padding),"Retry",{files.retry()})
             return@Scaffold
         }
         if (files.itemCount == 0) {

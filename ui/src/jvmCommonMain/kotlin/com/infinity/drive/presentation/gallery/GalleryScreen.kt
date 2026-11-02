@@ -39,7 +39,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
-import androidx.compose.material3.TopAppBar
+import com.infinity.drive.presentation.components.PageHeader
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -116,7 +116,7 @@ private fun DayHeaderRow(dayStartMillis: Long, modifier: Modifier = Modifier) {
         },
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.padding(start = 0.dp, top = 12.dp, bottom = 4.dp)
+        modifier = modifier.padding(start = 16.dp, top = 12.dp, bottom = 8.dp)
     )
 }
 
@@ -239,7 +239,7 @@ fun GalleryScreen(
     Scaffold(
         topBar = { Column {
             if (state.selectionMode) {
-                TopAppBar(
+                PageHeader(
                     colors = liftedTopAppBarColors(lifted),
                     title = {
                         Text(
@@ -353,9 +353,11 @@ fun GalleryScreen(
                             IconButton(onClick={sorting=true}){Icon(DriveIcons.Sort,"Sort gallery")}
                             SortMenu(expanded=sorting,current=state.sortField,direction=state.sortDirection,onDismiss={sorting=false},onSelect={field,direction->sorting=false;viewModel.setSort(field,direction)},fields=listOf(FileSortField.DATE_MODIFIED,FileSortField.DATE_ADDED,FileSortField.NAME,FileSortField.SIZE,FileSortField.TYPE),prefixContent={
                                 if(!state.isAlbumView){
+                                    Text("View",Modifier.padding(horizontal=16.dp,vertical=8.dp),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
                                     DropdownMenuItem(text={Text("All media")},onClick={sorting=false;viewModel.setTab(GalleryTab.ALL)},trailingIcon={if(state.tab!=GalleryTab.ALBUMS)Icon(DriveIcons.Check,null)})
                                     DropdownMenuItem(text={Text("Albums")},onClick={sorting=false;viewModel.setTab(GalleryTab.ALBUMS)},trailingIcon={if(state.tab==GalleryTab.ALBUMS)Icon(DriveIcons.Check,null)})
                                     androidx.compose.material3.HorizontalDivider()
+                                    Text("Sort by",Modifier.padding(horizontal=16.dp,vertical=8.dp),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             })
                         }
@@ -365,7 +367,7 @@ fun GalleryScreen(
         } }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(top=padding.calculateTopPadding())) {
-            if (!state.isAlbumView && !state.selectionMode && state.tab!=GalleryTab.ALBUMS) {
+            androidx.compose.animation.AnimatedVisibility(!state.isAlbumView && !state.selectionMode && state.tab!=GalleryTab.ALBUMS,enter=androidx.compose.animation.fadeIn()+androidx.compose.animation.expandVertically(),exit=androidx.compose.animation.fadeOut()+androidx.compose.animation.shrinkVertically()) {
                 GalleryTabSelector(selected=state.tab,onSelect=viewModel::setTab)
             }
 
@@ -412,6 +414,11 @@ fun GalleryScreen(
                 when {
                     media.isInitialLoad || !state.loaded -> com.infinity.drive.presentation.components.GallerySkeleton(state.gridSize,bottomPadding=padding.calculateBottomPadding()+LocalBottomBarInset.current,listMode=state.viewMode==ViewMode.LIST)
 
+                    media.loadState.refresh is androidx.paging.LoadState.Error && media.itemCount == 0 -> EmptyState(
+                        icon=DriveIcons.Info,title="Couldn't load your gallery",
+                        description="Your files are still safe. Try loading the library again.",
+                        actionLabel="Retry",onAction={media.retry()}
+                    )
                     media.itemCount == 0 -> EmptyState(
                         icon = DriveIcons.Photo,
                         title = if(query.isNotBlank())"No matching photos or videos"else stringResource(Res.string.gallery_no_media),

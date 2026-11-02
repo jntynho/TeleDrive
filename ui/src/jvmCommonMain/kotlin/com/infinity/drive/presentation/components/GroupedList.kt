@@ -8,6 +8,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -63,6 +65,7 @@ fun GroupedList(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = horizontalPadding)
+            .then(if(connected)Modifier.clip(RoundedCornerShape(OUTER_CORNER)).background(MaterialTheme.colorScheme.surfaceContainer)else Modifier)
     ) {
         items.forEachIndexed { index, item ->
             val position = visibleIndices.indexOf(index)

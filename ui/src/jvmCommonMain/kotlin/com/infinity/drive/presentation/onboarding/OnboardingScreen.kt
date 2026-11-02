@@ -233,7 +233,7 @@ fun OnboardingScreen(
                     modifier = Modifier
                         .verticalScroll(rememberScrollState())
                         .heightIn(min = availableHeight),
-                    verticalArrangement = Arrangement.Center
+                    verticalArrangement = Arrangement.Top
                 ) {
                     AnimatedContent(
                         modifier = Modifier.fillMaxWidth(),
@@ -471,7 +471,7 @@ private fun StepHeader(step: OnboardingStep, modifier: Modifier = Modifier) {
     Column(modifier = modifier,verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
             Text("TeleDrive",style=MaterialTheme.typography.titleMedium)
-            Text(stringResource(Res.string.onboarding_step_counter,stepNumber,totalSteps),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(when(step){OnboardingStep.WELCOME,OnboardingStep.API_CREDENTIALS->"Connection";OnboardingStep.PHONE,OnboardingStep.CODE,OnboardingStep.EMAIL_ADDRESS,OnboardingStep.EMAIL_CODE,OnboardingStep.PASSWORD->"Account";else->"Your library"},style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
         androidx.compose.material3.LinearProgressIndicator(progress={stepNumber.toFloat()/totalSteps},modifier=Modifier.fillMaxWidth().height(3.dp),color=MaterialTheme.colorScheme.primary,trackColor=MaterialTheme.colorScheme.surface)
     }
@@ -575,7 +575,7 @@ private fun CredentialsStep(
         title = stringResource(Res.string.onboarding_api_access),
         description = stringResource(Res.string.onboarding_one_time_setup_keys)
     ) {
-        FilledTonalButton(
+        TextButton(
             onClick = { showGuide = true },
             shape = RoundedCornerShape(18.dp)
         ) {
@@ -1532,7 +1532,7 @@ private fun ErrorAndAction(
 }
 
 private val EmphasizedEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
-private const val STEP_SLIDE_MS = 240
+private const val STEP_SLIDE_MS = 360
 
 private val PAGE_PADDING = 24.dp
 private val PAGE_VERTICAL_PADDING = 24.dp

@@ -32,7 +32,12 @@ fun LoadingState(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        LoadingIndicator(modifier = Modifier.size(56.dp))
+        app.tgdrive.ui.SkeletonScene {
+            Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                app.tgdrive.ui.SkeletonBlock(Modifier.size(48.dp),16.dp)
+                app.tgdrive.ui.SkeletonBlock(Modifier.size(width=120.dp,height=12.dp))
+            }
+        }
     }
 }
 

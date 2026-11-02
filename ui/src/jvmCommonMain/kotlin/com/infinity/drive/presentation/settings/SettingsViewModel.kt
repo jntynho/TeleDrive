@@ -92,6 +92,7 @@ class SettingsViewModel(
     private val updateChecker: UpdateChecker
 ) : ViewModel() {
 
+    val authorization = telegramAuthRepository.authState
     private val user = MutableStateFlow<TelegramUser?>(null)
 
     private val _updateState = MutableStateFlow<UpdateState>(UpdateState.Idle)

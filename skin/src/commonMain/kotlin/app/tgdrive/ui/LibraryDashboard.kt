@@ -54,10 +54,13 @@ fun LibraryDashboard(usage:LibraryOverview,onAdd:()->Unit,showAddAction:Boolean=
         colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)) {
         Box(Modifier.fillMaxWidth().heightIn(min=if(shortcuts.isEmpty())0.dp else 224.dp)) {
             val front=Modifier.fillMaxWidth().graphicsLayer{alpha=opacity}
-                .clickable(enabled=!collections&&!loading){details=true}
-                .then(if(collections)Modifier.clearAndSetSemantics{}else Modifier.semantics{contentDescription="About library storage"})
+
+                .then(if(collections)Modifier.clearAndSetSemantics{}else Modifier)
             Column(front.padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                Text("Your library",Modifier.padding(end=if(shortcuts.isEmpty())0.dp else 40.dp).skeleton(loading),style=MaterialTheme.typography.titleMedium)
+                Row(Modifier.padding(end=if(shortcuts.isEmpty())0.dp else 40.dp),verticalAlignment=Alignment.CenterVertically){
+                    Text("Your library",Modifier.weight(1f).skeleton(loading),style=MaterialTheme.typography.titleMedium)
+                    IconButton(onClick={details=true},enabled=!collections&&!loading,modifier=Modifier.size(48.dp)){Icon(DriveIcons.Info,"About library storage",Modifier.size(20.dp).skeleton(loading))}
+                }
                 Column(verticalArrangement=Arrangement.spacedBy(2.dp)) {
                     Text(if(loading)"42.8 GB"else formatBytes(usage.bytes),Modifier.skeleton(loading),style=MaterialTheme.typography.displaySmall,maxLines=1)
                     Text(if(loading)"1,284 files"else "${usage.count} files",Modifier.skeleton(loading),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)

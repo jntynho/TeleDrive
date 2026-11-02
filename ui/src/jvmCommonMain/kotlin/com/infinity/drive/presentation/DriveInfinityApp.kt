@@ -101,6 +101,7 @@ import com.infinity.drive.presentation.navigation.navigateOnce
 import com.infinity.drive.presentation.theme.DriveInfinityTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
 import com.infinity.drive.presentation.components.UpdateDialog
@@ -225,6 +226,14 @@ private fun MainScaffold(
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
+    var requestedTab by remember { mutableStateOf<TopLevelDestination?>(null) }
+    LaunchedEffect(requestedTab,backStackEntry) {
+        val target=requestedTab ?: return@LaunchedEffect
+        val entry=backStackEntry ?: return@LaunchedEffect
+        entry.lifecycle.currentStateFlow.first { it.isAtLeast(Lifecycle.State.RESUMED) }
+        if(navController.currentDestination?.hasRoute(target.route::class)!=true)navigateTopLevel(navController,target)
+        requestedTab=null
+    }
 
     val isTopLevel = TopLevelDestination.entries.any { destination -> currentDestination?.hasRoute(destination.route::class)==true }
     val showChrome=onboardingComplete&&currentDestination!=null&&
@@ -306,7 +315,7 @@ private fun MainScaffold(
                         currentDestination?.hasRoute(destination.route::class) == true
                     NavigationRailItem(
                         selected = selected,
-                        onClick = { if (!selected) navigateTopLevel(navController, destination) },
+                        onClick = { if (!selected) requestedTab=destination },
                         icon = {
                             Icon(
                                 if (selected) destination.selectedIcon else destination.icon,
@@ -355,7 +364,7 @@ private fun MainScaffold(
             ) {
                 androidx.compose.foundation.layout.Column(Modifier.onSizeChanged{bottomChromeHeight=with(chromeDensity){(it.height-systemBottom).coerceAtLeast(0).toDp()}}) {
                     com.infinity.drive.presentation.audio.LibraryAudioMiniPlayer()
-                    FloatingNavigationBar(selectedIndex=selectedNavIndex,onNavigate={navigateTopLevel(navController,it)})
+                    FloatingNavigationBar(selectedIndex=selectedNavIndex,onNavigate={requestedTab=it})
                 }
             }
         }
@@ -384,7 +393,8 @@ private fun navigateTopLevel(
     destination: TopLevelDestination
 ) {
     navController.navigateOnce(destination.route) {
-        popUpTo(Route.Home) { inclusive = destination.route == Route.Home }
+        popUpTo(Route.Home) { saveState = true }
+        restoreState = true
         launchSingleTop = true
     }
 }

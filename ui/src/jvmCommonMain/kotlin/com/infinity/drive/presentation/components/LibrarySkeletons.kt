@@ -26,7 +26,6 @@ fun HomeSkeleton(modifier:Modifier=Modifier,bottomPadding:androidx.compose.ui.un
 @Composable
 fun AudioSkeleton(modifier:Modifier=Modifier,bottomPadding:androidx.compose.ui.unit.Dp=0.dp){
     SkeletonScene(modifier){LazyColumn(contentPadding=PaddingValues(start=16.dp,end=16.dp,top=8.dp,bottom=bottomPadding+20.dp)){
-        item{AudioListHeading(loading=true)}
         items(10){AudioLibraryRow(null)}
     }}
 }
@@ -39,7 +38,7 @@ fun GallerySkeleton(columns:Int,modifier:Modifier=Modifier,bottomPadding:android
         val tileHeight=tileWidth/LibraryLayout.GalleryAspect
         val rows=ceil((maxHeight/tileHeight).toDouble()).toInt().coerceIn(2,12)
         LazyVerticalGrid(columns=GridCells.Fixed(count),contentPadding=PaddingValues(top=LibraryLayout.GalleryTop,bottom=bottomPadding+12.dp),horizontalArrangement=Arrangement.spacedBy(LibraryLayout.GalleryGutter),verticalArrangement=Arrangement.spacedBy(LibraryLayout.GalleryGutter)){
-            item(span={GridItemSpan(maxLineSpan)}){Text("Today",Modifier.wrapContentWidth(androidx.compose.ui.Alignment.Start).padding(top=12.dp,bottom=4.dp).skeleton(),style=MaterialTheme.typography.titleSmall)}
+            item(span={GridItemSpan(maxLineSpan)}){Text("Today",Modifier.wrapContentWidth(androidx.compose.ui.Alignment.Start).padding(start=16.dp,top=12.dp,bottom=8.dp).skeleton(),style=MaterialTheme.typography.titleSmall)}
             items(count*rows){SkeletonBlock(Modifier.fillMaxWidth().aspectRatio(LibraryLayout.GalleryAspect),0.dp)}
         }
     }}
@@ -59,7 +58,7 @@ private fun GalleryListSkeleton(modifier:Modifier,bottomPadding:androidx.compose
     }
     SkeletonScene(modifier){
         LazyColumn(contentPadding=PaddingValues(start=8.dp,end=8.dp,top=8.dp,bottom=bottomPadding+8.dp)){
-            item{Text("Today",Modifier.wrapContentWidth(androidx.compose.ui.Alignment.Start).padding(top=12.dp,bottom=4.dp).skeleton(),style=MaterialTheme.typography.titleSmall)}
+            item{Text("Today",Modifier.wrapContentWidth(androidx.compose.ui.Alignment.Start).padding(start=16.dp,top=12.dp,bottom=8.dp).skeleton(),style=MaterialTheme.typography.titleSmall)}
             items(12){FileListItem(placeholder,false,false,{},{},loading=true)}
         }
     }

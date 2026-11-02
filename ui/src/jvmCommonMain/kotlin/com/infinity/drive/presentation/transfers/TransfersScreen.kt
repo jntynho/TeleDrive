@@ -36,7 +36,7 @@ import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.infinity.drive.presentation.components.PageHeader
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -143,7 +143,7 @@ fun TransfersScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            PageHeader(
                 colors = liftedTopAppBarColors(lifted),
                 title = { Text("Activity") },
                 navigationIcon = {
@@ -226,8 +226,8 @@ fun TransfersScreen(
                             }
                         }
                     }
-                    val active=state.activeTotal+state.pausedTotal
-                    if(active>0)Text("$active active",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    val active=state.activeTotal
+                    if(active>0||state.pausedTotal>0)Text(listOfNotNull(if(active>0)"$active active"else null,if(state.pausedTotal>0)"${state.pausedTotal} paused"else null).joinToString(" · "),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             if(filter=="All transfers"||filter=="Active") section("active", activeTitle, state.active, state.activeTotal,visibleTaskIds) { transfer ->
