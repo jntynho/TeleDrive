@@ -221,9 +221,14 @@ fun PreviewScreen(
     val view = LocalView.current
     val activity = LocalActivity.current
 
+    val originalBarAppearance=remember(activity,view){
+        activity?.window?.let{window->WindowInsetsControllerCompat(window,view).let{it.isAppearanceLightStatusBars to it.isAppearanceLightNavigationBars}}
+    }
     LaunchedEffect(chromeShown, activity) {
         val window = activity?.window ?: return@LaunchedEffect
         val controller = WindowInsetsControllerCompat(window, view)
+        controller.isAppearanceLightStatusBars=false
+        controller.isAppearanceLightNavigationBars=false
         controller.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         if (chromeShown) controller.show(WindowInsetsCompat.Type.systemBars())
@@ -233,8 +238,10 @@ fun PreviewScreen(
     DisposableEffect(activity) {
         onDispose {
             val window = activity?.window ?: return@onDispose
-            WindowInsetsControllerCompat(window, view)
-                .show(WindowInsetsCompat.Type.systemBars())
+            WindowInsetsControllerCompat(window, view).apply{
+                originalBarAppearance?.let{isAppearanceLightStatusBars=it.first;isAppearanceLightNavigationBars=it.second}
+                show(WindowInsetsCompat.Type.systemBars())
+            }
         }
     }
 
@@ -270,7 +277,7 @@ fun PreviewScreen(
                     onPreferredAudioLanguage = viewModel::setPreferredAudioLanguage,
                     onPreferredSubtitleLanguage = viewModel::setPreferredSubtitleLanguage,
                     onToggleChrome = { if(!imageZoomed)chromeVisible = !chromeVisible },
-                    onImageZoomChanged={zoomed->if(pagerState.currentPage==page){imageZoomed=zoomed;if(zoomed)chromeVisible=false}},
+                    onImageZoomChanged={zoomed->if(pagerState.currentPage==page){imageZoomed=zoomed;chromeVisible=!zoomed}},
                     onChromeRequested = { visible -> chromeVisible = visible }
                 )
             }

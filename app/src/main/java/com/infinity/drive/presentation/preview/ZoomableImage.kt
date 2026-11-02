@@ -44,7 +44,9 @@ fun ZoomableImage(model:Any,contentDescription:String?,modifier:Modifier=Modifie
     fun clamp(position:Offset,zoom:Float):Offset=clampImagePan(position,zoom,viewport,imageSize)
     LaunchedEffect(model){snapshotFlow{scale>1.01f}.distinctUntilChanged().collect{zoomChanged(it)}}
     DisposableEffect(model){onDispose{animation?.cancel();zoomChanged(false)}}
-    if(failed){EmptyState(DriveIcons.BrokenImage,stringResource(Res.string.preview_image_undecodable),modifier=modifier);return}
+    if(failed){
+        LaunchedEffect(model){animation?.cancel();scale=1f;offset=Offset.Zero;zoomChanged(false)}
+        EmptyState(DriveIcons.BrokenImage,stringResource(Res.string.preview_image_undecodable),modifier=modifier);return}
     Box(modifier.fillMaxSize().clipToBounds().onSizeChanged{viewport=it;offset=clamp(offset,scale)}
         .pointerInput(model){detectTapGestures(onTap={tap()},onDoubleTap={point->
             animation?.cancel()

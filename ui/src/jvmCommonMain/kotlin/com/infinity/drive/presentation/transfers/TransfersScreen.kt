@@ -211,6 +211,8 @@ fun TransfersScreen(
             contentPadding = padding.add(horizontal = 16.dp, top = 16.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
+            // Independent database flows can briefly report the same task in two sections.
+            val visibleTaskIds=mutableSetOf<String>()
             item(key="filter") {
                 Row(Modifier.fillMaxWidth().padding(bottom=14.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
                     Box {
@@ -228,7 +230,7 @@ fun TransfersScreen(
                     if(active>0)Text("$active active",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            if(filter=="All transfers"||filter=="Active") section("active", activeTitle, state.active, state.activeTotal) { transfer ->
+            if(filter=="All transfers"||filter=="Active") section("active", activeTitle, state.active, state.activeTotal,visibleTaskIds) { transfer ->
                 TransferRow(
                     transfer = transfer,
                     primaryIcon = DriveIcons.Pause,
@@ -237,7 +239,7 @@ fun TransfersScreen(
                     onCancel = { viewModel.cancel(transfer.id) }
                 )
             }
-            if(filter=="All transfers"||filter=="Active") section("paused", pausedTitle, state.paused, state.pausedTotal) { transfer ->
+            if(filter=="All transfers"||filter=="Active") section("paused", pausedTitle, state.paused, state.pausedTotal,visibleTaskIds) { transfer ->
                 TransferRow(
                     transfer = transfer,
                     primaryIcon = DriveIcons.PlayArrow,
@@ -246,7 +248,7 @@ fun TransfersScreen(
                     onCancel = { viewModel.cancel(transfer.id) }
                 )
             }
-            if(filter=="All transfers"||filter=="Failed") section("failed", failedTitle, state.failed, state.failedTotal) { transfer ->
+            if(filter=="All transfers"||filter=="Failed") section("failed", failedTitle, state.failed, state.failedTotal,visibleTaskIds) { transfer ->
                 TransferRow(
                     transfer = transfer,
                     primaryIcon = DriveIcons.Refresh,
@@ -255,7 +257,7 @@ fun TransfersScreen(
                     onCancel = { viewModel.cancel(transfer.id) }
                 )
             }
-            if(filter=="All transfers"||filter=="Done") section("finished", finishedTitle, state.completed, state.completedTotal) { transfer ->
+            if(filter=="All transfers"||filter=="Done") section("finished", finishedTitle, state.completed, state.completedTotal,visibleTaskIds) { transfer ->
                 TransferRow(transfer = transfer)
             }
         }
@@ -267,9 +269,11 @@ private fun LazyListScope.section(
     title: String,
     transfers: List<TransferTask>,
     total: Int,
+    seen:MutableSet<String>,
     content: @Composable (TransferTask) -> Unit
 ) {
-    if (transfers.isEmpty()) return
+    val visible=transfers.filter{seen.add(it.id)}
+    if (visible.isEmpty()) return
     item(key = "header-$sectionKey") {
         Row(
             modifier = Modifier
@@ -281,12 +285,12 @@ private fun LazyListScope.section(
 
         }
     }
-    itemsIndexed(transfers,key={_,transfer->"transfer-${transfer.id}"}) { index,transfer ->
+    itemsIndexed(visible,key={_,transfer->"transfer-${transfer.id}"}) { index,transfer ->
         val top=if(index==0)24.dp else 0.dp
-        val bottom=if(index==transfers.lastIndex)24.dp else 0.dp
+        val bottom=if(index==visible.lastIndex)24.dp else 0.dp
         Column(Modifier.animateItem(fadeInSpec=androidx.compose.animation.core.tween(160),placementSpec=androidx.compose.animation.core.spring(dampingRatio=1f,stiffness=500f),fadeOutSpec=androidx.compose.animation.core.tween(120)).fillMaxWidth().clip(RoundedCornerShape(topStart=top,topEnd=top,bottomStart=bottom,bottomEnd=bottom)).background(MaterialTheme.colorScheme.surfaceContainer)) {
             content(transfer)
-            if(index!=transfers.lastIndex)HorizontalDivider(Modifier.padding(start=72.dp,end=16.dp),color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.35f))
+            if(index!=visible.lastIndex)HorizontalDivider(Modifier.padding(start=72.dp,end=16.dp),color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.35f))
         }
     }
     val hidden = total - transfers.size
