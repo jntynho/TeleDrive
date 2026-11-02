@@ -52,6 +52,7 @@ fun FileGridItem(
         Box {
             FileThumbnail(
                 file = file,
+                galleryTile=galleryTile,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(if(galleryTile)4f/5f else 1f)
@@ -67,7 +68,7 @@ fun FileGridItem(
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
-            if (file.backupState != BackupState.BACKED_UP) {
+            if (!galleryTile && file.backupState != BackupState.BACKED_UP) {
                 BackupStateBadge(
                     file = file,
                     modifier = Modifier

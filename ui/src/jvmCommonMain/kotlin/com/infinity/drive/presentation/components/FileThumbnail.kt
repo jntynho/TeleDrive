@@ -24,6 +24,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import coil3.compose.LocalPlatformContext
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.infinity.drive.core.files.MimeTypes
 import com.infinity.drive.core.media.ThumbnailModel
 import com.infinity.drive.domain.model.DriveFile
@@ -40,15 +43,18 @@ import com.infinity.drive.presentation.common.Formatters
 fun FileThumbnail(
     file: DriveFile,
     modifier: Modifier = Modifier,
-    contentScale: ContentScale = ContentScale.Crop
+    contentScale: ContentScale = ContentScale.Crop,
+    galleryTile:Boolean=false
 ) {
     // Text can carry one too: a note holding a link previews as that link.
     val supportsThumbnail = file.category == FileCategory.IMAGE ||
             file.category == FileCategory.VIDEO || file.category == FileCategory.AUDIO ||
             MimeTypes.isText(file.mimeType) ||
             MimeTypes.isApk(file.mimeType, file.name)
-    var failed by remember(file.id) { mutableStateOf(false) }
+    var failed by remember(file.id,file.localPath,file.remoteFileId,file.modifiedAt) { mutableStateOf(false) }
 
+    val context=LocalPlatformContext.current
+    val imageRequest=remember(context,file.id,file.modifiedAt,file.localPath){ImageRequest.Builder(context).data(ThumbnailModel(file.id)).crossfade(160).build()}
     BoxWithConstraints(
         modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh),
         contentAlignment = Alignment.Center
@@ -59,7 +65,7 @@ fun FileThumbnail(
 
         if (supportsThumbnail && (file.hasLocalCopy || file.hasRemoteCopy) && !failed) {
             AsyncImage(
-                model = ThumbnailModel(file.id),
+                model = imageRequest,
                 contentDescription = file.name,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = contentScale,
@@ -75,7 +81,7 @@ fun FileThumbnail(
         }
 
         if (file.category == FileCategory.VIDEO) {
-            Box(
+            if(!galleryTile)Box(
                 modifier = Modifier
                     .size(badgeSize)
                     .background(color = SCRIM, shape = CircleShape),

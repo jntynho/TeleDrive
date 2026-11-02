@@ -66,6 +66,7 @@ object FileQueryBuilder {
         }
         if (spec.backedUpOnly) where.append(" AND backupState = 'BACKED_UP'")
         if (spec.notBackedUpOnly) where.append(" AND backupState != 'BACKED_UP'")
+        if (spec.localCopiesOnly) where.append(" AND localPath IS NOT NULL")
         if (spec.favoritesOnly) where.append(" AND isFavorite = 1")
         if (spec.hiddenOnly) where.append(" AND isHidden = 1")
         if (spec.archivedOnly) where.append(" AND isArchived = 1")

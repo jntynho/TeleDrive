@@ -2,6 +2,13 @@
 package com.infinity.drive.presentation.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.graphics.Color
+import kotlinx.coroutines.delay
+
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.runtime.*
@@ -21,15 +28,25 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.infinity.drive.presentation.components.GroupedList
 import com.infinity.drive.presentation.components.GroupedListScope
 
+val LocalSettingsSearchTarget = staticCompositionLocalOf<String?> { null }
+
+@Composable
+private fun Modifier.searchTarget(title:String):Modifier {
+    val target=LocalSettingsSearchTarget.current
+    val requester=remember{BringIntoViewRequester()}
+    LaunchedEffect(title,target){if(title==target){delay(320);requester.bringIntoView()}}
+    return this.bringIntoViewRequester(requester).background(if(title==target)MaterialTheme.colorScheme.primary.copy(alpha=.10f)else Color.Transparent)
+}
+
+
 @Composable
 fun SettingsGroup(content: GroupedListScope.() -> Unit) {
-    GroupedList(horizontalPadding = 16.dp, content = content)
+    GroupedList(horizontalPadding = 16.dp, connected=true, content = content)
 }
 
 @Composable
@@ -37,8 +54,8 @@ fun SettingsSectionTitle(title: String) {
     Text(
         text = title,
         style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 4.dp)
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 20.dp, top = 24.dp, bottom = 8.dp)
     )
 }
 
@@ -53,7 +70,7 @@ fun SettingsSwitchRow(
 ) {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxWidth().heightIn(min=56.dp).searchTarget(title)
             .toggleable(value=checked,enabled=enabled,role=Role.Switch,onValueChange=onChange)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -85,7 +102,7 @@ fun SettingsClickRow(
 ) {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxWidth().heightIn(min=56.dp).searchTarget(title)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -118,7 +135,7 @@ private fun RowIcon(icon: ImageVector?) {
     Icon(
         imageVector = icon,
         contentDescription = null,
-        tint = MaterialTheme.colorScheme.primary,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.size(ROW_ICON_SIZE)
     )
     Spacer(Modifier.width(16.dp))
@@ -134,7 +151,7 @@ fun SettingsSliderRow(
 ) {
     Column(
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxWidth().searchTarget(title)
             .padding(horizontal = 16.dp, vertical = 6.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

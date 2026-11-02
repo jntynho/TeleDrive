@@ -1,140 +1,89 @@
-// Modified for TG Drive: Android integration, safety fixes and visual adaptation; see third_party/driveinfinity/SOURCE.md.
+// Modified for TG Drive; see third_party/driveinfinity/SOURCE.md.
 package com.infinity.drive.presentation.settings
 
-import app.tgdrive.ui.DriveIcons
-import app.tgdrive.ui.LibrarySearchField
+import app.tgdrive.ui.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import org.jetbrains.compose.resources.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.infinity.drive.resources.Res
-import com.infinity.drive.resources.common_back
-import com.infinity.drive.resources.settings
-import com.infinity.drive.presentation.platform.LocalPlatformCapabilities
-import com.infinity.drive.presentation.components.liftedTopAppBarColors
-import com.infinity.drive.presentation.components.rememberToolbarLift
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.infinity.drive.core.telegram.TelegramConnectionState
+import com.infinity.drive.presentation.components.EmptyState
 import com.infinity.drive.presentation.navigation.LocalBottomBarInset
+import com.infinity.drive.presentation.platform.LocalPlatformCapabilities
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(
-    onBack: (() -> Unit)?,
-    onOpenSection: (SettingsSectionType) -> Unit
-) {
+fun SettingsScreen(onBack:(()->Unit)?,onOpenSection:(SettingsSectionType)->Unit,
+    onOpenActivity:()->Unit={},onOpenSetting:(SettingsSectionType,String)->Unit={s,_->onOpenSection(s)},
+    viewModel:SettingsViewModel=koinViewModel()) {
     var query by rememberSaveable { mutableStateOf("") }
-    val scrollState = rememberScrollState()
-    val lifted by rememberToolbarLift(scrollState)
-
-    Scaffold(
-        topBar = { Column {
-            TopAppBar(
-                colors = liftedTopAppBarColors(lifted),
-                title = { Text(stringResource(Res.string.settings)) },
-                navigationIcon = {
-                    onBack?.let {
-                        IconButton(onClick = it) {
-                            Icon(
-                                DriveIcons.ArrowBack,
-                                contentDescription = stringResource(Res.string.common_back)
-                            )
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val capabilities=LocalPlatformCapabilities.current
+    val hidden=buildSet {
+        if(!capabilities.supportsAutoBackup)add(SettingsSectionType.BACKUP)
+        if(!capabilities.requiresPermissions)add(SettingsSectionType.PERMISSIONS)
+    }
+    val groups=listOf(
+        "Storage & sync" to listOf(SettingsSectionType.BACKUP,SettingsSectionType.STORAGE),
+        "Preferences" to listOf(SettingsSectionType.SECURITY,SettingsSectionType.APPEARANCE,SettingsSectionType.PLAYBACK),
+        "App" to listOf(SettingsSectionType.NOTIFICATIONS,SettingsSectionType.PERMISSIONS,SettingsSectionType.ADVANCED,SettingsSectionType.ABOUT)
+    )
+    val sections=SettingsSectionType.entries.filterNot{it in hidden}
+    val indexed=settingsSearchEntries().filterNot{it.section in hidden}
+    val results=indexed.map { Triple(it,stringResource(it.title),stringResource(it.section.titleRes)) }
+        .filter{ (_,title,parent)->"$title $parent".contains(query.trim(),true) }
+    Scaffold(topBar={Column {
+        LibraryHeader("Settings",navigationIcon={if(onBack!=null)IconButton(onBack){Icon(DriveIcons.ArrowBack,"Back")}})
+        LibrarySearchField(query,{query=it},"Search settings",Modifier.padding(horizontal=16.dp).padding(bottom=12.dp))
+    }}) { padding ->
+        if(query.isNotBlank()&&results.isEmpty()&&sections.none{stringResource(it.titleRes).contains(query.trim(),true)}) {
+            EmptyState(DriveIcons.Search,"No settings found","Try a setting name, such as cache, backup or playback.",Modifier.padding(padding),"Clear search",{query=""})
+        } else Column(Modifier.fillMaxSize().padding(top=padding.calculateTopPadding()).verticalScroll(rememberScrollState())) {
+            if(query.isBlank()) {
+                Card(onClick={onOpenSection(SettingsSectionType.ACCOUNT)},modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp),shape=DriveStyle.CardShape,colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)) {
+                    Row(Modifier.padding(18.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
+                        Icon(DriveIcons.AccountCircle,null,Modifier.size(36.dp),tint=MaterialTheme.colorScheme.primary)
+                        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                            Text(state.user?.let{listOf(it.firstName,it.lastName).filter(String::isNotBlank).joinToString(" ")}?.takeIf(String::isNotBlank)?:"Telegram account",style=MaterialTheme.typography.titleMedium)
+                            val connection=when(state.connection){TelegramConnectionState.READY->"Connected";TelegramConnectionState.CONNECTING->"Connecting";TelegramConnectionState.UPDATING->"Syncing";else->"Waiting for network"}
+                            Text(connection+if(state.preferences.storageChatId!=null)" · Private drive"else" · Set up your drive",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                         }
+                        Icon(DriveIcons.KeyboardArrowRight,null,tint=MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-            )
-            LibrarySearchField(query,{query=it},"Search settings",Modifier.padding(horizontal=16.dp).padding(bottom=12.dp))
-        } }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = padding.calculateTopPadding())
-                .verticalScroll(scrollState)
-        ) {
-            Spacer(Modifier.height(8.dp))
-            val capabilities = LocalPlatformCapabilities.current
-            val hiddenSections = buildSet {
-                if (!capabilities.supportsAutoBackup) add(SettingsSectionType.BACKUP)
-                if (!capabilities.requiresPermissions) add(SettingsSectionType.PERMISSIONS)
-            }
-            val visible=SettingsSectionType.entries.filterNot { it in hiddenSections }.map { it to (stringResource(it.titleRes)+" "+stringResource(it.subtitleRes)) }.filter { query.isBlank()||it.second.contains(query.trim(),true) }.map { it.first }
-            SettingsGroup {
-                visible.forEach { section ->
-                    add { SectionRow(section = section, onClick = { onOpenSection(section) }) }
+                groups.forEachIndexed { index,(title,items) ->
+                    SettingsSectionTitle(title.uppercase())
+                    SettingsGroup {
+                        if(index==0)add{SettingsClickRow("Activity",onOpenActivity,icon=DriveIcons.SwapVert,trailing={Icon(DriveIcons.KeyboardArrowRight,null)})}
+                        items.filterNot{it in hidden}.forEach { section->add{SectionRow(section){onOpenSection(section)}} }
+                    }
+                }
+            } else {
+                val matchingSections=sections.filter{stringResource(it.titleRes).contains(query.trim(),true)}
+                if(matchingSections.isNotEmpty()) {
+                    SettingsSectionTitle("SECTIONS")
+                    SettingsGroup{matchingSections.forEach{section->add{SectionRow(section){onOpenSection(section)}}}}
+                }
+                if(results.isNotEmpty()) {
+                    SettingsSectionTitle("SETTINGS")
+                    SettingsGroup{results.forEach{(entry,title,parent)->add{SettingsClickRow(title,{onOpenSetting(entry.section,title)},subtitle="Settings › $parent",icon=entry.section.icon,trailing={Icon(DriveIcons.KeyboardArrowRight,null)})}}}
                 }
             }
-            Spacer(
-                Modifier.height(
-                    24.dp + padding.calculateBottomPadding() + LocalBottomBarInset.current
-                )
-            )
+            Spacer(Modifier.height(24.dp+padding.calculateBottomPadding()+LocalBottomBarInset.current))
         }
     }
 }
 
 @Composable
-private fun SectionRow(section: SettingsSectionType, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .background(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = CircleShape
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = section.icon,
-                contentDescription = null,
-                modifier = Modifier.size(22.dp),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-        }
-        Spacer(Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(stringResource(section.titleRes), style = MaterialTheme.typography.bodyLarge)
-            Text(
-                text = stringResource(section.subtitleRes),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Icon(
-            imageVector = DriveIcons.KeyboardArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
+private fun SectionRow(section:SettingsSectionType,onClick:()->Unit) {
+    SettingsClickRow(stringResource(section.titleRes),onClick,icon=section.icon,trailing={Icon(DriveIcons.KeyboardArrowRight,null,tint=MaterialTheme.colorScheme.onSurfaceVariant)})
 }

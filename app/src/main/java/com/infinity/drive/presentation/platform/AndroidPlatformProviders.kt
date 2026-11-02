@@ -45,12 +45,18 @@ import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import java.io.File
 
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun ProvidePlatformActions(content: @Composable () -> Unit) {
     val capabilities = koinInject<PlatformCapabilities>()
     val settingsRepository = koinInject<SettingsRepository>()
     val context = LocalContext.current
     val activity = LocalActivity.current
+    val resolver=koinInject<com.infinity.drive.presentation.preview.PreviewContentResolver>()
+    val sources=koinInject<com.infinity.drive.core.media.TelegramDataSourceFactory>()
+    val files=koinInject<com.infinity.drive.domain.repository.FileRepository>()
+    val audio=remember(context,resolver,sources,files){com.infinity.drive.presentation.audio.AndroidAudioPlayback(context,resolver,sources,files)}
+    androidx.compose.runtime.DisposableEffect(audio){onDispose{audio.release()}}
 
     val prefs by settingsRepository.preferences.collectAsStateWithLifecycle(UserPreferences())
     val darkTheme = when (prefs.theme) {
@@ -58,6 +64,17 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
         AppTheme.DARK, AppTheme.AMOLED -> true
         AppTheme.SYSTEM -> isSystemInDarkTheme()
     }
+
+    val lifecycleOwner=androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val backgroundAllowed by androidx.compose.runtime.rememberUpdatedState(prefs.backgroundPlayback)
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner,audio){
+        val observer=androidx.lifecycle.LifecycleEventObserver{_,event->
+            if(event==androidx.lifecycle.Lifecycle.Event.ON_STOP&&!backgroundAllowed)audio.pause()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose{lifecycleOwner.lifecycle.removeObserver(observer)}
+    }
+    androidx.compose.runtime.LaunchedEffect(prefs.storageChatId,prefs.onboardingComplete){audio.stop()}
 
     val urlOpener = remember(context) { UrlOpener { url -> openLink(context, url) } }
     val telegramLinkOpener = remember(context) { AndroidTelegramLinkOpener(context) }
@@ -206,6 +223,7 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
     }
 
     CompositionLocalProvider(
+        LocalAudioPlayback provides audio,
         LocalAppIcon provides appIcon,
         LocalStandardFolders provides standardFolders,
         LocalUrlOpener provides urlOpener,

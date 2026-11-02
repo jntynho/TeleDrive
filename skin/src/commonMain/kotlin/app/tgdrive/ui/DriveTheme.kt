@@ -12,10 +12,10 @@ import androidx.compose.ui.unit.sp
 
 /** Native, asset-free styling based on the supplied Muse Android screenshots. */
 object DriveStyle {
-    val Canvas = Color(0xFF1E1E1E)
-    val SignInCanvas = Color(0xFF050505)
-    val Card = Color(0xFF333536)
-    val Blue = Color(0xFF73B2FF)
+    val Canvas = Color(0xFF111314)
+    val SignInCanvas = Color(0xFF111314)
+    val Card = Color(0xFF222527)
+    val Blue = Color(0xFF64B5FF)
     val ActionBlue = Color(0xFF0068D9)
     val ChartBlue = Color(0xFF0087FF)
     val Success = Color(0xFF69D994)
@@ -45,7 +45,7 @@ val DriveColors = darkColorScheme(
     surfaceContainerLow = Color(0xFF2B2D2F), surfaceContainer = DriveStyle.Card,
     surfaceContainerHigh = Color(0xFF393B3D), surfaceContainerHighest = Color(0xFF414345),
     surfaceTint = Color.Transparent,
-    outline = Color(0xFF777B7E), outlineVariant = Color(0xFF484A4C),
+    outline = Color(0xFF777B7E), outlineVariant = Color(0xFF35393C),
     error = Color(0xFFFFB4AB), onError = Color(0xFF690005),
     errorContainer = Color(0xFF59312E), onErrorContainer = Color(0xFFFFDAD6),
     inverseSurface = Color(0xFFF0F0F0), inverseOnSurface = Color(0xFF202020),

@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -56,6 +57,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -271,6 +274,14 @@ private fun MainScaffold(
         onDestinationHandled()
     }
 
+    val audioPlayer=com.infinity.drive.presentation.platform.LocalAudioPlayback.current
+    var bottomChromeHeight by remember { mutableStateOf(BottomBarHeight) }
+    val chromeDensity=androidx.compose.ui.platform.LocalDensity.current
+    val systemBottom=WindowInsets.navigationBars.getBottom(chromeDensity)
+    LaunchedEffect(currentDestination){
+        if(currentDestination?.hasRoute(Route.Preview::class)==true||!showChrome)audioPlayer.pause()
+    }
+
     if (useRail && showChrome) {
         Row(
             modifier = Modifier
@@ -294,14 +305,11 @@ private fun MainScaffold(
                     )
                 }
             }
-            AppNavHost(
-                navController = navController,
-                startDestination = startDestination,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .consumeWindowInsets(WindowInsets.systemBars.only(WindowInsetsSides.Start)),
-                verticalTabMotion = true
-            )
+            androidx.compose.foundation.layout.Column(Modifier.weight(1f).fillMaxSize()) {
+                AppNavHost(navController=navController,startDestination=startDestination,
+                    modifier=Modifier.weight(1f).fillMaxSize().consumeWindowInsets(WindowInsets.systemBars.only(WindowInsetsSides.Start)),verticalTabMotion=true)
+                com.infinity.drive.presentation.audio.LibraryAudioMiniPlayer()
+            }
         }
     } else {
         Box(
@@ -310,12 +318,12 @@ private fun MainScaffold(
                 .background(MaterialTheme.colorScheme.background)
         ) {
             CompositionLocalProvider(
-                LocalBottomBarHeight provides BottomBarHeight
+                LocalBottomBarHeight provides bottomChromeHeight
             ) {
                 AppNavHost(
                     navController = navController,
                     startDestination = startDestination,
-                    modifier = Modifier.fillMaxSize().padding(bottom=if(showChrome&&!isTopLevel&&!keyboardVisible)BottomBarHeight else 0.dp)
+                    modifier = Modifier.fillMaxSize().padding(bottom=if(showChrome&&!isTopLevel&&!keyboardVisible)bottomChromeHeight else 0.dp)
                 )
             }
             val topLevelIndex = TopLevelDestination.entries.indexOfFirst { destination ->
@@ -333,10 +341,10 @@ private fun MainScaffold(
                         fadeOut(tween(BAR_SLIDE_MS)),
                 modifier = Modifier.align(Alignment.BottomCenter)
             ) {
-                FloatingNavigationBar(
-                    selectedIndex = selectedNavIndex,
-                    onNavigate = { navigateTopLevel(navController, it) }
-                )
+                androidx.compose.foundation.layout.Column(Modifier.onSizeChanged{bottomChromeHeight=with(chromeDensity){(it.height-systemBottom).coerceAtLeast(0).toDp()}}) {
+                    com.infinity.drive.presentation.audio.LibraryAudioMiniPlayer()
+                    FloatingNavigationBar(selectedIndex=selectedNavIndex,onNavigate={navigateTopLevel(navController,it)})
+                }
             }
         }
     }
@@ -347,8 +355,8 @@ private fun MainScaffold(
 private fun FloatingNavigationBar(selectedIndex:Int,onNavigate:(TopLevelDestination)->Unit) {
     androidx.compose.material3.NavigationBar(containerColor=MaterialTheme.colorScheme.background,tonalElevation=0.dp){
         TopLevelDestination.entries.forEachIndexed{index,destination->
-            NavigationBarItem(selected=index==selectedIndex,onClick={onNavigate(destination)},icon={Icon(destination.icon,null)},label={Text(stringResource(destination.labelRes),style=MaterialTheme.typography.labelSmall)},
-                colors=androidx.compose.material3.NavigationBarItemDefaults.colors(selectedIconColor=MaterialTheme.colorScheme.onSurface,selectedTextColor=MaterialTheme.colorScheme.onSurface,indicatorColor=MaterialTheme.colorScheme.surface,unselectedIconColor=MaterialTheme.colorScheme.onSurfaceVariant,unselectedTextColor=MaterialTheme.colorScheme.onSurfaceVariant))
+            NavigationBarItem(modifier=Modifier.testTag("navigation-${destination.name.lowercase()}"),selected=index==selectedIndex,onClick={onNavigate(destination)},icon={Icon(destination.icon,null)},label={Text(stringResource(destination.labelRes),style=MaterialTheme.typography.labelSmall)},
+                colors=androidx.compose.material3.NavigationBarItemDefaults.colors(selectedIconColor=MaterialTheme.colorScheme.primary,selectedTextColor=MaterialTheme.colorScheme.primary,indicatorColor=androidx.compose.ui.graphics.Color.Transparent,unselectedIconColor=MaterialTheme.colorScheme.onSurfaceVariant,unselectedTextColor=MaterialTheme.colorScheme.onSurfaceVariant))
         }
     }
 }

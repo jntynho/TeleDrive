@@ -43,6 +43,9 @@ data class UserPreferences(
     val sortField: FileSortField = FileSortField.NAME,
     val sortDirection: SortDirection = SortDirection.ASCENDING,
 
+    val audioSortField: FileSortField = FileSortField.NAME,
+    val audioSortDirection: SortDirection = SortDirection.ASCENDING,
+
     val backgroundPlayback: Boolean = false,
     val streamBeforeDownload: Boolean = true,
     val preferredAudioLanguage: String = "",

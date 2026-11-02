@@ -69,6 +69,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -77,7 +82,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalUriHandler
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -207,7 +211,7 @@ fun OnboardingScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     if (state.step == OnboardingStep.DONE) {
-        onFinished()
+        LaunchedEffect(Unit) { onFinished() }
         return
     }
 
@@ -464,23 +468,12 @@ private fun StepHeader(step: OnboardingStep, modifier: Modifier = Modifier) {
     )
     val stepNumber = step.displayNumber(counted)
     val totalSteps = counted.size
-    Column(modifier = modifier) {
-        Surface(
-            shape = RoundedCornerShape(100),
-            color = MaterialTheme.colorScheme.secondaryContainer
-        ) {
-            Text(
-                text = stringResource(Res.string.onboarding_step_counter, stepNumber, totalSteps),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-            )
+    Column(modifier = modifier,verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
+            Text("TG Drive",style=MaterialTheme.typography.titleMedium)
+            Text(stringResource(Res.string.onboarding_step_counter,stepNumber,totalSteps),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Spacer(Modifier.height(14.dp))
-        LinearWavyProgressIndicator(
-            progress = { stepNumber.toFloat() / totalSteps },
-            modifier = Modifier.fillMaxWidth()
-        )
+        androidx.compose.material3.LinearProgressIndicator(progress={stepNumber.toFloat()/totalSteps},modifier=Modifier.fillMaxWidth().height(3.dp),color=MaterialTheme.colorScheme.primary,trackColor=MaterialTheme.colorScheme.surface)
     }
 }
 
@@ -514,27 +507,24 @@ private fun OnboardingPage(
 private fun HeroShape(icon: ImageVector?, iconPainter: Painter?) {
     Box(
         modifier = Modifier
-            .size(96.dp)
-            .clip(MaterialShapes.Cookie9Sided.toShape())
-            .background(
-                color = MaterialTheme.colorScheme.primaryContainer,
-                shape = MaterialShapes.Cookie9Sided.toShape()
-            ),
+            .size(64.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surface),
         contentAlignment = Alignment.Center
     ) {
         when {
             iconPainter != null -> Icon(
                 painter = iconPainter,
                 contentDescription = null,
-                modifier = Modifier.size(128.dp),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.primary
             )
 
             icon != null -> Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(44.dp),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                modifier = Modifier.size(30.dp),
+                tint = MaterialTheme.colorScheme.primary
             )
         }
     }
@@ -546,7 +536,7 @@ private fun StepTitle(title: String, description: String) {
     Column {
         Text(
             text = title,
-            style = MaterialTheme.typography.displaySmallEmphasized,
+            style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(Modifier.height(12.dp))
@@ -587,7 +577,7 @@ private fun CredentialsStep(
     ) {
         FilledTonalButton(
             onClick = { showGuide = true },
-            shapes = ButtonDefaults.shapes()
+            shape = RoundedCornerShape(18.dp)
         ) {
             Icon(
                 DriveIcons.HelpOutline,
@@ -600,7 +590,7 @@ private fun CredentialsStep(
         Spacer(Modifier.height(20.dp))
         OnboardingField(
             value = apiId,
-            onChange = { apiId = it },
+            onChange = { apiId = it.filter(Char::isDigit) },
             label = stringResource(Res.string.onboarding_api_id),
             keyboardType = KeyboardType.Number,
             enabled = !working
@@ -608,8 +598,9 @@ private fun CredentialsStep(
         Spacer(Modifier.height(12.dp))
         OnboardingField(
             value = apiHash,
-            onChange = { apiHash = it },
+            onChange = { apiHash = it.trim() },
             label = stringResource(Res.string.onboarding_api_hash),
+            password=true,
             enabled = !working
         )
         ErrorAndAction(
@@ -702,7 +693,7 @@ private fun ApiGuideDialog(onDismiss: () -> Unit) {
                         Spacer(Modifier.height(10.dp))
                         FilledTonalButton(
                             onClick = { uriHandler.openUri("https://my.telegram.org") },
-                            shapes = ButtonDefaults.shapes()
+                            shape = RoundedCornerShape(18.dp)
                         ) {
                             Icon(
                                 DriveIcons.OpenInNew,
@@ -731,7 +722,7 @@ private fun ApiGuideDialog(onDismiss: () -> Unit) {
         confirmButton = {
             Button(
                 onClick = onDismiss,
-                shapes = ButtonDefaults.shapes()
+                shape = RoundedCornerShape(18.dp)
             ) { Text(stringResource(Res.string.onboarding_got)) }
         }
     )
@@ -1034,12 +1025,14 @@ private fun CountryField(
                 }
             },
             singleLine = true,
+            shape=RoundedCornerShape(18.dp),
+            colors=OutlinedTextFieldDefaults.colors(unfocusedContainerColor=MaterialTheme.colorScheme.surface,focusedContainerColor=MaterialTheme.colorScheme.surface,unfocusedBorderColor=androidx.compose.ui.graphics.Color.Transparent),
             modifier = Modifier.fillMaxWidth()
         )
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .clip(OutlinedTextFieldDefaults.shape)
+                .clip(RoundedCornerShape(18.dp))
                 .clickable(enabled = enabled, onClick = onClick)
         )
     }
@@ -1351,7 +1344,7 @@ private fun PermissionsStep(working: Boolean, onResolved: () -> Unit) {
             Spacer(Modifier.height(4.dp))
             OutlinedButton(
                 onClick = onResolved,
-                shapes = ButtonDefaults.shapes(),
+                shape = RoundedCornerShape(18.dp),
                 enabled = !working,
                 modifier = Modifier.fillMaxWidth()
             ) { Text(stringResource(Res.string.onboarding_continue_without)) }
@@ -1426,7 +1419,7 @@ private fun ToggleCard(label: String, checked: Boolean, onChange: (Boolean) -> U
             .padding(vertical = 3.dp)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+            modifier = Modifier.fillMaxWidth().toggleable(checked,role=Role.Switch,onValueChange=onChange).padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -1436,7 +1429,7 @@ private fun ToggleCard(label: String, checked: Boolean, onChange: (Boolean) -> U
                 modifier = Modifier.weight(1f)
             )
             Spacer(Modifier.width(16.dp))
-            Switch(checked = checked, onCheckedChange = onChange)
+            app.tgdrive.ui.DriveSwitch(checked,null)
         }
     }
 }
@@ -1464,7 +1457,13 @@ private fun OnboardingField(
         },
         supportingText = supportingText?.let { { Text(it) } },
         singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType,autoCorrectEnabled=false),
+        shape=RoundedCornerShape(18.dp),
+        colors=androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+            unfocusedContainerColor=MaterialTheme.colorScheme.surface,
+            focusedContainerColor=MaterialTheme.colorScheme.surface,
+            unfocusedBorderColor=androidx.compose.ui.graphics.Color.Transparent
+        ),
         visualTransformation = if (password) {
             PasswordVisualTransformation()
         } else {
@@ -1484,16 +1483,14 @@ private fun BigButton(
 ) {
     Button(
         onClick = onClick,
-        shapes = ButtonDefaults.shapes(),
+        shape = RoundedCornerShape(18.dp),
         enabled = enabled,
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().heightIn(min=52.dp),
+        colors=ButtonDefaults.buttonColors(containerColor=app.tgdrive.ui.DriveStyle.ActionBlue,contentColor=androidx.compose.ui.graphics.Color.White)
     ) {
         if (loading) {
-            LoadingIndicator(
-                color = LocalContentColor.current,
-                modifier = Modifier.size(26.dp)
-            )
+            androidx.compose.material3.CircularProgressIndicator(color=LocalContentColor.current,modifier=Modifier.size(20.dp),strokeWidth=2.dp)
             Spacer(Modifier.size(10.dp))
         }
         Text(label, style = MaterialTheme.typography.titleMedium)
@@ -1520,7 +1517,7 @@ private fun ErrorAndAction(
                     text = it.resolve(),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onErrorContainer,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp).semantics{liveRegion=LiveRegionMode.Polite}
                 )
             }
         }
@@ -1535,9 +1532,9 @@ private fun ErrorAndAction(
 }
 
 private val EmphasizedEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
-private const val STEP_SLIDE_MS = 420
+private const val STEP_SLIDE_MS = 240
 
-private val PAGE_PADDING = 28.dp
+private val PAGE_PADDING = 24.dp
 private val PAGE_VERTICAL_PADDING = 24.dp
 
 private val PREFIX_GAP = 4.dp

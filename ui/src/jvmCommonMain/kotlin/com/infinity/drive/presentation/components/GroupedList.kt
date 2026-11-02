@@ -49,6 +49,7 @@ internal data class GroupedListItem(
 fun GroupedList(
     modifier: Modifier = Modifier,
     horizontalPadding: Dp = 16.dp,
+    connected:Boolean=false,
     content: GroupedListScope.() -> Unit
 ) {
     val items = GroupedListScope().apply(content).items
@@ -67,7 +68,8 @@ fun GroupedList(
             val position = visibleIndices.indexOf(index)
             val shape by animateShapeCorners(
                 isFirst = position == 0,
-                isLast = position >= 0 && position == visibleIndices.lastIndex
+                isLast = position >= 0 && position == visibleIndices.lastIndex,
+                innerCorner=if(connected)0.dp else INNER_CORNER
             )
             AnimatedVisibility(
                 visible = item.visible,
@@ -84,7 +86,8 @@ fun GroupedList(
                     ) {
                         item.content()
                     }
-                    Spacer(Modifier.height(2.dp))
+                    if(connected&&position>=0&&position<visibleIndices.lastIndex)androidx.compose.material3.HorizontalDivider(modifier=Modifier.padding(start=56.dp,end=16.dp),color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.5f))
+                    if(!connected)Spacer(Modifier.height(2.dp))
                 }
             }
         }
@@ -92,14 +95,14 @@ fun GroupedList(
 }
 
 @Composable
-private fun animateShapeCorners(isFirst: Boolean, isLast: Boolean): State<Shape> {
+private fun animateShapeCorners(isFirst: Boolean, isLast: Boolean,innerCorner:Dp=INNER_CORNER): State<Shape> {
     val top by animateDpAsState(
-        targetValue = if (isFirst) OUTER_CORNER else INNER_CORNER,
+        targetValue = if (isFirst) OUTER_CORNER else innerCorner,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "topCorner"
     )
     val bottom by animateDpAsState(
-        targetValue = if (isLast) OUTER_CORNER else INNER_CORNER,
+        targetValue = if (isLast) OUTER_CORNER else innerCorner,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "bottomCorner"
     )

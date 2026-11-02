@@ -199,18 +199,22 @@ fun HomeScreen(
     CollectSnackbarMessages(viewModel.messages, snackbarHostState)
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = Modifier.fillMaxSize(),
         snackbarHost = { BottomBarSnackbarHost(snackbarHostState) },
         topBar = {
             Column {
-                androidx.compose.material3.TopAppBar(title={Text("Home")})
+                app.tgdrive.ui.LibraryHeader("Home",actions={
+                    Button(onAddFiles,shape=androidx.compose.foundation.shape.RoundedCornerShape(16.dp),modifier=Modifier.padding(end=16.dp),colors=ButtonDefaults.buttonColors(containerColor=app.tgdrive.ui.DriveStyle.ActionBlue,contentColor=androidx.compose.ui.graphics.Color.White)){
+                        Icon(DriveIcons.Add,null,Modifier.size(20.dp));Spacer(Modifier.width(6.dp));Text("Upload")
+                    }
+                })
                 androidx.compose.material3.Surface(
                     onClick=onSearch,
                     modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp).padding(bottom=12.dp),
                     shape=app.tgdrive.ui.DriveStyle.PillShape,color=MaterialTheme.colorScheme.surface
                 ) {
                     Row(Modifier.padding(horizontal=18.dp,vertical=16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
-                        Icon(DriveIcons.Search,null);Text("Search your library",color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(DriveIcons.Search,null);Text("Search your files",color=MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -236,20 +240,18 @@ fun HomeScreen(
                     state.storage.filter{it.category==com.infinity.drive.domain.model.FileCategory.AUDIO}.sumOf{it.totalBytes},
                     state.storage.filter{it.category !in setOf(com.infinity.drive.domain.model.FileCategory.IMAGE,com.infinity.drive.domain.model.FileCategory.VIDEO,com.infinity.drive.domain.model.FileCategory.AUDIO)}.sumOf{it.totalBytes}
                 )
-                app.tgdrive.ui.LibraryDashboard(app.tgdrive.ui.LibraryOverview(state.storage.sumOf{it.fileCount},groups.sum(),groups,state.localBytes),onAddFiles)
+                app.tgdrive.ui.LibraryDashboard(app.tgdrive.ui.LibraryOverview(state.storage.sumOf{it.fileCount},groups.sum(),groups,state.localBytes),onAddFiles,showAddAction=false)
             }
             item {
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
                     listOf(Triple("All files",DriveIcons.Folder,onOpenFiles),Triple("Activity",DriveIcons.SwapVert,onOpenTransfers),Triple("Backups",DriveIcons.Backup,onOpenBackupSettings)).forEach{(title,icon,action)->
-                        Card(onClick=action,modifier=Modifier.weight(1f),shape=app.tgdrive.ui.DriveStyle.CardShape,colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)){
-                            Column(Modifier.fillMaxWidth().padding(horizontal=8.dp,vertical=14.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)){
-                                Icon(icon,null,Modifier.size(22.dp));Text(title,style=MaterialTheme.typography.labelMedium)
-                            }
+                        Column(Modifier.weight(1f).clip(MaterialTheme.shapes.small).clickable(onClick=action).padding(vertical=12.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(8.dp)){
+                            Icon(icon,null,Modifier.size(25.dp));Text(title,style=MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
             }
-            if (state.missingPermissions.isNotEmpty()) {
+            if (state.autoBackupEnabled && state.missingPermissions.isNotEmpty()) {
                 item {
                     PermissionWarningCard(
                         missing = state.missingPermissions,
@@ -307,43 +309,30 @@ fun HomeScreen(
                 }
             }
             if (state.showRecentSection && state.recentFiles.isNotEmpty()) {
-                item {
-                    SectionHeader(stringResource(Res.string.home_section_recent))
-                    Spacer(Modifier.height(8.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        items(state.recentFiles, key = { it.id }) { file ->
-                            Column(
-                                modifier = Modifier
-                                    .width(112.dp)
-                                    .clip(MaterialTheme.shapes.large)
-                                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                                    .clickable {
-                                        onOpenFile(
-                                            file.id,
-                                            PreviewSequence(
-                                                sortField = FileSortField.DATE_ADDED,
-                                                sortDirection = SortDirection.DESCENDING
-                                            )
-                                        )
-                                    }
-                                    .padding(6.dp)
-                            ) {
-                                FileThumbnail(
-                                    file = file,
-                                    modifier = Modifier
-                                        .size(100.dp)
-                                        .clip(MaterialTheme.shapes.medium)
-                                )
-                                Spacer(Modifier.height(6.dp))
-                                Text(
-                                    text = file.name,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(horizontal = 2.dp)
-                                )
-                            }
+                item("recent-header") {
+                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
+                        Text("Recent files",Modifier.weight(1f),style=MaterialTheme.typography.titleLarge)
+                        androidx.compose.material3.TextButton(onOpenFiles){Text("See all")}
+                    }
+                }
+                items(state.recentFiles,key={"recent-${it.id}"}) { file ->
+                    Row(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable {
+                        onOpenFile(file.id,PreviewSequence(sortField=FileSortField.DATE_ADDED,sortDirection=SortDirection.DESCENDING))
+                    }.padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                        FileThumbnail(file,Modifier.size(52.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp)))
+                        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)){
+                            Text(file.name,style=MaterialTheme.typography.titleSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
+                            Text("${file.category.name.lowercase().replaceFirstChar{it.uppercase()}} · ${Formatters.bytes(file.sizeBytes)}",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                         }
+                        Icon(DriveIcons.KeyboardArrowRight,null,tint=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.size(18.dp))
+                    }
+                }
+            } else if(state.recentFiles.isEmpty()) {
+                item("empty-library") {
+                    Column(Modifier.fillMaxWidth().padding(vertical=24.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                        Text("A place for everything",style=MaterialTheme.typography.titleLarge)
+                        Text("Upload your first files to see them here.",color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        androidx.compose.material3.TextButton(onAddFiles){Text("Upload files")}
                     }
                 }
             }

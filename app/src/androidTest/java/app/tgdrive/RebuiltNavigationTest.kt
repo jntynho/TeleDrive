@@ -33,15 +33,15 @@ class RebuiltNavigationTest {
         compose.setContent { ProvidePlatformActions { DriveInfinityApp(pending) } }
         compose.waitUntil(15_000) { compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Your library").assertIsDisplayed()
-        compose.onNodeWithText("Gallery").performClick()
+        compose.onNodeWithTag("navigation-gallery").performClick()
         compose.onNodeWithText("Search photos and videos").assertIsDisplayed()
         compose.onNodeWithContentDescription("Sort gallery").performClick()
         compose.onNodeWithText("Size").performClick()
-        compose.onNodeWithText("Audio").performClick()
+        compose.onNodeWithTag("navigation-audio").performClick()
         compose.onNodeWithText("Search audio").assertIsDisplayed()
-        compose.onNodeWithText("Settings").performClick()
+        compose.onNodeWithTag("navigation-settings").performClick()
         compose.onNodeWithText("Search settings").assertIsDisplayed()
-        compose.onNodeWithText("Account",substring=false).performClick()
+        compose.onNodeWithText("Telegram account",substring=false).performClick()
         compose.onNodeWithText("Previous library").performClick()
         compose.onNodeWithText("Previous library").assertIsDisplayed()
     }

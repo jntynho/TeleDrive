@@ -118,15 +118,9 @@ fun AppNavHost(
                 )
             }
         }
-        composable<Route.Audio> { entry ->
-            entry.savedStateHandle["audioTab"]=true
+        composable<Route.Audio> {
             UnderBottomBar {
-                FilesScreen(audioOnly=true,onOpenFolder={navController.navigateOnce(Route.Files(it))},
-                    onOpenCrumb={navController.navigateOnce(Route.Files(it))},
-                    onOpenFile={id,sequence->navController.navigateOnce(sequence.routeFor(id))},
-                    onOpenSearch={navController.navigateOnce(Route.Search)},
-                    onNewNote={navController.navigateOnce(Route.NoteEditor(folderId=it))},
-                    onEditNote={id,title->navController.navigateOnce(Route.NoteEditor(fileId=id,title=title))},onBack=null)
+                com.infinity.drive.presentation.audio.AudioScreen(onOpenFile={id,sequence->navController.navigateOnce(sequence.routeFor(id))})
             }
         }
         composable<Route.Gallery> {
@@ -200,6 +194,8 @@ fun AppNavHost(
             UnderBottomBar {
                 SettingsScreen(
                     onBack = null,
+                    onOpenActivity={navController.navigateOnce(Route.Transfers)},
+                    onOpenSetting={section,title->navController.navigateOnce(Route.SettingsSection(section.name,title))},
                     onOpenSection = { section ->
                         navController.navigateOnce(Route.SettingsSection(section.name))
                     }
@@ -211,6 +207,7 @@ fun AppNavHost(
             val section = SettingsSectionType.entries
                 .firstOrNull { it.name == route.section }
                 ?: SettingsSectionType.ACCOUNT
+            CompositionLocalProvider(com.infinity.drive.presentation.settings.LocalSettingsSearchTarget provides route.focusTitle) {
             SettingsSectionScreen(
                 section = section,
                 onOpenChannels = { navController.navigateOnce(Route.Channels) },
@@ -224,6 +221,7 @@ fun AppNavHost(
                     }
                 }
             )
+            }
         }
         composable<Route.PreviousLibrary> {
             LocalPlatformScreens.current.PreviousLibrary(onBack = { navController.popBackStackOnce() })

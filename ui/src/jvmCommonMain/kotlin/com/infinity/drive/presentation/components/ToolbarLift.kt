@@ -20,9 +20,6 @@ fun rememberToolbarLift(scrollState: ScrollableState): State<Boolean> = remember
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun liftedTopAppBarColors(lifted: Boolean): TopAppBarColors = TopAppBarDefaults.topAppBarColors(
-    containerColor = if (lifted) {
-        MaterialTheme.colorScheme.surfaceContainer
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
+    containerColor = MaterialTheme.colorScheme.background,
+    scrolledContainerColor = MaterialTheme.colorScheme.background
 )

@@ -1,0 +1,46 @@
+package com.infinity.drive.presentation.settings
+import com.infinity.drive.resources.*
+import org.jetbrains.compose.resources.StringResource
+
+data class SettingsSearchEntry(val section:SettingsSectionType,val title:StringResource)
+fun settingsSearchEntries():List<SettingsSearchEntry> = listOf(
+    SettingsSearchEntry(SettingsSectionType.ACCOUNT,Res.string.settings_rebuild_index_telegram),
+    SettingsSearchEntry(SettingsSectionType.ACCOUNT,Res.string.common_storage_channels),
+    SettingsSearchEntry(SettingsSectionType.BACKUP,Res.string.settings_automatic_backup),
+    SettingsSearchEntry(SettingsSectionType.BACKUP,Res.string.settings_back_new_media_instantly),
+    SettingsSearchEntry(SettingsSectionType.BACKUP,Res.string.settings_backup_interval),
+    SettingsSearchEntry(SettingsSectionType.BACKUP,Res.string.settings_wi_fi_only),
+    SettingsSearchEntry(SettingsSectionType.BACKUP,Res.string.settings_only_charging),
+    SettingsSearchEntry(SettingsSectionType.BACKUP,Res.string.settings_skip_files_larger_than),
+    SettingsSearchEntry(SettingsSectionType.BACKUP,Res.string.settings_exclusions),
+    SettingsSearchEntry(SettingsSectionType.BACKUP,Res.string.settings_add_another_folder),
+    SettingsSearchEntry(SettingsSectionType.STORAGE,Res.string.settings_download_location),
+    SettingsSearchEntry(SettingsSectionType.STORAGE,Res.string.common_free_space),
+    SettingsSearchEntry(SettingsSectionType.STORAGE,Res.string.settings_clear_cache_action),
+    SettingsSearchEntry(SettingsSectionType.STORAGE,Res.string.settings_clear_thumbnails_action),
+    SettingsSearchEntry(SettingsSectionType.STORAGE,Res.string.settings_cache_limit),
+    SettingsSearchEntry(SettingsSectionType.STORAGE,Res.string.settings_auto_clear_trash),
+    SettingsSearchEntry(SettingsSectionType.SECURITY,Res.string.settings_app_lock),
+    SettingsSearchEntry(SettingsSectionType.SECURITY,Res.string.settings_auto_lock),
+    SettingsSearchEntry(SettingsSectionType.SECURITY,Res.string.settings_block_screenshots),
+    SettingsSearchEntry(SettingsSectionType.SECURITY,Res.string.settings_encrypt_uploads),
+    SettingsSearchEntry(SettingsSectionType.SECURITY,Res.string.settings_restore_encryption_key),
+    SettingsSearchEntry(SettingsSectionType.SECURITY,Res.string.settings_encrypt_thumbnails),
+    SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_theme),
+    SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_language),
+    SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_dynamic_color),
+    SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_grid_view),
+    SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_grid_columns),
+    SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_gallery_grid_view),
+    SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_gallery_grid_columns),
+    SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_compact_layout),
+    SettingsSearchEntry(SettingsSectionType.PLAYBACK,Res.string.settings_stream_downloading),
+    SettingsSearchEntry(SettingsSectionType.PLAYBACK,Res.string.settings_background_playback),
+    SettingsSearchEntry(SettingsSectionType.NOTIFICATIONS,Res.string.settings_backup_results),
+    SettingsSearchEntry(SettingsSectionType.NOTIFICATIONS,Res.string.settings_failures),
+    SettingsSearchEntry(SettingsSectionType.ADVANCED,Res.string.settings_proxy),
+    SettingsSearchEntry(SettingsSectionType.ADVANCED,Res.string.settings_parallel_transfers),
+    SettingsSearchEntry(SettingsSectionType.ADVANCED,Res.string.settings_retry_attempts),
+    SettingsSearchEntry(SettingsSectionType.ADVANCED,Res.string.settings_transfers_wi_fi_only),
+    SettingsSearchEntry(SettingsSectionType.ADVANCED,Res.string.settings_debug_logging)
+)

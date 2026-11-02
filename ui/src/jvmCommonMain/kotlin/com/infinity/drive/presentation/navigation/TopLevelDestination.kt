@@ -18,7 +18,7 @@ enum class TopLevelDestination(
     val selectedIcon: ImageVector
 ) {
     HOME(Route.Home, Res.string.nav_home, DriveIcons.Home, DriveIcons.Home),
-    AUDIO(Route.Audio(true), Res.string.nav_audio,DriveIcons.MusicNotes,DriveIcons.MusicNotes),
     GALLERY(Route.Gallery, Res.string.nav_gallery, DriveIcons.Photo, DriveIcons.Photo),
+    AUDIO(Route.Audio(true), Res.string.nav_audio,DriveIcons.MusicNotes,DriveIcons.MusicNotes),
     SETTINGS(Route.Settings, Res.string.nav_settings, DriveIcons.Settings, DriveIcons.Settings)
 }

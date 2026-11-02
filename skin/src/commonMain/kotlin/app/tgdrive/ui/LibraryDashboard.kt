@@ -8,17 +8,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import kotlin.math.*
 
 data class LibraryOverview(val count:Int,val bytes:Long,val groups:List<Long>,val offlineBytes:Long=0,val lockedVaults:Int=0)
 
@@ -32,117 +30,47 @@ fun libraryArcShares(groups:List<Long>):List<Float> {
 }
 
 @Composable
-fun LibraryDashboard(usage:LibraryOverview,onAdd:()->Unit) {
+fun LibraryDashboard(usage:LibraryOverview,onAdd:()->Unit,showAddAction:Boolean=true) {
     var details by remember{mutableStateOf(false)}
-    Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        DashboardCard(onClick={details=true},modifier=Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
-                    Text("Your library",Modifier.weight(1f),style=MaterialTheme.typography.titleLarge)
-                    Icon(DriveIcons.Info,"About library storage",Modifier.size(22.dp))
-                }
-                LibrarySemicircle(usage)
-                BoxWithConstraints {
-                    val singleColumn=maxWidth<230.dp||LocalDensity.current.fontScale>1.5f
-                    if(singleColumn)Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                        usageLabels.indices.forEach{UsageLegend(it,usage.groups[it])}
-                    }else Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                        listOf(0 to 1,2 to 3).forEach{(left,right)->
-                            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(16.dp)) {
-                                Box(Modifier.weight(1f)){UsageLegend(left,usage.groups[left])}
-                                Box(Modifier.weight(1f)){UsageLegend(right,usage.groups[right])}
-                            }
-                        }
-                    }
-                }
-                HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
-                BoxWithConstraints(Modifier.fillMaxWidth()) {
-                    val stacked=maxWidth<260.dp||LocalDensity.current.fontScale>1.3f
-                    val count:@Composable ()->Unit={UsageStat(DriveIcons.Description,"${usage.count} files")}
-                    val offline:@Composable ()->Unit={UsageStat(DriveIcons.Download,"${formatBytes(usage.offlineBytes)} offline")}
-                    if(stacked)Column(verticalArrangement=Arrangement.spacedBy(12.dp)){count();offline()}
-                    else Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){count();offline()}
-                }
-                if(usage.lockedVaults>0)Text("${usage.lockedVaults} locked files are hidden",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+    val groups=List(4){usage.groups.getOrElse(it){0L}.coerceAtLeast(0)}
+    DashboardCard(onClick={details=true},modifier=Modifier.fillMaxWidth().semantics{contentDescription="About library storage"}) {
+        Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Text("Your library",style=MaterialTheme.typography.titleMedium)
+            Column(verticalArrangement=Arrangement.spacedBy(2.dp)) {
+                Text(formatBytes(usage.bytes),style=MaterialTheme.typography.displaySmall)
+                Text("${usage.count} files",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            val shares=remember(groups){libraryArcShares(groups)}
+            val emptyColor=MaterialTheme.colorScheme.outlineVariant
+            Canvas(Modifier.fillMaxWidth().height(12.dp).clip(DriveStyle.PillShape).semantics{contentDescription="File sizes by category; not a storage limit"}) {
+                if(groups.sum()==0L) drawRect(emptyColor)
+                else { var x=0f; shares.forEachIndexed { index,share ->
+                    val width=size.width*share/180f
+                    if(width>0)drawRect(usageColors[index],Offset(x,0f),androidx.compose.ui.geometry.Size(width,size.height))
+                    x+=width
+                } }
+            }
+            BoxWithConstraints {
+                val stacked=maxWidth<280.dp||LocalDensity.current.fontScale>1.25f
+                if(stacked) Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                    listOf(0 to 1,2 to 3).forEach{(a,b)->Row(Modifier.fillMaxWidth()){
+                        Box(Modifier.weight(1f)){UsageLegend(a,groups[a])};Box(Modifier.weight(1f)){UsageLegend(b,groups[b])}
+                    }}
+                } else Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){groups.indices.forEach{UsageLegend(it,groups[it])}}
             }
         }
-        Button(onAdd,Modifier.fillMaxWidth().heightIn(min=52.dp),shape=DriveStyle.PillShape,colors=ButtonDefaults.buttonColors(containerColor=DriveStyle.ActionBlue,contentColor=Color.White),contentPadding=PaddingValues(vertical=14.dp)){Icon(DriveIcons.Add,null,Modifier.size(24.dp));Spacer(Modifier.width(8.dp));Text("Add files")}
     }
-    if(details)AlertDialog(onDismissRequest={details=false},title={Text("Your indexed library")},text={Text("The chart shows the types of data in your visible active file versions, not a storage limit. Locked vaults, Trash, previous versions and other Telegram messages are excluded. Offline copies are stored separately on this device.\n\nPhotos: ${formatBytes(usage.groups[0])}\nVideos: ${formatBytes(usage.groups[1])}\nAudio: ${formatBytes(usage.groups[2])}\nOther files: ${formatBytes(usage.groups[3])}",Modifier.verticalScroll(rememberScrollState()))},confirmButton={TextButton({details=false}){Text("Done")}})
+    if(showAddAction)Button(onAdd,Modifier.fillMaxWidth().heightIn(min=52.dp).padding(top=8.dp),shape=DriveStyle.PillShape){Icon(DriveIcons.Add,null);Spacer(Modifier.width(8.dp));Text("Add files")}
+    if(details)AlertDialog(onDismissRequest={details=false},title={Text("Your indexed library")},text={Text("These sizes describe your visible active files, not a Telegram storage limit. Trash, previous versions and locked vaults are excluded.\n\n${formatBytes(usage.offlineBytes)} is stored offline on this device.",Modifier.verticalScroll(rememberScrollState()))},confirmButton={TextButton({details=false}){Text("Done")}})
 }
 
 @Composable private fun UsageLegend(index:Int,bytes:Long) {
-    Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-        Box(Modifier.size(12.dp).background(usageColors[index],CircleShape))
+    Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(5.dp)) {
+        Box(Modifier.size(7.dp).background(usageColors[index],CircleShape))
         Column(verticalArrangement=Arrangement.spacedBy(2.dp)) {
             Text(usageLabels[index],style=MaterialTheme.typography.labelMedium)
             Text(formatBytes(bytes),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
-    }
-}
-
-@Composable private fun UsageStat(icon:androidx.compose.ui.graphics.vector.ImageVector,text:String) {
-    Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
-        Icon(icon,null,Modifier.size(22.dp));Text(text,style=MaterialTheme.typography.labelMedium)
-    }
-}
-
-@Composable private fun LibrarySemicircle(usage:LibraryOverview) {
-    val shares=remember(usage.groups){libraryArcShares(usage.groups)}
-    val emptyColor=MaterialTheme.colorScheme.outlineVariant
-    val largeText=LocalDensity.current.fontScale>1.3f
-    Column(horizontalAlignment=Alignment.CenterHorizontally) {
-        BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal=24.dp)) {
-            val height=maxWidth/2+8.dp
-            Box(Modifier.fillMaxWidth().height(height)) {
-                Canvas(Modifier.fillMaxSize().semantics{contentDescription="Library composition by file size"}) {
-                    val thickness=20.dp.toPx().coerceAtMost(size.width/10)
-                    val center=Offset(size.width/2,size.height-thickness/2)
-                    val radius=(size.width-thickness)/2
-                    if(usage.bytes==0L)drawPath(roundedArc(center,radius,thickness,180f,180f),emptyColor)
-                    else {
-                        var start=180f
-                        // Blue video share first, as in the approved dashboard; legend order remains Photos / Videos.
-                        listOf(1,0,2,3).filter{shares[it]>0}.forEach{index->
-                            val sweep=shares[index]
-                            val gap=minOf(2f,sweep*.2f)
-                            drawPath(roundedArc(center,radius,thickness,start+gap/2,sweep-gap),usageColors[index])
-                            start+=sweep
-                        }
-                    }
-                }
-                if(!largeText)UsageTotal(usage,Modifier.align(Alignment.BottomCenter).padding(bottom=8.dp))
-            }
-        }
-        if(largeText)UsageTotal(usage,Modifier.padding(top=12.dp))
-    }
-}
-
-@Composable private fun UsageTotal(usage:LibraryOverview,modifier:Modifier=Modifier) {
-    Column(modifier,horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(2.dp)) {
-        Text(formatBytes(usage.bytes),style=MaterialTheme.typography.headlineLarge)
-        Text("Stored in your library",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-/** Rounded annular segment: small shares stay proportional instead of expanding to a stroke cap. */
-private fun roundedArc(center:Offset,radius:Float,width:Float,start:Float,sweep:Float):Path {
-    val outer=radius+width/2;val inner=radius-width/2
-    val end=start+sweep
-    val corner=minOf(width*.18f,inner*(sweep*PI.toFloat()/180)/4)
-    val outDelta=corner/outer*180/PI.toFloat();val inDelta=corner/inner*180/PI.toFloat()
-    fun point(r:Float,degrees:Float):Offset{val angle=degrees*PI.toFloat()/180;return center+Offset(cos(angle)*r,sin(angle)*r)}
-    fun bounds(r:Float)=Rect(center.x-r,center.y-r,center.x+r,center.y+r)
-    return Path().apply {
-        val first=point(outer,start+outDelta);moveTo(first.x,first.y)
-        arcTo(bounds(outer),start+outDelta,sweep-outDelta*2,false)
-        var control=point(outer,end);var next=point(outer-corner,end);quadraticTo(control.x,control.y,next.x,next.y)
-        next=point(inner+corner,end);lineTo(next.x,next.y)
-        control=point(inner,end);next=point(inner,end-inDelta);quadraticTo(control.x,control.y,next.x,next.y)
-        arcTo(bounds(inner),end-inDelta,-sweep+inDelta*2,false)
-        control=point(inner,start);next=point(inner+corner,start);quadraticTo(control.x,control.y,next.x,next.y)
-        next=point(outer-corner,start);lineTo(next.x,next.y)
-        control=point(outer,start);quadraticTo(control.x,control.y,first.x,first.y);close()
     }
 }
 

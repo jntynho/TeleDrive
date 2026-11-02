@@ -4,6 +4,9 @@ import android.app.Application
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.*
+import androidx.compose.ui.graphics.asAndroidBitmap
+import android.graphics.Bitmap
+import java.io.File
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import com.infinity.drive.core.crypto.CredentialCipher
 import com.infinity.drive.data.local.dao.FileDao
@@ -18,6 +21,7 @@ import com.infinity.drive.domain.repository.SettingsRepository
 import com.infinity.drive.presentation.DriveInfinityApp
 import com.infinity.drive.presentation.platform.ProvidePlatformActions
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -74,24 +78,87 @@ class RebuiltUiTest {
     @Test fun realEmptyLibraryNavigatesAcrossAllFourTabs() {
         compose.waitUntil(15_000) { compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Your library").assertIsDisplayed()
-        compose.onNodeWithText("Gallery").performClick()
+        capture("home")
+        compose.onNodeWithTag("navigation-gallery").performClick()
         compose.onNodeWithText("Search photos and videos").assertIsDisplayed()
+        capture("gallery")
         compose.onNodeWithContentDescription("Sort gallery").performClick()
         compose.onNodeWithText("Size").performClick()
-        compose.onNodeWithText("Audio").performClick()
+        compose.onNodeWithTag("navigation-audio").performClick()
         compose.onNodeWithText("Search audio").assertIsDisplayed()
-        compose.waitUntil(10_000) { compose.onAllNodesWithText("Song.mp3").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Song.mp3").assertIsDisplayed()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Song",substring=false).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Song",substring=false).assertIsDisplayed()
+        capture("audio")
         compose.onNodeWithText("Report.pdf").assertDoesNotExist()
         compose.onNodeWithText("Photo.jpg").assertDoesNotExist()
-        compose.onNodeWithText("Settings").performClick()
+        compose.onNodeWithTag("navigation-settings").performClick()
         compose.onNodeWithText("Search settings").assertIsDisplayed()
-        compose.onNodeWithText("Account").performClick()
+        capture("settings")
+        compose.onNodeWithText("Telegram account").performClick()
         compose.onNodeWithText("Previous library").assertIsDisplayed()
         runBlocking { GlobalContext.get().get<SettingsRepository>().update { it.copy(onboardingComplete=false) } }
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Get started").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Get started").performClick()
         compose.onNodeWithText("API access").assertIsDisplayed()
+        capture("api-setup")
         compose.onNodeWithText("Continue").assertIsNotEnabled()
     }
+    @Test fun settingsSearchFindsControlsAndExplainsNoResults() {
+        compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("navigation-settings").performClick()
+        compose.onNode(hasSetTextAction()).performTextInput("background")
+        compose.onNodeWithText("Background playback",substring=false).assertIsDisplayed().performClick()
+        compose.onNodeWithText("Background playback",substring=false).assertIsDisplayed()
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNode(hasSetTextAction()).performTextReplacement("zzzz-no-such-setting")
+        compose.onNodeWithText("No settings found").assertIsDisplayed()
+        compose.onNodeWithText("Clear search",substring=false).performClick()
+        compose.onNodeWithText("Telegram account").assertIsDisplayed()
+    }
+
+    @Test fun audioSortDoesNotChangeTheFileBrowserOrder() {
+        compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("navigation-audio").performClick()
+        compose.onNodeWithText("Sort",substring=false).performClick()
+        compose.onNodeWithText("Size",substring=false).performClick()
+        compose.waitUntil(10_000){compose.waitForIdle();runBlocking{GlobalContext.get().get<SettingsRepository>().preferences.first().audioSortField==com.infinity.drive.domain.model.FileSortField.SIZE}}
+        val prefs=runBlocking{GlobalContext.get().get<SettingsRepository>().preferences.first()}
+        org.junit.Assert.assertEquals(com.infinity.drive.domain.model.FileSortField.NAME,prefs.sortField)
+        compose.onNodeWithText("Favorites",substring=false).performClick()
+        compose.onNodeWithText("No favorites yet").assertIsDisplayed()
+        compose.onNodeWithText("On device",substring=false).performClick()
+        compose.onNodeWithText("No audio on this device").assertIsDisplayed()
+    }
+
+    @Test @Config(qualifiers="w320dp-h640dp-xhdpi")
+    fun narrowScreenWithLargeTextKeepsNavigationSearchAndSignInReachable() {
+        val pending=GlobalContext.get().get<PendingShare>()
+        compose.runOnUiThread {
+            activity.get().setContent { ProvidePlatformActions {
+                val density=androidx.compose.ui.platform.LocalDensity.current
+                androidx.compose.runtime.CompositionLocalProvider(
+                    androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(density.density,2f)
+                ){DriveInfinityApp(pending)}
+            } }
+        }
+        compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("Upload",substring=false).assertIsDisplayed()
+        listOf("gallery","audio","settings").forEach {
+            compose.onNodeWithTag("navigation-$it").assertIsDisplayed().performClick()
+            compose.onNode(hasSetTextAction()).assertIsDisplayed()
+        }
+        runBlocking { GlobalContext.get().get<SettingsRepository>().update { it.copy(onboardingComplete=false) } }
+        compose.waitUntil(10_000){compose.onAllNodesWithText("Get started").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("Get started").performScrollTo().performClick()
+        compose.onNodeWithText("Continue",substring=false).performScrollTo().assertIsDisplayed().assertIsNotEnabled()
+        capture("api-large-text")
+    }
+
+    private fun capture(name:String) {
+        compose.waitForIdle()
+        val file=File("build/design-previews/refreshed-$name.png")
+        file.parentFile?.mkdirs()
+        file.outputStream().use{compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG,100,it)}
+    }
+
 }

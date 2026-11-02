@@ -217,9 +217,8 @@ fun SettingsSectionScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                colors = liftedTopAppBarColors(lifted),
-                title = { Text(stringResource(section.titleRes)) },
+            app.tgdrive.ui.LibraryHeader(
+                title = stringResource(section.titleRes),
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(

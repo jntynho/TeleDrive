@@ -137,6 +137,8 @@ class SettingsRepositoryImpl(
                 this[PreferenceKeys.SORT_DIRECTION],
                 defaults.sortDirection
             ),
+            audioSortField = enumOrDefault(this[PreferenceKeys.AUDIO_SORT_FIELD], defaults.audioSortField),
+            audioSortDirection = enumOrDefault(this[PreferenceKeys.AUDIO_SORT_DIRECTION], defaults.audioSortDirection),
             backgroundPlayback = this[PreferenceKeys.BACKGROUND_PLAYBACK]
                 ?: defaults.backgroundPlayback,
             streamBeforeDownload = this[PreferenceKeys.STREAM_BEFORE_DOWNLOAD]
@@ -201,6 +203,8 @@ class SettingsRepositoryImpl(
         this[PreferenceKeys.PROXY_ENABLED] = prefs.proxyEnabled
         this[PreferenceKeys.ACTIVE_PROXY_ID] = prefs.activeProxyId
         this[PreferenceKeys.TEXT_PREVIEW_SCALE] = prefs.textPreviewScale
+        this[PreferenceKeys.AUDIO_SORT_FIELD] = prefs.audioSortField.name
+        this[PreferenceKeys.AUDIO_SORT_DIRECTION] = prefs.audioSortDirection.name
         this[PreferenceKeys.SORT_FIELD] = prefs.sortField.name
         this[PreferenceKeys.SORT_DIRECTION] = prefs.sortDirection.name
         this[PreferenceKeys.BACKGROUND_PLAYBACK] = prefs.backgroundPlayback

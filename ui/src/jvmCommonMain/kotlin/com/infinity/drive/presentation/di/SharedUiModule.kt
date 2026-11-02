@@ -16,6 +16,7 @@ import com.infinity.drive.presentation.settings.ExclusionsViewModel
 import com.infinity.drive.presentation.settings.SettingsViewModel
 import com.infinity.drive.presentation.transfers.TransfersViewModel
 import com.infinity.drive.presentation.trash.TrashViewModel
+import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
@@ -26,6 +27,7 @@ val sharedUiModule = module {
     viewModelOf(::PreviewViewModel)
     viewModelOf(::ChannelsViewModel)
     viewModelOf(::CollectionViewModel)
+    viewModel { com.infinity.drive.presentation.audio.AudioViewModel(get(),get(),get()) }
     viewModelOf(::FilesViewModel)
     viewModelOf(::GalleryViewModel)
     viewModelOf(::HomeViewModel)

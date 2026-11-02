@@ -118,41 +118,10 @@ private fun DayHeaderRow(dayStartMillis: Long, modifier: Modifier = Modifier) {
     )
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun GalleryTabSelector(
-    selected: GalleryTab,
-    onSelect: (GalleryTab) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)
-    ) {
-        GalleryTab.entries.forEachIndexed { index, tab ->
-            ToggleButton(
-                checked = tab == selected,
-                onCheckedChange = { onSelect(tab) },
-                shapes = when (index) {
-                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                    GalleryTab.entries.lastIndex ->
-                        ButtonGroupDefaults.connectedTrailingButtonShapes()
-
-                    else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                },
-                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 10.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = stringResource(tab.labelRes),
-                    style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-    }
+private fun GalleryTabSelector(selected:GalleryTab,onSelect:(GalleryTab)->Unit) {
+    val tabs=GalleryTab.entries.filter{it!=GalleryTab.ALBUMS}
+    app.tgdrive.ui.LibraryFilters(tabs.map{stringResource(it.labelRes)},tabs.indexOf(selected),{onSelect(tabs[it])})
 }
 
 @Composable
@@ -208,6 +177,7 @@ fun GalleryScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
+    var albumQuery by rememberSaveable { mutableStateOf("") }
     var sorting by remember { mutableStateOf(false) }
     val media = viewModel.pagedMedia.collectAsLazyPagingItems()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
@@ -356,9 +326,8 @@ fun GalleryScreen(
                     }
                 )
             } else {
-                TopAppBar(
-                    colors = liftedTopAppBarColors(lifted),
-                    title = { Text(state.albumTitle ?: stringResource(Res.string.gallery_title)) },
+                app.tgdrive.ui.LibraryHeader(
+                    title = state.albumTitle ?: if(state.tab==GalleryTab.ALBUMS) "Albums" else stringResource(Res.string.gallery_title),
                     navigationIcon = {
                         onBack?.let {
                             IconButton(onClick = it) {
@@ -370,57 +339,22 @@ fun GalleryScreen(
                         }
                     },
                     actions = {
+                        if(!state.isAlbumView) androidx.compose.material3.TextButton(onClick={viewModel.setTab(if(state.tab==GalleryTab.ALBUMS)GalleryTab.ALL else GalleryTab.ALBUMS)}) {
+                            Text(if(state.tab==GalleryTab.ALBUMS) "All media" else "Albums")
+                        }
                         Box {
                             IconButton(onClick={sorting=true}){Icon(DriveIcons.Sort,"Sort gallery")}
                             SortMenu(expanded=sorting,current=state.sortField,direction=state.sortDirection,onDismiss={sorting=false},onSelect={field,direction->sorting=false;viewModel.setSort(field,direction)},fields=listOf(FileSortField.DATE_MODIFIED,FileSortField.DATE_ADDED,FileSortField.NAME,FileSortField.SIZE,FileSortField.TYPE))
                         }
-                        RefreshAction(refreshing = refreshing, onRefresh = viewModel::refresh)
                     }
                 )
             }
-            if(!state.selectionMode&&state.tab!=GalleryTab.ALBUMS)LibrarySearchField(query,viewModel::setQuery,"Search photos and videos",Modifier.padding(horizontal=16.dp).padding(bottom=12.dp))
+            if(!state.selectionMode)LibrarySearchField(if(state.tab==GalleryTab.ALBUMS)albumQuery else query,{if(state.tab==GalleryTab.ALBUMS)albumQuery=it else viewModel.setQuery(it)},if(state.tab==GalleryTab.ALBUMS)"Search albums"else"Search photos and videos",Modifier.padding(horizontal=16.dp).padding(bottom=8.dp))
         } }
     ) { padding ->
-        var tabsVisible by remember { mutableStateOf(true) }
-        val mediaScrolls by remember(scrolled) {
-            derivedStateOf { scrolled.canScrollForward || scrolled.canScrollBackward }
-        }
-        LaunchedEffect(state.tab) { tabsVisible = true }
-        LaunchedEffect(mediaScrolls) { if (!mediaScrolls) tabsVisible = true }
-        val tabScrollConnection = remember {
-            object : NestedScrollConnection {
-                @Suppress("SameReturnValue")
-                override fun onPreScroll(
-                    available: Offset,
-                    source: NestedScrollSource
-                ): Offset {
-                    if (!mediaScrolls) return Offset.Zero
-                    when {
-                        available.y < -TAB_SCROLL_THRESHOLD -> tabsVisible = false
-                        available.y > TAB_SCROLL_THRESHOLD -> tabsVisible = true
-                    }
-                    return Offset.Zero
-                }
-            }
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = padding.calculateTopPadding())
-                .nestedScroll(tabScrollConnection)
-        ) {
-            if (!state.isAlbumView) {
-                AnimatedVisibility(
-                    visible = tabsVisible,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
-                ) {
-                    GalleryTabSelector(
-                        selected = state.tab,
-                        onSelect = viewModel::setTab
-                    )
-                }
+        Column(Modifier.fillMaxSize().padding(top=padding.calculateTopPadding())) {
+            if (!state.isAlbumView && !state.selectionMode && state.tab!=GalleryTab.ALBUMS) {
+                GalleryTabSelector(selected=state.tab,onSelect=viewModel::setTab)
             }
 
             if (state.tab == GalleryTab.ALBUMS && !state.isAlbumView) {
@@ -429,7 +363,7 @@ fun GalleryScreen(
                     return@Column
                 }
                 AlbumGrid(
-                    albums = state.albums,
+                    albums = state.albums.filter { albumQuery.isBlank() || (it.name ?: "Not in a folder").contains(albumQuery.trim(),true) },
                     columns = state.albumGridSize,
                     bottomPadding = padding.calculateBottomPadding() + LocalBottomBarInset.current,
                     onOpenAlbum = onOpenAlbum,
@@ -468,8 +402,8 @@ fun GalleryScreen(
 
                     media.itemCount == 0 -> EmptyState(
                         icon = DriveIcons.Photo,
-                        title = stringResource(Res.string.gallery_no_media),
-                        description = stringResource(Res.string.gallery_photos_videos_appear_here)
+                        title = if(query.isNotBlank())"No matching photos or videos"else stringResource(Res.string.gallery_no_media),
+                        description = if(query.isNotBlank())"Try another filename or change the filter."else stringResource(Res.string.gallery_photos_videos_appear_here)
                     )
 
                     state.viewMode == ViewMode.LIST -> LazyColumn(
@@ -532,13 +466,13 @@ fun GalleryScreen(
                             )
                             .then(gridDragSelect),
                         contentPadding = PaddingValues(
-                            start = 12.dp,
-                            end = 12.dp,
+                            start = 4.dp,
+                            end = 4.dp,
                             top = 12.dp,
                             bottom = 12.dp + padding.calculateBottomPadding() + LocalBottomBarInset.current
                         ),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         items(
                             count = media.itemCount,
