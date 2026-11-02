@@ -101,6 +101,7 @@ fun PlayerControls(
     resizeMode: PlayerResizeMode,
     onCycleResizeMode: () -> Unit,
     onInteraction: () -> Unit,
+    onScrubbingChanged:(Boolean)->Unit={},
     onPreferredAudioLanguage: (String) -> Unit = {},
     onPreferredSubtitleLanguage: (String) -> Unit = {},
     modifier: Modifier = Modifier
@@ -196,8 +197,9 @@ fun PlayerControls(
     }
 
     LaunchedEffect(visible) {
-        if (!visible) expanded = false
+        if (!visible) {expanded = false;scrubTarget=null;onScrubbingChanged(false)}
     }
+    DisposableEffect(player){onDispose{onScrubbingChanged(false)}}
 
     AnimatedVisibility(
         visible = visible,
@@ -379,10 +381,13 @@ fun PlayerControls(
                             .padding(bottom = 8.dp)
                     )
                 }
-                Slider(
+                app.tgdrive.ui.SlimSlider(
+                    enabled=duration>0,
+                    trackHeight=3.dp,thumbSize=12.dp,
                     value = scrubTarget ?: position.toFloat(),
                     onValueChange = { value ->
                         onInteraction()
+                        onScrubbingChanged(true)
                         scrubTarget = value
                     },
                     onValueChangeFinished = {
@@ -393,18 +398,10 @@ fun PlayerControls(
                             player.seekTo(millis)
                         }
                         scrubTarget = null
+                        onScrubbingChanged(false)
                     },
-                    valueRange = 0f..duration.coerceAtLeast(1).toFloat(),
-                    thumb = {
-                        Box(
-                            modifier = Modifier
-                                .size(width = THUMB_WIDTH, height = THUMB_HEIGHT)
-                                .background(
-                                    color = MaterialTheme.colorScheme.primary,
-                                    shape = CircleShape
-                                )
-                        )
-                    }
+                    valueRange = 0f..duration.coerceAtLeast(1).toFloat()
+
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(

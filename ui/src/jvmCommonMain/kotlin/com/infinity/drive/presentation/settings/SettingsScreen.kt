@@ -26,6 +26,8 @@ fun SettingsScreen(onBack:(()->Unit)?,onOpenSection:(SettingsSectionType)->Unit,
     onOpenActivity:()->Unit={},onOpenSetting:(SettingsSectionType,String)->Unit={s,_->onOpenSection(s)},
     viewModel:SettingsViewModel=koinViewModel()) {
     var query by rememberSaveable { mutableStateOf("") }
+    var searching by rememberSaveable { mutableStateOf(false) }
+    com.infinity.drive.presentation.common.AppBackHandler(searching){searching=false;query=""}
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val capabilities=LocalPlatformCapabilities.current
     val hidden=buildSet {
@@ -42,8 +44,7 @@ fun SettingsScreen(onBack:(()->Unit)?,onOpenSection:(SettingsSectionType)->Unit,
     val results=indexed.map { Triple(it,stringResource(it.title),stringResource(it.section.titleRes)) }
         .filter{ (_,title,parent)->"$title $parent".contains(query.trim(),true) }
     Scaffold(topBar={Column {
-        LibraryHeader("Settings",navigationIcon={if(onBack!=null)IconButton(onBack){Icon(DriveIcons.ArrowBack,"Back")}})
-        LibrarySearchField(query,{query=it},"Search settings",Modifier.padding(horizontal=16.dp).padding(bottom=12.dp))
+        ExpandableLibraryHeader("Settings",query,{query=it},searching,{searching=it},"Search settings",navigationIcon={if(onBack!=null)IconButton(onBack){Icon(DriveIcons.ArrowBack,"Back")}})
     }}) { padding ->
         if(query.isNotBlank()&&results.isEmpty()&&sections.none{stringResource(it.titleRes).contains(query.trim(),true)}) {
             EmptyState(DriveIcons.Search,"No settings found","Try a setting name, such as cache, backup or playback.",Modifier.padding(padding),"Clear search",{query=""})

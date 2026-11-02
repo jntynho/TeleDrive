@@ -61,7 +61,7 @@ fun DriveScreen(
             TopAppBar(title = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Icon(DriveIcons.CloudQueue, null, tint = MaterialTheme.colorScheme.primary)
-                    Text("TG Drive", fontWeight = FontWeight.Bold)
+                    Text("TeleDrive", fontWeight = FontWeight.Bold)
                 }
             }, actions = {
                 IconButton(onClick = { privacy = true }) { Icon(DriveIcons.Shield, stringResource(R.string.privacy)) }
@@ -183,7 +183,7 @@ fun AuthPanel(state: DriveState, configure: (String, String) -> Unit, login: (St
     Column(modifier.fillMaxSize().background(DriveStyle.SignInCanvas).imePadding().verticalScroll(rememberScrollState()).padding(horizontal=16.dp,vertical=24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Column(Modifier.fillMaxWidth().padding(top=8.dp,bottom=8.dp), horizontalAlignment=Alignment.CenterHorizontally, verticalArrangement=Arrangement.spacedBy(20.dp)) {
             Icon(DriveIcons.CloudQueue, null, Modifier.size(56.dp), tint = MaterialTheme.colorScheme.primary)
-            Text("Welcome to TG Drive", style=MaterialTheme.typography.headlineLarge, textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+            Text("Welcome to TeleDrive", style=MaterialTheme.typography.headlineLarge, textAlign=androidx.compose.ui.text.style.TextAlign.Center)
         }
         androidx.compose.animation.AnimatedContent(state.login, transitionSpec={horizontalNavigation(authStepForward(initialState,targetState))},label="sign-in-step") { step ->
             var secret by remember(step) { mutableStateOf("") }

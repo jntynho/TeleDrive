@@ -20,21 +20,21 @@ class DriveDocumentsProvider:DocumentsProvider(){
         for(profile in app.sessions.profiles.value.filter{it.userId!=0L}){
             val accessible=!app.sessions.lockEnabled(profile.id)||app.authorized(profile.id)
             out.newRow().add(DocumentsContract.Root.COLUMN_ROOT_ID,profile.id).add(DocumentsContract.Root.COLUMN_DOCUMENT_ID,id(profile.id,"folder","root"))
-                .add(DocumentsContract.Root.COLUMN_TITLE,"TG Drive")
-                .add(DocumentsContract.Root.COLUMN_SUMMARY,if(accessible)profile.label else "Unlock TG Drive first")
+                .add(DocumentsContract.Root.COLUMN_TITLE,"TeleDrive")
+                .add(DocumentsContract.Root.COLUMN_SUMMARY,if(accessible)profile.label else "Unlock TeleDrive first")
                 .add(DocumentsContract.Root.COLUMN_FLAGS,DocumentsContract.Root.FLAG_SUPPORTS_SEARCH or DocumentsContract.Root.FLAG_SUPPORTS_IS_CHILD)
                 .add(DocumentsContract.Root.COLUMN_ICON,R.drawable.ic_drive)
         }
         return out
     }
     private fun bundle(profile:String):SessionBundle{
-        if(app.sessions.lockEnabled(profile)&&!app.authorized(profile))throw FileNotFoundException("Unlock TG Drive to access this account.")
+        if(app.sessions.lockEnabled(profile)&&!app.authorized(profile))throw FileNotFoundException("Unlock TeleDrive to access this account.")
         return app.sessions.bundle(profile)
     }
     override fun queryDocument(documentId:String,projection:Array<out String>?):Cursor{
         val (profile,kind,key)=parse(documentId);val state=bundle(profile).library.state.value
         val out=MatrixCursor(projection?:DOCUMENT_COLUMNS)
-        if(kind=="folder"&&key=="root")addFolder(out,documentId,"TG Drive")
+        if(kind=="folder"&&key=="root")addFolder(out,documentId,"TeleDrive")
         else if(kind=="folder")addFolder(out,documentId,state.folders.firstOrNull{it.id==key&&it.deletedAt==0L}?.name?:throw FileNotFoundException("Folder unavailable or locked"))
         else addItem(out,profile,state.items.firstOrNull{it.id==key&&it.deletedAt==0L}?:throw FileNotFoundException("File unavailable or locked"))
         return out

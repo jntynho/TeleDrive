@@ -58,16 +58,17 @@ fun SearchScreen(
     onBack: () -> Unit,
     onOpenFile: (String, PreviewSequence) -> Unit,
     onOpenFolder: (String) -> Unit,
-    viewModel: SearchViewModel = koinViewModel()
+    viewModel: SearchViewModel = koinViewModel(),
+    showHeader:Boolean=true,modifier:Modifier=Modifier
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     val listState = rememberLazyListState()
     val lifted by rememberToolbarLift(listState)
 
-    Scaffold(
+    Scaffold(modifier=modifier,contentWindowInsets=if(showHeader)androidx.compose.material3.ScaffoldDefaults.contentWindowInsets else androidx.compose.foundation.layout.WindowInsets(0),
         topBar = {
-            TopAppBar(
+            if(showHeader)TopAppBar(
                 colors = liftedTopAppBarColors(lifted),
                 title = {
                     OutlinedTextField(
@@ -155,7 +156,7 @@ fun SearchScreen(
                         start = 12.dp,
                         end = 12.dp,
                         top = 12.dp,
-                        bottom = 12.dp + padding.calculateBottomPadding()
+                        bottom = 12.dp + padding.calculateBottomPadding()+com.infinity.drive.presentation.navigation.LocalBottomBarInset.current
                     )
                 ) {
                     if (state.folders.isNotEmpty()) {

@@ -13,6 +13,6 @@ object AndroidPlatformScreens : PlatformScreens {
 
     @Composable
     override fun Preview(onBack: () -> Unit, onEditNote: (String, String) -> Unit) {
-        PreviewScreen(onBack = onBack, onEditNote = onEditNote)
+        app.tgdrive.ui.DriveTheme { PreviewScreen(onBack = onBack, onEditNote = onEditNote) }
     }
 }

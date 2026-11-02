@@ -101,7 +101,7 @@ class SettingsRepositoryImpl(
             theme = enumOrDefault(this[PreferenceKeys.THEME], defaults.theme),
             language = AppLanguage.fromCode(this[PreferenceKeys.LANGUAGE]),
             dynamicColor = this[PreferenceKeys.DYNAMIC_COLOR] ?: defaults.dynamicColor,
-            viewMode = enumOrDefault(this[PreferenceKeys.VIEW_MODE], defaults.viewMode),
+            viewMode = if(this[PreferenceKeys.FILE_LIST_DEFAULT_APPLIED]==true)enumOrDefault(this[PreferenceKeys.VIEW_MODE], defaults.viewMode)else com.infinity.drive.domain.model.ViewMode.LIST,
             galleryViewMode = enumOrDefault(
                 this[PreferenceKeys.GALLERY_VIEW_MODE],
                 enumOrDefault(this[PreferenceKeys.VIEW_MODE], defaults.galleryViewMode)
@@ -186,6 +186,7 @@ class SettingsRepositoryImpl(
         this[PreferenceKeys.THEME] = prefs.theme.name
         this[PreferenceKeys.LANGUAGE] = prefs.language.code
         this[PreferenceKeys.DYNAMIC_COLOR] = prefs.dynamicColor
+        this[PreferenceKeys.FILE_LIST_DEFAULT_APPLIED] = true
         this[PreferenceKeys.VIEW_MODE] = prefs.viewMode.name
         this[PreferenceKeys.GALLERY_VIEW_MODE] = prefs.galleryViewMode.name
         this[PreferenceKeys.GALLERY_GRID_SIZE] = prefs.galleryGridSize

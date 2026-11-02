@@ -20,10 +20,10 @@ import androidx.navigation.toRoute
 
 object NavigationTransitions {
 
-    private val EmphasizedDecelerate = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
-    private val EmphasizedAccelerate = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
+    private val EmphasizedDecelerate = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+    private val EmphasizedAccelerate = CubicBezierEasing(0.2f, 0f, 0f, 1f)
     private const val ENTER_MS = 240
-    private const val EXIT_MS = 180
+    private const val EXIT_MS = 240
 
     fun sharedAxisEnter(forward: Boolean): EnterTransition =
         slideInHorizontally(

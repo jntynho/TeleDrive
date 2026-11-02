@@ -28,7 +28,7 @@ data class UserPreferences(
     val theme: AppTheme = AppTheme.DARK,
     val language: AppLanguage = AppLanguage.ENGLISH,
     val dynamicColor: Boolean = false,
-    val viewMode: ViewMode = ViewMode.GRID,
+    val viewMode: ViewMode = ViewMode.LIST,
     val gridSize: Int = 3,
     val galleryViewMode: ViewMode = ViewMode.GRID,
     val galleryGridSize: Int = 3,

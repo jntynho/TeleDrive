@@ -13,7 +13,7 @@ import app.tgdrive.library.LibraryState
 
 internal val visibleSettingsRoutes=setOf("home","transfers","storage","index","privacy","vaults","diagnostics","about")
 internal fun settingsTitle(page:String):String=when(page.substringBefore("#")){
-    "transfers"->"Transfers";"storage"->"Storage & offline";"index"->"Library & recovery";"privacy"->"Privacy & security";"vaults"->"Encrypted vaults";"diagnostics"->"Diagnostics";"about"->"About TG Drive";else->"Settings"
+    "transfers"->"Transfers";"storage"->"Storage & offline";"index"->"Library & recovery";"privacy"->"Privacy & security";"vaults"->"Encrypted vaults";"diagnostics"->"Diagnostics";"about"->"About TeleDrive";else->"Settings"
 }
 internal data class SettingDestination(val title:String,val subtitle:String,val route:String,val icon:ImageVector)
 internal fun settingDestinations(state:LibraryState)=listOf(
@@ -23,7 +23,7 @@ internal fun settingDestinations(state:LibraryState)=listOf(
     SettingDestination("Library & recovery","Sync, export and restore library information","index",DriveIcons.Restore),
     SettingDestination("Privacy & security","${state.vaults.size} vaults · app lock and privacy","privacy",DriveIcons.Lock),
     SettingDestination("Diagnostics","Check availability and view a local report","diagnostics",DriveIcons.HealthAndSafety),
-    SettingDestination("About TG Drive","Version ${BuildConfig.VERSION_NAME}","about",DriveIcons.Info))
+    SettingDestination("About TeleDrive","Version ${BuildConfig.VERSION_NAME}","about",DriveIcons.Info))
 
 @Composable
 fun SettingsHome(state:LibraryState,query:String="",onOpen:(String)->Unit) {

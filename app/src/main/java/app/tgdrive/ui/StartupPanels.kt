@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
                 Text(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.semantics{liveRegion=LiveRegionMode.Polite})
             }
             Spacer(Modifier.height(22.dp))
-            DriveButton(onUnlock){Text("Unlock TG Drive")}
+            DriveButton(onUnlock){Text("Unlock TeleDrive")}
             if(error!=null)TextButton(onSecuritySettings){Text("Open Android security settings")}
         }
     }

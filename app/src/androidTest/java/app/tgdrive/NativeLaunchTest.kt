@@ -12,7 +12,7 @@ class NativeLaunchTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
     @Test fun actualActivityStartsWithPrivateChannelOnboarding() {
         compose.waitUntil(15_000) { compose.onAllNodesWithText("Get started").fetchSemanticsNodes().isNotEmpty() }
-        compose.onAllNodesWithText("TG Drive").onFirst().assertIsDisplayed()
+        compose.onAllNodesWithText("TeleDrive").onFirst().assertIsDisplayed()
         compose.onNodeWithText("Your files live in your own private Telegram channel. Your account, your storage, your control.").assertIsDisplayed()
         compose.onNodeWithText("Get started").performClick()
         compose.onNodeWithText("API access").assertIsDisplayed()

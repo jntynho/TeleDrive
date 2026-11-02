@@ -118,7 +118,7 @@ import app.tgdrive.library.*
                             item{InfoCard("Redacted by default","This report excludes login codes, API credentials, sessions, filenames and source URIs. Select and copy only the information you intend to share.")}
                         }
                         "about"->{
-                            item{SectionTitle("TG Drive","${BuildConfig.VERSION_NAME} · build ${BuildConfig.VERSION_CODE}")}
+                            item{SectionTitle("TeleDrive","${BuildConfig.VERSION_NAME} · build ${BuildConfig.VERSION_CODE}")}
                             item{InfoCard("Independent Telegram client","Your files use your own account. No claim of unlimited storage, guaranteed SMS or permanent provider availability is made.",DriveIcons.CloudQueue)}
                             item{DriveGroup{
                                 ActionRow("Solar Linear icons","By 480 Design · adapted as native vectors",DriveIcons.Info){uriHandler.openUri("https://www.figma.com/community/file/1166831539721848736")}

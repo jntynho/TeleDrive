@@ -66,7 +66,7 @@ fun LibraryDashboard(usage:LibraryOverview,onAdd:()->Unit,showAddAction:Boolean=
 
 @Composable private fun UsageLegend(index:Int,bytes:Long) {
     Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(5.dp)) {
-        Box(Modifier.size(7.dp).background(usageColors[index],CircleShape))
+        Box(Modifier.size(11.dp).background(usageColors[index],CircleShape))
         Column(verticalArrangement=Arrangement.spacedBy(2.dp)) {
             Text(usageLabels[index],style=MaterialTheme.typography.labelMedium)
             Text(formatBytes(bytes),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)

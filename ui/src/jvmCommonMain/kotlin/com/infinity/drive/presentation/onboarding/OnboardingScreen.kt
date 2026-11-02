@@ -470,7 +470,7 @@ private fun StepHeader(step: OnboardingStep, modifier: Modifier = Modifier) {
     val totalSteps = counted.size
     Column(modifier = modifier,verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
-            Text("TG Drive",style=MaterialTheme.typography.titleMedium)
+            Text("TeleDrive",style=MaterialTheme.typography.titleMedium)
             Text(stringResource(Res.string.onboarding_step_counter,stepNumber,totalSteps),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
         androidx.compose.material3.LinearProgressIndicator(progress={stepNumber.toFloat()/totalSteps},modifier=Modifier.fillMaxWidth().height(3.dp),color=MaterialTheme.colorScheme.primary,trackColor=MaterialTheme.colorScheme.surface)

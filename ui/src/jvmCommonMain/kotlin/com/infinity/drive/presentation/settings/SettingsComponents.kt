@@ -149,6 +149,9 @@ fun SettingsSliderRow(
     onChange: (Int) -> Unit,
     valueLabel: (Int) -> String = { it.toString() }
 ) {
+    var draft by remember(title){mutableFloatStateOf(value.toFloat())}
+    var dragging by remember(title){mutableStateOf(false)}
+    LaunchedEffect(value,dragging){if(!dragging)draft=value.toFloat()}
     Column(
         modifier = Modifier
             .fillMaxWidth().searchTarget(title)
@@ -161,14 +164,15 @@ fun SettingsSliderRow(
                 modifier = Modifier.weight(1f)
             )
             Text(
-                valueLabel(value),
+                valueLabel(if(dragging)kotlin.math.round(draft).toInt()else value),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Slider(
-            value = value.toFloat(),
-            onValueChange = { onChange(it.toInt()) },
+        app.tgdrive.ui.SlimSlider(
+            value = if(dragging)draft else value.toFloat(),
+            onValueChange = { dragging=true;draft=it },
+            onValueChangeFinished={val next=kotlin.math.round(draft).toInt().coerceIn(range);dragging=false;if(next!=value)onChange(next)},
             valueRange = range.first.toFloat()..range.last.toFloat(),
             steps = (range.last - range.first - 1).coerceAtLeast(0)
         )

@@ -182,6 +182,11 @@ fun FilesScreen(
     viewModel: FilesViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var searching by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    val searchModel:com.infinity.drive.presentation.search.SearchViewModel=koinViewModel()
+    val searchState by searchModel.uiState.collectAsStateWithLifecycle()
+    AppBackHandler(searching){searching=false;searchModel.setQuery("")}
+
     val renameTarget by viewModel.renameTarget.collectAsStateWithLifecycle()
     val files = viewModel.pagedFiles.collectAsLazyPagingItems()
     val infoTarget by viewModel.infoTarget.collectAsStateWithLifecycle()
@@ -441,9 +446,9 @@ fun FilesScreen(
                             }
                         )
                     } else {
-                        TopAppBar(
-                            colors = liftedTopAppBarColors(lifted),
-                            title = { Text(if(audioOnly)"Audio"else stringResource(Res.string.files)) },
+                        app.tgdrive.ui.ExpandableLibraryHeader(
+                            title=if(audioOnly)"Audio"else "All files",
+                            query=searchState.query,onQueryChange=searchModel::setQuery,expanded=searching,onExpandedChange={searching=it},placeholder="Search files",
                             navigationIcon = {
                                 onBack?.let {
                                     IconButton(onClick = it) {
@@ -459,12 +464,6 @@ fun FilesScreen(
                                     refreshing = refreshing,
                                     onRefresh = viewModel::refresh
                                 )
-                                if(!audioOnly)IconButton(onClick = onOpenSearch) {
-                                    Icon(
-                                        DriveIcons.Search,
-                                        contentDescription = stringResource(Res.string.files_search)
-                                    )
-                                }
                                 if(!audioOnly)IconButton(onClick = { showCreateFolder = true }) {
                                     Icon(
                                         DriveIcons.CreateNewFolder,
@@ -491,13 +490,12 @@ fun FilesScreen(
                         )
                     }
 
-                        if(audioOnly&&!state.selectionMode)app.tgdrive.ui.LibrarySearchField(
-                            audioQuery,{audioQuery=it;viewModel.setAudioQuery(it)},"Search audio",Modifier.padding(horizontal=16.dp).padding(bottom=12.dp))
+
                     }
                 },
                 floatingActionButton = {
                     AnimatedVisibility(
-                        visible = fabVisible && !state.selectionMode && !audioOnly,
+                        visible = fabVisible && !state.selectionMode && !audioOnly && !searching,
                         enter = scaleIn() + fadeIn(),
                         exit = scaleOut() + fadeOut()
                     ) {
@@ -565,6 +563,10 @@ fun FilesScreen(
                     }
                 }
             ) { padding ->
+                if(searching){
+                    com.infinity.drive.presentation.search.SearchScreen(onBack={searching=false;searchModel.setQuery("")},onOpenFile=onOpenFile,onOpenFolder=onOpenFolder,viewModel=searchModel,showHeader=false,modifier=Modifier.padding(padding))
+                    return@Scaffold
+                }
                 var everLoaded by remember(state.folderId) { mutableStateOf(false) }
                 val loadingNow = !state.loaded || files.isInitialLoad
                 LaunchedEffect(loadingNow) {

@@ -80,19 +80,25 @@ class RebuiltUiTest {
         compose.onNodeWithText("Your library").assertIsDisplayed()
         capture("home")
         compose.onNodeWithTag("navigation-gallery").performClick()
+        compose.onNodeWithContentDescription("Search gallery").performClick()
         compose.onNodeWithText("Search photos and videos").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Close search").performClick()
         capture("gallery")
         compose.onNodeWithContentDescription("Sort gallery").performClick()
         compose.onNodeWithText("Size").performClick()
         compose.onNodeWithTag("navigation-audio").performClick()
+        compose.onNodeWithContentDescription("Search audio").performClick()
         compose.onNodeWithText("Search audio").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Close search").performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Song",substring=false).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Song",substring=false).assertIsDisplayed()
         capture("audio")
         compose.onNodeWithText("Report.pdf").assertDoesNotExist()
         compose.onNodeWithText("Photo.jpg").assertDoesNotExist()
         compose.onNodeWithTag("navigation-settings").performClick()
+        compose.onNodeWithContentDescription("Search settings").performClick()
         compose.onNodeWithText("Search settings").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Close search").performClick()
         capture("settings")
         compose.onNodeWithText("Telegram account").performClick()
         compose.onNodeWithText("Previous library").assertIsDisplayed()
@@ -106,6 +112,7 @@ class RebuiltUiTest {
     @Test fun settingsSearchFindsControlsAndExplainsNoResults() {
         compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithTag("navigation-settings").performClick()
+        compose.onNodeWithContentDescription("Search settings").performClick()
         compose.onNode(hasSetTextAction()).performTextInput("background")
         compose.onNodeWithText("Background playback",substring=false).assertIsDisplayed().performClick()
         compose.onNodeWithText("Background playback",substring=false).assertIsDisplayed()
@@ -142,16 +149,39 @@ class RebuiltUiTest {
             } }
         }
         compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithText("Upload",substring=false).assertIsDisplayed()
+        compose.onNodeWithContentDescription("Upload files").assertIsDisplayed()
         listOf("gallery","audio","settings").forEach {
             compose.onNodeWithTag("navigation-$it").assertIsDisplayed().performClick()
+            compose.onNodeWithContentDescription("Search $it").performClick()
             compose.onNode(hasSetTextAction()).assertIsDisplayed()
+            compose.onNodeWithContentDescription("Close search").performClick()
         }
         runBlocking { GlobalContext.get().get<SettingsRepository>().update { it.copy(onboardingComplete=false) } }
         compose.waitUntil(10_000){compose.onAllNodesWithText("Get started").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("Get started").performScrollTo().performClick()
         compose.onNodeWithText("Continue",substring=false).performScrollTo().assertIsDisplayed().assertIsNotEnabled()
         capture("api-large-text")
+    }
+
+
+    @Test fun backGestureCommitsOnceAndSearchClosesBeforeLeavingThePage() {
+        compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("All files",substring=false).performClick()
+        compose.onNodeWithText("All files",substring=false).assertIsDisplayed()
+        compose.runOnUiThread {
+            val dispatcher=activity.get().onBackPressedDispatcher
+            dispatcher.dispatchOnBackStarted(androidx.activity.BackEventCompat(0f,100f,0f,0))
+            dispatcher.dispatchOnBackProgressed(androidx.activity.BackEventCompat(160f,100f,.6f,0))
+        }
+        compose.onNodeWithText("All files",substring=false).assertIsDisplayed()
+        compose.onNodeWithText("Your library").assertDoesNotExist()
+        compose.runOnUiThread{activity.get().onBackPressedDispatcher.dispatchOnBackCancelled()}
+        compose.onNodeWithContentDescription("Search all files").performClick()
+        compose.onNode(hasSetTextAction()).performTextInput("Photo")
+        compose.runOnUiThread{activity.get().onBackPressedDispatcher.onBackPressed()}
+        compose.onNodeWithContentDescription("Search all files").assertIsDisplayed()
+        compose.runOnUiThread{activity.get().onBackPressedDispatcher.onBackPressed()}
+        compose.onNodeWithText("Your library").assertIsDisplayed()
     }
 
     private fun capture(name:String) {

@@ -141,7 +141,7 @@ fun MediaPlayer(
 
     val lifecycleOwner = LocalLifecycleOwner.current
     val backgroundAllowed by rememberUpdatedState(allowBackgroundPlayback)
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner,player) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP && !backgroundAllowed) {
                 player?.pause()
@@ -158,6 +158,7 @@ fun MediaPlayer(
     }
 
     var interactionTick by remember { mutableIntStateOf(0) }
+    var scrubbing by remember { mutableStateOf(false) }
     val visibleControls by rememberUpdatedState(controlsVisible)
     var resizeMode by remember { mutableStateOf(PlayerResizeMode.FIT) }
     var playing by remember(player) { mutableStateOf(player?.isPlaying == true) }
@@ -177,6 +178,7 @@ fun MediaPlayer(
             }
 
             override fun onPlayerError(error: PlaybackException) {
+                notifyControls(true)
                 when (error.errorCode) {
                     PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
                     PlaybackException.ERROR_CODE_DECODING_FAILED,
@@ -192,8 +194,8 @@ fun MediaPlayer(
         onDispose { player.removeListener(listener) }
     }
 
-    LaunchedEffect(controlsVisible, playing, interactionTick, activePage, audioOnly) {
-        if (!controlsVisible || !playing || !activePage || audioOnly) return@LaunchedEffect
+    LaunchedEffect(controlsVisible, playing, interactionTick, activePage, audioOnly,scrubbing) {
+        if (!controlsVisible || !playing || !activePage || audioOnly || scrubbing) return@LaunchedEffect
         delay(CONTROLLER_TIMEOUT_MS.milliseconds)
         notifyControls(false)
     }
@@ -209,7 +211,7 @@ fun MediaPlayer(
         if (!audioOnly && player != null) {
             AndroidView(
                 factory = { viewContext ->
-                    PlayerView(viewContext).apply {
+                    (android.view.LayoutInflater.from(viewContext).inflate(app.tgdrive.R.layout.teledrive_video_surface,null,false) as PlayerView).apply {
                         useController = false
                         this.player = player
                         setBackgroundColor(Color.TRANSPARENT)
@@ -224,7 +226,8 @@ fun MediaPlayer(
                         PlayerResizeMode.FILL -> AspectRatioFrameLayout.RESIZE_MODE_FILL
                     }
                 },
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                onRelease={it.player=null}
             )
         }
         if (!audioOnly && !sized) {
@@ -286,6 +289,7 @@ fun MediaPlayer(
                 resizeMode = resizeMode,
                 onCycleResizeMode = { resizeMode = resizeMode.next() },
                 onInteraction = { interactionTick++ },
+                onScrubbingChanged={scrubbing=it},
                 onPreferredAudioLanguage = onPreferredAudioLanguage,
                 onPreferredSubtitleLanguage = onPreferredSubtitleLanguage
             )

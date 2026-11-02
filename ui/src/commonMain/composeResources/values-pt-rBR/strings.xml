@@ -1,7 +1,7 @@
-<!-- Modified for TG Drive: Android integration, branding and visual adaptation. See third_party/driveinfinity/SOURCE.md. -->
+<!-- Modified for TeleDrive: Android integration, branding and visual adaptation. See third_party/driveinfinity/SOURCE.md. -->
 <resources>
     <!-- App-wide -->
-    <string name="app_name">TG Drive</string>
+    <string name="app_name">TeleDrive</string>
     <string name="app_backed_up">Salvo em backup</string>
     <string name="app_drive_recreated">Seu drive foi excluído no Telegram, portanto um novo vazio foi criado</string>
     <string name="app_no_results">Nenhum resultado</string>
@@ -122,8 +122,8 @@
 
     <!-- App lock -->
     <string name="lock_no_screen_lock">O bloqueio de tela não está disponível neste dispositivo. Desbloqueando.</string>
-    <string name="lock_prompt_title">Desbloquear o TG Drive</string>
-    <string name="lock_screen_title">O TG Drive está bloqueado</string>
+    <string name="lock_prompt_title">Desbloquear o TeleDrive</string>
+    <string name="lock_screen_title">O TeleDrive está bloqueado</string>
     <string name="lock_too_many_attempts">Muitas tentativas. Tente novamente mais tarde.</string>
     <string name="lock_unlock">Desbloquear</string>
     <string name="session_broken_action">Entrar novamente</string>
@@ -150,7 +150,7 @@
     <string name="onboarding_api_id">ID da API</string>
     <string name="onboarding_api_id_number">O ID da API deve ser um número</string>
     <string name="onboarding_choose_api_dev_tools">Escolha &quot;API development tools&quot; e crie um app. Qualquer nome serve.</string>
-    <string name="onboarding_copy_api_keys">Copie o api_id e o api_hash no TG Drive.</string>
+    <string name="onboarding_copy_api_keys">Copie o api_id e o api_hash no TeleDrive.</string>
     <string name="onboarding_get_api_keys">Obtenha suas chaves de API</string>
     <string name="onboarding_my_telegram_org">my.telegram.org</string>
     <string name="onboarding_one_time_setup_keys">Configuração única. Suas chaves permanecem neste dispositivo, criptografadas.</string>
@@ -214,7 +214,7 @@
     <string name="onboarding_allow_media">Permitir acesso a mídia</string>
     <string name="onboarding_files_access_covers_documents">O acesso a todos os arquivos abrange documentos, downloads e pastas do cartão SD. Sem ele, essas pastas não poderão ser salvas em backup.</string>
     <string name="onboarding_storage_access">Acesso ao armazenamento</string>
-    <string name="onboarding_driveinfinity_needs_media_files">O TG Drive precisa de acesso às suas mídias e arquivos para fazer o backup e de notificações para exibir o progresso das transferências.</string>
+    <string name="onboarding_driveinfinity_needs_media_files">O TeleDrive precisa de acesso às suas mídias e arquivos para fazer o backup e de notificações para exibir o progresso das transferências.</string>
 
     <!-- Onboarding: drive setup -->
     <string name="onboarding_channel_files_in_channel">%1$d arquivos neste canal</string>
@@ -526,7 +526,7 @@
 
     <!-- Drives and channels -->
     <string name="channels_channel_container">contêiner-canal</string>
-    <string name="channels_create_one_driveinfinity_store">Crie um e o TG Drive armazenará seus arquivos nesse canal privado.</string>
+    <string name="channels_create_one_driveinfinity_store">Crie um e o TeleDrive armazenará seus arquivos nesse canal privado.</string>
     <string name="channels_creates_private_channel_account">Cria um canal privado na sua conta. O nome ajuda a distinguir seus drives.</string>
     <string name="channels_creating_drive">Criando drive</string>
     <string name="channels_delete_confirm_hint">Digite %1$s para confirmar</string>
@@ -781,7 +781,7 @@
     <!-- Permissions -->
     <string name="permission_all_files_rationale">Necessário para fazer backup de documentos, downloads e pastas do cartão SD</string>
     <string name="permission_all_files_title">Acesso a todos os arquivos</string>
-    <string name="permission_missing_message">O TG Drive não pode ler %1$s sem permissão.</string>
+    <string name="permission_missing_message">O TeleDrive não pode ler %1$s sem permissão.</string>
     <string name="permission_not_allowed">Não permitido \u00b7 %1$s</string>
     <string name="permission_notifications_rationale">Exibe o progresso de transferências e backups</string>
     <string name="permission_notifications_title">Notificações</string>
@@ -809,13 +809,13 @@
     <string name="about_check_updates">Verificar se há atualizações</string>
     <string name="about_check_updates_summary">Compara esta compilação com a versão mais recente</string>
     <string name="about_checking">Verificando…</string>
-    <string name="about_support">Apoiar o TG Drive</string>
+    <string name="about_support">Apoiar o TeleDrive</string>
     <string name="about_support_summary">Apoie o projeto pelo Ko-fi</string>
     <string name="about_no_update">Você está na versão mais recente</string>
-    <string name="about_section_project">TG Drive</string>
+    <string name="about_section_project">TeleDrive</string>
     <string name="about_section_updates">Atualizações</string>
-    <string name="about_source_code">TG Drive no GitHub</string>
-    <string name="about_source_code_summary">Abrir o repositório do TG Drive</string>
+    <string name="about_source_code">TeleDrive no GitHub</string>
+    <string name="about_source_code_summary">Abrir o repositório do TeleDrive</string>
     <string name="about_tagline">Seu próprio drive em nuvem, armazenado em um canal privado do Telegram.</string>
     <string name="about_update_download">Baixar</string>
     <string name="about_update_from">Instalada: %1$s; disponível: %2$s</string>

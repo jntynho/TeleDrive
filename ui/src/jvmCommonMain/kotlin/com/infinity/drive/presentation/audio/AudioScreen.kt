@@ -35,15 +35,16 @@ fun AudioScreen(onOpenFile:(String,PreviewSequence)->Unit,viewModel:AudioViewMod
     val player=LocalAudioPlayback.current
     val playback by player.state.collectAsStateWithLifecycle()
     val audio=viewModel.audio.collectAsLazyPagingItems()
+    var searching by rememberSaveable{mutableStateOf(false)}
+    com.infinity.drive.presentation.common.AppBackHandler(searching){searching=false;viewModel.search("")}
     var sorting by rememberSaveable{mutableStateOf(false)}
     val listState=rememberLazyListState()
     LaunchedEffect(query,filter,prefs.audioSortField,prefs.audioSortDirection){listState.scrollToItem(0)}
     Scaffold(topBar={Column{
-        LibraryHeader("Audio",actions={Box {
+        ExpandableLibraryHeader("Audio",query,viewModel::search,searching,{searching=it},"Search audio",actions={Box {
             TextButton({sorting=true}){Icon(DriveIcons.Sort,null,Modifier.size(20.dp));Spacer(Modifier.width(6.dp));Text("Sort")}
             SortMenu(sorting,prefs.audioSortField,prefs.audioSortDirection,{sorting=false},{field,direction->sorting=false;viewModel.sort(field,direction)},fields=listOf(FileSortField.NAME,FileSortField.DATE_ADDED,FileSortField.DATE_MODIFIED,FileSortField.SIZE))
         }})
-        LibrarySearchField(query,viewModel::search,"Search audio",Modifier.padding(horizontal=16.dp).padding(bottom=8.dp))
         LibraryFilters(listOf("All","Favorites","On device"),filter.ordinal,{viewModel.filter(AudioFilter.entries[it])})
     }}){padding->
         val bottom=padding.calculateBottomPadding()+LocalBottomBarInset.current
@@ -111,7 +112,7 @@ fun LibraryAudioMiniPlayer() {
                 IconButton(player::stop){Icon(DriveIcons.Close,"Close audio player")}
             }
             if(expanded&&state.durationMs>0){
-                Slider(value=state.positionMs.coerceIn(0,state.durationMs).toFloat(),onValueChange={player.seek(it.toLong())},valueRange=0f..state.durationMs.toFloat(),modifier=Modifier.padding(horizontal=16.dp))
+                app.tgdrive.ui.SlimSlider(value=state.positionMs.coerceIn(0,state.durationMs).toFloat(),onValueChange={player.seek(it.toLong())},valueRange=0f..state.durationMs.toFloat(),modifier=Modifier.padding(horizontal=16.dp))
                 Text("${Formatters.duration(state.positionMs)} / ${Formatters.duration(state.durationMs)}",Modifier.padding(start=16.dp,bottom=8.dp),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

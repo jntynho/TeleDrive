@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/brand/tg-drive-icon.svg" width="112" height="112" alt="TG Drive — Aero Fold app icon">
+  <img src="docs/brand/tg-drive-icon.svg" width="112" height="112" alt="TeleDrive — Aero Fold app icon">
 </p>
 
-<h1 align="center">TG Drive</h1>
+<h1 align="center">TeleDrive</h1>
 
 <p align="center"><strong>Everything you keep, in one place.</strong></p>
 <p align="center">A native Android home for your files, photos and music — stored in your own private Telegram channels.</p>

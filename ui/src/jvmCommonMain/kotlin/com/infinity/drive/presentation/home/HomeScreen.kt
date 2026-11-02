@@ -165,6 +165,11 @@ fun HomeScreen(
     viewModel: HomeViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var searching by rememberSaveable { mutableStateOf(false) }
+    val searchModel:com.infinity.drive.presentation.search.SearchViewModel=koinViewModel()
+    val searchState by searchModel.uiState.collectAsStateWithLifecycle()
+    com.infinity.drive.presentation.common.AppBackHandler(searching){searchModel.setQuery("");searching=false}
+
     var lastConnectionStatus by remember { mutableStateOf<ConnectionStatus?>(null) }
     val scanning by viewModel.scanning.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -202,24 +207,19 @@ fun HomeScreen(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { BottomBarSnackbarHost(snackbarHostState) },
         topBar = {
-            Column {
-                app.tgdrive.ui.LibraryHeader("Home",actions={
-                    Button(onAddFiles,shape=androidx.compose.foundation.shape.RoundedCornerShape(16.dp),modifier=Modifier.padding(end=16.dp),colors=ButtonDefaults.buttonColors(containerColor=app.tgdrive.ui.DriveStyle.ActionBlue,contentColor=androidx.compose.ui.graphics.Color.White)){
-                        Icon(DriveIcons.Add,null,Modifier.size(20.dp));Spacer(Modifier.width(6.dp));Text("Upload")
-                    }
-                })
-                androidx.compose.material3.Surface(
-                    onClick=onSearch,
-                    modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp).padding(bottom=12.dp),
-                    shape=app.tgdrive.ui.DriveStyle.PillShape,color=MaterialTheme.colorScheme.surface
-                ) {
-                    Row(Modifier.padding(horizontal=18.dp,vertical=16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
-                        Icon(DriveIcons.Search,null);Text("Search your files",color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+            app.tgdrive.ui.ExpandableLibraryHeader("Home",searchState.query,searchModel::setQuery,searching,{searching=it},"Search your files",actions={
+                androidx.compose.material3.FilledIconButton(onAddFiles,modifier=Modifier.padding(end=8.dp).size(48.dp),shape=CircleShape,
+                    colors=androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(containerColor=app.tgdrive.ui.DriveStyle.ActionBlue,contentColor=androidx.compose.ui.graphics.Color.White)){
+                    Icon(DriveIcons.Upload,"Upload files",Modifier.size(24.dp))
                 }
-            }
+            })
         }
+
     ) { padding ->
+        if(searching){
+            com.infinity.drive.presentation.search.SearchScreen(onBack={searching=false;searchModel.setQuery("")},onOpenFile=onOpenFile,onOpenFolder=onOpenFolder,viewModel=searchModel,showHeader=false,modifier=Modifier.padding(padding))
+            return@Scaffold
+        }
         if (state.loading) {
             LoadingState(modifier = Modifier.padding(padding))
             return@Scaffold
@@ -260,20 +260,6 @@ fun HomeScreen(
                                 viewModel.refreshPermissions()
                             }
                         }
-                    )
-                }
-            }
-            if (capabilities.supportsAutoBackup && (state.autoBackupEnabled || state.activeBackup!=null)) {
-                item {
-                    BackupCard(
-                        state = state,
-                        scanning = scanning,
-                        onChooseFolders = onOpenBackupSettings,
-                        onScanNow = viewModel::scanNow,
-                        onBackUpPending = viewModel::backUpPending,
-                        onPause = viewModel::pauseBackup,
-                        onResume = viewModel::resumeBackup,
-                        onCancel = { confirmCancelBackup = it }
                     )
                 }
             }

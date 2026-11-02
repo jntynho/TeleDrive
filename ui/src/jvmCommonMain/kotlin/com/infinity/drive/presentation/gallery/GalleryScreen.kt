@@ -114,7 +114,7 @@ private fun DayHeaderRow(dayStartMillis: Long, modifier: Modifier = Modifier) {
         },
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.padding(start = 4.dp, top = 12.dp, bottom = 4.dp)
+        modifier = modifier.padding(start = 0.dp, top = 12.dp, bottom = 4.dp)
     )
 }
 
@@ -178,6 +178,8 @@ fun GalleryScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
     var albumQuery by rememberSaveable { mutableStateOf("") }
+    var searching by rememberSaveable { mutableStateOf(false) }
+    AppBackHandler(searching){searching=false;viewModel.setQuery("");albumQuery=""}
     var sorting by remember { mutableStateOf(false) }
     val media = viewModel.pagedMedia.collectAsLazyPagingItems()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
@@ -326,7 +328,11 @@ fun GalleryScreen(
                     }
                 )
             } else {
-                app.tgdrive.ui.LibraryHeader(
+                app.tgdrive.ui.ExpandableLibraryHeader(
+                    query=if(state.tab==GalleryTab.ALBUMS)albumQuery else query,
+                    onQueryChange={if(state.tab==GalleryTab.ALBUMS)albumQuery=it else viewModel.setQuery(it)},
+                    expanded=searching,onExpandedChange={searching=it},
+                    placeholder=if(state.tab==GalleryTab.ALBUMS)"Search albums"else"Search photos and videos",
                     title = state.albumTitle ?: if(state.tab==GalleryTab.ALBUMS) "Albums" else stringResource(Res.string.gallery_title),
                     navigationIcon = {
                         onBack?.let {
@@ -349,7 +355,6 @@ fun GalleryScreen(
                     }
                 )
             }
-            if(!state.selectionMode)LibrarySearchField(if(state.tab==GalleryTab.ALBUMS)albumQuery else query,{if(state.tab==GalleryTab.ALBUMS)albumQuery=it else viewModel.setQuery(it)},if(state.tab==GalleryTab.ALBUMS)"Search albums"else"Search photos and videos",Modifier.padding(horizontal=16.dp).padding(bottom=8.dp))
         } }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(top=padding.calculateTopPadding())) {
@@ -466,8 +471,8 @@ fun GalleryScreen(
                             )
                             .then(gridDragSelect),
                         contentPadding = PaddingValues(
-                            start = 4.dp,
-                            end = 4.dp,
+                            start = 0.dp,
+                            end = 0.dp,
                             top = 12.dp,
                             bottom = 12.dp + padding.calculateBottomPadding() + LocalBottomBarInset.current
                         ),

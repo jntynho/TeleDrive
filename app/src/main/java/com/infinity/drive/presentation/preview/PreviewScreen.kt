@@ -67,6 +67,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
@@ -195,7 +196,7 @@ fun PreviewScreen(
         return
     }
     if (state.files.isEmpty()) {
-        onBack()
+        LaunchedEffect(Unit){onBack()}
         return
     }
 
@@ -213,7 +214,9 @@ fun PreviewScreen(
     val immersive = currentFile.category == FileCategory.IMAGE ||
             currentFile.category == FileCategory.VIDEO
     var chromeVisible by remember { mutableStateOf(true) }
-    val chromeShown = chromeVisible || !immersive
+    var imageZoomed by remember { mutableStateOf(false) }
+    LaunchedEffect(pagerState.currentPage){imageZoomed=false;chromeVisible=true;showOverflow=false}
+    val chromeShown = (chromeVisible&&!imageZoomed) || !immersive
 
     val view = LocalView.current
     val activity = LocalActivity.current
@@ -243,6 +246,7 @@ fun PreviewScreen(
             HorizontalPager(
                 state = pagerState,
                 beyondViewportPageCount = 1,
+                userScrollEnabled=!imageZoomed,
                 modifier = Modifier
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.surfaceContainerLowest),
@@ -265,7 +269,8 @@ fun PreviewScreen(
                     preferredSubtitleLanguage = preferredSubtitleLanguage,
                     onPreferredAudioLanguage = viewModel::setPreferredAudioLanguage,
                     onPreferredSubtitleLanguage = viewModel::setPreferredSubtitleLanguage,
-                    onToggleChrome = { chromeVisible = !chromeVisible },
+                    onToggleChrome = { if(!imageZoomed)chromeVisible = !chromeVisible },
+                    onImageZoomChanged={zoomed->if(pagerState.currentPage==page){imageZoomed=zoomed;if(zoomed)chromeVisible=false}},
                     onChromeRequested = { visible -> chromeVisible = visible }
                 )
             }
@@ -277,12 +282,13 @@ fun PreviewScreen(
                 modifier = Modifier.align(Alignment.TopCenter)
             ) {
                 TopAppBar(
+                    expandedHeight=52.dp,
                     title = {
                         Text(
                             currentFile.name,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.bodyLarge
                         )
                     },
                     navigationIcon = {
@@ -310,12 +316,6 @@ fun PreviewScreen(
                                 )
                             }
                         }
-                        IconButton(onClick = { viewModel.showInfo(currentFile) }) {
-                            Icon(
-                                DriveIcons.Info,
-                                contentDescription = stringResource(Res.string.preview_file_info)
-                            )
-                        }
                         Box {
                             IconButton(onClick = { showOverflow = true }) {
                                 Icon(
@@ -327,6 +327,7 @@ fun PreviewScreen(
                                 expanded = showOverflow,
                                 onDismissRequest = { showOverflow = false }
                             ) {
+                                DropdownMenuItem(text={Text(stringResource(Res.string.preview_file_info))},onClick={showOverflow=false;viewModel.showInfo(currentFile)})
                                 DropdownMenuItem(
                                     text = {
                                         Text(
@@ -423,7 +424,7 @@ fun PreviewScreen(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+                        containerColor = Color.Transparent,scrolledContainerColor=Color.Transparent
                     )
                 )
             }
@@ -476,6 +477,7 @@ private fun PreviewPage(
     onPreferredAudioLanguage: (String) -> Unit,
     onPreferredSubtitleLanguage: (String) -> Unit,
     onToggleChrome: () -> Unit,
+    onImageZoomChanged:(Boolean)->Unit={},
     onChromeRequested: (Boolean) -> Unit,
     loadLinkMetadata: suspend (String) -> LinkMetadata?,
     storedTextScale: Float,
@@ -543,7 +545,8 @@ private fun PreviewPage(
         is PreviewContent.Image -> ZoomableImage(
             model = content.model,
             contentDescription = file.name,
-            onTap = onToggleChrome
+            onTap = onToggleChrome,
+            onZoomChanged=onImageZoomChanged
         )
 
         is PreviewContent.LocalMedia,

@@ -3,6 +3,8 @@ package app.tgdrive.ui
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -71,6 +73,7 @@ private val DriveTypography = Typography(
 @Composable
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 fun DriveTheme(colorScheme:ColorScheme=DriveColors,content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalOverscrollFactory provides ElasticOverscrollFactory) {
     MaterialExpressiveTheme(
         colorScheme = colorScheme, typography = DriveTypography, motionScheme = MotionScheme.standard(),
         shapes = Shapes(
@@ -79,4 +82,5 @@ fun DriveTheme(colorScheme:ColorScheme=DriveColors,content: @Composable () -> Un
             extraLarge = RoundedCornerShape(32.dp),
         ), content = content,
     )
+    }
 }

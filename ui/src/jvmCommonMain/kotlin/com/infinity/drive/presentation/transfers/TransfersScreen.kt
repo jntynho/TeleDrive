@@ -274,17 +274,17 @@ private fun LazyListScope.section(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 8.dp, bottom = 2.dp),
+                .animateItem().padding(top = 8.dp, bottom = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(text = title,style = MaterialTheme.typography.labelLarge,color = MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(top=10.dp,bottom=10.dp))
 
         }
     }
-    itemsIndexed(transfers,key={_,transfer->"$sectionKey-${transfer.id}"}) { index,transfer ->
+    itemsIndexed(transfers,key={_,transfer->"transfer-${transfer.id}"}) { index,transfer ->
         val top=if(index==0)24.dp else 0.dp
         val bottom=if(index==transfers.lastIndex)24.dp else 0.dp
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(topStart=top,topEnd=top,bottomStart=bottom,bottomEnd=bottom)).background(MaterialTheme.colorScheme.surfaceContainer)) {
+        Column(Modifier.animateItem(fadeInSpec=androidx.compose.animation.core.tween(160),placementSpec=androidx.compose.animation.core.spring(dampingRatio=1f,stiffness=500f),fadeOutSpec=androidx.compose.animation.core.tween(120)).fillMaxWidth().clip(RoundedCornerShape(topStart=top,topEnd=top,bottomStart=bottom,bottomEnd=bottom)).background(MaterialTheme.colorScheme.surfaceContainer)) {
             content(transfer)
             if(index!=transfers.lastIndex)HorizontalDivider(Modifier.padding(start=72.dp,end=16.dp),color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.35f))
         }
@@ -436,7 +436,8 @@ private fun ChunkProgressBar(
     chunkCount: Int,
     modifier: Modifier = Modifier
 ) {
-    LinearProgressIndicator(progress={progress},modifier=modifier.height(3.dp),gapSize=0.dp,drawStopIndicator={})
+    val displayed by androidx.compose.animation.core.animateFloatAsState(progress.coerceIn(0f,1f),animationSpec=androidx.compose.animation.core.tween(180,easing=androidx.compose.animation.core.LinearEasing),label="transferProgress")
+    LinearProgressIndicator(progress={displayed},modifier=modifier.height(3.dp),gapSize=0.dp,drawStopIndicator={})
 }
 
 private fun chunkLabel(transfer: TransferTask): String {

@@ -1,24 +1,15 @@
-// Modified for TG Drive: Android integration, safety fixes and visual adaptation; see third_party/driveinfinity/SOURCE.md.
+// Modified for TeleDrive; see third_party/driveinfinity/SOURCE.md.
 package com.infinity.drive.presentation.preview
 
 import app.tgdrive.ui.DriveIcons
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculatePan
-import androidx.compose.foundation.gestures.calculateZoom
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -30,120 +21,80 @@ import coil3.compose.AsyncImagePainter
 import com.infinity.drive.presentation.components.EmptyState
 import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.preview_image_undecodable
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import org.jetbrains.compose.resources.stringResource
+import kotlin.math.abs
 
-/**
- * Pinch and double-tap zoomable image. Pan is clamped so the image cannot be
- * dragged off-screen, and touches stay unconsumed while the image sits at 1x
- * so a horizontal drag still reaches the pager.
- */
+/** Fit-aware zoom. Drag transforms are synchronous; only double-tap uses an animation. */
 @Composable
-fun ZoomableImage(
-    model: Any,
-    contentDescription: String?,
-    modifier: Modifier = Modifier,
-    onTap: () -> Unit = {}
+fun ZoomableImage(model:Any,contentDescription:String?,modifier:Modifier=Modifier,
+    onTap:()->Unit={},onZoomChanged:(Boolean)->Unit={}
 ) {
-    var undecodable by remember(model) { mutableStateOf(false) }
-    if (undecodable) {
-        EmptyState(
-            icon = DriveIcons.BrokenImage,
-            title = stringResource(Res.string.preview_image_undecodable),
-            modifier = modifier.fillMaxSize()
-        )
-        return
-    }
-    val scale = remember { Animatable(1f) }
-    val offset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
-    val scope = rememberCoroutineScope()
-    var viewport by remember { mutableStateOf(IntSize.Zero) }
-
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .onSizeChanged { viewport = it }
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { onTap() },
-                    onDoubleTap = { tapOffset ->
-                        val zoomedIn = scale.value > 1f
-                        val target = if (zoomedIn) 1f else DOUBLE_TAP_SCALE
-                        val focus = if (zoomedIn) {
-                            Offset.Zero
-                        } else {
-                            clampOffset(
-                                Offset(
-                                    (viewport.width / 2f - tapOffset.x) * (target - 1f),
-                                    (viewport.height / 2f - tapOffset.y) * (target - 1f)
-                                ),
-                                target,
-                                viewport
-                            )
-                        }
-                        scope.launch {
-                            launch { scale.animateTo(target, tween(ZOOM_ANIMATION_MS)) }
-                            launch { offset.animateTo(focus, tween(ZOOM_ANIMATION_MS)) }
-                        }
-                    }
-                )
-            }
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false)
-                    do {
-                        val event = awaitPointerEvent()
-                        val pinching = event.changes.count { it.pressed } > 1
-                        if (!pinching && scale.value <= 1f) continue
-
-                        val zoom = event.calculateZoom()
-                        val pan = event.calculatePan()
-                        if (zoom == 1f && pan == Offset.Zero) continue
-
-                        val target = (scale.value * zoom).coerceIn(1f, MAX_SCALE)
-                        val moved = if (target > 1f) {
-                            clampOffset(offset.value + pan, target, viewport)
-                        } else {
-                            Offset.Zero
-                        }
-                        scope.launch {
-                            launch { scale.snapTo(target) }
-                            launch { offset.snapTo(moved) }
-                        }
-                        event.changes.forEach { it.consume() }
-                    } while (event.changes.any { it.pressed })
+    var failed by remember(model){mutableStateOf(false)}
+    var scale by remember(model){mutableFloatStateOf(1f)}
+    var offset by remember(model){mutableStateOf(Offset.Zero)}
+    var viewport by remember(model){mutableStateOf(IntSize.Zero)}
+    var imageSize by remember(model){mutableStateOf(IntSize.Zero)}
+    var animation by remember(model){mutableStateOf<Job?>(null)}
+    val scope=rememberCoroutineScope()
+    val tap by rememberUpdatedState(onTap)
+    val zoomChanged by rememberUpdatedState(onZoomChanged)
+    fun clamp(position:Offset,zoom:Float):Offset=clampImagePan(position,zoom,viewport,imageSize)
+    LaunchedEffect(model){snapshotFlow{scale>1.01f}.distinctUntilChanged().collect{zoomChanged(it)}}
+    DisposableEffect(model){onDispose{animation?.cancel();zoomChanged(false)}}
+    if(failed){EmptyState(DriveIcons.BrokenImage,stringResource(Res.string.preview_image_undecodable),modifier=modifier);return}
+    Box(modifier.fillMaxSize().clipToBounds().onSizeChanged{viewport=it;offset=clamp(offset,scale)}
+        .pointerInput(model){detectTapGestures(onTap={tap()},onDoubleTap={point->
+            animation?.cancel()
+            val startScale=scale
+            val startOffset=offset
+            val targetScale=if(scale>1.01f)1f else 2.5f
+            val anchor=point-Offset(viewport.width/2f,viewport.height/2f)
+            val targetOffset=clamp((startOffset-anchor)*(targetScale/startScale)+anchor,targetScale)
+            animation=scope.launch{
+                Animatable(0f).animateTo(1f,tween(220)){
+                    scale=startScale+(targetScale-startScale)*value
+                    offset=clamp(startOffset+(targetOffset-startOffset)*value,scale)
                 }
             }
+        })}
+        .pointerInput(model){awaitEachGesture{
+            awaitFirstDown(requireUnconsumed=false)
+            do {
+                val event=awaitPointerEvent()
+                val pinching=event.changes.count{it.pressed}>1
+                if(!pinching&&scale<=1.01f)continue
+                val zoom=event.calculateZoom()
+                val pan=event.calculatePan()
+                if(abs(zoom-1f)<.0001f&&pan==Offset.Zero)continue
+                animation?.cancel()
+                val next=(scale*zoom).coerceIn(1f,6f)
+                val centroid=event.calculateCentroid(useCurrent=false)
+                val anchor=if(centroid.x.isFinite()&&centroid.y.isFinite())centroid-Offset(viewport.width/2f,viewport.height/2f)else Offset.Zero
+                offset=if(next<=1.01f)Offset.Zero else clamp((offset-anchor)*(next/scale)+anchor+pan,next)
+                scale=next
+                event.changes.forEach{it.consume()}
+            }while(event.changes.any{it.pressed})
+        }}
     ) {
-        AsyncImage(
-            model = model,
-            contentDescription = contentDescription,
-            contentScale = ContentScale.Fit,
-            onState = { state ->
-                if (state is AsyncImagePainter.State.Error) undecodable = true
-            },
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    scaleX = scale.value
-                    scaleY = scale.value
-                    translationX = offset.value.x
-                    translationY = offset.value.y
-                }
-        )
+        AsyncImage(model,contentDescription,contentScale=ContentScale.Fit,onState={state->
+            when(state){
+                is AsyncImagePainter.State.Error->failed=true
+                is AsyncImagePainter.State.Success->{imageSize=IntSize(state.result.image.width,state.result.image.height);offset=clamp(offset,scale)}
+                else->Unit
+            }
+        },modifier=Modifier.fillMaxSize().graphicsLayer{scaleX=scale;scaleY=scale;translationX=offset.x;translationY=offset.y})
     }
 }
 
-/** Keeps the scaled image covering the viewport, so no empty edge shows. */
-private fun clampOffset(target: Offset, scale: Float, viewport: IntSize): Offset {
-    val maxX = viewport.width * (scale - 1f) / 2f
-    val maxY = viewport.height * (scale - 1f) / 2f
-    return Offset(
-        x = target.x.coerceIn(-maxX, maxX),
-        y = target.y.coerceIn(-maxY, maxY)
-    )
+internal fun clampImagePan(position:Offset,scale:Float,viewport:IntSize,image:IntSize):Offset {
+    if(viewport.width<=0||viewport.height<=0||scale<=1f)return Offset.Zero
+    val ratio=if(image.width>0&&image.height>0)minOf(viewport.width.toFloat()/image.width,viewport.height.toFloat()/image.height)else 1f
+    val width=if(image.width>0)image.width*ratio else viewport.width.toFloat()
+    val height=if(image.height>0)image.height*ratio else viewport.height.toFloat()
+    val x=((width*scale-viewport.width)/2f).coerceAtLeast(0f)
+    val y=((height*scale-viewport.height)/2f).coerceAtLeast(0f)
+    return Offset(if(x>0f)position.x.coerceIn(-x,x)else 0f,if(y>0f)position.y.coerceIn(-y,y)else 0f)
 }
-
-private const val MAX_SCALE = 6f
-private const val DOUBLE_TAP_SCALE = 2.5f
-private const val ZOOM_ANIMATION_MS = 250

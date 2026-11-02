@@ -60,7 +60,7 @@ class DriveDesignTest {
         screenshot("settings")
         val destinations = linkedMapOf(
             "Telegram accounts" to "accounts", "Transfers" to "transfers", "Storage & offline" to "storage",
-            "Library & recovery" to "index", "Privacy & security" to "privacy", "Diagnostics" to "diagnostics", "About TG Drive" to "about",
+            "Library & recovery" to "index", "Privacy & security" to "privacy", "Diagnostics" to "diagnostics", "About TeleDrive" to "about",
         )
         destinations.forEach { (label, route) ->
             compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(label))
@@ -360,7 +360,7 @@ class DriveDesignTest {
         var settings=0
         render{LockedScreen("Device authentication was not completed. Try again.",{unlocks++},{settings++})}
         compose.onNodeWithText("Device authentication was not completed. Try again.").assertIsDisplayed()
-        compose.onNodeWithText("Unlock TG Drive").performScrollTo().performClick()
+        compose.onNodeWithText("Unlock TeleDrive").performScrollTo().performClick()
         compose.onNodeWithText("Open Android security settings").performScrollTo().performClick()
         assertEquals(1,unlocks);assertEquals(1,settings)
         screenshot("locked")

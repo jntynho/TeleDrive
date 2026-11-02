@@ -41,6 +41,7 @@ fun AppNavHost(
         navController = navController,
         startDestination = startDestination,
         modifier = modifier,
+        sizeTransform={androidx.compose.animation.SizeTransform(clip=true){_,_->androidx.compose.animation.core.snap()}},
         enterTransition = {
             if (isPeerSwitch()) tabEnterFor(verticalTabMotion, movesForward())
             else NavigationTransitions.sharedAxisEnter(forward = true)
@@ -58,7 +59,7 @@ fun AppNavHost(
             else NavigationTransitions.sharedAxisExit(forward = false)
         }
     ) {
-        composable<Route.Onboarding> {
+        stableComposable<Route.Onboarding>(navController) {
             OnboardingScreen(
                 onOpenProxy = { navController.navigateOnce(Route.Proxy) },
                 onFinished = {
@@ -68,7 +69,7 @@ fun AppNavHost(
                 }
             )
         }
-        composable<Route.Home> {
+        stableComposable<Route.Home>(navController) {
             UnderBottomBar {
                 HomeScreen(
                     onOpenFile = { id, sequence ->
@@ -90,7 +91,7 @@ fun AppNavHost(
                 )
             }
         }
-        composable<Route.Files> { entry ->
+        stableComposable<Route.Files>(navController) { entry ->
             UnderBottomBar {
                 val isRoot = entry.toRoute<Route.Files>().folderId == null
                 FilesScreen(
@@ -118,12 +119,12 @@ fun AppNavHost(
                 )
             }
         }
-        composable<Route.Audio> {
+        stableComposable<Route.Audio>(navController) {
             UnderBottomBar {
                 com.infinity.drive.presentation.audio.AudioScreen(onOpenFile={id,sequence->navController.navigateOnce(sequence.routeFor(id))})
             }
         }
-        composable<Route.Gallery> {
+        stableComposable<Route.Gallery>(navController) {
             UnderBottomBar {
                 val unfiledAlbumName = stringResource(Res.string.album_not_in_folder)
                 GalleryScreen(
@@ -138,7 +139,7 @@ fun AppNavHost(
                 )
             }
         }
-        composable<Route.GalleryAlbum> {
+        stableComposable<Route.GalleryAlbum>(navController) {
             GalleryScreen(
                 onOpenFile = { id, sequence ->
                     navController.navigateOnce(sequence.routeFor(id))
@@ -146,7 +147,7 @@ fun AppNavHost(
                 onBack = { navController.popBackStackOnce() }
             )
         }
-        composable<Route.Preview>(
+        stableComposable<Route.Preview>(navController,
             enterTransition = { NavigationTransitions.previewEnter() },
             exitTransition = { NavigationTransitions.fadeThroughExit() },
             popEnterTransition = { NavigationTransitions.fadeThroughEnter() },
@@ -161,10 +162,10 @@ fun AppNavHost(
                 }
             )
         }
-        composable<Route.Transfers> {
+        stableComposable<Route.Transfers>(navController) {
             TransfersScreen(onBack = { navController.popBackStackOnce() })
         }
-        composable<Route.Search> {
+        stableComposable<Route.Search>(navController) {
             SearchScreen(
                 onBack = { navController.popBackStackOnce() },
                 onOpenFile = { id, sequence ->
@@ -173,7 +174,7 @@ fun AppNavHost(
                 onOpenFolder = { navController.navigateOnce(Route.Files(it)) }
             )
         }
-        composable<Route.Collection> {
+        stableComposable<Route.Collection>(navController) {
             CollectionScreen(
                 onBack = { navController.popBackStackOnce() },
                 onOpenFile = { id, sequence ->
@@ -181,16 +182,16 @@ fun AppNavHost(
                 }
             )
         }
-        composable<Route.NoteEditor> {
+        stableComposable<Route.NoteEditor>(navController) {
             NoteEditorScreen(onBack = { navController.popBackStackOnce() })
         }
-        composable<Route.Channels> {
+        stableComposable<Route.Channels>(navController) {
             ChannelsScreen(onBack = { navController.popBackStackOnce() })
         }
-        composable<Route.Trash> {
+        stableComposable<Route.Trash>(navController) {
             TrashScreen(onBack = { navController.popBackStackOnce() })
         }
-        composable<Route.Settings> {
+        stableComposable<Route.Settings>(navController) {
             UnderBottomBar {
                 SettingsScreen(
                     onBack = null,
@@ -202,7 +203,7 @@ fun AppNavHost(
                 )
             }
         }
-        composable<Route.SettingsSection> { entry ->
+        stableComposable<Route.SettingsSection>(navController) { entry ->
             val route = entry.toRoute<Route.SettingsSection>()
             val section = SettingsSectionType.entries
                 .firstOrNull { it.name == route.section }
@@ -223,13 +224,13 @@ fun AppNavHost(
             )
             }
         }
-        composable<Route.PreviousLibrary> {
+        stableComposable<Route.PreviousLibrary>(navController) {
             LocalPlatformScreens.current.PreviousLibrary(onBack = { navController.popBackStackOnce() })
         }
-        composable<Route.Exclusions> {
+        stableComposable<Route.Exclusions>(navController) {
             ExclusionsScreen(onBack = { navController.popBackStackOnce() })
         }
-        composable<Route.Proxy> {
+        stableComposable<Route.Proxy>(navController) {
             ProxyScreen(onBack = { navController.popBackStackOnce() })
         }
     }
@@ -255,4 +256,19 @@ private fun UnderBottomBar(content: @Composable () -> Unit) {
         LocalBottomBarInset provides LocalBottomBarHeight.current,
         content = content
     )
+}
+
+/** Disable gesture-progress previews while retaining the ordinary committed pop transition. */
+private inline fun <reified T:Any> androidx.navigation.NavGraphBuilder.stableComposable(
+    controller:NavHostController,
+    noinline enterTransition:(androidx.compose.animation.AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.()->androidx.compose.animation.EnterTransition?)?=null,
+    noinline exitTransition:(androidx.compose.animation.AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.()->androidx.compose.animation.ExitTransition?)?=null,
+    noinline popEnterTransition:(androidx.compose.animation.AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.()->androidx.compose.animation.EnterTransition?)?=enterTransition,
+    noinline popExitTransition:(androidx.compose.animation.AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.()->androidx.compose.animation.ExitTransition?)?=exitTransition,
+    noinline content:@Composable androidx.compose.animation.AnimatedContentScope.(androidx.navigation.NavBackStackEntry)->Unit
+) {
+    composable<T>(enterTransition=enterTransition,exitTransition=exitTransition,popEnterTransition=popEnterTransition,popExitTransition=popExitTransition){entry->
+        com.infinity.drive.presentation.common.AppBackHandler(controller.previousBackStackEntry!=null){controller.popBackStackOnce()}
+        content(entry)
+    }
 }
