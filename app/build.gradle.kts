@@ -55,8 +55,8 @@ android {
         abi {
             isEnable = providers.gradleProperty("splitApks").map(String::toBoolean).getOrElse(false)
             reset()
-            include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
-            isUniversalApk = true
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = false
         }
     }
     buildFeatures { compose = true; buildConfig = true }
