@@ -25,7 +25,7 @@ android {
     compileSdk = 37
     buildToolsVersion = "37.0.0"
     defaultConfig {
-        applicationId = "app.tgdrive"
+        applicationId = "app.tgdrive.next"
         minSdk = 26
         targetSdk = 37
         versionCode = setting("APP_VERSION_CODE").ifBlank { "24" }.toInt().also { require(it > 0) }

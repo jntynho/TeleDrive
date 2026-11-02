@@ -1,6 +1,6 @@
 # TG Drive rebuild: DriveInfinity foundation
 
-Baseline: ZHINFINITY/DriveInfinity `8a17d352802b8229038ce78363e670ace45c0c55` (Apache-2.0). Android is the target; previous instructions excluded desktop. The public Android identity remains `app.tgdrive` with the existing signing certificate and `app.tgdrive.MainActivity` entry point.
+Baseline: ZHINFINITY/DriveInfinity `8a17d352802b8229038ce78363e670ace45c0c55` (Apache-2.0). Android is the target; previous instructions excluded desktop. The fresh distribution is `app.tgdrive.next` (TG Drive Next), with a new pinned certificate and the retained `app.tgdrive.MainActivity` class. It installs beside the original application. Android prevents the fresh package from accessing the old package’s private session/index; old data stays in the original app.
 
 The reference `shared` engine and `ui` presentation modules are integrated rather than imitating their README. TG Drive changes are isolated in the platform integration and `skin` design module. The source attribution and license are under `third_party/driveinfinity`.
 

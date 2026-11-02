@@ -1,3 +1,5 @@
+> Signing recovery: the legacy signing step failed before Gradle. The authorized replacement is `app.tgdrive.next`, installed beside the original app with a separately pinned certificate. The app suite was rerun for that identity: 178 passed. The signing initializer was checked for first creation, reuse and refusal to replace a missing initialized key. Its signed-install gate replaces the old same-package upgrade gate.
+
 > Release output scope is now three standalone APKs: ARM64, ARM32 and x86_64. Five-APK/AAB results below record checks completed before that reduction; those extra outputs are no longer produced by CI.
 
 # Validation — Android private-channel rebuild

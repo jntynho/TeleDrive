@@ -22,7 +22,7 @@ for entry in metadata['elements']:
     variants[abi] = path
     versions.add((entry['versionCode'], entry['versionName']))
 assert set(variants) == expected, variants
-assert metadata['applicationId'] == 'app.tgdrive' and len(versions) == 1
+assert metadata['applicationId'] == 'app.tgdrive.next' and len(versions) == 1
 code, version = next(iter(versions))
 assert code > 11 and all(c.isalnum() or c in '.-' for c in version), (code, version)
 
@@ -59,4 +59,4 @@ for abi, source in sorted(variants.items()):
     checksums.append(line)
     print(f'{abi}: {target.stat().st_size / 1024**2:.1f} MiB')
 (dest / 'SHA256SUMS').write_text(''.join(checksums))
-print(f'Shared code/resources/assets and three standalone APKs verified; package app.tgdrive, version {version} ({code}).')
+print(f'Shared code/resources/assets and three standalone APKs verified; package app.tgdrive.next, version {version} ({code}).')

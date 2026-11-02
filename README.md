@@ -43,7 +43,7 @@ All variants require **Android 8.0 or later** and install independently. Downloa
 Only these three standalone APKs are published. Universal, x86 and AAB builds are disabled in the release workflow. GitHub's automatic source ZIP/TAR downloads contain source code; choose an APK to install.
 
 
-**Updating?** Install the new release APK over the existing release app to retain its data. The release workflow checks the existing signing identity and a signed in-place upgrade. Debug builds use a different signature; see the [release guide](docs/RELEASING.md).
+**New signing identity:** these releases install as **TG Drive Next** (`app.tgdrive.next`) alongside the original TG Drive. Keep the old app and its data; sign in again in Next. Subsequent Next releases use the pinned Next certificate. See the [release guide](docs/RELEASING.md).
 
 ## Features
 
@@ -80,11 +80,11 @@ No separate storage server is required. Telegram still controls account limits, 
 
 TDLib sends the document and its manifest caption in the same message directly to the chosen private channel. The caption records the file/folder identity and allows the index to be rebuilt. Large/encrypted files retain the reference multipart, streaming and key-recovery paths. One account-wide pacer controls message writes and respects Telegram's cooldowns; changing the destination does not remove those limits.
 
-## Updating from 0.x
+## Moving from the original app
 
-Keep the existing installation and install a release with the same signing certificate. The rebuild copies the active session when its original key is available, preserves previous data, and stops the old queue. Select unfinished uploads again from their original sources.
+TG Drive Next is a separate installation with a new signing identity. It does not overwrite `app.tgdrive`, clear its files, or read its private local session/index. Keep the original app for its existing Saved Messages library and old vaults. Sign in again in Next to use private-channel drives; restore the matching encryption recovery material when opening encrypted channel content.
 
-New uploads use private channels. **Settings → Account → Previous library** provides read-only access to previous Saved Messages files and vaults, with verified-copy export. It does not delete, move or automatically re-upload your previous library. The reference's new encryption format and 0.x vault format are distinct.
+The previous-library compatibility reader only reads data within the current installation's own namespace. It cannot bypass Android's isolation to import the other app's private data.
 
 Ordinary channels are not end-to-end encrypted. Keep encryption recovery material outside your phone and a separate copy of important data. Read [the security boundaries](docs/SECURITY.md) and [current validation status](docs/TESTING.md).
 
@@ -130,7 +130,7 @@ The optional sharing-service tests require Node.js 24. Native Android device tes
 
 The rebuilt onboarding asks for the user’s own API ID/hash. The old build-time fields remain for source compatibility and do not currently skip that step. Never commit credentials, user sessions, login codes, passwords or signing keys.
 
-Local release outputs are unsigned unless the existing signing configuration is supplied. The GitHub workflow verifies device tests, unit tests and release lint checks, matching APK payloads, signature/alignment and a signed upgrade before publishing installable assets. It does not upload to Google Play.
+Local release outputs are unsigned unless the Next signing configuration is supplied. The GitHub workflow verifies device tests, unit tests and release lint checks, matching APK payloads, signature/alignment and a signed installation check before publishing installable assets. It does not upload to Google Play.
 
 </details>
 

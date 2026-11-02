@@ -20,7 +20,7 @@ Imports, new TDLib storage, thumbnails and generated previews use the `drive-v2`
 
 ## Upgrades and previous libraries
 
-The application ID, launcher identity and signing-certificate requirement stay unchanged. The active 0.x session can be copied with its original database key. The original directory is never moved, cleared or overwritten. Other old profiles, databases, indexes and vaults are retained.
+The fresh distribution uses `app.tgdrive.next` and a new signing identity, as authorized after the old signing-setup failure. It installs alongside `app.tgdrive`; it never uninstalls or clears the original app. Android isolates their private data. The compatibility session-copy/reader code only operates inside the current package’s own namespace, so it cannot read the other app’s session or index.
 
 Old queue/backup work is cancelled by its exact old work name. Old worker/service classes are inert compatibility tombstones; new launches never construct an old session pool or drain its queue. Unfinished old uploads must be selected again from their original sources. New uploads never use Saved Messages.
 
@@ -30,6 +30,6 @@ Settings → Account → Previous library reads the signed-in account's previous
 
 The TDLib dependency remains the community prebuilt `io.github.tdlib-android:core:0.1.1`, preserving the installed native API/session compatibility. Native provenance and dependency licensing still require review before wider production distribution; alignment and compilation are not supply-chain audits. See [third-party notices](../THIRD_PARTY_NOTICES.md).
 
-Release builds must use the existing certificate, pinned in `scripts/sideload-cert-sha256.txt`. A missing cache/signing backup must fail rather than create a new identity. Keep an independent backup of the signing key. No signing key or real Telegram credentials were supplied to this workspace.
+Next release builds bootstrap a new signer once, cache it under a separate key, and record its public fingerprint in `scripts/next-cert-sha256.txt`. Later builds require that same fingerprint. A lost initialized key must be restored through `NEXT_RELEASE_*` secrets; the build refuses to rotate it silently. Cache is not a durable signing-key backup and is not suitable as the only production key store. Configure independently backed-up signing secrets for durable distribution. The old signer/cache/pin are left untouched. No real Telegram credentials were supplied.
 
 Do not attach sessions, API hashes, login codes, recovery keys, documents or signing keys to public issues. Keep another copy of important files. Validation status is recorded in [TESTING.md](TESTING.md).
