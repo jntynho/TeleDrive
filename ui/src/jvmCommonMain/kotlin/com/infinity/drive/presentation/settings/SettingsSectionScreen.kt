@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.infinity.drive.domain.model.AppLanguage
+import com.infinity.drive.resources.collection_hidden_title
 import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.language_english
 import com.infinity.drive.resources.language_labels
@@ -193,6 +194,7 @@ fun SettingsSectionScreen(
     onOpenExclusions: () -> Unit,
     onOpenProxy: () -> Unit,
     onLoggedOut: () -> Unit,
+    onOpenHidden:()->Unit={},
     viewModel: SettingsViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -265,7 +267,7 @@ fun SettingsSectionScreen(
                 SettingsSectionType.PERMISSIONS ->
                     PermissionsSection(viewModel.permissionChecker)
 
-                SettingsSectionType.SECURITY -> SecuritySection(state, viewModel)
+                SettingsSectionType.SECURITY -> SecuritySection(state, viewModel,onOpenHidden)
                 SettingsSectionType.APPEARANCE -> AppearanceSection(state, viewModel)
                 SettingsSectionType.PLAYBACK -> PlaybackSection(state, viewModel)
                 SettingsSectionType.NOTIFICATIONS -> NotificationsSection(state, viewModel)
@@ -705,7 +707,7 @@ private fun StorageSection(
 }
 
 @Composable
-private fun SecuritySection(state: SettingsUiState, viewModel: SettingsViewModel) {
+private fun SecuritySection(state: SettingsUiState, viewModel: SettingsViewModel,onOpenHidden:()->Unit) {
     val encryptionOffMessage = UiText.Resource(Res.string.settings_encryption_stays_off)
     val prefs = state.preferences
     val deviceOwnerGate = LocalDeviceOwnerGate.current
@@ -773,6 +775,7 @@ private fun SecuritySection(state: SettingsUiState, viewModel: SettingsViewModel
 
     val capabilities = LocalPlatformCapabilities.current
     SettingsGroup {
+        add{SettingsClickRow(title=stringResource(com.infinity.drive.resources.Res.string.collection_hidden_title),onClick=onOpenHidden,icon=DriveIcons.VisibilityOff)}
         add(visible = capabilities.supportsAppLock) {
             SettingsSwitchRow(
                 title = stringResource(Res.string.settings_app_lock),

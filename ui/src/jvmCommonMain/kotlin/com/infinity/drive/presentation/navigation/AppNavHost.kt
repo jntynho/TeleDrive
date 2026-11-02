@@ -77,7 +77,6 @@ fun AppNavHost(
                     },
                     onOpenFolder = { navController.navigateOnce(Route.Files(it)) },
                     onOpenFiles={navController.navigateOnce(Route.Files())},
-                    onAddFiles={navController.navigateOnce(Route.Files(upload=true))},
                     onSearch={navController.navigateOnce(Route.Search)},
                     onOpenTransfers = { navController.navigateOnce(Route.Transfers) },
                     onOpenTrash = { navController.navigateOnce(Route.Trash) },
@@ -150,7 +149,7 @@ fun AppNavHost(
         stableComposable<Route.Preview>(navController,
             enterTransition = { NavigationTransitions.previewEnter() },
             exitTransition = { NavigationTransitions.fadeThroughExit() },
-            popEnterTransition = { NavigationTransitions.fadeThroughEnter() },
+            popEnterTransition = { NavigationTransitions.sharedAxisEnter(forward=false) },
             popExitTransition = { NavigationTransitions.previewExit() }
         ) {
             LocalPlatformScreens.current.Preview(
@@ -211,6 +210,7 @@ fun AppNavHost(
             CompositionLocalProvider(com.infinity.drive.presentation.settings.LocalSettingsSearchTarget provides route.focusTitle) {
             SettingsSectionScreen(
                 section = section,
+                onOpenHidden={navController.navigateOnce(Route.Collection(com.infinity.drive.presentation.collection.CollectionType.HIDDEN.name))},
                 onOpenChannels = { navController.navigateOnce(Route.Channels) },
                 onOpenPreviousLibrary = { navController.navigateOnce(Route.PreviousLibrary) },
                 onBack = { navController.popBackStackOnce() },

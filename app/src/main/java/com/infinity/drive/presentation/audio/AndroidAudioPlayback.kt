@@ -70,6 +70,7 @@ class AndroidAudioPlayback(context:Context,private val resolver:PreviewContentRe
         player.stop();player.clearMediaItems()
         requestedPlay=true
         mutable.value=AudioPlaybackState(file=file,loading=true,playRequested=true)
+        setQueue(queue)
         resolveJob=scope.launch {
             try {
                 mutable.update{it.copy(metadata=metadata(file))}
@@ -88,7 +89,11 @@ class AndroidAudioPlayback(context:Context,private val resolver:PreviewContentRe
             catch(_:Exception){mutable.update{it.copy(loading=false,playing=false,error="Couldn't load this audio. Tap play to retry.")}}
         }
     }
-    override fun setQueue(ids:List<String>){queue=ids}
+    override fun setQueue(ids:List<String>){
+        queue=ids
+        val index=queue.indexOf(mutable.value.file?.id)
+        mutable.update{it.copy(canSkipPrevious=index>0,canSkipNext=index>=0&&index<queue.lastIndex)}
+    }
     override fun toggle(){
         val current=mutable.value
         if(current.error!=null){current.file?.let(::play);return}
@@ -97,16 +102,15 @@ class AndroidAudioPlayback(context:Context,private val resolver:PreviewContentRe
         else {requestedPlay=true;if(player.playbackState==Player.STATE_ENDED)player.seekTo(0);player.play()}
     }
     override fun pause(){requestedPlay=false;player.pause();mutable.update{it.copy(playRequested=false)}}
-    override fun next(){
+    override fun previous(){if(player.currentPosition>3000){seek(0);return};skip(-1)}
+    override fun next()=skip(1)
+    private fun skip(direction:Int){
         queueJob?.cancel()
         val index=queue.indexOf(mutable.value.file?.id)
-        if(index<0||index>=queue.lastIndex)return
-        val following=queue.drop(index+1)
-        queueJob=scope.launch {
-            for(id in following){val file=files.getFile(id);if(file!=null&&!file.isTrashed){
-                // Clear the queue lookup before play, so play cannot cancel this coroutine.
-                queueJob=null;play(file);return@launch
-            }}
+        if(index<0)return
+        val following=if(direction>0)queue.drop(index+1)else queue.take(index).asReversed()
+        queueJob=scope.launch{
+            for(id in following){val file=files.getFile(id);if(file!=null&&!file.isTrashed){queueJob=null;play(file);return@launch}}
         }
     }
     override fun stop(){requestedPlay=false;resolveJob?.cancel();queueJob?.cancel();player.stop();player.clearMediaItems();queue=emptyList();mutable.value=AudioPlaybackState()}

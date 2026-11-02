@@ -144,5 +144,7 @@
   "VolumeUp": "volume-loud-linear",
   "VpnKey": "key-minimalistic-linear",
   "Warning": "danger-triangle-linear",
-  "ZoomOutMap": "full-screen-linear"
+  "ZoomOutMap": "full-screen-linear",
+  "SkipPrevious": "skip-previous-linear",
+  "SkipNext": "skip-next-linear"
 }

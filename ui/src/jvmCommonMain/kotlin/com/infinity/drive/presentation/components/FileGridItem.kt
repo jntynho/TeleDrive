@@ -55,7 +55,7 @@ fun FileGridItem(
                 galleryTile=galleryTile,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(if(galleryTile)4f/5f else 1f)
+                    .aspectRatio(if(galleryTile)app.tgdrive.ui.LibraryLayout.GalleryAspect else 1f)
             )
             if (selected) {
                 Icon(

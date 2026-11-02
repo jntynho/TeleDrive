@@ -49,15 +49,14 @@ fun AudioScreen(onOpenFile:(String,PreviewSequence)->Unit,viewModel:AudioViewMod
     }}){padding->
         val bottom=padding.calculateBottomPadding()+LocalBottomBarInset.current
         when {
-            audio.loadState.refresh is LoadState.Loading&&audio.itemCount==0->LoadingState(Modifier.padding(top=padding.calculateTopPadding(),bottom=bottom))
+            audio.loadState.refresh is LoadState.Loading&&audio.itemCount==0->AudioSkeleton(Modifier.padding(top=padding.calculateTopPadding()),bottom)
             audio.loadState.refresh is LoadState.Error->EmptyState(DriveIcons.Info,"Couldn't load audio","Try loading your library again.",Modifier.padding(top=padding.calculateTopPadding(),bottom=bottom),"Retry",{audio.retry()})
             audio.itemCount==0->EmptyState(DriveIcons.MusicNote,if(query.isNotBlank())"No matching audio"else when(filter){AudioFilter.FAVORITES->"No favorites yet";AudioFilter.ON_DEVICE->"No audio on this device";else->"Your sound, in one place"},if(query.isNotBlank())"Try another filename."else"Audio files in your drive will appear here.",Modifier.padding(top=padding.calculateTopPadding(),bottom=bottom))
-            else->LazyColumn(state=listState,modifier=Modifier.fillMaxSize().padding(top=padding.calculateTopPadding()),contentPadding=PaddingValues(start=16.dp,end=16.dp,top=8.dp,bottom=bottom+20.dp)){
-                item("audio-actions") {Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("Your audio",Modifier.weight(1f),style=MaterialTheme.typography.titleMedium);TextButton({viewModel.playAll(player)}){Icon(DriveIcons.PlayArrow,null,Modifier.size(18.dp));Text("Play all")}}}
+            else->LazyColumn(state=listState,modifier=Modifier.fillMaxSize().padding(top=padding.calculateTopPadding()).resultReveal(query to audio.itemSnapshotList.items.take(8).map{it.id}),contentPadding=PaddingValues(start=16.dp,end=16.dp,top=8.dp,bottom=bottom+20.dp)){
+                item("audio-actions") {AudioListHeading()}
                 items(audio.itemCount,key=audio.itemKey{it.id}){index->
                     val file=audio[index]?:return@items
-                    AudioRow(file,playback.file?.id==file.id&&playback.playing,playback.metadata.takeIf{playback.file?.id==file.id},{viewModel.play(file,player)},{viewModel.favorite(file)}){
-                        player.pause()
+                    AudioLibraryRow(file,playback.file?.id==file.id&&playback.playing,playback.metadata.takeIf{playback.file?.id==file.id},modifier=Modifier.animateItem(fadeInSpec=androidx.compose.animation.core.tween(240)),onPlay={viewModel.play(file,player)},onFavorite={viewModel.favorite(file)}){
                         onOpenFile(file.id,PreviewSequence(categories=listOf(FileCategory.AUDIO),nameQuery=query.trim().takeIf{it.isNotBlank()},favoritesOnly=filter==AudioFilter.FAVORITES,sortField=prefs.audioSortField,sortDirection=prefs.audioSortDirection))
                     }
                 }
@@ -68,52 +67,34 @@ fun AudioScreen(onOpenFile:(String,PreviewSequence)->Unit,viewModel:AudioViewMod
 }
 
 @Composable
-private fun AudioRow(file:DriveFile,playing:Boolean,currentMetadata:AudioMetadata?,onPlay:()->Unit,onFavorite:()->Unit,onDetails:()->Unit) {
-    val player=LocalAudioPlayback.current
-    val storedMetadata by produceState(AudioMetadata(),file.id,file.modifiedAt,file.localPath){value=player.metadata(file)}
-    val meta=if(currentMetadata!=null)AudioMetadata(currentMetadata.title?:storedMetadata.title,currentMetadata.artist?:storedMetadata.artist,currentMetadata.durationMs?:storedMetadata.durationMs)else storedMetadata
-    var menu by remember{mutableStateOf(false)}
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick=onPlay).padding(vertical=10.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
-        FileThumbnail(file,Modifier.size(54.dp).clip(RoundedCornerShape(12.dp)))
-        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)){
-            Text(meta.title?.takeIf{it.isNotBlank()}?:file.name.substringBeforeLast('.'),style=MaterialTheme.typography.titleSmall,color=if(playing)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,maxLines=1,overflow=TextOverflow.Ellipsis)
-            Text(meta.artist?.takeIf{it.isNotBlank()}?:file.extension.uppercase().ifBlank{"Audio"},style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
-        }
-        val duration=meta.durationMs?:file.durationMs
-        if(duration!=null)Text(Formatters.duration(duration),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-        if(playing)Icon(DriveIcons.Audiotrack,"Playing",Modifier.size(20.dp),tint=MaterialTheme.colorScheme.primary)
-        Box {
-            IconButton({menu=true}){Icon(DriveIcons.MoreVert,"Audio options for ${file.name}")}
-            DropdownMenu(menu,{menu=false}){
-                DropdownMenuItem(text={Text(if(file.isFavorite)"Remove from favorites"else"Add to favorites")},onClick={menu=false;onFavorite()})
-                DropdownMenuItem(text={Text("Open player & file options")},onClick={menu=false;onDetails()})
-            }
-        }
-    }
+fun AudioListHeading(loading:Boolean=false){
+    Text("Your audio",Modifier.fillMaxWidth().padding(vertical=12.dp).wrapContentWidth(Alignment.Start).skeleton(loading),style=MaterialTheme.typography.titleMedium)
 }
 
 @Composable
-fun LibraryAudioMiniPlayer() {
+fun AudioLibraryRow(file:DriveFile?,playing:Boolean=false,currentMetadata:AudioMetadata?=null,modifier:Modifier=Modifier,
+    onPlay:()->Unit={},onFavorite:()->Unit={},onDetails:()->Unit={}
+) {
+    val loading=file==null
     val player=LocalAudioPlayback.current
-    val state by player.state.collectAsStateWithLifecycle()
-    val file=state.file?:return
-    val canPause=state.playing||(state.loading&&state.playRequested)
-    var expanded by rememberSaveable(file.id){mutableStateOf(false)}
-    Surface(color=MaterialTheme.colorScheme.surface,tonalElevation=0.dp) {
-        Column {
-            Row(Modifier.fillMaxWidth().clickable{expanded=!expanded}.padding(start=16.dp,end=4.dp,top=8.dp,bottom=8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)){
-                FileThumbnail(file,Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)))
-                Column(Modifier.weight(1f)){
-                    Text(state.metadata.title?:file.name.substringBeforeLast('.'),maxLines=1,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.titleSmall)
-                    Text(state.error?:if(state.loading)"Loading audio…"else state.metadata.artist?:"Audio",maxLines=1,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.bodySmall,color=if(state.error!=null)MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                IconButton(player::toggle){Icon(if(canPause)DriveIcons.Pause else DriveIcons.PlayArrow,if(state.error!=null)"Retry audio"else if(canPause)"Pause audio"else"Play audio")}
-                IconButton(player::next){Icon(DriveIcons.KeyboardArrowRight,"Next audio")}
-                IconButton(player::stop){Icon(DriveIcons.Close,"Close audio player")}
-            }
-            if(expanded&&state.durationMs>0){
-                app.tgdrive.ui.SlimSlider(value=state.positionMs.coerceIn(0,state.durationMs).toFloat(),onValueChange={player.seek(it.toLong())},valueRange=0f..state.durationMs.toFloat(),modifier=Modifier.padding(horizontal=16.dp))
-                Text("${Formatters.duration(state.positionMs)} / ${Formatters.duration(state.durationMs)}",Modifier.padding(start=16.dp,bottom=8.dp),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+    val storedMetadata by produceState(AudioMetadata(),file?.id,file?.modifiedAt,file?.localPath){if(file!=null)value=player.metadata(file)}
+    val meta=if(currentMetadata!=null)AudioMetadata(currentMetadata.title?:storedMetadata.title,currentMetadata.artist?:storedMetadata.artist,currentMetadata.durationMs?:storedMetadata.durationMs)else storedMetadata
+    var menu by remember{mutableStateOf(false)}
+    Row(modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(enabled=!loading,onClick=onPlay).padding(vertical=LibraryLayout.AudioRowPadding),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(LibraryLayout.AudioRowGap)){
+        if(file!=null)FileThumbnail(file,Modifier.size(LibraryLayout.AudioCover).clip(RoundedCornerShape(LibraryLayout.CoverCorner)))
+        else SkeletonBlock(Modifier.size(LibraryLayout.AudioCover),LibraryLayout.CoverCorner)
+        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)){
+            Text(meta.title?.takeIf{it.isNotBlank()}?:file?.name?.substringBeforeLast('.')?:"Midnight City",Modifier.skeleton(loading),style=MaterialTheme.typography.titleSmall,color=if(playing)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,maxLines=1,overflow=TextOverflow.Ellipsis)
+            Text(meta.artist?.takeIf{it.isNotBlank()}?:file?.extension?.uppercase()?.ifBlank{"Audio"}?:"Artist name",Modifier.skeleton(loading),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
+        }
+        val duration=meta.durationMs?:file?.durationMs
+        if(duration!=null||loading)Text(if(loading)"3:42"else Formatters.duration(duration!!),Modifier.skeleton(loading),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        if(playing)Icon(DriveIcons.Audiotrack,"Playing",Modifier.size(20.dp),tint=MaterialTheme.colorScheme.primary)
+        Box {
+            IconButton({menu=true},enabled=!loading){Icon(DriveIcons.MoreVert,"Audio options for ${file?.name.orEmpty()}",Modifier.skeleton(loading))}
+            DropdownMenu(menu,{menu=false}){
+                DropdownMenuItem(text={Text(if(file?.isFavorite==true)"Remove from favorites"else"Add to favorites")},onClick={menu=false;onFavorite()})
+                DropdownMenuItem(text={Text("Open player & file options")},onClick={menu=false;onDetails()})
             }
         }
     }

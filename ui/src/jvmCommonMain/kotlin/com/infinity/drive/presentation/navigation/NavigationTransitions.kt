@@ -22,8 +22,8 @@ object NavigationTransitions {
 
     private val EmphasizedDecelerate = CubicBezierEasing(0.2f, 0f, 0f, 1f)
     private val EmphasizedAccelerate = CubicBezierEasing(0.2f, 0f, 0f, 1f)
-    private const val ENTER_MS = 240
-    private const val EXIT_MS = 240
+    private const val ENTER_MS = 320
+    private const val EXIT_MS = 320
 
     fun sharedAxisEnter(forward: Boolean): EnterTransition =
         slideInHorizontally(

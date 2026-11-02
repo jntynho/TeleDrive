@@ -50,13 +50,13 @@ internal class ElasticOverscrollEffect:OverscrollEffect {
         }
     }
     private fun resist(distance:Float,size:Float):Float {
-        val limit=(size*.12f).coerceAtLeast(1f)
-        val damped=distance*.45f
+        val limit=(size*.20f).coerceAtLeast(1f)
+        val damped=distance*.62f
         return damped/(1f+abs(damped)/limit)
     }
     private fun restore(distance:Float,size:Float):Float {
-        val limit=(size*.12f).coerceAtLeast(1f)
-        return (distance/(1f-abs(distance).coerceAtMost(limit*.99f)/limit)/.45f).coerceIn(-size*2,size*2)
+        val limit=(size*.20f).coerceAtLeast(1f)
+        return (distance/(1f-abs(distance).coerceAtMost(limit*.99f)/limit)/.62f).coerceIn(-size*2,size*2)
     }
     private fun update(){offset=Offset(resist(raw.x,width),resist(raw.y,height))}
     private fun unwind(delta:Float,current:Float):Float =
@@ -68,6 +68,8 @@ internal class ElasticOverscrollEffect:OverscrollEffect {
         raw+=released
         val consumed=performScroll(delta-released)
         val remaining=delta-released-consumed
+        fun releaseConsumed(current:Float,used:Float)=if(sign(current)==sign(used))current-sign(current)*minOf(abs(current),abs(used))else current
+        raw=Offset(releaseConsumed(raw.x,consumed.x),releaseConsumed(raw.y,consumed.y))
         raw=Offset((raw.x+remaining.x).coerceIn(-width*2,width*2),(raw.y+remaining.y).coerceIn(-height*2,height*2))
         update()
         return released+consumed+remaining
@@ -78,7 +80,7 @@ internal class ElasticOverscrollEffect:OverscrollEffect {
         if(!isInProgress){raw=Offset.Zero;offset=Offset.Zero;return}
         settling=scope?.launch {
             val animation=Animatable(offset,Offset.VectorConverter)
-            animation.animateTo(Offset.Zero,spring(dampingRatio=1f,stiffness=350f)){offset=value}
+            animation.animateTo(Offset.Zero,spring(dampingRatio=1f,stiffness=220f)){offset=value}
             raw=Offset.Zero;offset=Offset.Zero
         }
     }

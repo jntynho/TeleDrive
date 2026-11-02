@@ -1,6 +1,7 @@
 // Modified for TG Drive: Android integration, safety fixes and visual adaptation; see third_party/driveinfinity/SOURCE.md.
 package com.infinity.drive.presentation.gallery
 
+import app.tgdrive.ui.skeleton
 import app.tgdrive.ui.DriveIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -34,14 +35,15 @@ import com.infinity.drive.domain.model.MediaAlbum
 fun AlbumCard(
     album: MediaAlbum,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    loading:Boolean=false
 ) {
     val albumName = album.name ?: stringResource(Res.string.album_not_in_folder)
     Column(
         modifier = modifier
             .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .clickable(onClick = onClick)
+            .clickable(enabled=!loading,onClick = onClick)
             .padding(6.dp)
     ) {
         Box(
@@ -49,7 +51,7 @@ fun AlbumCard(
                 .fillMaxWidth()
                 .aspectRatio(1f)
                 .clip(MaterialTheme.shapes.medium)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh).skeleton(loading,12.dp),
             contentAlignment = Alignment.Center
         ) {
             val coverFileId = album.coverFileId
@@ -72,11 +74,13 @@ fun AlbumCard(
         Column(modifier = Modifier.padding(horizontal = 2.dp, vertical = 6.dp)) {
             Text(
                 text = albumName,
+                modifier=Modifier.skeleton(loading),
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
+                modifier=Modifier.skeleton(loading),
                 text = pluralStringResource(Res.plurals.item_count, album.itemCount, album.itemCount),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant

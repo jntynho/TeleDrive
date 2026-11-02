@@ -23,19 +23,22 @@ fun LibraryHeader(title:String, navigationIcon:@Composable ()->Unit={}, actions:
         colors=TopAppBarDefaults.topAppBarColors(containerColor=MaterialTheme.colorScheme.background,scrolledContainerColor=MaterialTheme.colorScheme.background))
 }
 
-/** Stable height: changing filters never moves the content while scrolling. */
+/** Equal-width native tabs, with one quiet sliding indicator and no press ripple. */
 @Composable
 fun LibraryFilters(labels:List<String>,selected:Int,onSelect:(Int)->Unit,modifier:Modifier=Modifier) {
-    Row(modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal=16.dp),horizontalArrangement=Arrangement.spacedBy(24.dp)) {
-        labels.forEachIndexed { index,label ->
-            val active=index==selected
-            val color by animateColorAsState(if(active)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,label="filterColor")
-            Column(Modifier.width(IntrinsicSize.Max).widthIn(min=48.dp).selectable(active,onClick={onSelect(index)},role=Role.Tab).heightIn(min=48.dp),horizontalAlignment=Alignment.CenterHorizontally) {
-                Box(Modifier.heightIn(min=44.dp).padding(horizontal=2.dp,vertical=10.dp),contentAlignment=Alignment.Center) {
-                    Text(label,color=color,style=MaterialTheme.typography.titleSmall)
+    if(labels.isEmpty())return
+    val index=selected.coerceIn(0,labels.lastIndex)
+    val position by androidx.compose.animation.core.animateFloatAsState(index.toFloat(),androidx.compose.animation.core.tween(260,easing=androidx.compose.animation.core.FastOutSlowInEasing),label="filterIndicator")
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val width=maxWidth/labels.size
+        Row(Modifier.fillMaxWidth()) {
+            labels.forEachIndexed { item,label->
+                val color by animateColorAsState(if(item==index)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,androidx.compose.animation.core.tween(220),label="filterLabel")
+                Box(Modifier.weight(1f).heightIn(min=48.dp).selectable(selected=item==index,onClick={if(item!=index)onSelect(item)},role=Role.Tab,interactionSource=remember{androidx.compose.foundation.interaction.MutableInteractionSource()},indication=null).padding(horizontal=4.dp,vertical=12.dp),contentAlignment=Alignment.Center) {
+                    Text(label,color=color,style=MaterialTheme.typography.titleSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
                 }
-                Box(Modifier.fillMaxWidth().height(2.dp).background(if(active)color else Color.Transparent))
             }
         }
+        Box(Modifier.align(Alignment.BottomStart).offset(x=width*position).width(width).padding(horizontal=12.dp).height(2.dp).background(MaterialTheme.colorScheme.primary))
     }
 }

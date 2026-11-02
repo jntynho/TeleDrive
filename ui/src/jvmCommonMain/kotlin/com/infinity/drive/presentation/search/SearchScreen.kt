@@ -1,6 +1,7 @@
 // Modified for TG Drive: Android integration, safety fixes and visual adaptation; see third_party/driveinfinity/SOURCE.md.
 package com.infinity.drive.presentation.search
 
+import com.infinity.drive.presentation.components.resultReveal
 import app.tgdrive.ui.DriveIcons
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -151,7 +152,7 @@ fun SearchScreen(
 
                 else -> LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().resultReveal(state.query to state.results.take(8).map{it.id}),
                     contentPadding = PaddingValues(
                         start = 12.dp,
                         end = 12.dp,

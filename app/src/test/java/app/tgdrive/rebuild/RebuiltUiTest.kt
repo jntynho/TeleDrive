@@ -149,7 +149,7 @@ class RebuiltUiTest {
             } }
         }
         compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithContentDescription("Upload files").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Upload").assertIsDisplayed()
         listOf("gallery","audio","settings").forEach {
             compose.onNodeWithTag("navigation-$it").assertIsDisplayed().performClick()
             compose.onNodeWithContentDescription("Search $it").performClick()
@@ -182,6 +182,115 @@ class RebuiltUiTest {
         compose.onNodeWithContentDescription("Search all files").assertIsDisplayed()
         compose.runOnUiThread{activity.get().onBackPressedDispatcher.onBackPressed()}
         compose.onNodeWithText("Your library").assertIsDisplayed()
+    }
+
+    @Test fun libraryCollectionsKeepTheCardBoundsAndRemainReachable() {
+        compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        val before=compose.onNodeWithTag("library-card").fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithContentDescription("Show collections").performClick()
+        compose.onNodeWithText("Your shortcuts").assertIsDisplayed()
+        val after=compose.onNodeWithTag("library-card").fetchSemanticsNode().boundsInRoot
+        org.junit.Assert.assertEquals(before,after)
+        listOf("Favorites","Archived","Trash").forEach{compose.onNodeWithText(it,substring=false).assertIsDisplayed()}
+        capture("library-shortcuts")
+        compose.onNodeWithContentDescription("Show library overview").performClick()
+        compose.onNodeWithText("Your library").assertIsDisplayed()
+        org.junit.Assert.assertEquals(before,compose.onNodeWithTag("library-card").fetchSemanticsNode().boundsInRoot)
+        compose.onNodeWithContentDescription("Show collections").performClick()
+        compose.onNodeWithText("Archived",substring=false).performClick()
+        compose.onNodeWithText("Archived",substring=false).assertIsDisplayed()
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithContentDescription("Show library overview").assertIsDisplayed()
+    }
+
+    @Test fun homeUploadOpensOnlyTheRequestedPickerWithoutChangingDestination() {
+        var filePicks=0
+        var folderPicks=0
+        val pending=GlobalContext.get().get<PendingShare>()
+        compose.runOnUiThread {
+            activity.get().setContent { ProvidePlatformActions {
+                androidx.compose.runtime.CompositionLocalProvider(
+                    com.infinity.drive.presentation.platform.LocalMultiFilePicker provides com.infinity.drive.presentation.platform.MultiFilePicker { callback->filePicks++;callback(emptyList()) },
+                    com.infinity.drive.presentation.platform.LocalFolderPicker provides com.infinity.drive.presentation.platform.FolderPicker { callback->folderPicks++;callback(com.infinity.drive.presentation.platform.PickResult.Canceled) }
+                ){ DriveInfinityApp(pending) }
+            } }
+        }
+        compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithContentDescription("Upload",useUnmergedTree=true).performClick()
+        compose.onNodeWithText("Upload files",substring=false).assertIsDisplayed()
+        compose.onNodeWithText("Upload folder",substring=false).assertIsDisplayed()
+        compose.onNodeWithText("New note",substring=false).assertDoesNotExist()
+        capture("upload-sheet")
+        compose.onNodeWithText("Upload files",substring=false).performClick()
+        compose.waitUntil(5_000){filePicks==1}
+        compose.onNodeWithTag("navigation-home").assertIsSelected()
+        compose.onNodeWithText("Your library").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Upload").performClick()
+        compose.onNodeWithText("Upload folder",substring=false).performClick()
+        compose.waitUntil(5_000){folderPicks==1}
+        compose.onNodeWithTag("navigation-home").assertIsSelected()
+        compose.onNodeWithTag("navigation-gallery").performClick()
+        compose.onNodeWithContentDescription("Upload").assertDoesNotExist()
+        compose.onNodeWithTag("navigation-audio").performClick()
+        compose.onNodeWithContentDescription("Upload").assertDoesNotExist()
+    }
+
+    @Test fun galleryAndAudioFiltersFillTheirAvailableWidthEqually() {
+        compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("navigation-gallery").performClick()
+        fun equalTabs(labels:List<String>){
+            val tabs=labels.map{compose.onNode(hasText(it) and isSelectable()).fetchSemanticsNode().boundsInRoot}
+            tabs.zipWithNext().forEach{(a,b)->
+                org.junit.Assert.assertEquals(a.width,b.width,1f)
+                org.junit.Assert.assertEquals(a.right,b.left,1f)
+            }
+        }
+        equalTabs(listOf("All","Photos","Videos"))
+        compose.onNodeWithContentDescription("Sort gallery").performClick()
+        compose.onNodeWithText("Albums",substring=false).assertIsDisplayed()
+        compose.onNodeWithText("All media",substring=false).performClick()
+        compose.onNodeWithTag("navigation-audio").performClick()
+        equalTabs(listOf("All","Favorites","On device"))
+        compose.onNodeWithText("Play all",substring=false).assertDoesNotExist()
+    }
+
+    @Test fun expandedAudioControlsUseTheSamePlaybackStateAsTheMiniPlayer() {
+        val file=runBlocking{GlobalContext.get().get<com.infinity.drive.domain.repository.FileRepository>().getFile("Song.mp3")}!!
+        val playback=kotlinx.coroutines.flow.MutableStateFlow(com.infinity.drive.presentation.platform.AudioPlaybackState(
+            file=file,playing=true,metadata=com.infinity.drive.presentation.platform.AudioMetadata("Midnight City","M83"),durationMs=240_000,positionMs=60_000,canSkipPrevious=true,canSkipNext=true))
+        var previous=0
+        var next=0
+        val player=object:com.infinity.drive.presentation.platform.AudioPlayback {
+            override val state=playback
+            override fun play(file:com.infinity.drive.domain.model.DriveFile){playback.value=playback.value.copy(file=file,playing=true)}
+            override fun setQueue(ids:List<String>){}
+            override fun toggle(){playback.value=playback.value.copy(playing=!playback.value.playing)}
+            override fun pause(){playback.value=playback.value.copy(playing=false)}
+            override fun previous(){previous++}
+            override fun next(){next++}
+            override fun stop(){playback.value=com.infinity.drive.presentation.platform.AudioPlaybackState()}
+            override fun seek(positionMs:Long){playback.value=playback.value.copy(positionMs=positionMs)}
+            override suspend fun metadata(file:com.infinity.drive.domain.model.DriveFile)=playback.value.metadata
+        }
+        val pending=GlobalContext.get().get<PendingShare>()
+        compose.runOnUiThread{activity.get().setContent{ProvidePlatformActions{
+            androidx.compose.runtime.CompositionLocalProvider(com.infinity.drive.presentation.platform.LocalAudioPlayback provides player){DriveInfinityApp(pending)}
+        }}}
+        compose.waitUntil(15_000){compose.onAllNodesWithText("Midnight City",substring=false).fetchSemanticsNodes().isNotEmpty()}
+        compose.runOnUiThread{playback.value=playback.value.copy(playing=true)}
+        compose.onNodeWithText("Midnight City",substring=false).performClick()
+        compose.onNodeWithText("NOW PLAYING",substring=false).assertIsDisplayed()
+        capture("now-playing")
+        compose.onNodeWithContentDescription("Previous audio").performClick()
+        compose.onNodeWithContentDescription("Next audio").performClick()
+        org.junit.Assert.assertEquals(1,previous)
+        org.junit.Assert.assertEquals(1,next)
+        compose.onAllNodesWithContentDescription("Pause audio").onLast().performClick()
+        org.junit.Assert.assertFalse(playback.value.playing)
+        compose.onNodeWithText("Stop playback",substring=false).performClick()
+        compose.waitUntil(5_000){playback.value.file==null}
+        compose.onNodeWithText("Your library").assertIsDisplayed()
+        compose.onNodeWithText("Midnight City",substring=false).assertDoesNotExist()
     }
 
     private fun capture(name:String) {

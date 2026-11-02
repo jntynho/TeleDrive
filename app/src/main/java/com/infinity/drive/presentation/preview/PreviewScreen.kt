@@ -58,6 +58,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -210,6 +212,12 @@ fun PreviewScreen(
     val liveFile by viewModel.observeFile(pagedFile.id)
         .collectAsStateWithLifecycle(initialValue = pagedFile)
     val currentFile = liveFile ?: pagedFile
+    val backgroundAudio=com.infinity.drive.presentation.platform.LocalAudioPlayback.current
+    val mediaScope=rememberCoroutineScope()
+    LaunchedEffect(currentFile.id){
+        if(currentFile.category!=FileCategory.AUDIO)backgroundAudio.pause()
+        else backgroundAudio.setQueue(state.files.filter{it.category==FileCategory.AUDIO}.map{it.id})
+    }
 
     val immersive = currentFile.category == FileCategory.IMAGE ||
             currentFile.category == FileCategory.VIDEO
@@ -277,6 +285,10 @@ fun PreviewScreen(
                     onPreferredAudioLanguage = viewModel::setPreferredAudioLanguage,
                     onPreferredSubtitleLanguage = viewModel::setPreferredSubtitleLanguage,
                     onToggleChrome = { if(!imageZoomed)chromeVisible = !chromeVisible },
+                    onAudioTrackChanged={id->
+                        val index=state.files.indexOfFirst{it.id==id}
+                        if(index>=0&&index!=pagerState.currentPage)mediaScope.launch{pagerState.scrollToPage(index)}
+                    },
                     onImageZoomChanged={zoomed->if(pagerState.currentPage==page){imageZoomed=zoomed;chromeVisible=!zoomed}},
                     onChromeRequested = { visible -> chromeVisible = visible }
                 )
@@ -485,6 +497,7 @@ private fun PreviewPage(
     onPreferredSubtitleLanguage: (String) -> Unit,
     onToggleChrome: () -> Unit,
     onImageZoomChanged:(Boolean)->Unit={},
+    onAudioTrackChanged:(String)->Unit={},
     onChromeRequested: (Boolean) -> Unit,
     loadLinkMetadata: suspend (String) -> LinkMetadata?,
     storedTextScale: Float,
@@ -558,7 +571,7 @@ private fun PreviewPage(
 
         is PreviewContent.LocalMedia,
         is PreviewContent.StreamedMedia ->
-            MediaPlayer(
+            if(file.category==FileCategory.AUDIO)com.infinity.drive.presentation.audio.FullscreenAudioPlayer(file,isActivePage,Modifier.fillMaxSize(),onAudioTrackChanged)else MediaPlayer(
                 content = content,
                 title = file.name,
                 fileId = file.id,

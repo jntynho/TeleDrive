@@ -2,6 +2,7 @@
 package com.infinity.drive.presentation.components
 
 import app.tgdrive.ui.DriveIcons
+import app.tgdrive.ui.skeleton
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -39,7 +40,8 @@ fun FileListItem(
     selectionMode: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    loading: Boolean = false
 ) {
     val compact = LocalCompactLayout.current
     val background = if (selected) {
@@ -52,7 +54,7 @@ fun FileListItem(
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.large)
             .background(background)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .combinedClickable(enabled = !loading, onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 12.dp, vertical = if (compact) 4.dp else 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -61,7 +63,7 @@ fun FileListItem(
                 file = file,
                 modifier = Modifier
                     .size(if (compact) 38.dp else 48.dp)
-                    .clip(MaterialTheme.shapes.medium)
+                    .clip(MaterialTheme.shapes.medium).skeleton(loading)
             )
             if (selected) {
                 Icon(
@@ -82,7 +84,7 @@ fun FileListItem(
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
+                    modifier = Modifier.weight(1f, fill = false).skeleton(loading)
                 )
                 if (file.isFavorite) {
                     Spacer(Modifier.width(6.dp))
@@ -102,11 +104,12 @@ fun FileListItem(
                         Formatters.date(file.modifiedAt)
                     ),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.skeleton(loading)
                 )
             }
         }
         Spacer(Modifier.width(8.dp))
-        BackupStateBadge(file = file)
+        BackupStateBadge(file = file, modifier = Modifier.skeleton(loading))
     }
 }

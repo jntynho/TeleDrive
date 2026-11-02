@@ -194,6 +194,7 @@ fun FilesScreen(
     val allSelected by viewModel.allSelected.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    var fileActions by remember { mutableStateOf(false) }
     var showCreateFolder by remember { mutableStateOf(false) }
     var confirmDeleteLocal by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
@@ -476,6 +477,12 @@ fun FilesScreen(
                                         contentDescription = stringResource(Res.string.files_sort)
                                     )
                                 }
+                                Box {
+                                    IconButton({fileActions=true}){Icon(DriveIcons.MoreVert,"More file actions")}
+                                    DropdownMenu(fileActions,{fileActions=false}){
+                                        DropdownMenuItem(text={Text("New note")},onClick={fileActions=false;onNewNote(state.folderId)})
+                                    }
+                                }
                                 SortMenu(
                                     expanded = showSortMenu,
                                     current = state.sortField,
@@ -493,75 +500,7 @@ fun FilesScreen(
 
                     }
                 },
-                floatingActionButton = {
-                    AnimatedVisibility(
-                        visible = fabVisible && !state.selectionMode && !audioOnly && !searching,
-                        enter = scaleIn() + fadeIn(),
-                        exit = scaleOut() + fadeOut()
-                    ) {
-                        FloatingActionButtonMenu(
-                            expanded = showAddMenu,
-                            modifier = Modifier.padding(
-                                bottom = fabLift + if (LocalBottomBarInset.current > 0.dp) {
-                                    FabBottomBarInset
-                                } else {
-                                    0.dp
-                                }
-                            ),
-                            button = {
-                                ToggleFloatingActionButton(
-                                    checked = showAddMenu,
-                                    onCheckedChange = { showAddMenu = it }
-                                ) {
-                                    Icon(
-                                        imageVector = if (showAddMenu) {
-                                            DriveIcons.Close
-                                        } else {
-                                            DriveIcons.Add
-                                        },
-                                        contentDescription = stringResource(Res.string.common_add),
-                                        // The container animates to primary when checked.
-                                        tint = if (showAddMenu) {
-                                            MaterialTheme.colorScheme.onPrimary
-                                        } else {
-                                            MaterialTheme.colorScheme.onPrimaryContainer
-                                        }
-                                    )
-                                }
-                            }
-                        ) {
-                            FloatingActionButtonMenuItem(
-                                onClick = {
-                                    showAddMenu = false
-                                    onPickUploads()
-                                },
-                                icon = { Icon(DriveIcons.Upload, contentDescription = null) },
-                                text = { Text(stringResource(Res.string.files_add_files)) }
-                            )
-                            FloatingActionButtonMenuItem(
-                                onClick = {
-                                    showAddMenu = false
-                                    onPickUploadFolder()
-                                },
-                                icon = {
-                                    Icon(
-                                        DriveIcons.DriveFolderUpload,
-                                        contentDescription = null
-                                    )
-                                },
-                                text = { Text(stringResource(Res.string.files_add_folder)) }
-                            )
-                            FloatingActionButtonMenuItem(
-                                onClick = {
-                                    showAddMenu = false
-                                    onNewNote(state.folderId)
-                                },
-                                icon = { Icon(DriveIcons.EditNote, contentDescription = null) },
-                                text = { Text(stringResource(Res.string.note_new)) }
-                            )
-                        }
-                    }
-                }
+                floatingActionButton = {}
             ) { padding ->
                 if(searching){
                     com.infinity.drive.presentation.search.SearchScreen(onBack={searching=false;searchModel.setQuery("")},onOpenFile=onOpenFile,onOpenFolder=onOpenFolder,viewModel=searchModel,showHeader=false,modifier=Modifier.padding(padding))
@@ -962,9 +901,11 @@ internal fun SortMenu(
     direction: SortDirection,
     onDismiss: () -> Unit,
     onSelect: (FileSortField, SortDirection) -> Unit,
-    fields:List<FileSortField> = FileSortField.entries
+    fields:List<FileSortField> = FileSortField.entries,
+    prefixContent:@Composable androidx.compose.foundation.layout.ColumnScope.()->Unit={}
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        prefixContent()
         fields.forEach { field ->
             val selected = field == current
             val ascending = direction == SortDirection.ASCENDING

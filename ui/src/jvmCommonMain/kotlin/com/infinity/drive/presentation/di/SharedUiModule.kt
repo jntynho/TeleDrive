@@ -22,6 +22,7 @@ import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
 val sharedUiModule = module {
+    single { com.infinity.drive.presentation.upload.UploadCoordinator(get(),get(),get()) }
     singleOf(::PreviewContentResolver)
     viewModelOf(::AppViewModel)
     viewModelOf(::PreviewViewModel)

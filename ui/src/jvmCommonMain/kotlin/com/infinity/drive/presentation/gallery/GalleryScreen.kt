@@ -1,6 +1,8 @@
 // Modified for TG Drive: Android integration, safety fixes and visual adaptation; see third_party/driveinfinity/SOURCE.md.
 package com.infinity.drive.presentation.gallery
 
+import app.tgdrive.ui.LibraryLayout
+import com.infinity.drive.presentation.components.resultReveal
 import app.tgdrive.ui.DriveIcons
 import com.infinity.drive.presentation.files.SortMenu
 import com.infinity.drive.domain.model.FileSortField
@@ -131,7 +133,8 @@ private fun AlbumGrid(
     bottomPadding: Dp,
     onOpenAlbum: (MediaAlbum) -> Unit,
     onZoomIn: () -> Unit,
-    onZoomOut: () -> Unit
+    onZoomOut: () -> Unit,
+    loading:Boolean=false
 ) {
     if (albums.isEmpty()) {
         EmptyState(
@@ -158,6 +161,7 @@ private fun AlbumGrid(
         items(albums, key = { it.folderId ?: UNFILED_ALBUM_KEY }) { album ->
             AlbumCard(
                 album = album,
+                loading=loading,
                 onClick = { onOpenAlbum(album) },
                 modifier = Modifier.animateItem()
             )
@@ -345,12 +349,15 @@ fun GalleryScreen(
                         }
                     },
                     actions = {
-                        if(!state.isAlbumView) androidx.compose.material3.TextButton(onClick={viewModel.setTab(if(state.tab==GalleryTab.ALBUMS)GalleryTab.ALL else GalleryTab.ALBUMS)}) {
-                            Text(if(state.tab==GalleryTab.ALBUMS) "All media" else "Albums")
-                        }
                         Box {
                             IconButton(onClick={sorting=true}){Icon(DriveIcons.Sort,"Sort gallery")}
-                            SortMenu(expanded=sorting,current=state.sortField,direction=state.sortDirection,onDismiss={sorting=false},onSelect={field,direction->sorting=false;viewModel.setSort(field,direction)},fields=listOf(FileSortField.DATE_MODIFIED,FileSortField.DATE_ADDED,FileSortField.NAME,FileSortField.SIZE,FileSortField.TYPE))
+                            SortMenu(expanded=sorting,current=state.sortField,direction=state.sortDirection,onDismiss={sorting=false},onSelect={field,direction->sorting=false;viewModel.setSort(field,direction)},fields=listOf(FileSortField.DATE_MODIFIED,FileSortField.DATE_ADDED,FileSortField.NAME,FileSortField.SIZE,FileSortField.TYPE),prefixContent={
+                                if(!state.isAlbumView){
+                                    DropdownMenuItem(text={Text("All media")},onClick={sorting=false;viewModel.setTab(GalleryTab.ALL)},trailingIcon={if(state.tab!=GalleryTab.ALBUMS)Icon(DriveIcons.Check,null)})
+                                    DropdownMenuItem(text={Text("Albums")},onClick={sorting=false;viewModel.setTab(GalleryTab.ALBUMS)},trailingIcon={if(state.tab==GalleryTab.ALBUMS)Icon(DriveIcons.Check,null)})
+                                    androidx.compose.material3.HorizontalDivider()
+                                }
+                            })
                         }
                     }
                 )
@@ -364,7 +371,7 @@ fun GalleryScreen(
 
             if (state.tab == GalleryTab.ALBUMS && !state.isAlbumView) {
                 if (!state.loaded) {
-                    LoadingState()
+                    app.tgdrive.ui.SkeletonScene { AlbumGrid(List(state.albumGridSize*4){MediaAlbum("skeleton-$it","Album",0,null,0)},state.albumGridSize,padding.calculateBottomPadding()+LocalBottomBarInset.current,{},{},{},loading=true) }
                     return@Column
                 }
                 AlbumGrid(
@@ -403,7 +410,7 @@ fun GalleryScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 when {
-                    media.isInitialLoad || !state.loaded -> LoadingState()
+                    media.isInitialLoad || !state.loaded -> com.infinity.drive.presentation.components.GallerySkeleton(state.gridSize,bottomPadding=padding.calculateBottomPadding()+LocalBottomBarInset.current,listMode=state.viewMode==ViewMode.LIST)
 
                     media.itemCount == 0 -> EmptyState(
                         icon = DriveIcons.Photo,
@@ -419,7 +426,7 @@ fun GalleryScreen(
                                 onZoomIn = viewModel::zoomIn,
                                 onZoomOut = viewModel::zoomOut
                             )
-                            .then(listDragSelect),
+                            .then(listDragSelect).resultReveal(query to media.itemSnapshotList.items.take(8).map{it.key}),
                         contentPadding = PaddingValues(
                             start = 8.dp,
                             end = 8.dp,
@@ -469,15 +476,15 @@ fun GalleryScreen(
                                 onZoomIn = viewModel::zoomIn,
                                 onZoomOut = viewModel::zoomOut
                             )
-                            .then(gridDragSelect),
+                            .then(gridDragSelect).resultReveal(query to media.itemSnapshotList.items.take(8).map{it.key}),
                         contentPadding = PaddingValues(
                             start = 0.dp,
                             end = 0.dp,
                             top = 12.dp,
                             bottom = 12.dp + padding.calculateBottomPadding() + LocalBottomBarInset.current
                         ),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                        horizontalArrangement = Arrangement.spacedBy(LibraryLayout.GalleryGutter),
+                        verticalArrangement = Arrangement.spacedBy(LibraryLayout.GalleryGutter)
                     ) {
                         items(
                             count = media.itemCount,

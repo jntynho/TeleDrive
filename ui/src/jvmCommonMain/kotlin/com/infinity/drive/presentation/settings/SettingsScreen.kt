@@ -1,6 +1,7 @@
 // Modified for TG Drive; see third_party/driveinfinity/SOURCE.md.
 package com.infinity.drive.presentation.settings
 
+import com.infinity.drive.presentation.components.resultReveal
 import app.tgdrive.ui.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -48,7 +49,7 @@ fun SettingsScreen(onBack:(()->Unit)?,onOpenSection:(SettingsSectionType)->Unit,
     }}) { padding ->
         if(query.isNotBlank()&&results.isEmpty()&&sections.none{stringResource(it.titleRes).contains(query.trim(),true)}) {
             EmptyState(DriveIcons.Search,"No settings found","Try a setting name, such as cache, backup or playback.",Modifier.padding(padding),"Clear search",{query=""})
-        } else Column(Modifier.fillMaxSize().padding(top=padding.calculateTopPadding()).verticalScroll(rememberScrollState())) {
+        } else Column(Modifier.fillMaxSize().padding(top=padding.calculateTopPadding()).verticalScroll(rememberScrollState()).resultReveal(query)) {
             if(query.isBlank()) {
                 Card(onClick={onOpenSection(SettingsSectionType.ACCOUNT)},modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp),shape=DriveStyle.CardShape,colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)) {
                     Row(Modifier.padding(18.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {

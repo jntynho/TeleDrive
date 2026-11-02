@@ -59,6 +59,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -169,8 +171,15 @@ fun DriveInfinityApp(
             (LocalLocaleList as ProvidableCompositionLocal<LocaleList>) provides targetLocaleList,
             LocalCompactLayout provides state.compactLayout
         ) {
+            var contentFrameReady by remember { mutableStateOf(false) }
+            LaunchedEffect(state.loading){if(!state.loading){withFrameNanos{};withFrameNanos{};contentFrameReady=true}}
+            val warmup=remember{androidx.compose.animation.core.MutableTransitionState(true)}
+            warmup.targetState=state.loading||!contentFrameReady
+            val preparing=warmup.currentState||warmup.targetState
+            Box(Modifier.fillMaxSize()){
+            Box(Modifier.fillMaxSize().then(if(preparing)Modifier.clearAndSetSemantics{}else Modifier)){
             when {
-                state.loading -> LoadingState()
+                state.loading -> Unit
                 state.locked -> LockScreen(onUnlocked = viewModel::unlock)
                 else -> MainScaffold(
                     pendingShare = pendingShare,
@@ -181,11 +190,14 @@ fun DriveInfinityApp(
                     driveMissing = viewModel.driveMissing
                 )
             }
-            if(upgradeNotice!=null&&!state.loading)androidx.compose.material3.AlertDialog(onDismissRequest=viewModel::dismissUpgradeNotice,title={Text("Previous library preserved")},text={Text(upgradeNotice.orEmpty())},confirmButton={androidx.compose.material3.TextButton(viewModel::dismissUpgradeNotice){Text("Continue")}})
-            if (sessionBroken) {
+            }
+            androidx.compose.animation.AnimatedVisibility(visibleState=warmup,enter=fadeIn(tween(200)),exit=fadeOut(tween(360))){com.infinity.drive.presentation.components.StartupSurface()}
+            }
+            if(upgradeNotice!=null&&!state.loading&&!preparing)androidx.compose.material3.AlertDialog(onDismissRequest=viewModel::dismissUpgradeNotice,title={Text("Previous library preserved")},text={Text(upgradeNotice.orEmpty())},confirmButton={androidx.compose.material3.TextButton(viewModel::dismissUpgradeNotice){Text("Continue")}})
+            if (sessionBroken&&!preparing) {
                 SessionBrokenDialog(onSignInAgain = viewModel::resetSession)
             }
-            pendingUpdate?.takeIf { !state.loading && !state.locked }?.let { release ->
+            pendingUpdate?.takeIf { !state.loading && !state.locked&&!preparing }?.let { release ->
                 UpdateDialog(
                     currentVersion = LocalAppVersion.current,
                     onOpenUrl = urlOpener::open,
@@ -279,7 +291,7 @@ private fun MainScaffold(
     val chromeDensity=androidx.compose.ui.platform.LocalDensity.current
     val systemBottom=WindowInsets.navigationBars.getBottom(chromeDensity)
     LaunchedEffect(currentDestination){
-        if(currentDestination?.hasRoute(Route.Preview::class)==true||!showChrome)audioPlayer.pause()
+        if(!showChrome&&currentDestination?.hasRoute(Route.Preview::class)!=true)audioPlayer.pause()
     }
 
     if (useRail && showChrome) {

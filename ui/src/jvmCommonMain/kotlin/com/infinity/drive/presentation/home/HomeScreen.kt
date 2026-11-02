@@ -45,6 +45,10 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.toShape
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import app.tgdrive.ui.skeleton
+import org.koin.compose.koinInject
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -165,6 +169,13 @@ fun HomeScreen(
     viewModel: HomeViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val uploads= koinInject<com.infinity.drive.presentation.upload.UploadCoordinator>()
+    val uploadPicker=com.infinity.drive.presentation.platform.LocalMultiFilePicker.current
+    val folderPicker=com.infinity.drive.presentation.platform.LocalFolderPicker.current
+    val uploadSheetState=androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded=true)
+    var showUploadSheet by rememberSaveable{mutableStateOf(false)}
+    val sheetScope=rememberCoroutineScope()
+
     var searching by rememberSaveable { mutableStateOf(false) }
     val searchModel:com.infinity.drive.presentation.search.SearchViewModel=koinViewModel()
     val searchState by searchModel.uiState.collectAsStateWithLifecycle()
@@ -202,17 +213,32 @@ fun HomeScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
     CollectSnackbarMessages(viewModel.messages, snackbarHostState)
+    CollectSnackbarMessages(uploads.messages, snackbarHostState)
+    if(showUploadSheet)androidx.compose.material3.ModalBottomSheet(onDismissRequest={showUploadSheet=false},sheetState=uploadSheetState){
+        Column(Modifier.fillMaxWidth().padding(horizontal=16.dp).padding(bottom=24.dp)){
+            Text("Upload",style=MaterialTheme.typography.titleLarge,modifier=Modifier.padding(8.dp))
+            androidx.compose.material3.ListItem(colors=androidx.compose.material3.ListItemDefaults.colors(containerColor=androidx.compose.ui.graphics.Color.Transparent),headlineContent={Text("Upload files")},leadingContent={Icon(DriveIcons.Description,null)},modifier=Modifier.clickable{
+                sheetScope.launch{uploadSheetState.hide();showUploadSheet=false;uploadPicker.pick{references->if(references.isNotEmpty())uploads.importAndUpload(references)}}
+            })
+            androidx.compose.material3.ListItem(colors=androidx.compose.material3.ListItemDefaults.colors(containerColor=androidx.compose.ui.graphics.Color.Transparent),headlineContent={Text("Upload folder")},leadingContent={Icon(DriveIcons.Folder,null)},modifier=Modifier.clickable{
+                sheetScope.launch{uploadSheetState.hide();showUploadSheet=false;folderPicker.pick{result->if(result is com.infinity.drive.presentation.platform.PickResult.Picked)uploads.importAndUpload(listOf(result.path))}}
+            })
+        }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { BottomBarSnackbarHost(snackbarHostState) },
-        topBar = {
-            app.tgdrive.ui.ExpandableLibraryHeader("Home",searchState.query,searchModel::setQuery,searching,{searching=it},"Search your files",actions={
-                androidx.compose.material3.FilledIconButton(onAddFiles,modifier=Modifier.padding(end=8.dp).size(48.dp),shape=CircleShape,
-                    colors=androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(containerColor=app.tgdrive.ui.DriveStyle.ActionBlue,contentColor=androidx.compose.ui.graphics.Color.White)){
-                    Icon(DriveIcons.Upload,"Upload files",Modifier.size(24.dp))
+        floatingActionButton={
+            androidx.compose.animation.AnimatedVisibility(visible=!searching&&!state.loading,enter=fadeIn(androidx.compose.animation.core.tween(240)),exit=fadeOut(androidx.compose.animation.core.tween(160))){
+                androidx.compose.material3.FloatingActionButton(onClick={showUploadSheet=true},shape=CircleShape,containerColor=app.tgdrive.ui.DriveStyle.ActionBlue,contentColor=androidx.compose.ui.graphics.Color.White,
+                    modifier=Modifier.padding(bottom=LocalBottomBarInset.current)){
+                    Icon(DriveIcons.CloudUpload,"Upload",Modifier.size(26.dp))
                 }
-            })
+            }
+        },
+        topBar = {
+            app.tgdrive.ui.ExpandableLibraryHeader("Home",searchState.query,searchModel::setQuery,searching,{searching=it},"Search your files")
         }
 
     ) { padding ->
@@ -221,7 +247,7 @@ fun HomeScreen(
             return@Scaffold
         }
         if (state.loading) {
-            LoadingState(modifier = Modifier.padding(padding))
+            com.infinity.drive.presentation.components.HomeSkeleton(modifier=Modifier.padding(top=padding.calculateTopPadding()),bottomPadding=padding.calculateBottomPadding()+LocalBottomBarInset.current)
             return@Scaffold
         }
         LazyColumn(
@@ -229,7 +255,7 @@ fun HomeScreen(
             contentPadding = padding.add(
                 horizontal = 16.dp,
                 top = 8.dp,
-                bottom = 24.dp + LocalBottomBarInset.current
+                bottom = 96.dp + LocalBottomBarInset.current
             ),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -240,16 +266,18 @@ fun HomeScreen(
                     state.storage.filter{it.category==com.infinity.drive.domain.model.FileCategory.AUDIO}.sumOf{it.totalBytes},
                     state.storage.filter{it.category !in setOf(com.infinity.drive.domain.model.FileCategory.IMAGE,com.infinity.drive.domain.model.FileCategory.VIDEO,com.infinity.drive.domain.model.FileCategory.AUDIO)}.sumOf{it.totalBytes}
                 )
-                app.tgdrive.ui.LibraryDashboard(app.tgdrive.ui.LibraryOverview(state.storage.sumOf{it.fileCount},groups.sum(),groups,state.localBytes),onAddFiles,showAddAction=false)
+                app.tgdrive.ui.LibraryDashboard(app.tgdrive.ui.LibraryOverview(state.storage.sumOf{it.fileCount},groups.sum(),groups,state.localBytes),{showUploadSheet=true},showAddAction=false,shortcuts=listOf(
+                    app.tgdrive.ui.LibraryShortcut("Favorites",DriveIcons.Star){onOpenCollection(CollectionType.FAVORITES)},
+                    app.tgdrive.ui.LibraryShortcut("Archived",DriveIcons.Archive){onOpenCollection(CollectionType.ARCHIVED)},
+                    app.tgdrive.ui.LibraryShortcut("Trash",DriveIcons.Delete,onOpenTrash)
+                ))
             }
             item {
-                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                    listOf(Triple("All files",DriveIcons.Folder,onOpenFiles),Triple("Activity",DriveIcons.SwapVert,onOpenTransfers),Triple("Backups",DriveIcons.Backup,onOpenBackupSettings)).forEach{(title,icon,action)->
-                        Column(Modifier.weight(1f).clip(MaterialTheme.shapes.small).clickable(onClick=action).padding(vertical=12.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(8.dp)){
-                            Icon(icon,null,Modifier.size(25.dp));Text(title,style=MaterialTheme.typography.labelMedium)
-                        }
-                    }
-                }
+                com.infinity.drive.presentation.components.HomeQuickLinks(listOf(
+                    app.tgdrive.ui.LibraryShortcut("All files",DriveIcons.Folder,onOpenFiles),
+                    app.tgdrive.ui.LibraryShortcut("Activity",DriveIcons.SwapVert,onOpenTransfers),
+                    app.tgdrive.ui.LibraryShortcut("Backups",DriveIcons.Backup,onOpenBackupSettings)
+                ))
             }
             if (state.autoBackupEnabled && state.missingPermissions.isNotEmpty()) {
                 item {
@@ -296,21 +324,11 @@ fun HomeScreen(
             }
             if (state.showRecentSection && state.recentFiles.isNotEmpty()) {
                 item("recent-header") {
-                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
-                        Text("Recent files",Modifier.weight(1f),style=MaterialTheme.typography.titleLarge)
-                        androidx.compose.material3.TextButton(onOpenFiles){Text("See all")}
-                    }
+                    com.infinity.drive.presentation.components.RecentSectionHeader(onOpenFiles)
                 }
                 items(state.recentFiles,key={"recent-${it.id}"}) { file ->
-                    Row(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable {
+                    com.infinity.drive.presentation.components.LibraryRecentRow(file,Modifier.animateItem(fadeInSpec=androidx.compose.animation.core.tween(240))){
                         onOpenFile(file.id,PreviewSequence(sortField=FileSortField.DATE_ADDED,sortDirection=SortDirection.DESCENDING))
-                    }.padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                        FileThumbnail(file,Modifier.size(52.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp)))
-                        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)){
-                            Text(file.name,style=MaterialTheme.typography.titleSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
-                            Text("${file.category.name.lowercase().replaceFirstChar{it.uppercase()}} · ${Formatters.bytes(file.sizeBytes)}",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Icon(DriveIcons.KeyboardArrowRight,null,tint=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.size(18.dp))
                     }
                 }
             } else if(state.recentFiles.isEmpty()) {
@@ -318,21 +336,12 @@ fun HomeScreen(
                     Column(Modifier.fillMaxWidth().padding(vertical=24.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                         Text("A place for everything",style=MaterialTheme.typography.titleLarge)
                         Text("Upload your first files to see them here.",color=MaterialTheme.colorScheme.onSurfaceVariant)
-                        androidx.compose.material3.TextButton(onAddFiles){Text("Upload files")}
+                        androidx.compose.material3.TextButton({showUploadSheet=true}){Text("Upload files")}
                     }
                 }
             }
 
-            item {
-                CollectionLinks(
-                    showArchived = state.showArchivedSection,
-                    showHidden = state.showHiddenSection,
-                    activeTransferCount = state.activeTransferCount,
-                    onOpenCollection = onOpenCollection,
-                    onOpenTransfers = onOpenTransfers,
-                    onOpenTrash = onOpenTrash
-                )
-            }
+
         }
     }
 }

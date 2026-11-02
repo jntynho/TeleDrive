@@ -4,6 +4,7 @@ import org.jetbrains.compose.resources.StringResource
 
 data class SettingsSearchEntry(val section:SettingsSectionType,val title:StringResource)
 fun settingsSearchEntries():List<SettingsSearchEntry> = listOf(
+    SettingsSearchEntry(SettingsSectionType.SECURITY,Res.string.collection_hidden_title),
     SettingsSearchEntry(SettingsSectionType.ACCOUNT,Res.string.settings_rebuild_index_telegram),
     SettingsSearchEntry(SettingsSectionType.ACCOUNT,Res.string.common_storage_channels),
     SettingsSearchEntry(SettingsSectionType.BACKUP,Res.string.settings_automatic_backup),

@@ -28,8 +28,7 @@ class AudioViewModel(private val handle:SavedStateHandle,private val files:FileR
     fun favorite(file:DriveFile){viewModelScope.launch{files.setFilesFavorite(listOf(file.id),!file.isFavorite)}}
     private var queueJob:Job?=null
     fun play(file:DriveFile,player:AudioPlayback){
-        if(player.state.value.file?.id==file.id){player.toggle();return}
-        player.play(file)
+        if(player.state.value.file?.id==file.id)player.toggle() else player.play(file)
         queueJob?.cancel()
         queueJob=viewModelScope.launch{
             val ids=files.fileIds(spec.first())
