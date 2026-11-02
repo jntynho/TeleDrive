@@ -36,7 +36,7 @@ Final local packaging results are appended after the build completes. GitHub dev
 - Release lint: **0 errors**, 72 non-blocking warnings. Debug and instrumented-test APK compilation succeeded; device execution is a separate CI gate.
 - R8/resource-shrunk standalone APKs built for all four ABIs plus universal. Identical DEX/resources/assets and per-ABI native bytes verified across all five outputs.
 - All **40 native library entries** passed ELF alignment; every APK passed ZIP alignment for 16 KB packaging. The Aero Fold launcher check passed.
-- Unsigned local APK sizes: ARM64 **40.03 MiB**, ARM32 about **29 MiB**, x86_64 about **42 MiB**, x86 about **44 MiB**, universal about **137 MiB**. Exact signed sizes are determined by the release workflow.
+- Unsigned local APK sizes: ARM64 **40.03 MiB**, ARM32 **29.84 MiB**, x86_64 **42.88 MiB**, x86 **44.60 MiB**, universal **137.81 MiB**. Exact signed sizes are determined by the release workflow.
 - License texts/attribution are packaged in APK assets. The removed upstream launcher bitmap is absent; welcome uses the retained TG Drive vector.
 
-AAB and GitHub device/signature/publication results are recorded separately when available. These local APKs are unsigned; they are not substitutes for the existing signed release identity.
+The separate resource-shrunk **AAB build also passed** (about 68 MiB). GitHub device/signature/publication results are recorded separately when available. These local APKs are unsigned; they are not substitutes for the existing signed release identity.

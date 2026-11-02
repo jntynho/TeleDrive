@@ -14,7 +14,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import app.tgdrive.R
-import com.infinity.drive.presentation.MainActivity
+import app.tgdrive.MainActivity
 import com.infinity.drive.core.update.UpdateSkipReceiver
 
 class AppNotifications(
