@@ -29,29 +29,19 @@
 </p>
 <p align="center">
   <a href="https://github.com/jntynho/TG-Drive/releases/latest/download/tg-drive-armeabi-v7a.apk"><img src="https://img.shields.io/badge/Older_phones-ARM32-475569?style=for-the-badge&logo=android&logoColor=white" alt="Download latest ARM32 APK for older phones"></a>
-  <a href="https://github.com/jntynho/TG-Drive/releases/latest/download/tg-drive-universal.apk"><img src="https://img.shields.io/badge/Not_sure%3F-Universal-475569?style=for-the-badge&logo=android&logoColor=white" alt="Download latest universal APK"></a>
+  <a href="https://github.com/jntynho/TG-Drive/releases/latest/download/tg-drive-x86_64.apk"><img src="https://img.shields.io/badge/Intel-x86__64-475569?style=for-the-badge&logo=android&logoColor=white" alt="Download latest x86_64 APK"></a>
 </p>
 
 | Your device | Choose |
 | --- | --- |
 | Most modern Android phones and tablets | **[ARM64 · arm64-v8a](https://github.com/jntynho/TG-Drive/releases/latest/download/tg-drive-arm64-v8a.apk)** |
 | Older devices running a 32-bit ARM system | [ARM32 · armeabi-v7a](https://github.com/jntynho/TG-Drive/releases/latest/download/tg-drive-armeabi-v7a.apk) |
-| Unsure which architecture your device supports | [Universal](https://github.com/jntynho/TG-Drive/releases/latest/download/tg-drive-universal.apk) — includes all supported architectures; larger download |
+| Intel devices and emulators | [x86_64](https://github.com/jntynho/TG-Drive/releases/latest/download/tg-drive-x86_64.apk) |
 
 All variants require **Android 8.0 or later** and install independently. Download **one `.apk`**; no ZIP extraction or split-APK installer is needed. The buttons always target the latest published release.
 
-<details>
-<summary><strong>Intel devices, checksums and other downloads</strong></summary>
+Only these three standalone APKs are published. Universal, x86 and AAB builds are disabled in the release workflow. GitHub's automatic source ZIP/TAR downloads contain source code; choose an APK to install.
 
-- [Intel 64-bit · x86_64](https://github.com/jntynho/TG-Drive/releases/latest/download/tg-drive-x86_64.apk)
-- [Intel 32-bit · x86](https://github.com/jntynho/TG-Drive/releases/latest/download/tg-drive-x86.apk)
-- [SHA-256 checksums](https://github.com/jntynho/TG-Drive/releases/latest/download/SHA256SUMS)
-- [Android App Bundle](https://github.com/jntynho/TG-Drive/releases/latest/download/tg-drive.aab) — for store tooling, not direct installation
-- [All releases and release notes](https://github.com/jntynho/TG-Drive/releases)
-
-GitHub's automatic **Source code (zip/tar.gz)** downloads contain the repository, not the Android installer. Actions artifacts are also ZIP archives; use the APK assets in Releases for installation.
-
-</details>
 
 **Updating?** Install the new release APK over the existing release app to retain its data. The release workflow checks the existing signing identity and a signed in-place upgrade. Debug builds use a different signature; see the [release guide](docs/RELEASING.md).
 
@@ -132,7 +122,6 @@ The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 ```sh
 ./gradlew --max-workers=1 :shared:allTests :app:testDebugUnitTest :app:lintDebug :app:assembleDebugAndroidTest
 ./gradlew --max-workers=1 testDebugUnitTest lintRelease assembleRelease -PsplitApks=true
-./gradlew --max-workers=1 bundleRelease -PbundleOnly=true
 npm test --prefix sharing-server
 python3 scripts/generate_launcher.py --check
 ```

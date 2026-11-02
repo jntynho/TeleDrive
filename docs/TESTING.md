@@ -1,3 +1,5 @@
+> Release output scope is now three standalone APKs: ARM64, ARM32 and x86_64. Five-APK/AAB results below record checks completed before that reduction; those extra outputs are no longer produced by CI.
+
 # Validation — Android private-channel rebuild
 
 The active engine is the pinned DriveInfinity derivative described in [REBUILD-PARITY.md](REBUILD-PARITY.md). Earlier `UPLOAD-0.x`, `SOLAR-0.11` and UI-review documents are historical.

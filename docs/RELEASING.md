@@ -1,3 +1,5 @@
+> Current release scope: only `tg-drive-arm64-v8a.apk`, `tg-drive-armeabi-v7a.apk` and `tg-drive-x86_64.apk`. The workflow no longer builds/uploads Universal, x86 or AAB, and publishes only the three APK assets. The remaining historical packaging notes below describe earlier versions. Signing, alignment and upgrade checks are retained.
+
 # Building and releasing
 
 ## GitHub Actions
