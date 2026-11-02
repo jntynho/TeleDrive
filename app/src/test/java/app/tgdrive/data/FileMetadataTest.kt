@@ -7,7 +7,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], manifest = Config.NONE)
+@Config(application = android.app.Application::class, sdk = [28], manifest = Config.NONE)
 class FileMetadataTest {
     @Test fun `Arabic and unicode metadata survive remote caption round trip`() {
         val original = FileMetadata.create("صورة العائلة 📷.jpg", "صور")

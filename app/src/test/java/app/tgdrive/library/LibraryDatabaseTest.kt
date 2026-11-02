@@ -9,7 +9,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], manifest = Config.NONE)
+@Config(application = android.app.Application::class, sdk = [28], manifest = Config.NONE)
 class LibraryDatabaseTest {
     @Before fun clean() { for (id in 910..921) RuntimeEnvironment.getApplication().deleteDatabase("library-v2-$id.db") }
     private fun db(id: Long = 910) = LibraryDatabase(RuntimeEnvironment.getApplication(), id, PlainRows)

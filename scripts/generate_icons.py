@@ -94,5 +94,5 @@ for icon in sorted(canonical):
             + f'pathFillType=PathFillType.{fill_type},fillAlpha={float_literal(fill_alpha)},strokeAlpha={float_literal(stroke_alpha)})')
     lines.append('        }.build()\n    }')
 lines.append('}\n')
-(ROOT / 'app/src/main/java/app/tgdrive/ui/DriveIcons.kt').write_text('\n'.join(lines))
+(ROOT / 'skin/src/commonMain/kotlin/app/tgdrive/ui/DriveIcons.kt').write_text('\n'.join(lines))
 print(f'Generated {len(canonical)} Solar Linear icons, {len(aliases)} semantic aliases.')

@@ -4,6 +4,12 @@ This project uses third-party software, including:
 
 | Component | Project / license information |
 | --- | --- |
+| DriveInfinity Android/shared/UI source | https://github.com/ZHINFINITY/DriveInfinity — Apache 2.0; [pinned source, authors and modifications](third_party/driveinfinity/SOURCE.md), [license](third_party/driveinfinity/LICENSE) |
+| Solar Linear by 480 Design | CC BY 4.0; [SVG sources and attribution](third_party/solar/SOURCE.md) |
+| Coil | https://github.com/coil-kt/coil — Apache 2.0 |
+| Koin | https://github.com/InsertKoinIO/koin — Apache 2.0 |
+| Zip4j | https://github.com/srikanth-lingala/zip4j — Apache 2.0 |
+| ZXing | https://github.com/zxing/zxing — Apache 2.0 |
 | Telegram TDLib | https://github.com/tdlib/td — Boost Software License 1.0 |
 | TDLib Android community packaging 0.1.1 | io.github.tdlib-android:core; Maven POM declares Boost Software License 1.0; provenance limitations are recorded in docs/SECURITY.md |
 | AndroidX / Jetpack Compose | https://android.googlesource.com/platform/frameworks/support/ — Apache License 2.0 |

@@ -10,11 +10,14 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class NativeLaunchTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
-    @Test fun actualActivityStartsWithNativeAccountConfiguration() {
-        compose.onNodeWithText("Sign in").assertIsDisplayed()
-        compose.onNodeWithText("Connect your own app").assertIsDisplayed()
+    @Test fun actualActivityStartsWithPrivateChannelOnboarding() {
+        compose.waitUntil(15_000) { compose.onAllNodesWithText("Get started").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("TG Drive").assertIsDisplayed()
+        compose.onNodeWithText("Your files live in your own private Telegram channel. Your account, your storage, your control.").assertIsDisplayed()
+        compose.onNodeWithText("Get started").performClick()
+        compose.onNodeWithText("API access").assertIsDisplayed()
+        compose.onNodeWithText("API ID").assertIsDisplayed()
+        compose.onNodeWithText("API hash").assertIsDisplayed()
         compose.onNodeWithText("Continue").assertIsNotEnabled()
-        compose.onNodeWithText("Manage accounts").performClick()
-        compose.onNodeWithText("Your accounts").assertIsDisplayed()
     }
 }

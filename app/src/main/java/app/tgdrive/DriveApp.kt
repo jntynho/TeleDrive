@@ -3,7 +3,7 @@ package app.tgdrive
 import android.app.Application
 import app.tgdrive.data.TelegramDrive
 
-class DriveApp : Application() {
+class DriveApp : com.infinity.drive.DriveInfinityApplication() {
     val sessions: SessionPool by lazy { SessionPool(this) }
     val drive: TelegramDrive get() = sessions.active().drive
     private val authorizations = java.util.concurrent.ConcurrentHashMap<String,Long>()

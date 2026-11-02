@@ -5,7 +5,7 @@
 <h1 align="center">TG Drive</h1>
 
 <p align="center"><strong>Everything you keep, in one place.</strong></p>
-<p align="center">A native Android home for your files, photos and music — stored in your own Telegram Saved Messages.</p>
+<p align="center">A native Android home for your files, photos and music — stored in your own private Telegram channels.</p>
 
 <p align="center">
   <a href="https://github.com/jntynho/TG-Drive/releases/latest"><img src="https://img.shields.io/github/v/release/jntynho/TG-Drive?style=flat&color=1684FA&label=release" alt="Latest release"></a>
@@ -57,62 +57,52 @@ GitHub's automatic **Source code (zip/tar.gz)** downloads contain the repository
 
 ## Features
 
-<table>
-  <tr>
-    <td width="50%" valign="top"><strong>A home for your files</strong><br>Recent uploads, library size and file count, with folders, favorites, tags and search to keep everything organized.</td>
-    <td width="50%" valign="top"><strong>A gallery for your memories</strong><br>Photo and video thumbnails, sorting, immersive image zoom and video playback, without filenames crowding the grid.</td>
-  </tr>
-  <tr>
-    <td valign="top"><strong>Your music, together</strong><br>Songs and recordings in one place, embedded cover art when available, background playback and saved positions.</td>
-    <td valign="top"><strong>Transfers you can manage</strong><br>Batch uploads, a persistent queue, pause and retry, priorities, and network and charging preferences.</td>
-  </tr>
-  <tr>
-    <td valign="top"><strong>Ready when you are offline</strong><br>Keep selected files on the device, manage cached copies, back up selected folders and verify downloaded content with SHA-256.</td>
-    <td valign="top"><strong>Privacy with a choice</strong><br>Separate Telegram profiles, device credential or biometric app lock, and optional encrypted vaults with recovery keys.</td>
-  </tr>
-</table>
+The Android rebuild uses the real [DriveInfinity](https://github.com/ZHINFINITY/DriveInfinity) engine and presentation modules, adapted to TG Drive's dark visual system, Solar Linear icons, semicircle dashboard and four-tab navigation.
 
-Files also support Trash and restore, content versions, Android sharing, document/PDF previews and on-device Latin-text OCR. The interface is built with **Kotlin and Jetpack Compose**, with dark surfaces, system typography and horizontal page transitions.
+| Area | Available options |
+| --- | --- |
+| Home & files | Recent files, size/type overview, folders, favorites, hidden/archived collections, bulk actions, search and Markdown notes |
+| Gallery & Audio | Photo/video grids and albums, search/sort, immersive previews, music artwork, Media3 streaming and playback preferences |
+| Storage channels | Discover, create, switch, rename and delete owned private drives |
+| Activity | Persistent upload/download queue, progress, pause/resume/retry/cancel, concurrency and shared Telegram cooldowns |
+| Backup | Selected folders, exclusions, instant/scheduled backup, Wi-Fi/charging rules and file-size limits |
+| Privacy & recovery | Optional file/thumbnail encryption, passphrase-protected key backup, device app lock and screenshot blocking |
+| Storage & advanced | Cache budget, cleanup, Trash/restore/retention, proxies/failover, notifications, appearance/density and optional updates |
 
 ### Four tabs. One library.
 
 | Home | Gallery | Audio | Settings |
 | --- | --- | --- | --- |
-| Recent uploads, storage overview and shortcuts to all files and backups | Photos and videos, thumbnail grid, search and sorting | Songs and recordings, artwork and playback | Accounts, transfers, storage, library recovery and privacy |
+| Dashboard, recent files and shortcuts | Photos/videos, albums and thumbnail grids | Songs/recordings with available artwork | Account/drives, backup, storage, security and the other reference settings |
 
-See the [implementation details and limits](docs/IMPLEMENTATION_STATUS.md) for the broader feature inventory, the [full UI review](docs/UI-UX-SKILL-REVIEW.ar.md), and the [upload audit](docs/UPLOAD-0.10.ar.md) for current corrections and validation boundaries.
+The complete mapping is in [the rebuild inventory](docs/REBUILD-PARITY.md). Earlier 0.x design/upload documents describe the retired engine and are retained as history.
 
 ## Getting started
 
-1. **Install an APK** matching your device from the downloads above.
-2. **Connect Telegram.** If the build asks for an API ID and API hash, create your own application at [my.telegram.org/apps](https://my.telegram.org/apps). Enter these on the device, then follow Telegram's sign-in prompts. Code delivery and any additional authentication are controlled by Telegram.
-3. **Add your files.** Choose files in TG Drive or share them from another Android app. Follow progress in **Activity** and browse your library through Home, Gallery or Audio.
-4. **Make it yours.** Set transfer preferences, choose offline files or configure a folder backup. Keep a vault recovery key somewhere safe outside the phone if you enable a vault.
+1. Install an APK matching your phone.
+2. Create Telegram application credentials at [my.telegram.org/apps](https://my.telegram.org/apps), enter API ID/hash on the device and follow Telegram's sign-in prompts. Code delivery, password/email checks and QR availability are controlled by Telegram.
+3. Choose or create an owned private TG Drive channel.
+4. Add files or share documents from another Android app. Follow their progress in Activity. Enable folder backup or encryption only after choosing the relevant preferences and saving recovery material.
 
-No separate storage server is needed for the main Telegram-backed library. Advanced WebDAV exports and the optional [public-copy sharing service](sharing-server/README.md) require your own endpoints.
+No separate storage server is required. Telegram still controls account limits, connection speed and server-requested waiting periods; Android can defer background work.
 
-## How it works
+## How uploading works
 
-TG Drive uses **TDLib** to connect to your Telegram account and store file content in Saved Messages. Its library index adds folders, tags, versions and other organization on top of those messages.
+TDLib sends the document and its manifest caption in the same message directly to the chosen private channel. The caption records the file/folder identity and allows the index to be rebuilt. Large/encrypted files retain the reference multipart, streaming and key-recovery paths. One account-wide pacer controls message writes and respects Telegram's cooldowns; changing the destination does not remove those limits.
 
-Eligible ordinary single-part files carry their creation metadata in the **same Telegram message as the file**. The upload pipeline can overlap up to two ordinary content uploads while coordinating publication and account-wide cooldowns. Multipart and encrypted files retain their own handling. See the [upload pipeline](docs/UPLOAD-0.8.md).
+## Updating from 0.x
 
-Telegram controls connection speeds, account limits and rate limits. TG Drive cannot guarantee unlimited storage or eliminate server-requested waiting periods. Android can also defer background work.
+Keep the existing installation and install a release with the same signing certificate. The rebuild copies the active session when its original key is available, preserves previous data, and stops the old queue. Select unfinished uploads again from their original sources.
 
-## Privacy and data
+New uploads use private channels. **Settings → Account → Previous library** provides read-only access to previous Saved Messages files and vaults, with verified-copy export. It does not delete, move or automatically re-upload your previous library. The reference's new encryption format and 0.x vault format are distinct.
 
-- **Ordinary Saved Messages are not end-to-end encrypted.** App lock protects access on your device; optional vaults add client-side encryption for their content and metadata. Some metadata, including sizes and timing, remains visible.
-- **Recovery matters.** Keep vault recovery credentials outside the phone. An exported library index does not restore file content deleted from Telegram.
-- **Sharing creates a copy.** Sharing or exporting a vault file decrypts that copy for the destination. Revoking a public link cannot recall copies already downloaded.
-- **This is experimental software.** Keep another copy of important files. Automated checks do not replace physical-device, real-account or independent security validation.
-
-Read the [security boundaries](docs/SECURITY.md) before relying on encrypted vaults or external sharing.
+Ordinary channels are not end-to-end encrypted. Keep encryption recovery material outside your phone and a separate copy of important data. Read [the security boundaries](docs/SECURITY.md) and [current validation status](docs/TESTING.md).
 
 ## Documentation
 
 | Guide | What you will find |
 | --- | --- |
-| [Feature inventory](docs/IMPLEMENTATION_STATUS.md) | Implemented capabilities and their limits |
+| [Rebuild inventory](docs/REBUILD-PARITY.md) | DriveInfinity feature mapping, upgrade behavior and validation |
 | [Connection troubleshooting](docs/CONNECTION_TROUBLESHOOTING.md) | Telegram setup and connection diagnostics |
 | [Security](docs/SECURITY.md) | Encryption, credentials, sharing and recovery boundaries |
 | [Testing](docs/TESTING.md) | Checks, device coverage and remaining validation |
@@ -126,12 +116,12 @@ Read the [security boundaries](docs/SECURITY.md) before relying on encrypted vau
 
 ## Build from source
 
-Use **JDK 21**, Android SDK **36**, Build Tools **36.0.0**, and the checked-in Gradle wrapper. Set `ANDROID_HOME`, or add `sdk.dir` to an ignored `local.properties` file.
+Use **JDK 21**, Android SDK **37.0**, Build Tools **37.0.0**, and the checked-in Gradle wrapper. Set `ANDROID_HOME`, or add `sdk.dir` to an ignored `local.properties` file.
 
 ```sh
 git clone https://github.com/jntynho/TG-Drive.git
 cd TG-Drive
-./gradlew --max-workers=2 assembleDebug
+./gradlew --max-workers=1 assembleDebug
 ```
 
 The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
@@ -140,18 +130,18 @@ The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 <summary><strong>Validation, release builds and Telegram application credentials</strong></summary>
 
 ```sh
-./gradlew --max-workers=2 testDebugUnitTest lintDebug assembleDebugAndroidTest
-./gradlew --max-workers=2 testReleaseUnitTest lintRelease assembleRelease -PsplitApks=true
-./gradlew --max-workers=2 bundleRelease -PbundleOnly=true
+./gradlew --max-workers=1 :shared:allTests :app:testDebugUnitTest :app:lintDebug :app:assembleDebugAndroidTest
+./gradlew --max-workers=1 testDebugUnitTest lintRelease assembleRelease -PsplitApks=true
+./gradlew --max-workers=1 bundleRelease -PbundleOnly=true
 npm test --prefix sharing-server
 python3 scripts/generate_launcher.py --check
 ```
 
 The optional sharing-service tests require Node.js 24. Native Android device tests additionally need a connected device or emulator; see [Testing](docs/TESTING.md).
 
-A distributor may supply authorized `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` through environment settings or ignored `local.properties`; users can then begin with their phone number. Embedded application identifiers are extractable. Never commit user sessions, login codes, passwords or signing keys.
+The rebuilt onboarding asks for the user’s own API ID/hash. The old build-time fields remain for source compatibility and do not currently skip that step. Never commit credentials, user sessions, login codes, passwords or signing keys.
 
-Local release outputs are unsigned unless the existing signing configuration is supplied. The GitHub workflow verifies device tests, release unit/lint checks, matching APK payloads, signature/alignment and a signed upgrade before publishing installable assets. It does not upload to Google Play.
+Local release outputs are unsigned unless the existing signing configuration is supplied. The GitHub workflow verifies device tests, unit tests and release lint checks, matching APK payloads, signature/alignment and a signed upgrade before publishing installable assets. It does not upload to Google Play.
 
 </details>
 
@@ -162,6 +152,8 @@ Local release outputs are unsigned unless the existing signing configuration is 
 For code contributions, keep changes focused and run the checks relevant to the change. See [Testing](docs/TESTING.md) for the full validation guide.
 
 ## Acknowledgements
+
+Based on [DriveInfinity](https://github.com/ZHINFINITY/DriveInfinity), originally by Mahmudul Hasan Khan (Mahmud0808 / DrDisagree), with ZHINFINITY and contributor changes, under [Apache 2.0](third_party/driveinfinity/LICENSE). The pinned source and derivative changes are recorded [here](third_party/driveinfinity/SOURCE.md).
 
 Built with [TDLib](https://github.com/tdlib/td), [Jetpack Compose](https://developer.android.com/compose), [Media3](https://developer.android.com/media/media3) and [Tink](https://github.com/tink-crypto/tink). Interface icons use **Solar Linear by [480 Design](https://www.figma.com/community/file/1166831539721848736)**, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Selected SVG sources, attribution and the native-vector conversion details are in [third_party/solar](third_party/solar/SOURCE.md).
 

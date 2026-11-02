@@ -1,0 +1,7 @@
+TG Drive includes Android, shared-engine and UI code derived from DriveInfinity.
+Upstream: https://github.com/ZHINFINITY/DriveInfinity
+Pinned source: 8a17d352802b8229038ce78363e670ace45c0c55
+Original work: Mahmudul Hasan Khan (Mahmud0808 / DrDisagree), with ZHINFINITY and contributor changes.
+Licensed under the Apache License, Version 2.0; see DriveInfinity-LICENSE.txt in this package, or LICENSE alongside this notice in the source repository.
+TG Drive modifications: Android-only integration, retained application/signing identity, protected session upgrade and previous-library reader, native TDLib schema adaptation, transfer safety fixes, Solar Linear vectors and TG Drive visual/navigation adaptation.
+These modifications do not imply endorsement by the original authors.

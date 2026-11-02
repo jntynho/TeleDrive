@@ -17,7 +17,7 @@ import java.io.File
 /** Real repository/SQLite/queue/cache with a fake Telegram wire; never contacts a real account. */
 @OptIn(ExperimentalCoroutinesApi::class,DelicateCoroutinesApi::class,ObsoleteCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk=[28],manifest=Config.NONE)
+@Config(application = android.app.Application::class, sdk=[28],manifest=Config.NONE)
 class TransferIntegrationTest {
     private val context get()=RuntimeEnvironment.getApplication()
     private lateinit var dispatcher:ExecutorCoroutineDispatcher

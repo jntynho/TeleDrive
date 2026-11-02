@@ -242,7 +242,12 @@ class TransferEngine(val repository: LibraryRepository, val scope: CoroutineScop
         }
         active.job=job;job.start()
         val monitor=launch {
-            while(isActive){delay(1000);val reason=gate(task(next.id));if(reason!=null){
+            while(isActive){delay(1000)
+                // The read-only compatibility code is never scheduled by the new
+                // app. Its regression fixture can still switch the old account.
+                val observed=repository.state.value.tasks.firstOrNull{it.id==next.id} ?: break
+                if(repository.state.value.accountId!=next.accountId)break
+                val reason=gate(observed);if(reason!=null){
                 withContext(NonCancellable){pause(next.id);val current=task(next.id)
                     if(current.state !in terminal)repository.setTask(current.copy(state=reason.first,error=reason.second,nextAttemptAt=now()+60_000))}
                 break

@@ -5,7 +5,7 @@
 [release-no-secrets.yml](../.github/workflows/release-no-secrets.yml), **Release APK (no secrets)**:
 
 1. Optional sharing service tests on Node 24 and native device tests on an accelerated Android 30 x86_64 emulator. No account credentials are used.
-2. Release unit tests, lint, R8/shrunk APK and AAB build.
+2. Debug/host unit tests, release lint, R8/shrunk APK and AAB build.
 3. Existing signature verification, ZIP and ELF alignment checks.
 4. Validate that all standalone APKs contain identical DEX/resources/assets and byte-identical native libraries for their ABI. Upload each APK separately with its own checksum; AAB and mapping files have separate artifacts.
 5. Install the published signed universal 0.1.1 APK on a disposable x86_64 emulator, seed synthetic private files/preferences, and install the new signed x86_64 APK with `adb install -r`. Check UID/data retention and release activity launch. No real Telegram session is created.
@@ -24,7 +24,7 @@ Published Release assets use stable names: `tg-drive-arm64-v8a.apk`, `tg-drive-a
 
 Choose one APK matching the device. These are standalone APKs, not a set that must be installed together. All outputs share the application ID, version code/name and signing identity. Ordinary debug/emulator builds keep their existing universal packaging; opt into distribution APKs with `-PsplitApks=true`. ABI selection changes only packaging, not transfer, account, encryption or preview code.
 
-Push to `main`, a `v…` tag, or workflow dispatch with `publish=true` creates a GitHub Release. Open Releases → latest → Assets and download a `.apk` directly; Actions artifacts are still ZIP archives and the automatic source ZIP/TAR files are not app installers. Default manual version is `0.11.0`; `APP_VERSION_CODE` is the workflow run number. Keep version codes monotonic. No Google Play upload is configured. An APK artifact is distinct from a published GitHub release; a locally compiled test APK is distinct from an executed device test.
+Push to `main`, a `v…` tag, or workflow dispatch with `publish=true` creates a GitHub Release. Open Releases → latest → Assets and download a `.apk` directly; Actions artifacts are still ZIP archives and the automatic source ZIP/TAR files are not app installers. Default manual version is `1.0.0`; `APP_VERSION_CODE` is the workflow run number. Keep version codes monotonic. No Google Play upload is configured. An APK artifact is distinct from a published GitHub release; a locally compiled test APK is distinct from an executed device test.
 
 ## Existing signing identity
 
@@ -42,14 +42,17 @@ Gradle accepts `RELEASE_STORE_FILE`, `RELEASE_STORE_PASSWORD`, `RELEASE_KEY_ALIA
 
 ## Application API credentials
 
-No Telegram developer credentials were supplied for this change. The app therefore retains manual API ID/hash setup. A distributor with an authorized Telegram application may supply `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` to the build through secure environment bindings or ignored `local.properties`; users then begin with a phone number. These are extractable application identifiers in the APK, not user sessions. SMS delivery and additional Telegram authentication steps are not guaranteed by the app.
+The rebuilt onboarding asks for API ID/hash and supports the reference phone/code/password/email/QR flows. Legacy build-time fields are retained for compatibility but do not skip the reference onboarding. No real Telegram credentials were supplied. SMS delivery and additional authentication are controlled by Telegram.
 
 ## Local validation
 
+The rebuild requires JDK 21, Gradle 9.7 (wrapper), Android SDK `platforms;android-37.0` and Build Tools `37.0.0`. CI also installs `36.0.0` for the retained signing/upgrade scripts.
+
+
 ```sh
-./gradlew --max-workers=2 testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
-./gradlew --max-workers=2 testReleaseUnitTest lintRelease assembleRelease -PsplitApks=true
-./gradlew --max-workers=2 bundleRelease -PbundleOnly=true
+./gradlew --max-workers=1 :shared:allTests :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+./gradlew --max-workers=1 testDebugUnitTest lintRelease assembleRelease -PsplitApks=true
+./gradlew --max-workers=1 bundleRelease -PbundleOnly=true
 npm test --prefix sharing-server
 python3 scripts/check_native_alignment.py app/build/outputs/apk/release/*.apk
 "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 4 app/build/outputs/apk/release/app-universal-release-unsigned.apk
@@ -67,3 +70,5 @@ Local packaging validation for 0.2.1: ARM64 APK approximately 39.7 MB (19.0 MB i
 0.10 combines the [full UI review](UI-UX-SKILL-REVIEW.ar.md) and [upload audit](UPLOAD-0.10.ar.md). Healthy publications no longer have a fixed inter-message delay. Two bounded native content uploads can overlap; server cooldowns, configured pacing, thermal protection and recovery remain enforced. Cloud captions/journal and the signing identity stay compatible with 0.7–0.9.
 
 0.11 implements the approved [Solar / Home / Activity design](SOLAR-0.11.ar.md). SVG sources are pinned and converted offline to native vectors, with CC BY 4.0 attribution in About. There is no new runtime dependency. The upload protocol and signing identity remain unchanged.
+
+1.0 replaces the active engine with the pinned DriveInfinity Android/shared/UI foundation. See [REBUILD-PARITY.md](REBUILD-PARITY.md) for channel storage, feature mapping and old-library compatibility. Previous release notes above are historical.

@@ -8,7 +8,7 @@ import org.robolectric.annotation.Config
 import java.io.ByteArrayOutputStream
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], manifest = Config.NONE)
+@Config(application = android.app.Application::class, sdk = [28], manifest = Config.NONE)
 class VaultManagerTest {
     @Test fun `password and recovery each unlock a portable vault`() {
         val first = VaultManager(); val (descriptor,recovery) = first.create("Documents", "a strong test password".toCharArray())

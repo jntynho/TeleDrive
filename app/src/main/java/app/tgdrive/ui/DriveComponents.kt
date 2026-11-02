@@ -134,20 +134,6 @@ fun DriveDivider() {
         color = MaterialTheme.colorScheme.outlineVariant)
 }
 
-/** Reference proportions: a wide capsule thumb inside a 64 × 28 dp track. */
-@Composable
-fun DriveSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier) {
-    val track by animateColorAsState(if(checked) Color(0xFF0085FF) else Color(0xFFA7AAAE), tween(140), label="switch-track")
-    val thumb by animateColorAsState(if(checked) Color.White else Color(0xFF111111), tween(140), label="switch-thumb")
-    val offset by animateDpAsState(if(checked) 22.dp else 2.dp, tween(140), label="switch-position")
-    val touch = if(onCheckedChange != null) Modifier.toggleable(checked, role=Role.Switch, onValueChange=onCheckedChange) else Modifier
-    Box(modifier.then(touch).size(width=64.dp,height=48.dp),contentAlignment=Alignment.Center) {
-        Box(Modifier.size(64.dp,28.dp).background(track,DriveStyle.PillShape)) {
-            Box(Modifier.offset(x=offset,y=2.dp).size(40.dp,24.dp).background(thumb,DriveStyle.PillShape))
-        }
-    }
-}
-
 @Composable
 fun DriveCheckboxRow(label:String,checked:Boolean,onChange:(Boolean)->Unit,enabled:Boolean=true) {
     Row(Modifier.fillMaxWidth().heightIn(min=48.dp).toggleable(checked,enabled=enabled,role=Role.Checkbox,onValueChange=onChange),

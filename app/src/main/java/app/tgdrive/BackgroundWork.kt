@@ -1,67 +1,16 @@
 package app.tgdrive
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
-import android.content.pm.ServiceInfo
-import androidx.core.app.NotificationCompat
-import androidx.work.*
-import kotlinx.coroutines.*
-import java.util.concurrent.TimeUnit
+import androidx.work.CoroutineWorker
+import androidx.work.WorkerParameters
 
-class LibraryWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
-    override suspend fun doWork(): Result {
-        val profile = inputData.getString("profile") ?: return Result.failure()
-        val bundle = withContext(Dispatchers.Main) { (applicationContext as DriveApp).sessions.bundle(profile) }
-        return try {
-            bundle.library.awaitReady()
-            withTimeout(8 * 60 * 1000L) {
-                if (inputData.getBoolean("scan", false)) { bundle.backups.scan(); bundle.backups.purgeExpiredTrash() }
-                val pending = bundle.library.state.value.tasks.any { it.state in setOf(app.tgdrive.library.TaskState.QUEUED, app.tgdrive.library.TaskState.RETRY_WAIT) }
-                if (pending) setForeground(foregroundInfo(applicationContext,profile))
-                bundle.transfers.drain(7 * 60 * 1000L)
-            }
-            notifyFailures(bundle)
-            Result.success()
-        } catch (e: CancellationException) { throw e }
-        catch (e: Exception) { bundle.library.report(e); if (runAttemptCount < 2) Result.retry() else Result.failure() }
-    }
-    private fun notifyFailures(bundle: SessionBundle) {
-        val state = bundle.library.state.value
-        if (!state.preferences.backupNotifications || state.rules.isEmpty()) return
-        val failed = state.tasks.count { it.ruleId.isNotEmpty() && it.state == app.tgdrive.library.TaskState.FAILED }
-        if (failed == 0 && state.rules.none { it.error.isNotEmpty() }) return
-        val manager = applicationContext.getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(NotificationChannel("backup-health", "Backup health", NotificationManager.IMPORTANCE_DEFAULT))
-        val pending = notificationRoute(applicationContext,bundle.profile.id,"backups")
-        val notification = NotificationCompat.Builder(applicationContext,"backup-health").setSmallIcon(R.drawable.ic_drive).setContentTitle("TG Drive backup needs attention")
-            .setContentText("Open the app to inspect incomplete work. No files were automatically marked safe.").setContentIntent(pending).setAutoCancel(true).build()
-        runCatching { manager.notify("backup:${bundle.profile.id}",20,notification) }
-    }
-    companion object {
-        fun foregroundInfo(context: Context,profile:String="legacy"): ForegroundInfo {
-            context.getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel("transfers", "File transfers", NotificationManager.IMPORTANCE_LOW))
-            val notification = NotificationCompat.Builder(context,"transfers").setSmallIcon(R.drawable.ic_drive).setContentTitle("TG Drive")
-                .setContentText("Processing saved transfers").setContentIntent(notificationRoute(context,profile,"activity")).setGroup("transfers:$profile").setOngoing(true).build()
-            return if(android.os.Build.VERSION.SDK_INT>=29)ForegroundInfo(2_000_000+profileNotificationId(profile),notification,ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC) else ForegroundInfo(2_000_000+profileNotificationId(profile),notification)
-        }
-    }
+/** Tombstone for persisted jobs created by 0.x: never restart the retired Saved Messages uploader. */
+class LibraryWorker(context:Context,params:WorkerParameters):CoroutineWorker(context,params) {
+    override suspend fun doWork()=Result.success()
 }
 
+@Deprecated("The Saved Messages scheduler is retired; new transfers use the private-channel engine.")
 object BackgroundWork {
-    fun enqueue(context: Context, profile: String, delayMillis:Long=1000) {
-        val request = OneTimeWorkRequestBuilder<LibraryWorker>().setInitialDelay(delayMillis.coerceAtLeast(1000),TimeUnit.MILLISECONDS).setInputData(workDataOf("profile" to profile))
-            // Evaluate the current preferences in the engine; queued work must not retain obsolete rules.
-            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,30,TimeUnit.SECONDS).build()
-        WorkManager.getInstance(context).enqueueUniqueWork("library-$profile",ExistingWorkPolicy.APPEND_OR_REPLACE,request)
-    }
-    fun schedule(context: Context, profile: String, hours: Int) {
-        val request = PeriodicWorkRequestBuilder<LibraryWorker>(hours.coerceIn(1,24).toLong(),TimeUnit.HOURS)
-            .setInputData(workDataOf("profile" to profile,"scan" to true))
-            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()).build()
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork("backup-$profile",ExistingPeriodicWorkPolicy.UPDATE,request)
-    }
+    fun enqueue(context:Context,profile:String,delayMillis:Long=1000)=Unit
+    fun schedule(context:Context,profile:String,hours:Int)=Unit
 }

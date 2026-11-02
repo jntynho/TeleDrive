@@ -366,7 +366,7 @@ class DriveDesignTest {
         screenshot("locked")
     }
 
-    @Test @Config(qualifiers="w640dp-h360dp-xhdpi")
+    @Test @Config(application = android.app.Application::class, qualifiers="w640dp-h360dp-xhdpi")
     fun landscapeLargeTextAuthenticationKeepsInputsAndContinueReachable() {
         render{
             val density=androidx.compose.ui.platform.LocalDensity.current

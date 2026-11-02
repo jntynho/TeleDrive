@@ -14,7 +14,7 @@ import org.robolectric.annotation.Config
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], manifest = Config.NONE)
+@Config(application = android.app.Application::class, sdk = [28], manifest = Config.NONE)
 class TelegramConnectionTest {
     @Test fun `phone state received before parameters acknowledgement is never overwritten`() = runTest {
         val transport = FakeTdFactory()

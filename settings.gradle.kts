@@ -4,4 +4,4 @@ dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
 rootProject.name = "TG Drive"
-include(":app")
+include(":app", ":shared", ":ui", ":skin")

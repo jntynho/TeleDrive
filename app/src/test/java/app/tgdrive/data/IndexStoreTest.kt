@@ -9,7 +9,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], manifest = Config.NONE)
+@Config(application = android.app.Application::class, sdk = [28], manifest = Config.NONE)
 class IndexStoreTest {
     private val context: Context get() = RuntimeEnvironment.getApplication()
     @Test fun `saved index survives reopening with remote identity and Arabic folder`() {

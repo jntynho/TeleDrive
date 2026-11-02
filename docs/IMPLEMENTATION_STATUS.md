@@ -1,3 +1,5 @@
+> Historical 0.x engine inventory. The active 1.0 rebuild is documented in [REBUILD-PARITY.md](REBUILD-PARITY.md).
+
 # Android 0.2.0 implementation
 
 Scope follows the 34-item research report. Desktop/web client (#27) and Arabic UI/OCR expansion (#33 and Arabic portion of #30) are excluded at the user's request. No external sharing/WebDAV service was provided; those connections are optional. This is an experimental implementation, not a claim that all production acceptance checks passed.

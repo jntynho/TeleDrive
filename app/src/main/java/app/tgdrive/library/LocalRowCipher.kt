@@ -19,16 +19,18 @@ object PlainRows : RowCodec {
     override fun decode(table: String, id: String, value: String) = value
 }
 /** Encrypts local row payloads, including source URIs and private task titles. IDs remain queryable. */
-class LocalRowCipher(accountId: Long) : RowCodec {
+class LocalRowCipher(accountId: Long, existingOnly: Boolean = false) : RowCodec {
     private val key: SecretKey
     init {
         val alias = "tgdrive.library.$accountId"
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        key = synchronized(creationLock) { (store.getKey(alias, null) as? SecretKey) ?: KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore").run {
+        key = synchronized(creationLock) { (store.getKey(alias, null) as? SecretKey) ?: run {
+            check(!existingOnly) { "Previous library key is unavailable. The original data has been preserved." }
+            KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore").run {
             init(KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build())
             generateKey()
-        } }
+        } } }
     }
     override fun encode(table: String, id: String, value: String): String {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {

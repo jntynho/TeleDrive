@@ -21,16 +21,9 @@ class SessionBundle(context: Context, val profile: AccountProfile, allowAccount:
     val connections = OptionalConnections(library)
     private var wakeJob: Job? = null
     init {
-        val wake = { wakeJob?.cancel(); wakeJob = scope.launch {
-            delay(500)
-            val state=library.state.value
-            val readyRead=state.tasks.any{it.kind!=TaskKind.UPLOAD && it.state==TaskState.QUEUED}
-            val pending=state.tasks.filter{it.state !in setOf(TaskState.COMPLETED,TaskState.CANCELLED,TaskState.FAILED,TaskState.PAUSED,TaskState.WAITING_FOR_UNLOCK)}
-            val next=if(readyRead)0 else maxOf(state.sendCooldownUntil,pending.minOfOrNull{it.nextAttemptAt}?:0)
-            BackgroundWork.enqueue(context,profile.id,(next-now()).coerceAtLeast(1000))
-        }; Unit }
-        library.changed = wake
-        transfers.wake = wake
+        // Compatibility objects are never background writers in the rebuilt application.
+        library.changed = null
+        transfers.wake = null
         transfers.external = { task -> if (task.kind == TaskKind.OCR) DocumentTools(library).recognize(task) else connections.execute(task) }
         transfers.completed = { task -> backups.onCompleted(task); connections.forget(task) }
     }
