@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
@@ -232,7 +233,6 @@ private fun MainScaffold(
         requestedTab=null
     }
 
-    val isTopLevel = TopLevelDestination.entries.any { destination -> currentDestination?.hasRoute(destination.route::class)==true }
     val showChrome=onboardingComplete&&currentDestination!=null&&
         currentDestination.hasRoute(Route.Onboarding::class).not()&&currentDestination.hasRoute(Route.Preview::class).not()&&
         currentDestination.hasRoute(Route.NoteEditor::class).not()&&currentDestination.hasRoute(Route.Search::class).not()
@@ -300,67 +300,35 @@ private fun MainScaffold(
         if(!showChrome&&currentDestination?.hasRoute(Route.Preview::class)!=true)audioPlayer.pause()
     }
 
-    if (useRail && showChrome) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        val railWidth=if(useRail&&onboardingComplete)80.dp else 0.dp
+        CompositionLocalProvider(
+            LocalBottomBarHeight provides if(onboardingComplete)bottomChromeHeight else 0.dp,
+            com.infinity.drive.presentation.navigation.LocalNavigationRailWidth provides railWidth
         ) {
-            NavigationRail(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+            AppNavHost(navController=navController,startDestination=startDestination,modifier=Modifier.fillMaxSize().testTag("navigation-host"))
+        }
+        if(useRail) AnimatedVisibility(visible=showChrome&&!keyboardVisible,
+            enter=fadeIn(tween(180)),exit=fadeOut(tween(180)),modifier=Modifier.align(Alignment.CenterStart)) {
+            NavigationRail(modifier=Modifier.width(80.dp).fillMaxHeight(),containerColor=MaterialTheme.colorScheme.surfaceContainer) {
                 TopLevelDestination.entries.forEach { destination ->
-                    val selected =
-                        currentDestination?.hasRoute(destination.route::class) == true
-                    NavigationRailItem(
-                        selected = selected,
-                        onClick = { if (!selected) requestedTab=destination },
-                        icon = {
-                            Icon(
-                                if (selected) destination.selectedIcon else destination.icon,
-                                contentDescription = stringResource(destination.labelRes)
-                            )
-                        },
-                        label = { Text(stringResource(destination.labelRes)) }
-                    )
+                    val selected=currentDestination?.hasRoute(destination.route::class)==true
+                    NavigationRailItem(selected=selected,onClick={if(!selected)requestedTab=destination},
+                        icon={Icon(if(selected)destination.selectedIcon else destination.icon,contentDescription=stringResource(destination.labelRes))},
+                        label={Text(stringResource(destination.labelRes))})
                 }
-            }
-            androidx.compose.foundation.layout.Column(Modifier.weight(1f).fillMaxSize()) {
-                AppNavHost(navController=navController,startDestination=startDestination,
-                    modifier=Modifier.weight(1f).fillMaxSize().consumeWindowInsets(WindowInsets.systemBars.only(WindowInsetsSides.Start)))
-                com.infinity.drive.presentation.audio.LibraryAudioMiniPlayer()
             }
         }
-    } else {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            CompositionLocalProvider(
-                LocalBottomBarHeight provides bottomChromeHeight
-            ) {
-                AppNavHost(
-                    navController = navController,
-                    startDestination = startDestination,
-                    modifier = Modifier.fillMaxSize().padding(bottom=if(showChrome&&!isTopLevel&&!keyboardVisible)bottomChromeHeight else 0.dp)
-                )
-            }
-            val topLevelIndex = TopLevelDestination.entries.indexOfFirst { destination ->
-                currentDestination?.hasRoute(destination.route::class) == true
-            }
-            var selectedNavIndex by remember { mutableIntStateOf(0) }
-            LaunchedEffect(topLevelIndex) {
-                if (topLevelIndex >= 0) selectedNavIndex = topLevelIndex
-            }
-            AnimatedVisibility(
-                visible = showChrome&&!keyboardVisible,
-                enter = com.infinity.drive.presentation.navigation.NavigationTransitions.enter(),
-                exit = com.infinity.drive.presentation.navigation.NavigationTransitions.exit(),
-                modifier = Modifier.align(Alignment.BottomCenter)
-            ) {
-                androidx.compose.foundation.layout.Column(Modifier.onSizeChanged{bottomChromeHeight=with(chromeDensity){(it.height-systemBottom).coerceAtLeast(0).toDp()}}) {
-                    com.infinity.drive.presentation.audio.LibraryAudioMiniPlayer()
-                    FloatingNavigationBar(selectedIndex=selectedNavIndex,onNavigate={requestedTab=it})
-                }
+        val topLevelIndex=TopLevelDestination.entries.indexOfFirst { currentDestination?.hasRoute(it.route::class)==true }
+        var selectedNavIndex by remember { mutableIntStateOf(0) }
+        LaunchedEffect(topLevelIndex){if(topLevelIndex>=0)selectedNavIndex=topLevelIndex}
+        AnimatedVisibility(visible=showChrome&&!keyboardVisible,enter=fadeIn(tween(180)),exit=fadeOut(tween(180)),
+            modifier=Modifier.align(Alignment.BottomCenter).padding(start=railWidth)) {
+            androidx.compose.foundation.layout.Column(Modifier.onSizeChanged {
+                bottomChromeHeight=with(chromeDensity){(it.height-if(useRail)0 else systemBottom).coerceAtLeast(0).toDp()}
+            }) {
+                com.infinity.drive.presentation.audio.LibraryAudioMiniPlayer()
+                if(!useRail)FloatingNavigationBar(selectedIndex=selectedNavIndex,onNavigate={requestedTab=it})
             }
         }
     }

@@ -41,7 +41,9 @@ import com.infinity.drive.resources.common_selection_count
 import com.infinity.drive.presentation.common.isInitialLoad
 import com.infinity.drive.presentation.components.ConfirmDialog
 import com.infinity.drive.presentation.components.EmptyState
-import com.infinity.drive.presentation.components.FileListItem
+import com.infinity.drive.presentation.components.ActivityLibraryRow
+import com.infinity.drive.presentation.components.FileThumbnail
+import com.infinity.drive.presentation.common.Formatters
 import com.infinity.drive.presentation.components.LoadingState
 import com.infinity.drive.presentation.components.liftedTopAppBarColors
 import com.infinity.drive.presentation.components.rememberDragSelect
@@ -188,8 +190,8 @@ fun CollectionScreen(
                 .padding(top = padding.calculateTopPadding())
                 .then(dragSelect),
             contentPadding = PaddingValues(
-                start = 8.dp,
-                end = 8.dp,
+                start = 16.dp,
+                end = 16.dp,
                 top = 8.dp,
                 bottom = 8.dp + padding.calculateBottomPadding()
             )
@@ -202,10 +204,13 @@ fun CollectionScreen(
                 key = files.itemKey { it.id }
             ) { index ->
                 val file = files[index] ?: return@items
-                FileListItem(
-                    file = file,
+                ActivityLibraryRow(
+                    title = file.name,
+                    subtitle = "${Formatters.bytes(file.sizeBytes)} · ${Formatters.dateTime(file.modifiedAt)}",
+                    first = index == 0,
+                    last = index == files.itemCount - 1,
+                    leading = { FileThumbnail(file, Modifier.fillMaxSize()) },
                     selected = file.id in selection,
-                    selectionMode = selectionMode,
                     onClick = {
                         if (selectionMode) viewModel.toggleSelection(file.id)
                         else onOpenFile(file.id, viewModel.previewSequence)

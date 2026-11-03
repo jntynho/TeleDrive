@@ -15,6 +15,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.infinity.drive.core.media.TelegramDataSourceFactory
 import com.infinity.drive.domain.model.DriveFile
 import com.infinity.drive.domain.repository.FileRepository
+import com.infinity.drive.presentation.platform.AudioRepeatMode
 import com.infinity.drive.presentation.platform.AudioMetadata
 import com.infinity.drive.presentation.platform.AudioPlayback
 import com.infinity.drive.presentation.platform.AudioPlaybackState
@@ -39,6 +40,7 @@ class AndroidAudioPlayback(context:Context,private val resolver:PreviewContentRe
     }
     private var resolveJob:Job?=null
     private var queueJob:Job?=null
+    private var sleepJob:Job?=null
     private var queue=emptyList<String>()
     private var requestedPlay=false
     private val metadataSlots=Semaphore(2)
@@ -51,17 +53,40 @@ class AndroidAudioPlayback(context:Context,private val resolver:PreviewContentRe
             override fun onPlayWhenReadyChanged(playWhenReady:Boolean,reason:Int){mutable.update{it.copy(playRequested=playWhenReady)}}
             override fun onPlaybackStateChanged(playbackState:Int){
                 mutable.update{it.copy(loading=playbackState==Player.STATE_BUFFERING,durationMs=player.duration.coerceAtLeast(0))}
-                if(playbackState==Player.STATE_ENDED)next()
+                if(playbackState==Player.STATE_ENDED&&requestedPlay&&player.playWhenReady){
+                    if(mutable.value.repeatMode==AudioRepeatMode.ONE){player.seekTo(0);player.play()}
+                    else next()
+                }
             }
-            override fun onMediaMetadataChanged(metadata:MediaMetadata){mutable.update{
-                it.copy(metadata=it.metadata.copy(title=metadata.title?.toString()?:it.metadata.title,artist=metadata.artist?.toString()?:it.metadata.artist))
-            }}
+            override fun onMediaMetadataChanged(metadata:MediaMetadata){
+                mutable.update{it.copy(metadata=it.metadata.copy(title=metadata.title?.toString()?:it.metadata.title,artist=metadata.artist?.toString()?:it.metadata.artist))}
+                metadata.artworkData?.takeIf{it.size<=5*1024*1024}?.let{picture->
+                    val track=mutable.value.file?.id
+                    scope.launch {
+                        val colors=withContext(Dispatchers.Default){artworkColors(picture)}
+                        mutable.update{if(it.file?.id==track&&colors.isNotEmpty())it.copy(metadata=it.metadata.copy(artworkColors=colors))else it}
+                    }
+                }
+            }
+            override fun onTracksChanged(tracks:androidx.media3.common.Tracks){
+                for(group in tracks.groups)for(index in 0 until group.length)if(group.isTrackSelected(index)){
+                    group.getTrackFormat(index).metadata?.let(::acceptLyricsMetadata)
+                }
+            }
+            override fun onMetadata(metadata:androidx.media3.common.Metadata){acceptLyricsMetadata(metadata)}
             override fun onPlayerError(error:PlaybackException){mutable.update{it.copy(playing=false,loading=false,error="Couldn't play this audio. Tap play to retry.")}}
         })
         scope.launch {
             state.map{it.file!=null}.distinctUntilChanged().collectLatest { active ->
-                if(active)while(isActive){delay(750);mutable.update{it.copy(positionMs=player.currentPosition.coerceAtLeast(0),durationMs=player.duration.coerceAtLeast(0))}}
+                if(active)while(isActive){delay(if(mutable.value.playing&&mutable.value.metadata.lyrics!=null)150 else 500);mutable.update{it.copy(positionMs=player.currentPosition.coerceAtLeast(0),durationMs=player.duration.coerceAtLeast(0))}}
             }
+        }
+    }
+    private fun acceptLyricsMetadata(metadata:androidx.media3.common.Metadata){
+        val track=mutable.value.file?.id?:return
+        scope.launch {
+            val lyrics=withContext(Dispatchers.Default){streamedLyrics(metadata)}?:return@launch
+            mutable.update{if(it.file?.id==track)it.copy(metadata=it.metadata.copy(lyrics=lyrics))else it}
         }
     }
     override fun play(file:DriveFile){
@@ -69,7 +94,7 @@ class AndroidAudioPlayback(context:Context,private val resolver:PreviewContentRe
         if(file.id !in queue)queue=emptyList()
         player.stop();player.clearMediaItems()
         requestedPlay=true
-        mutable.value=AudioPlaybackState(file=file,loading=true,playRequested=true)
+        mutable.value=AudioPlaybackState(file=file,loading=true,playRequested=true,repeatMode=mutable.value.repeatMode,sleepTimerMinutes=mutable.value.sleepTimerMinutes)
         setQueue(queue)
         resolveJob=scope.launch {
             try {
@@ -92,7 +117,7 @@ class AndroidAudioPlayback(context:Context,private val resolver:PreviewContentRe
     override fun setQueue(ids:List<String>){
         queue=ids
         val index=queue.indexOf(mutable.value.file?.id)
-        mutable.update{it.copy(canSkipPrevious=index>0,canSkipNext=index>=0&&index<queue.lastIndex)}
+        mutable.update{it.copy(canSkipPrevious=index>0,canSkipNext=index>=0&&(index<queue.lastIndex||it.repeatMode==AudioRepeatMode.ALL))}
     }
     override fun toggle(){
         val current=mutable.value
@@ -108,13 +133,24 @@ class AndroidAudioPlayback(context:Context,private val resolver:PreviewContentRe
         queueJob?.cancel()
         val index=queue.indexOf(mutable.value.file?.id)
         if(index<0)return
-        val following=if(direction>0)queue.drop(index+1)else queue.take(index).asReversed()
+        val following=if(direction>0)queue.drop(index+1)+(if(mutable.value.repeatMode==AudioRepeatMode.ALL)queue.take(index+1)else emptyList())else queue.take(index).asReversed()
         queueJob=scope.launch{
             for(id in following){val file=files.getFile(id);if(file!=null&&!file.isTrashed){queueJob=null;play(file);return@launch}}
         }
     }
-    override fun stop(){requestedPlay=false;resolveJob?.cancel();queueJob?.cancel();player.stop();player.clearMediaItems();queue=emptyList();mutable.value=AudioPlaybackState()}
+    override fun stop(){sleepJob?.cancel();sleepJob=null;requestedPlay=false;resolveJob?.cancel();queueJob?.cancel();player.stop();player.clearMediaItems();queue=emptyList();mutable.value=AudioPlaybackState()}
     override fun seek(positionMs:Long){val target=positionMs.coerceIn(0,player.duration.coerceAtLeast(0));player.seekTo(target);mutable.update{it.copy(positionMs=target)}}
+    override fun cycleRepeat(){
+        mutable.update{it.copy(repeatMode=AudioRepeatMode.entries[(it.repeatMode.ordinal+1)%AudioRepeatMode.entries.size])}
+        setQueue(queue)
+    }
+    override fun setSleepTimer(minutes:Int?){
+        sleepJob?.cancel();sleepJob=null
+        val duration=minutes?.coerceIn(1,180)
+        mutable.update{it.copy(sleepTimerMinutes=duration)}
+        if(duration!=null)sleepJob=scope.launch{delay(duration*60_000L);pause();mutable.update{it.copy(sleepTimerMinutes=null)}}
+    }
+    override suspend fun queuedFiles():List<DriveFile> = queue.drop(queue.indexOf(mutable.value.file?.id).coerceAtLeast(0)).take(100).mapNotNull{files.getFile(it)}.filterNot{it.isTrashed}
     override suspend fun metadata(file:DriveFile):AudioMetadata {
         val path=file.localPath?:return AudioMetadata(durationMs=file.durationMs)
         val key="${file.id}:${file.modifiedAt}:$path"
@@ -125,11 +161,10 @@ class AndroidAudioPlayback(context:Context,private val resolver:PreviewContentRe
                 retriever.setDataSource(path)
                 run {
                     val picture=retriever.embeddedPicture?.takeIf{it.size<=5*1024*1024}
-                    val bitmap=picture?.let{android.graphics.BitmapFactory.decodeByteArray(it,0,it.size,android.graphics.BitmapFactory.Options().apply{inSampleSize=8})}
-                    val colors=bitmap?.let{b->listOf(b.getPixel(b.width/3,b.height/3).toLong() and 0xffffffffL,b.getPixel(b.width*2/3,b.height*2/3).toLong() and 0xffffffffL).also{b.recycle()}}.orEmpty()
+                    val colors=picture?.let(::artworkColors).orEmpty()
                     AudioMetadata(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE),retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST),retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?:file.durationMs,colors,readEmbeddedLyrics(File(path)))
                 }
-            } catch(_:Exception){AudioMetadata(durationMs=file.durationMs)}
+            } catch(_:Exception){AudioMetadata(durationMs=file.durationMs,lyrics=readEmbeddedLyrics(File(path)))}
             finally{runCatching{retriever.release()}}
         }}
         synchronized(metadataCache){metadataCache[key]=metadata}
@@ -138,27 +173,70 @@ class AndroidAudioPlayback(context:Context,private val resolver:PreviewContentRe
     fun release(){resolveJob?.cancel();scope.cancel();player.release()}
 }
 
-/** Read bounded ID3 USLT text only; no network lyric requests or full-file buffering. */
-private fun readId3Lyrics(file:File):String?=runCatching {
-    file.inputStream().buffered().use { input ->
+/** Millisecond SYLT takes priority over plain USLT; MPEG-frame timestamps cannot be guessed. */
+private fun readId3Lyrics(file:File):String?=runCatching {file.inputStream().buffered().use(::readId3Lyrics)}.getOrNull()
+
+private fun readId3Lyrics(input:java.io.InputStream):String?=runCatching {
+    input.use { input ->
         val header=input.readBounded(10)
         if(header.size!=10||String(header,0,3,Charsets.ISO_8859_1)!="ID3")return@use null
         val version=header[3].toInt()
         if(version !in 3..4 || header[5].toInt() and 0xC0 != 0)return@use null
         val size=(6..9).fold(0){a,i->(a shl 7) or (header[i].toInt() and 127)}
         val bytes=input.readBounded(size.coerceAtMost(1024*1024));var offset=0
+        var plain:String?=null
         while(offset+10<=bytes.size){
             val id=String(bytes,offset,4,Charsets.ISO_8859_1)
             val length=(4..7).fold(0){a,i->(a shl if(version==4)7 else 8) or (bytes[offset+i].toInt() and if(version==4)127 else 255)}
             if(length<=0||length>bytes.size-offset-10)break
-            if(id=="USLT"&&length>4){
-                val encoding=bytes[offset+10].toInt();val start=offset+14;val end=offset+10+length
-                val charset=when(encoding){1->Charsets.UTF_16;2->Charsets.UTF_16BE;3->Charsets.UTF_8;else->Charsets.ISO_8859_1}
-                val text=String(bytes,start,end-start,charset)
-                return@use text.substringAfter('\u0000',text).trim('\u0000',' ','\n','\r').take(32000).takeIf{it.isNotBlank()}
-            }
-            offset+=10+length
-        };null
+            val flags=bytes[offset+9].toInt() and 255
+            if(flags and (if(version==4)0x4F else 0xE0)==0 && id in listOf("USLT","SYLT")&&length>4){
+                val frame=bytes.copyOfRange(offset+10,offset+10+length)
+                val encoding=frame[0].toInt() and 255
+                if(encoding in 0..3){
+                    val descriptorStart=if(id=="SYLT")6 else 4
+                    val charset=when(encoding){1->if(frame.getOrNull(descriptorStart)==0xFF.toByte()&&frame.getOrNull(descriptorStart+1)==0xFE.toByte())Charsets.UTF_16LE else Charsets.UTF_16BE;2->Charsets.UTF_16BE;3->Charsets.UTF_8;else->Charsets.ISO_8859_1}
+                    fun terminated(start:Int):Pair<String,Int>? {
+                        val unit=if(encoding in 1..2)2 else 1
+                        var end=start
+                        while(end+unit<=frame.size){
+                            if(frame[end].toInt()==0&&(unit==1||frame[end+1].toInt()==0))return String(frame,start,end-start,charset).removePrefix("\uFEFF") to end+unit
+                            end+=unit
+                        };return null
+                    }
+                    if(id=="USLT"){
+                        val description=terminated(4)
+                        if(description!=null)plain=String(frame,description.second,frame.size-description.second,charset)
+                            .trim('\u0000','\uFEFF',' ','\n','\r').take(32000).takeIf{it.isNotBlank()}?:plain
+                    }else if(frame.size>6&&frame[4].toInt()==2){
+                        var cursor=terminated(6)?.second?:frame.size
+                        val lines=mutableListOf<String>();var total=0
+                        var startTime:Long?=null
+                        val current=StringBuilder()
+                        fun stamp(time:Long)="%02d:%02d:%02d.%03d".format(java.util.Locale.ROOT,time/3_600_000,time/60_000%60,time/1000%60,time%1000)
+                        fun flush(){if(startTime!=null&&current.isNotEmpty())lines+="[${stamp(startTime!!)}]$current";current.clear();startTime=null}
+                        while(cursor<frame.size&&lines.size<1024){
+                            val text=terminated(cursor)?:break;cursor=text.second
+                            if(cursor+4>frame.size)break
+                            val time=(0..3).fold(0L){a,i->(a shl 8) or (frame[cursor+i].toLong() and 255)};cursor+=4
+                            if(time>86_400_000)continue
+                            val value=text.first.replace("\r\n","\n").replace('\r','\n').take(4000)
+                            total+=value.length+24
+                            if(total>30000)break
+                            value.split('\n').forEachIndexed { index, part ->
+                                if(index>0)flush()
+                                if(part.isNotEmpty()){
+                                    if(startTime==null)startTime=time
+                                    current.append("<${stamp(time)}>").append(part)
+                                }
+                            }
+                        }
+                        flush()
+                        if(lines.isNotEmpty())return@use lines.joinToString("\n").take(32000)
+                    }
+                }
+            };offset+=10+length
+        };plain
     }
 }.getOrNull()
 
@@ -182,7 +260,7 @@ private fun readEmbeddedLyrics(file:File):String? = readId3Lyrics(file) ?: runCa
                     val buffer=java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN)
                     fun text():String {val length=buffer.int;require(length>=0&&length<=buffer.remaining());val value=ByteArray(length);buffer.get(value);return String(value,Charsets.UTF_8)}
                     text();val comments=buffer.int.coerceIn(0,10000)
-                    repeat(comments){val comment=text();if(comment.substringBefore('=').uppercase() in listOf("LYRICS","UNSYNCEDLYRICS"))return@use comment.substringAfter('=').take(32000)}
+                    repeat(comments){val comment=text();if(comment.substringBefore('=').uppercase() in listOf("LYRICS","UNSYNCEDLYRICS","SYNCEDLYRICS"))return@use comment.substringAfter('=').take(32000)}
                 }else input.seek(input.filePointer+count)
             };return@use null
         }
@@ -206,3 +284,29 @@ private fun readEmbeddedLyrics(file:File):String? = readId3Lyrics(file) ?: runCa
         atoms(0,input.length(),0)
     }
 }.getOrNull()?.takeIf{it.isNotBlank()}
+
+/** Convert existing extractor entries only; timed lyrics win over an untimed fallback. */
+@androidx.annotation.OptIn(UnstableApi::class)
+internal fun streamedLyrics(metadata:androidx.media3.common.Metadata):String? {
+    var plain:String?=null
+    for(index in 0 until minOf(metadata.length(),256)){
+        val entry=metadata[index]
+        val text=when(entry){
+            is androidx.media3.extractor.metadata.id3.BinaryFrame->if(entry.id in listOf("USLT","SYLT")&&entry.data.size<=1024*1024){
+                val length=entry.data.size
+                val frame=java.nio.ByteBuffer.allocate(length+10).put(entry.id.toByteArray(Charsets.ISO_8859_1)).putInt(length).putShort(0).put(entry.data).array()
+                val count=frame.size
+                val header="ID3".toByteArray()+byteArrayOf(3,0,0,((count shr 21)and 127).toByte(),((count shr 14)and 127).toByte(),((count shr 7)and 127).toByte(),(count and 127).toByte())
+                readId3Lyrics((header+frame).inputStream())
+            }else null
+            is androidx.media3.extractor.metadata.vorbis.VorbisComment->if(entry.key.uppercase() in listOf("LYRICS","UNSYNCEDLYRICS","SYNCEDLYRICS"))entry.value.take(32000)else null
+            is androidx.media3.extractor.metadata.id3.TextInformationFrame->if(entry.id=="TXXX"&&entry.description?.uppercase() in listOf("LYRICS","UNSYNCEDLYRICS","SYNCEDLYRICS"))entry.values.firstOrNull()?.take(32000)else null
+            else->null
+        }
+        if(!text.isNullOrBlank()){
+            if(AudioLyricsParser.parse(text).cues.isNotEmpty())return text
+            if(plain==null)plain=text
+        }
+    }
+    return plain
+}

@@ -43,6 +43,11 @@ android {
         }
     }
     buildTypes {
+        debug {
+            // Automated UI tests never initialize Telegram with production application credentials.
+            buildConfigField("String", "TELEGRAM_API_ID", literal(""))
+            buildConfigField("String", "TELEGRAM_API_HASH", literal(""))
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

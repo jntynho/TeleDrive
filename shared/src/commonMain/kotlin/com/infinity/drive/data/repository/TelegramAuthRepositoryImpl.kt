@@ -6,6 +6,7 @@ import com.infinity.drive.core.telegram.TelegramAuthState
 import com.infinity.drive.core.telegram.TelegramClient
 import com.infinity.drive.core.telegram.TelegramConnectionState
 import com.infinity.drive.core.telegram.TelegramCredentials
+import com.infinity.drive.core.telegram.TelegramAppCredentials
 import com.infinity.drive.core.telegram.TelegramException
 import com.infinity.drive.core.telegram.TelegramUser
 import com.infinity.drive.domain.model.CountryList
@@ -19,7 +20,8 @@ import com.infinity.drive.domain.repository.ProxyRepository
 class TelegramAuthRepositoryImpl(
     private val telegramClient: TelegramClient,
     private val settingsRepository: SettingsRepository,
-    private val proxyRepository: ProxyRepository
+    private val proxyRepository: ProxyRepository,
+    private val appCredentials: TelegramAppCredentials? = null
 ) : TelegramAuthRepository {
 
     override val authState: StateFlow<TelegramAuthState> = telegramClient.authState
@@ -28,7 +30,7 @@ class TelegramAuthRepositoryImpl(
         telegramClient.connectionState
 
     override fun hasCredentials(): Flow<Boolean> = flow {
-        emit(settingsRepository.getTelegramCredentials() != null)
+        emit(settingsRepository.getTelegramCredentials() != null || appCredentials?.get() != null)
     }
 
     override suspend fun configure(credentials: TelegramCredentials): AppResult<Unit> {
@@ -45,12 +47,11 @@ class TelegramAuthRepositoryImpl(
     }
 
     override suspend fun startFromStoredCredentials(): AppResult<Boolean> {
-        val credentials = settingsRepository.getTelegramCredentials()
-            ?: return if (settingsRepository.hasStoredTelegramCredentials()) {
-                AppResult.Failure(AppError.InvalidApiCredentials)
-            } else {
-                AppResult.Success(false)
-            }
+        val stored = settingsRepository.getTelegramCredentials()
+        if (stored == null && settingsRepository.hasStoredTelegramCredentials()) {
+            return AppResult.Failure(AppError.InvalidApiCredentials)
+        }
+        val credentials = stored ?: appCredentials?.get() ?: return AppResult.Success(false)
         return when (val result = runTelegram {
             telegramClient.start(credentials)
             proxyRepository.applyActive()

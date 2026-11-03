@@ -236,8 +236,8 @@ fun OnboardingScreen(
                         contentAlignment = Alignment.Center,
                         targetState = state.step,
                         transitionSpec = {
-                            (com.infinity.drive.presentation.navigation.NavigationTransitions.enter()
-                                .togetherWith(com.infinity.drive.presentation.navigation.NavigationTransitions.exit()))
+                            (com.infinity.drive.presentation.navigation.NavigationTransitions.enter(targetState.ordinal >= initialState.ordinal)
+                                .togetherWith(com.infinity.drive.presentation.navigation.NavigationTransitions.exit(targetState.ordinal >= initialState.ordinal)))
                                 .using(SizeTransform(clip = true) { _, _ -> snap() })
                         },
                         label = stringResource(Res.string.onboarding_step)

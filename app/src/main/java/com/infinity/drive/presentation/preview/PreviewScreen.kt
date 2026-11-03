@@ -301,9 +301,11 @@ fun PreviewScreen(
                 modifier = Modifier.align(Alignment.TopCenter).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(if(immersive)androidx.compose.ui.graphics.Color.Black.copy(alpha=.65f)else androidx.compose.ui.graphics.Color.Transparent,androidx.compose.ui.graphics.Color.Transparent)))
             ) {
                 TopAppBar(
-                    expandedHeight=52.dp,
+                    expandedHeight=if(currentFile.category==FileCategory.AUDIO)com.infinity.drive.presentation.audio.audioHeaderHeight() else 52.dp,
                     title = {
-                        Text(
+                        if(currentFile.category==FileCategory.AUDIO){
+                            com.infinity.drive.presentation.audio.AudioNowPlayingTitle(currentFile)
+                        }else Text(
                             currentFile.name,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -444,9 +446,9 @@ fun PreviewScreen(
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = Color.Transparent,scrolledContainerColor=Color.Transparent,
-                        titleContentColor=if(immersive)Color.White else MaterialTheme.colorScheme.onSurface,
-                        navigationIconContentColor=if(immersive)Color.White else MaterialTheme.colorScheme.onSurface,
-                        actionIconContentColor=if(immersive)Color.White else MaterialTheme.colorScheme.onSurface
+                        titleContentColor=if(immersive||currentFile.category==FileCategory.AUDIO)Color.White else MaterialTheme.colorScheme.onSurface,
+                        navigationIconContentColor=if(immersive||currentFile.category==FileCategory.AUDIO)Color.White else MaterialTheme.colorScheme.onSurface,
+                        actionIconContentColor=if(immersive||currentFile.category==FileCategory.AUDIO)Color.White else MaterialTheme.colorScheme.onSurface
                     )
                 )
             }

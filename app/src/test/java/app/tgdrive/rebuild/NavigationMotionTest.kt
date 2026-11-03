@@ -17,6 +17,7 @@ import app.tgdrive.ui.DriveTheme
 import com.infinity.drive.presentation.navigation.NavigationTransitions
 import org.junit.*
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
@@ -31,32 +32,39 @@ class NavigationMotionTest {
     @get:Rule val compose=createEmptyComposeRule()
     private lateinit var activity:ActivityController<ComponentActivity>
     @After fun stop(){if(::activity.isInitialized)activity.pause().stop().destroy()}
-    @Test fun galleryAudioAndBackKeepContentAnchoredThroughoutTheTransition(){
+    @Test fun horizontalNavigationKeepsHeightStableAndMovesMonotonically(){
         lateinit var nav:NavHostController
         activity=Robolectric.buildActivity(ComponentActivity::class.java).setup().visible()
         activity.get().setContent{DriveTheme{
             nav=rememberNavController()
             NavHost(nav,"gallery",Modifier.fillMaxSize(),
                 enterTransition={NavigationTransitions.enter()},exitTransition={NavigationTransitions.exit()},
-                popEnterTransition={NavigationTransitions.enter()},popExitTransition={NavigationTransitions.exit()},
+                popEnterTransition={NavigationTransitions.enter(false)},popExitTransition={NavigationTransitions.exit(false)},
                 sizeTransform={SizeTransform(clip=true){_,_->snap()}}){
                 composable("gallery"){Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){Text("Gallery content")}}
                 composable("audio"){Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){Text("Audio content")}}
             }
         }}
         compose.waitForIdle()
-        val anchor=compose.onNodeWithText("Gallery content").fetchSemanticsNode().boundsInRoot.center
+        val anchor=compose.onNodeWithText("Gallery content").getUnclippedBoundsInRoot()
         compose.mainClock.autoAdvance=false
-        fun assertAnchored(label:String){
-            val center=compose.onNodeWithText(label).fetchSemanticsNode().boundsInRoot.center
-            assertEquals(anchor.x,center.x,.5f);assertEquals(anchor.y,center.y,.5f)
+        fun sample(label:String,forward:Boolean){
+            var previous=if(forward)Float.POSITIVE_INFINITY else Float.NEGATIVE_INFINITY
+            repeat(6){
+                compose.mainClock.advanceTimeBy(80)
+                val center=compose.onNodeWithText(label).getUnclippedBoundsInRoot()
+                assertEquals((anchor.top.value+anchor.bottom.value)/2,(center.top.value+center.bottom.value)/2,.5f)
+                assertTrue(if(forward)(center.left.value+center.right.value)/2<=previous+.5f else (center.left.value+center.right.value)/2>=previous-.5f)
+                previous=(center.left.value+center.right.value)/2
+            }
+            assertEquals((anchor.left.value+anchor.right.value)/2,previous,.5f)
         }
         compose.runOnUiThread{nav.navigate("audio")}
         compose.mainClock.advanceTimeBy(32)
-        repeat(4){compose.mainClock.advanceTimeBy(80);assertAnchored("Audio content")}
+        sample("Audio content",true)
         compose.runOnUiThread{nav.popBackStack()}
         compose.mainClock.advanceTimeBy(32)
-        repeat(4){compose.mainClock.advanceTimeBy(80);assertAnchored("Gallery content")}
+        sample("Gallery content",false)
         compose.mainClock.autoAdvance=true
         compose.onNodeWithText("Audio content").assertDoesNotExist()
     }

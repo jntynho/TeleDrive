@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -65,6 +66,7 @@ import com.infinity.drive.presentation.common.add
 import com.infinity.drive.presentation.components.BlockingProgressDialog
 import com.infinity.drive.presentation.components.ConfirmDialog
 import com.infinity.drive.presentation.components.EmptyState
+import com.infinity.drive.presentation.components.ActivityLibraryRow
 import com.infinity.drive.presentation.components.FileThumbnail
 import com.infinity.drive.presentation.components.liftedTopAppBarColors
 import com.infinity.drive.presentation.components.rememberDragSelect
@@ -200,95 +202,40 @@ fun TrashScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .then(dragSelect),
-            contentPadding = padding.add(horizontal = 12.dp, top = 12.dp, bottom = 12.dp)
+            contentPadding = padding.add(horizontal = 16.dp, top = 12.dp, bottom = 12.dp)
         ) {
             item("trash-summary"){
                 Text(if(state.autoClearDays>0)"Restore items before they are removed after ${state.autoClearDays} days."else"Restore items, or remove them permanently when you are ready.",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(horizontal=12.dp,vertical=16.dp))
             }
-            items(
-                state.rows,
-                key = { it.key }
-            ) { row ->
+            itemsIndexed(state.rows, key = { _, row -> row.key }) { index, row ->
                 val item = row.item
                 val selected = row.selectable && item.id in state.selection
-                Row(
-                    modifier = Modifier
-                        .animateItem()
-                        .fillMaxWidth()
-                        .padding(start = (row.depth * 20).dp)
-                        .clip(MaterialTheme.shapes.large)
-                        .background(
-                            if (selected) MaterialTheme.colorScheme.secondaryContainer
-                            else Color.Transparent
-                        )
-                        .combinedClickable(
-                            onClick = {
-                                when {
-                                    state.selectionMode && row.selectable ->
-                                        viewModel.toggleSelection(item.id)
-
-                                    row.expandable -> viewModel.toggleExpanded(item.id)
-                                }
-                            },
-                            onLongClick = {
-                                if (row.selectable) viewModel.toggleSelection(item.id)
-                            }
-                        )
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    when (item) {
-                        is TrashItem.File -> FileThumbnail(
-                            file = item.file,
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(MaterialTheme.shapes.medium)
-                        )
-
-                        is TrashItem.Folder -> Icon(
-                            imageVector = DriveIcons.Folder,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = item.name,
-                            style = MaterialTheme.typography.bodyLarge,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = if (row.depth == 0) {
-                                stringResource(
-                                    Res.string.trash_trashed_at,
-                                    Formatters.dateTime(item.trashedAt)
-                                )
-                            } else {
-                                stringResource(Res.string.trash_restores_with_folder)
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    if (row.expandable) {
-                        IconButton(onClick = { viewModel.toggleExpanded(item.id) }) {
-                            Icon(
-                                imageVector = if (row.expanded) {
-                                    DriveIcons.ExpandLess
-                                } else {
-                                    DriveIcons.ExpandMore
-                                },
-                                contentDescription = if (row.expanded) {
-                                    "Collapse ${item.name}"
-                                } else {
-                                    "Show contents of ${item.name}"
-                                }
-                            )
+                ActivityLibraryRow(
+                    title = item.name,
+                    subtitle = if (row.depth == 0) stringResource(Res.string.trash_trashed_at, Formatters.dateTime(item.trashedAt))
+                        else stringResource(Res.string.trash_restores_with_folder),
+                    first = index == 0, last = index == state.rows.lastIndex, selected = selected,
+                    onClick = {
+                        if (state.selectionMode && row.selectable) viewModel.toggleSelection(item.id)
+                        else if (row.expandable) viewModel.toggleExpanded(item.id)
+                        else if (row.selectable) viewModel.toggleSelection(item.id)
+                    },
+                    onLongClick = { if (row.selectable) viewModel.toggleSelection(item.id) },
+                    indent = row.depth,
+                    leading = {
+                        when (item) {
+                            is TrashItem.File -> FileThumbnail(item.file, Modifier.fillMaxSize())
+                            is TrashItem.Folder -> Icon(DriveIcons.Folder, null, tint = MaterialTheme.colorScheme.primary)
+                        }
+                    },
+                    modifier = Modifier.animateItem(),
+                    actions = {
+                        if (row.expandable) IconButton({viewModel.toggleExpanded(item.id)}) {
+                            Icon(if(row.expanded) DriveIcons.ExpandLess else DriveIcons.ExpandMore,
+                                if(row.expanded) "Collapse ${item.name}" else "Show contents of ${item.name}")
                         }
                     }
-                }
+                )
             }
         }
     }

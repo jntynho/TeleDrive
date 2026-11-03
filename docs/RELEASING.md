@@ -14,7 +14,7 @@ Future builds verify that fingerprint. If an initialized key is unavailable, the
 
 ## Checks and publication
 
-Device tests and the build run in parallel. The build runs shared host tests, app unit tests, release lint and R8, then verifies signatures, alignment, the three ABI filters and shared code/resources/assets. A separate emulator gate installs and launches the signed x86_64 APK. Publication requires all gates to pass and uploads exactly the three APKs to Releases.
+Device tests and the build run in parallel. The build runs shared host tests, app unit tests, release lint and R8, then verifies signatures, alignment, the three ABI filters and shared code/resources/assets. A separate emulator gate installs and launches the signed x86_64 APK and verifies that Get started opens phone sign-in without asking for API credentials. It does not enter a phone number or request a code. Publication requires all gates to pass and uploads exactly the three APKs to Releases.
 
 Main pushes create immutable `v<version>-build.<run-number>` releases. Manual/tag builds retain their normal version tags. GitHub's automatic source ZIP/TAR files contain source, not the app. No Google Play publishing is configured.
 
@@ -30,3 +30,7 @@ python3 scripts/check_native_alignment.py app/build/outputs/apk/release/*.apk
 ```
 
 Local release APKs are unsigned unless all four Gradle `RELEASE_*` signing values are supplied. Debug builds have a separate debug signature. Compiled tests do not prove live Telegram authentication or transfer performance.
+
+## Application API identity
+
+Configure `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` as repository Actions Secrets before a release build. The workflow validates format without logging values. These identify TeleDrive, not a user account. Debug and device tests use blank build-time values. See [setup and session compatibility](TELEGRAM_APP_CREDENTIALS.md).

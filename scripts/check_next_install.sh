@@ -10,6 +10,7 @@ for apk in upgrade/new/*.apk; do
   adb install -r "$apk"
 done
 adb logcat -c
+adb shell pm grant "$app_id" android.permission.POST_NOTIFICATIONS 2>/dev/null || true
 adb shell am start -W -n "$app_id/app.tgdrive.MainActivity"
 sleep 3
 app_pid="$(adb shell pidof "$app_id" | tr -d '\r')"
@@ -18,4 +19,5 @@ if adb logcat --pid="$app_pid" -d -s AndroidRuntime | grep -q 'FATAL EXCEPTION';
   adb logcat --pid="$app_pid" -d -s AndroidRuntime
   exit 1
 fi
+python3 scripts/check_phone_onboarding.py
 printf '## Signed installation\n\nTG Drive Next installed and launched as app.tgdrive.next. It does not replace or clear app.tgdrive. Live Telegram authentication was not exercised.\n' >> "$GITHUB_STEP_SUMMARY"

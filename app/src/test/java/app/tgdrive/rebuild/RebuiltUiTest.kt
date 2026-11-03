@@ -255,9 +255,13 @@ class RebuiltUiTest {
     }
 
     @Test fun expandedAudioControlsUseTheSamePlaybackStateAsTheMiniPlayer() {
+        runBlocking {
+            val dao=GlobalContext.get().get<FileDao>()
+            dao.upsert(dao.byId("Song.mp3")!!.copy(localPath=File("src/androidTest/assets/cover-song.mp3").absolutePath))
+        }
         val file=runBlocking{GlobalContext.get().get<com.infinity.drive.domain.repository.FileRepository>().getFile("Song.mp3")}!!
         val playback=kotlinx.coroutines.flow.MutableStateFlow(com.infinity.drive.presentation.platform.AudioPlaybackState(
-            file=file,playing=true,metadata=com.infinity.drive.presentation.platform.AudioMetadata("Midnight City","M83"),durationMs=240_000,positionMs=60_000,canSkipPrevious=true,canSkipNext=true))
+            file=file,playing=true,metadata=com.infinity.drive.presentation.platform.AudioMetadata("Midnight City","M83",lyrics="[00:00]First lyric\n[00:30]Second lyric\n[01:30]Third lyric"),durationMs=240_000,positionMs=60_000,canSkipPrevious=true,canSkipNext=true))
         var previous=0
         var next=0
         val player=object:com.infinity.drive.presentation.platform.AudioPlayback {
@@ -281,12 +285,19 @@ class RebuiltUiTest {
         compose.onNodeWithText("Midnight City",substring=false).performClick()
         compose.onNodeWithContentDescription("Back to library").assertIsDisplayed()
         capture("now-playing")
+        compose.onNodeWithContentDescription("Show lyrics").performClick()
+        compose.onNodeWithContentDescription("Back to player").assertIsDisplayed()
+        compose.onAllNodesWithText("Third lyric").onLast().performScrollTo().performClick()
+        org.junit.Assert.assertEquals(90_000L,playback.value.positionMs)
+        capture("synchronized-lyrics")
+        compose.onNodeWithContentDescription("Back to player").performClick()
         compose.onNodeWithContentDescription("Previous audio").performClick()
         compose.onNodeWithContentDescription("Next audio").performClick()
         org.junit.Assert.assertEquals(1,previous)
         org.junit.Assert.assertEquals(1,next)
         compose.onAllNodesWithContentDescription("Pause audio").onLast().performClick()
         org.junit.Assert.assertFalse(playback.value.playing)
+        compose.onNodeWithContentDescription("Playback options").performClick()
         compose.onNodeWithText("Stop playback",substring=false).performClick()
         compose.waitUntil(5_000){playback.value.file==null}
         compose.onNodeWithText("Your library").assertIsDisplayed()
@@ -344,6 +355,43 @@ class RebuiltUiTest {
             compose.onNodeWithTag("navigation-home").performClick()
             compose.onNodeWithText("Your library").assertIsDisplayed()
         }
+    }
+
+    @Test fun collectionsKeepSelectionAndTrashRestoreWithActivityRows() {
+        val dao=GlobalContext.get().get<FileDao>()
+        runBlocking {
+            dao.upsert(dao.byId("Photo.jpg")!!.copy(isFavorite=true))
+            dao.upsert(dao.byId("Song.mp3")!!.copy(isArchived=true))
+            dao.upsert(dao.byId("Report.pdf")!!.copy(trashedAt=System.currentTimeMillis()))
+        }
+        compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithContentDescription("Show collections").performClick()
+        listOf("Favorites" to "Photo.jpg","Archived" to "Song.mp3","Trash" to "Report.pdf").forEach { (collection,name)->
+            compose.onNodeWithText(collection,substring=false).performClick()
+            compose.waitUntil(10_000){compose.onAllNodesWithText(name,substring=false).fetchSemanticsNodes().isNotEmpty()}
+            capture(collection.lowercase())
+            compose.onNodeWithText(name,substring=false).performTouchInput{longClick()}
+            compose.onNodeWithContentDescription("Clear selection").assertIsDisplayed()
+            if(collection=="Trash"){
+                compose.onNodeWithContentDescription("Restore").performClick()
+                capture("trash-after-restore")
+                compose.waitUntil(10_000){runBlocking{dao.byId("Report.pdf")?.trashedAt==null}}
+            }else compose.onNodeWithContentDescription("Clear selection").performClick()
+            compose.onNodeWithContentDescription("Back").performClick()
+        }
+    }
+
+    @Test fun navigationHostKeepsItsBoundsAcrossTabsAndSecondaryPages() {
+        compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        val bounds=compose.onNodeWithTag("navigation-host").fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithTag("navigation-settings").performClick()
+        org.junit.Assert.assertEquals(bounds,compose.onNodeWithTag("navigation-host").fetchSemanticsNode().boundsInRoot)
+        compose.onNodeWithText("Activity",substring=false).performClick()
+        compose.onNodeWithText("Activity",substring=false).assertIsDisplayed()
+        org.junit.Assert.assertEquals(bounds,compose.onNodeWithTag("navigation-host").fetchSemanticsNode().boundsInRoot)
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithTag("navigation-gallery").performClick()
+        org.junit.Assert.assertEquals(bounds,compose.onNodeWithTag("navigation-host").fetchSemanticsNode().boundsInRoot)
     }
 
     private fun capture(name:String) {

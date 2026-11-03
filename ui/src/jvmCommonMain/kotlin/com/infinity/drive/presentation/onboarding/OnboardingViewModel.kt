@@ -58,7 +58,7 @@ class OnboardingViewModel(
                 /* Falling back here from a QR wait means the token died, so the
                    cached link is dropped and a fresh one can be asked for. */
                 is TelegramAuthState.WaitingForPhoneNumber -> when {
-                    current.step == OnboardingStep.API_CREDENTIALS && current.working ->
+                    current.step in listOf(OnboardingStep.API_CREDENTIALS, OnboardingStep.PHONE) && current.working ->
                         current.copy(step = OnboardingStep.PHONE, working = false, error = null)
 
                     current.qrLink != null -> current.copy(working = false, qrLink = null)
@@ -141,7 +141,18 @@ class OnboardingViewModel(
     }
 
     fun start() {
-        _uiState.update { it.copy(step = OnboardingStep.API_CREDENTIALS, error = null) }
+        if (_uiState.value.working) return
+        _uiState.update { it.copy(step = OnboardingStep.PHONE, working = true, error = null) }
+        runAction {
+            when (val result = telegramAuthRepository.startFromStoredCredentials()) {
+                is AppResult.Success -> {
+                    if (result.value) onAuthStateChanged(telegramAuthRepository.authState.value)
+                    else _uiState.update { it.copy(step = OnboardingStep.API_CREDENTIALS, working = false) }
+                    AppResult.Success(Unit)
+                }
+                is AppResult.Failure -> result
+            }
+        }
     }
 
     fun submitCredentials(apiIdText: String, apiHash: String) {

@@ -1,6 +1,13 @@
 // Modified for TG Drive: Android integration, safety fixes and visual adaptation; see third_party/driveinfinity/SOURCE.md.
 package com.infinity.drive.presentation.navigation
 
+import com.infinity.drive.presentation.navigation.NavigationTransitions.forward
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.staticCompositionLocalOf
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -39,10 +46,10 @@ fun AppNavHost(
         startDestination = startDestination,
         modifier = modifier,
         sizeTransform={androidx.compose.animation.SizeTransform(clip=true){_,_->androidx.compose.animation.core.snap()}},
-        enterTransition = { NavigationTransitions.enter() },
-        exitTransition = { NavigationTransitions.exit() },
-        popEnterTransition = { NavigationTransitions.enter() },
-        popExitTransition = { NavigationTransitions.exit() }
+        enterTransition = { NavigationTransitions.enter(forward(true)) },
+        exitTransition = { NavigationTransitions.exit(forward(true)) },
+        popEnterTransition = { NavigationTransitions.enter(forward(false)) },
+        popExitTransition = { NavigationTransitions.exit(forward(false)) }
     ) {
         stableComposable<Route.Onboarding>(navController) {
             OnboardingScreen(
@@ -131,10 +138,10 @@ fun AppNavHost(
             )
         }
         stableComposable<Route.Preview>(navController,
-            enterTransition = { NavigationTransitions.enter() },
-            exitTransition = { NavigationTransitions.exit() },
-            popEnterTransition = { NavigationTransitions.enter() },
-            popExitTransition = { NavigationTransitions.exit() }
+            enterTransition = { NavigationTransitions.enter(forward(true)) },
+            exitTransition = { NavigationTransitions.exit(forward(true)) },
+            popEnterTransition = { NavigationTransitions.enter(forward(false)) },
+            popExitTransition = { NavigationTransitions.exit(forward(false)) }
         ) {
             LocalPlatformScreens.current.Preview(
                 onBack = { navController.popBackStackOnce() },
@@ -244,6 +251,14 @@ private inline fun <reified T:Any> androidx.navigation.NavGraphBuilder.stableCom
 ) {
     composable<T>(enterTransition=enterTransition,exitTransition=exitTransition,popEnterTransition=popEnterTransition,popExitTransition=popExitTransition){entry->
         com.infinity.drive.presentation.common.AppBackHandler(controller.previousBackStackEntry!=null){controller.popBackStackOnce()}
-        content(entry)
+        val chrome = T::class !in setOf<kotlin.reflect.KClass<*>>(Route.Onboarding::class, Route.Preview::class, Route.NoteEditor::class, Route.Search::class)
+        val ownsBottomInset = T::class in setOf<kotlin.reflect.KClass<*>>(Route.Home::class, Route.Gallery::class, Route.Audio::class, Route.Settings::class, Route.Files::class)
+        Box(Modifier.fillMaxSize().padding(start = if(chrome) LocalNavigationRailWidth.current else 0.dp,
+            bottom = if(chrome && !ownsBottomInset) LocalBottomBarHeight.current else 0.dp)) {
+            content(entry)
+        }
     }
 }
+
+/** Fixed rail width is applied per entry, never to the animated host itself. */
+val LocalNavigationRailWidth = staticCompositionLocalOf { 0.dp }

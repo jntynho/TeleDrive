@@ -70,7 +70,7 @@ The complete mapping is in [the rebuild inventory](docs/REBUILD-PARITY.md). Earl
 ## Getting started
 
 1. Install an APK matching your phone.
-2. Create Telegram application credentials at [my.telegram.org/apps](https://my.telegram.org/apps), enter API ID/hash on the device and follow Telegram's sign-in prompts. Code delivery, password/email checks and QR availability are controlled by Telegram.
+2. Enter your Telegram phone number and follow Telegram’s sign-in prompts. Official releases include TeleDrive’s application identity; code delivery, password/email checks and QR availability are controlled by Telegram.
 3. Choose or create an owned private TG Drive channel.
 4. Add files or share documents from another Android app. Follow their progress in Activity. Enable folder backup or encryption only after choosing the relevant preferences and saving recovery material.
 
@@ -128,7 +128,7 @@ python3 scripts/generate_launcher.py --check
 
 The optional sharing-service tests require Node.js 24. Native Android device tests additionally need a connected device or emulator; see [Testing](docs/TESTING.md).
 
-The rebuilt onboarding asks for the user’s own API ID/hash. The old build-time fields remain for source compatibility and do not currently skip that step. Never commit credentials, user sessions, login codes, passwords or signing keys.
+Release builds use `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` from GitHub Actions Secrets so users sign in with their phone number. Existing stored credentials keep priority. Debug builds exclude production values and retain manual API setup. See [application identity setup](docs/TELEGRAM_APP_CREDENTIALS.md). Never commit credential values, user sessions, login codes, passwords or signing keys.
 
 Local release outputs are unsigned unless the Next signing configuration is supplied. The GitHub workflow verifies device tests, unit tests and release lint checks, matching APK payloads, signature/alignment and a signed installation check before publishing installable assets. It does not upload to Google Play.
 
