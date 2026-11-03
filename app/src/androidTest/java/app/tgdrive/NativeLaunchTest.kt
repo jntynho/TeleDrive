@@ -13,8 +13,8 @@ class NativeLaunchTest {
     @Test fun actualActivityStartsWithPrivateChannelOnboarding() {
         compose.waitUntil(15_000) { compose.onAllNodesWithText("Get started").fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodesWithText("TeleDrive").onFirst().assertIsDisplayed()
-        compose.onNodeWithText("Your files live in your own private Telegram channel. Your account, your storage, your control.").assertIsDisplayed()
-        compose.onNodeWithText("Get started").performClick()
+        compose.onNodeWithText("Your files. Your Telegram.\nKeep everything in your private cloud.").assertIsDisplayed()
+        compose.onNodeWithText("Get started").performScrollTo().performClick()
         compose.onNodeWithText("API access").assertIsDisplayed()
         compose.onNodeWithText("API ID").assertIsDisplayed()
         compose.onNodeWithText("API hash").assertIsDisplayed()

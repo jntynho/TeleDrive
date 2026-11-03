@@ -11,3 +11,5 @@ Validation includes bounded/symmetric resistance and proximity tests, a real Com
 This release also builds the previously pushed welcome/sign-in, library pass and file-browser/shared-sheet changes. No new animation dependency is added, and the three-ABI release/signing checks remain unchanged. Automated checks do not establish a device-specific frame rate.
 
 Local validation completed: 241 app tests plus 66 shared tests (307 total), no failures or skipped tests. `lintRelease`, `assembleDebug` and `assembleDebugAndroidTest` succeeded. Signed release packaging and installation are checked separately by GitHub Actions.
+
+The first device run caught a stale NativeLaunchTest assertion for the replaced welcome copy. The assertion now checks the approved welcome text and still verifies the API setup fields and disabled empty Continue action; the device gate is retained.
