@@ -12,8 +12,6 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -68,7 +66,6 @@ import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.Lifecycle
@@ -328,7 +325,7 @@ private fun MainScaffold(
             }
             androidx.compose.foundation.layout.Column(Modifier.weight(1f).fillMaxSize()) {
                 AppNavHost(navController=navController,startDestination=startDestination,
-                    modifier=Modifier.weight(1f).fillMaxSize().consumeWindowInsets(WindowInsets.systemBars.only(WindowInsetsSides.Start)),verticalTabMotion=true)
+                    modifier=Modifier.weight(1f).fillMaxSize().consumeWindowInsets(WindowInsets.systemBars.only(WindowInsetsSides.Start)))
                 com.infinity.drive.presentation.audio.LibraryAudioMiniPlayer()
             }
         }
@@ -356,10 +353,8 @@ private fun MainScaffold(
             }
             AnimatedVisibility(
                 visible = showChrome&&!keyboardVisible,
-                enter = slideInVertically(barSlideSpec()) { height -> height } +
-                        fadeIn(tween(BAR_SLIDE_MS)),
-                exit = slideOutVertically(barSlideSpec()) { height -> height } +
-                        fadeOut(tween(BAR_SLIDE_MS)),
+                enter = com.infinity.drive.presentation.navigation.NavigationTransitions.enter(),
+                exit = com.infinity.drive.presentation.navigation.NavigationTransitions.exit(),
                 modifier = Modifier.align(Alignment.BottomCenter)
             ) {
                 androidx.compose.foundation.layout.Column(Modifier.onSizeChanged{bottomChromeHeight=with(chromeDensity){(it.height-systemBottom).coerceAtLeast(0).toDp()}}) {
@@ -382,12 +377,6 @@ private fun FloatingNavigationBar(selectedIndex:Int,onNavigate:(TopLevelDestinat
     }
 }
 
-/** One spec for both directions so the bar leaves exactly the way it arrives. */
-private fun barSlideSpec() = tween<IntOffset>(
-    durationMillis = BAR_SLIDE_MS,
-    easing = FastOutSlowInEasing
-)
-
 private fun navigateTopLevel(
     navController: NavHostController,
     destination: TopLevelDestination
@@ -398,8 +387,6 @@ private fun navigateTopLevel(
         launchSingleTop = true
     }
 }
-
-private const val BAR_SLIDE_MS = 180
 
 private const val NAV_READY_TIMEOUT_MS = 5_000L
 private const val NAV_READY_POLL_MS = 50L

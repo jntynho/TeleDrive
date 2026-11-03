@@ -17,8 +17,6 @@ import com.infinity.drive.presentation.files.FilesScreen
 import com.infinity.drive.presentation.gallery.GalleryScreen
 import com.infinity.drive.presentation.home.HomeScreen
 import com.infinity.drive.presentation.platform.LocalPlatformScreens
-import com.infinity.drive.presentation.navigation.NavigationTransitions.isPeerSwitch
-import com.infinity.drive.presentation.navigation.NavigationTransitions.movesForward
 import com.infinity.drive.presentation.note.NoteEditorScreen
 import com.infinity.drive.presentation.onboarding.OnboardingScreen
 import com.infinity.drive.presentation.search.SearchScreen
@@ -34,30 +32,17 @@ import com.infinity.drive.presentation.trash.TrashScreen
 fun AppNavHost(
     navController: NavHostController,
     startDestination: Route,
-    modifier: Modifier = Modifier,
-    verticalTabMotion: Boolean = false
+    modifier: Modifier = Modifier
 ) {
     NavHost(
         navController = navController,
         startDestination = startDestination,
         modifier = modifier,
         sizeTransform={androidx.compose.animation.SizeTransform(clip=true){_,_->androidx.compose.animation.core.snap()}},
-        enterTransition = {
-            if (isPeerSwitch()) tabEnterFor(verticalTabMotion, movesForward())
-            else NavigationTransitions.sharedAxisEnter(forward = true)
-        },
-        exitTransition = {
-            if (isPeerSwitch()) tabExitFor(verticalTabMotion, movesForward())
-            else NavigationTransitions.sharedAxisExit(forward = true)
-        },
-        popEnterTransition = {
-            if (isPeerSwitch()) tabEnterFor(verticalTabMotion, movesForward())
-            else NavigationTransitions.sharedAxisEnter(forward = false)
-        },
-        popExitTransition = {
-            if (isPeerSwitch()) tabExitFor(verticalTabMotion, movesForward())
-            else NavigationTransitions.sharedAxisExit(forward = false)
-        }
+        enterTransition = { NavigationTransitions.enter() },
+        exitTransition = { NavigationTransitions.exit() },
+        popEnterTransition = { NavigationTransitions.enter() },
+        popExitTransition = { NavigationTransitions.exit() }
     ) {
         stableComposable<Route.Onboarding>(navController) {
             OnboardingScreen(
@@ -146,10 +131,10 @@ fun AppNavHost(
             )
         }
         stableComposable<Route.Preview>(navController,
-            enterTransition = { NavigationTransitions.previewEnter() },
-            exitTransition = { NavigationTransitions.fadeThroughExit() },
-            popEnterTransition = { NavigationTransitions.sharedAxisEnter(forward=false) },
-            popExitTransition = { NavigationTransitions.previewExit() }
+            enterTransition = { NavigationTransitions.enter() },
+            exitTransition = { NavigationTransitions.exit() },
+            popEnterTransition = { NavigationTransitions.enter() },
+            popExitTransition = { NavigationTransitions.exit() }
         ) {
             LocalPlatformScreens.current.Preview(
                 onBack = { navController.popBackStackOnce() },
@@ -234,15 +219,6 @@ fun AppNavHost(
         }
     }
 }
-
-/** The rail stacks destinations vertically, so switching tabs moves up or down. */
-private fun tabEnterFor(vertical: Boolean, forward: Boolean) =
-    if (vertical) NavigationTransitions.tabEnterVertical(forward)
-    else NavigationTransitions.tabEnter(forward)
-
-private fun tabExitFor(vertical: Boolean, forward: Boolean) =
-    if (vertical) NavigationTransitions.tabExitVertical(forward)
-    else NavigationTransitions.tabExit(forward)
 
 /**
  * Screens that sit under the bottom bar reserve its height for their whole

@@ -6,9 +6,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -86,7 +83,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.Lifecycle
@@ -240,18 +236,9 @@ fun OnboardingScreen(
                         contentAlignment = Alignment.Center,
                         targetState = state.step,
                         transitionSpec = {
-                            val forward = targetState.ordinal >= initialState.ordinal
-                            val spec = tween<IntOffset>(
-                                durationMillis = STEP_SLIDE_MS,
-                                easing = EmphasizedEasing
-                            )
-                            slideInHorizontally(spec) { width ->
-                                if (forward) width else -width
-                            }.togetherWith(
-                                slideOutHorizontally(spec) { width ->
-                                    if (forward) -width else width
-                                }
-                            ).using(SizeTransform(clip = true) { _, _ -> snap() })
+                            (com.infinity.drive.presentation.navigation.NavigationTransitions.enter()
+                                .togetherWith(com.infinity.drive.presentation.navigation.NavigationTransitions.exit()))
+                                .using(SizeTransform(clip = true) { _, _ -> snap() })
                         },
                         label = stringResource(Res.string.onboarding_step)
                     ) { step ->
@@ -1532,7 +1519,6 @@ private fun ErrorAndAction(
 }
 
 private val EmphasizedEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
-private const val STEP_SLIDE_MS = 360
 
 private val PAGE_PADDING = 24.dp
 private val PAGE_VERTICAL_PADDING = 24.dp
