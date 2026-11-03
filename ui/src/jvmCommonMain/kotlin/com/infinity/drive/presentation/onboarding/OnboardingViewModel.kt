@@ -245,6 +245,26 @@ class OnboardingViewModel(
         viewModelScope.launch { telegramAuthRepository.restartAuthentication() }
     }
 
+    fun setSignInTheme(dark: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.update { it.copy(theme=if(dark) com.infinity.drive.domain.model.AppTheme.DARK else com.infinity.drive.domain.model.AppTheme.LIGHT) }
+        }
+    }
+
+    /** Return through the real authentication state rather than displaying a stale phone form. */
+    fun backFromSignIn() {
+        val current=_uiState.value
+        if(current.working)return
+        if(current.qrMode){cancelQrLogin();return}
+        if(current.step==OnboardingStep.PHONE||current.step==OnboardingStep.API_CREDENTIALS){
+            _uiState.update{it.copy(step=OnboardingStep.WELCOME,error=null)}
+            return
+        }
+        if(current.step !in setOf(OnboardingStep.CODE,OnboardingStep.PASSWORD,OnboardingStep.EMAIL_ADDRESS,OnboardingStep.EMAIL_CODE))return
+        _uiState.update{it.copy(step=OnboardingStep.PHONE,working=true,error=null,qrMode=false,qrLink=null)}
+        runAction{telegramAuthRepository.restartAuthentication()}
+    }
+
     fun submitEmailAddress(email: String) {
         if (email.isBlank()) return
         runAction { telegramAuthRepository.submitEmailAddress(email.trim()) }

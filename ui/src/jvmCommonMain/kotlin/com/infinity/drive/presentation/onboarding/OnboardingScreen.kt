@@ -2,6 +2,17 @@
 package com.infinity.drive.presentation.onboarding
 
 import app.tgdrive.ui.DriveIcons
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.foundation.border
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.CubicBezierEasing
@@ -66,6 +77,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -73,6 +85,9 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -211,23 +226,41 @@ fun OnboardingScreen(
         return
     }
 
-    Scaffold { padding ->
+    val initialDark = MaterialTheme.colorScheme.background.luminance() < .5f
+    var dark by rememberSaveable { mutableStateOf(initialDark) }
+    val colors = if (dark) app.tgdrive.ui.DriveColors.copy(
+        background=Color(0xFF17212B), surface=Color(0xFF202B36),
+        primary=Color(0xFF59B6F7), onPrimary=Color(0xFF071D36), outline=Color(0xFF647482)
+    ) else lightColorScheme(primary=Color(0xFF168ACD),background=Color.White,surface=Color(0xFFF4F7FA))
+    val formStates=androidx.compose.runtime.saveable.rememberSaveableStateHolder()
+    val canBack = state.step in setOf(OnboardingStep.API_CREDENTIALS,OnboardingStep.PHONE,
+        OnboardingStep.CODE,OnboardingStep.EMAIL_ADDRESS,OnboardingStep.EMAIL_CODE,OnboardingStep.PASSWORD)
+    com.infinity.drive.presentation.common.AppBackHandler(canBack) { if(!state.working)viewModel.backFromSignIn() }
+    com.infinity.drive.presentation.theme.PlatformThemeSideEffects(dark)
+    MaterialTheme(colorScheme=colors) {
+    Scaffold(containerColor=colors.background) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = padding.calculateTopPadding())
                 .imePadding()
         ) {
-            Spacer(Modifier.height(20.dp))
-            StepHeader(
-                step = state.step,
-                modifier = Modifier.padding(horizontal = PAGE_PADDING)
-            )
+            Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal=12.dp),
+                verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
+                if(canBack) IconButton(onClick=viewModel::backFromSignIn,enabled=!state.working) {
+                    Icon(DriveIcons.ArrowBack,"Back")
+                } else Spacer(Modifier.size(48.dp))
+                IconButton(onClick={dark=!dark;viewModel.setSignInTheme(dark)}) {
+                    Icon(DriveIcons.AutoAwesome,if(dark)"Use light theme"else"Use dark theme")
+                }
+            }
             BoxWithConstraints(modifier = Modifier.weight(1f)) {
                 val availableHeight = maxHeight
+                val scroll=rememberScrollState()
+                LaunchedEffect(state.step){scroll.scrollTo(0)}
                 Column(
                     modifier = Modifier
-                        .verticalScroll(rememberScrollState())
+                        .verticalScroll(scroll)
                         .heightIn(min = availableHeight),
                     verticalArrangement = Arrangement.Top
                 ) {
@@ -242,6 +275,7 @@ fun OnboardingScreen(
                         },
                         label = stringResource(Res.string.onboarding_step)
                     ) { step ->
+                        formStates.SaveableStateProvider(step.name) {
                         when (step) {
                             OnboardingStep.WELCOME -> WelcomeStep(onContinue = viewModel::start)
                             OnboardingStep.API_CREDENTIALS -> CredentialsStep(
@@ -331,11 +365,13 @@ fun OnboardingScreen(
 
                             OnboardingStep.DONE -> Unit
                         }
+                        }
                     }
                     Spacer(Modifier.height(32.dp + padding.calculateBottomPadding()))
                 }
             }
         }
+    }
     }
 }
 
@@ -445,25 +481,6 @@ private fun ChannelSelectStep(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun StepHeader(step: OnboardingStep, modifier: Modifier = Modifier) {
-    val capabilities = LocalPlatformCapabilities.current
-    val counted = OnboardingStep.counted(
-        includePermissions = capabilities.requiresPermissions,
-        includeBackup = capabilities.supportsAutoBackup
-    )
-    val stepNumber = step.displayNumber(counted)
-    val totalSteps = counted.size
-    Column(modifier = modifier,verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
-            Text("TeleDrive",style=MaterialTheme.typography.titleMedium)
-            Text(when(step){OnboardingStep.WELCOME,OnboardingStep.API_CREDENTIALS->"Connection";OnboardingStep.PHONE,OnboardingStep.CODE,OnboardingStep.EMAIL_ADDRESS,OnboardingStep.EMAIL_CODE,OnboardingStep.PASSWORD->"Account";else->"Your library"},style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        androidx.compose.material3.LinearProgressIndicator(progress={stepNumber.toFloat()/totalSteps},modifier=Modifier.fillMaxWidth().height(3.dp),color=MaterialTheme.colorScheme.primary,trackColor=MaterialTheme.colorScheme.surface)
-    }
-}
-
 /**
  * Every onboarding step is laid out the same way: hero shape, title, supporting
  * line, then whatever that step needs. Only the content block differs.
@@ -479,10 +496,13 @@ private fun OnboardingPage(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = PAGE_PADDING, vertical = PAGE_VERTICAL_PADDING)
+            .padding(horizontal = PAGE_PADDING, vertical = PAGE_VERTICAL_PADDING),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        HeroShape(icon = icon, iconPainter = iconPainter)
-        Spacer(Modifier.height(24.dp))
+        if(icon!=DriveIcons.PhoneAndroid) {
+            HeroShape(icon = icon, iconPainter = iconPainter)
+            Spacer(Modifier.height(24.dp))
+        }
         StepTitle(title = title, description = description)
         Spacer(Modifier.height(28.dp))
         content()
@@ -495,8 +515,8 @@ private fun HeroShape(icon: ImageVector?, iconPainter: Painter?) {
     Box(
         modifier = Modifier
             .size(64.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surface),
+            .clip(CircleShape)
+            .background(Color.Transparent),
         contentAlignment = Alignment.Center
     ) {
         when {
@@ -520,16 +540,18 @@ private fun HeroShape(icon: ImageVector?, iconPainter: Painter?) {
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun StepTitle(title: String, description: String) {
-    Column {
+    Column(horizontalAlignment=Alignment.CenterHorizontally) {
         Text(
             text = title,
-            style = MaterialTheme.typography.headlineLarge,
+            textAlign=TextAlign.Center,
+            style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(Modifier.height(12.dp))
         Text(
             text = description,
-            style = MaterialTheme.typography.bodyLarge,
+            textAlign=TextAlign.Center,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
@@ -537,12 +559,32 @@ private fun StepTitle(title: String, description: String) {
 
 @Composable
 private fun WelcomeStep(onContinue: () -> Unit) {
-    OnboardingPage(
-        iconPainter = painterResource(Res.drawable.ic_launcher_monochrome),
-        title = stringResource(Res.string.app_name),
-        description = stringResource(Res.string.onboarding_files_live_own_private)
-    ) {
-        BigButton(label = stringResource(Res.string.onboarding_get_started), onClick = onContinue)
+    val pager=rememberPagerState(pageCount={3})
+    Column(Modifier.fillMaxWidth().padding(horizontal=24.dp,vertical=24.dp),
+        horizontalAlignment=Alignment.CenterHorizontally) {
+        Spacer(Modifier.height(48.dp))
+        HorizontalPager(state=pager,modifier=Modifier.fillMaxWidth().heightIn(min=300.dp)) { page ->
+            Column(Modifier.fillMaxWidth().padding(horizontal=8.dp),horizontalAlignment=Alignment.CenterHorizontally) {
+                if(page==0) com.infinity.drive.presentation.platform.LocalAppIcon.current(Modifier.size(150.dp))
+                else Box(Modifier.size(150.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha=.12f)),contentAlignment=Alignment.Center) {
+                    Icon(if(page==1)DriveIcons.Folder else DriveIcons.Shield,null,Modifier.size(72.dp),tint=MaterialTheme.colorScheme.primary)
+                }
+                Spacer(Modifier.height(28.dp))
+                Text(listOf("TeleDrive","Your private cloud","Always your files")[page],style=MaterialTheme.typography.headlineMedium,textAlign=TextAlign.Center)
+                Spacer(Modifier.height(12.dp))
+                Text(listOf("Your files. Your Telegram.\nKeep everything in your private cloud.",
+                    "Keep photos, videos and audio in your own private Telegram channels.",
+                    "Browse your library and keep local copies when you need them.")[page],
+                    style=MaterialTheme.typography.bodyLarge,textAlign=TextAlign.Center,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Spacer(Modifier.height(48.dp))
+        Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+            repeat(3){index->Box(Modifier.size(7.dp).clip(CircleShape).background(
+                if(index==pager.currentPage)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant))}
+        }
+        Spacer(Modifier.height(56.dp))
+        BigButton(label=stringResource(Res.string.onboarding_get_started),onClick=onContinue)
     }
 }
 
@@ -610,55 +652,8 @@ private fun CredentialsStep(
  */
 @Composable
 private fun BlockedNetworkCard(onOpenProxy: () -> Unit) {
-    val shape = MaterialTheme.shapes.extraLarge
-    Surface(
-        shape = shape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .clickable(onClick = onOpenProxy)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.tertiaryContainer,
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = DriveIcons.VpnKey,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(Res.string.onboarding_telegram_blocked),
-                    style = MaterialTheme.typography.titleSmall
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = stringResource(Res.string.onboarding_set_up_proxy),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            Icon(
-                imageVector = DriveIcons.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+    TextButton(onClick=onOpenProxy,modifier=Modifier.fillMaxWidth()) {
+        Text(stringResource(Res.string.onboarding_set_up_proxy))
     }
 }
 
@@ -951,13 +946,17 @@ private fun PhoneStep(
             enabled = !working,
             prefix = "+$callingCode"
         )
-        ErrorAndAction(
-            working = working,
-            error = error,
-            actionLabel = stringResource(Res.string.onboarding_send_code),
-            enabled = national.isNotBlank() && !registrationRequired,
-            onAction = { onSubmit("+$callingCode$national") }
-        )
+        error?.let { Text(it.resolve(),color=MaterialTheme.colorScheme.error,
+            modifier=Modifier.padding(top=12.dp).semantics{liveRegion=LiveRegionMode.Polite}) }
+        Row(Modifier.fillMaxWidth().padding(top=20.dp),horizontalArrangement=Arrangement.End) {
+            FilledIconButton(onClick={onSubmit("+$callingCode$national")},
+                enabled=national.isNotBlank()&&!registrationRequired&&!working,
+                shape=CircleShape,modifier=Modifier.size(56.dp),
+                colors=IconButtonDefaults.filledIconButtonColors(containerColor=MaterialTheme.colorScheme.primary)) {
+                if(working) CircularProgressIndicator(Modifier.size(22.dp),strokeWidth=2.dp)
+                else Icon(DriveIcons.ChevronRight,stringResource(Res.string.onboarding_send_code))
+            }
+        }
         TextButton(
             onClick = onUseQrCode,
             enabled = !working,
@@ -1012,14 +1011,14 @@ private fun CountryField(
                 }
             },
             singleLine = true,
-            shape=RoundedCornerShape(18.dp),
-            colors=OutlinedTextFieldDefaults.colors(unfocusedContainerColor=MaterialTheme.colorScheme.surface,focusedContainerColor=MaterialTheme.colorScheme.surface,unfocusedBorderColor=androidx.compose.ui.graphics.Color.Transparent),
+            shape=RoundedCornerShape(8.dp),
+            colors=OutlinedTextFieldDefaults.colors(unfocusedContainerColor=Color.Transparent,focusedContainerColor=Color.Transparent),
             modifier = Modifier.fillMaxWidth()
         )
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .clip(RoundedCornerShape(18.dp))
+                .clip(RoundedCornerShape(8.dp))
                 .clickable(enabled = enabled, onClick = onClick)
         )
     }
@@ -1174,22 +1173,12 @@ private fun EmailCodeStep(
         title = stringResource(Res.string.onboarding_email_code_title),
         description = codeDeliveryText(CodeDeliveryChannel.EMAIL, emailPattern)
     ) {
-        OnboardingField(
-            value = code,
-            onChange = { input ->
-                code = input.filter(Char::isDigit).let {
-                    if (codeLength != null) it.take(codeLength) else it
-                }
-            },
-            label = stringResource(Res.string.onboarding_code),
-            keyboardType = KeyboardType.NumberPassword,
-            enabled = !working
-        )
+        VerificationInput(value=code,onChange={code=it},length=codeLength,enabled=!working)
         ErrorAndAction(
             working = working,
             error = error,
             actionLabel = stringResource(Res.string.onboarding_verify),
-            enabled = code.isNotBlank(),
+            enabled = code.isNotBlank() && (codeLength == null || code.length == codeLength),
             onAction = { onSubmit(code) }
         )
     }
@@ -1211,22 +1200,13 @@ private fun CodeStep(
         title = stringResource(Res.string.onboarding_enter_code),
         description = codeDeliveryText(channel, phoneNumber)
     ) {
-        OnboardingField(
-            value = code,
-            onChange = { input ->
-                code = input.filter(Char::isDigit).let {
-                    if (codeLength != null) it.take(codeLength) else it
-                }
-            },
-            label = stringResource(Res.string.onboarding_code),
-            keyboardType = KeyboardType.NumberPassword,
-            enabled = !working
-        )
+        VerificationInput(value=code,onChange={code=it},length=codeLength,enabled=!working,
+            numeric=channel!=CodeDeliveryChannel.SMS_WORD&&channel!=CodeDeliveryChannel.SMS_PHRASE)
         ErrorAndAction(
             working = working,
             error = error,
             actionLabel = stringResource(Res.string.onboarding_verify),
-            enabled = code.isNotBlank(),
+            enabled = code.isNotBlank() && (channel==CodeDeliveryChannel.SMS_WORD || channel==CodeDeliveryChannel.SMS_PHRASE || codeLength == null || code.length == codeLength),
             onAction = { onSubmit(code) }
         )
         TextButton(
@@ -1235,6 +1215,40 @@ private fun CodeStep(
             modifier = Modifier.align(Alignment.CenterHorizontally)
         ) { Text(stringResource(Res.string.onboarding_resend_code)) }
     }
+}
+
+/** A single editable node preserves IME, paste and accessibility across the visual slots. */
+@Composable
+private fun VerificationInput(value:String,onChange:(String)->Unit,length:Int?,enabled:Boolean,numeric:Boolean=true) {
+    val slots=length?.takeIf{numeric&&it in 1..8}
+    if(slots==null) {
+        OnboardingField(value,{input->onChange(if(numeric)input.filter(Char::isDigit).let{if(length!=null)it.take(length.coerceAtLeast(0))else it}else input)},
+            stringResource(Res.string.onboarding_code),keyboardType=if(numeric)KeyboardType.NumberPassword else KeyboardType.Text,enabled=enabled)
+        return
+    }
+    var focused by remember { mutableStateOf(false) }
+    BasicTextField(value=value,onValueChange={onChange(it.filter(Char::isDigit).take(slots))},
+        enabled=enabled,singleLine=true,cursorBrush=SolidColor(Color.Transparent),
+        keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.NumberPassword),
+        textStyle=MaterialTheme.typography.titleLarge.copy(color=Color.Transparent),
+        modifier=Modifier.fillMaxWidth().onFocusChanged{focused=it.isFocused}.semantics{contentDescription="Verification code"},
+        decorationBox={inner->
+            Box(Modifier.fillMaxWidth()) {
+                // One real editor owns paste, IME and accessibility; slots are decoration only.
+                Box(Modifier.matchParentSize().alpha(0f)){inner()}
+                Row(Modifier.fillMaxWidth().clearAndSetSemantics{},horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                    repeat(slots){index->
+                        val active=focused&&index==value.length
+                        Box(Modifier.weight(1f).height(56.dp).border(if(active)2.dp else 1.dp,
+                            if(active)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                            RoundedCornerShape(8.dp)),contentAlignment=Alignment.Center) {
+                            Text(value.getOrNull(index)?.toString()?:if(active)"│"else"",
+                                style=MaterialTheme.typography.titleLarge,color=MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                }
+            }
+        })
 }
 
 @Composable
@@ -1445,11 +1459,10 @@ private fun OnboardingField(
         supportingText = supportingText?.let { { Text(it) } },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType,autoCorrectEnabled=false),
-        shape=RoundedCornerShape(18.dp),
+        shape=RoundedCornerShape(8.dp),
         colors=androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-            unfocusedContainerColor=MaterialTheme.colorScheme.surface,
-            focusedContainerColor=MaterialTheme.colorScheme.surface,
-            unfocusedBorderColor=androidx.compose.ui.graphics.Color.Transparent
+            unfocusedContainerColor=Color.Transparent,
+            focusedContainerColor=Color.Transparent
         ),
         visualTransformation = if (password) {
             PasswordVisualTransformation()
@@ -1470,11 +1483,11 @@ private fun BigButton(
 ) {
     Button(
         onClick = onClick,
-        shape = RoundedCornerShape(18.dp),
+        shape = CircleShape,
         enabled = enabled,
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp),
         modifier = Modifier.fillMaxWidth().heightIn(min=52.dp),
-        colors=ButtonDefaults.buttonColors(containerColor=app.tgdrive.ui.DriveStyle.ActionBlue,contentColor=androidx.compose.ui.graphics.Color.White)
+        colors=ButtonDefaults.buttonColors(containerColor=MaterialTheme.colorScheme.primary,contentColor=MaterialTheme.colorScheme.onPrimary)
     ) {
         if (loading) {
             androidx.compose.material3.CircularProgressIndicator(color=LocalContentColor.current,modifier=Modifier.size(20.dp),strokeWidth=2.dp)
