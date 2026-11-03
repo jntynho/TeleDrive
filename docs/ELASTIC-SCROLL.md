@@ -13,3 +13,7 @@ This release also builds the previously pushed welcome/sign-in, library pass and
 Local validation completed: 241 app tests plus 66 shared tests (307 total), no failures or skipped tests. `lintRelease`, `assembleDebug` and `assembleDebugAndroidTest` succeeded. Signed release packaging and installation are checked separately by GitHub Actions.
 
 The first device run caught a stale NativeLaunchTest assertion for the replaced welcome copy. The assertion now checks the approved welcome text and still verifies the API setup fields and disabled empty Continue action; the device gate is retained.
+
+## Build validation update
+
+The earlier build deferral is superseded by the user-authorized release [v1.0.0-build.44](https://github.com/jntynho/TeleDrive/releases/tag/v1.0.0-build.44). [Workflow 44](https://github.com/jntynho/TeleDrive/actions/runs/41704922759) passed configuration validation, tests/lint/release packaging, native device tests, signing/installation/phone-page checks and publication. Local validation passed 241 app tests plus 66 shared tests (307 total). All three standalone APK assets were verified on the public release page. Live Telegram account login and device-specific frame-rate measurement were not exercised. This documentation update does not modify the released application.

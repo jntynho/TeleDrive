@@ -9,3 +9,7 @@ Both faces remain measured inside the same container, including the two heading 
 Category navigation stays outside the card in a two-column grid. Photos and Videos open their corresponding Gallery filter; Audio opens Audio, and Files opens the file browser. All files / Activity / Backups use a compact row with a stacked fallback at narrow widths or large font scales. Home loading uses the same pass and category components and spacing.
 
 Validation: Kotlin syntax parsing, call-site review and whitespace checks only. Per the user's instruction, Gradle, compilation, APK builds and device tests were not run. The commit uses `[skip ci]` to prevent the release workflow from starting on push. Runtime animation, layout and navigation checks remain pending a later build request.
+
+## Build validation update
+
+The earlier build deferral is superseded by the user-authorized release [v1.0.0-build.44](https://github.com/jntynho/TeleDrive/releases/tag/v1.0.0-build.44). [Workflow 44](https://github.com/jntynho/TeleDrive/actions/runs/41704922759) passed configuration validation, tests/lint/release packaging, native device tests, signing/installation/phone-page checks and publication. Local validation passed 241 app tests plus 66 shared tests (307 total). All three standalone APK assets were verified on the public release page. Live Telegram account login and device-specific frame-rate measurement were not exercised. This documentation update does not modify the released application.
