@@ -39,7 +39,7 @@ for abi in sorted(expected):
         libraries = [n for n in apk.namelist() if n.startswith('lib/') and n.endswith('.so')]
         assert libraries and {n.split('/')[1] for n in libraries} == {abi}, abi
         assert any(n.endswith('/libtdjni.so') for n in libraries), abi
-        assert any(n.endswith('/libmlkit_google_ocr_pipeline.so') for n in libraries), abi
+        assert not any('mlkit' in n.lower() or n.endswith('/libsqliteJni.so') for n in libraries), abi
 
 print('Matching code/resources/assets and correct native ABI verified for all three APKs.')
 assert sys.argv[1:] in ([], ['--verify-only']), 'Supported option: --verify-only'
