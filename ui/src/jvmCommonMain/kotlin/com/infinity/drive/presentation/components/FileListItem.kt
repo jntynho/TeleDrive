@@ -17,7 +17,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,19 +47,23 @@ fun FileListItem(
     modifier: Modifier = Modifier,
     loading: Boolean = false
 ) {
+    var menu by remember(file.id) { mutableStateOf(false) }
+    if(menu)FileActionsSheet(file,onDismiss={menu=false},onOpen=onClick)
     val compact = LocalCompactLayout.current
     val background = if (selected) {
         MaterialTheme.colorScheme.secondaryContainer
     } else {
         Color.Transparent
     }
+    Column(modifier.fillMaxWidth()) {
     Row(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.large)
+            .clip(RoundedCornerShape(8.dp))
             .background(background)
             .combinedClickable(enabled = !loading, onClick = onClick, onLongClick = onLongClick)
-            .padding(horizontal = 12.dp, vertical = if (compact) 4.dp else 8.dp),
+            .heightIn(min=if(compact)56.dp else 72.dp)
+            .padding(horizontal = 4.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box {
@@ -63,7 +71,7 @@ fun FileListItem(
                 file = file,
                 modifier = Modifier
                     .size(if (compact) 38.dp else 48.dp)
-                    .clip(MaterialTheme.shapes.medium).skeleton(loading)
+                    .clip(RoundedCornerShape(12.dp)).skeleton(loading)
             )
             if (selected) {
                 Icon(
@@ -110,6 +118,9 @@ fun FileListItem(
             }
         }
         Spacer(Modifier.width(8.dp))
-        BackupStateBadge(file = file, modifier = Modifier.skeleton(loading))
+        if(selectionMode)BackupStateBadge(file = file, modifier = Modifier.skeleton(loading))
+        else IconButton(onClick={menu=true},enabled=!loading) {Icon(DriveIcons.MoreVert,"Options for ${file.name}",Modifier.size(20.dp))}
+    }
+    HorizontalDivider(Modifier.padding(start=if(compact)52.dp else 66.dp),color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.35f))
     }
 }

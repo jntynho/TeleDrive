@@ -47,7 +47,7 @@ internal fun nameError(value:String):String?=runCatching{cleanName(value)}.excep
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun FilterSheet(type:String,minimum:Long,days:Int,order:String,onDismiss:()->Unit,onApply:(String,Long,Int,String)->Unit){
     var t by androidx.compose.runtime.saveable.rememberSaveable{mutableStateOf(type)};var m by androidx.compose.runtime.saveable.rememberSaveable{mutableLongStateOf(minimum)};var d by androidx.compose.runtime.saveable.rememberSaveable{mutableIntStateOf(days)};var o by androidx.compose.runtime.saveable.rememberSaveable{mutableStateOf(order)}
-    ModalBottomSheet(onDismissRequest=onDismiss){Column(Modifier.fillMaxWidth().padding(24.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)){
+    com.infinity.drive.presentation.components.DriveBottomSheet(onDismissRequest=onDismiss){Column(Modifier.fillMaxWidth().padding(24.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)){
         SectionTitle("Find the right file")
         Text("Type");LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)){items(listOf("all","image","video","audio","document")){v->DriveFilterChip(t==v,{t=v},label={Text(v.replaceFirstChar{it.uppercase()})})}}
         Text("Minimum size");LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)){items(listOf(0L,10L*1024*1024,100L*1024*1024)){v->DriveFilterChip(m==v,{m=v},label={Text(if(v==0L)"Any" else formatBytes(v))})}}
@@ -104,7 +104,7 @@ internal fun nameError(value:String):String?=runCatching{cleanName(value)}.excep
             Text(if(state.local[item.id]?.verifiedVersion==item.versionId&&item.sha256.isNotEmpty())"Downloaded content was verified against the original checksum." else "An uploaded/indexed reference is not the same as a fully verified downloaded copy.",style=MaterialTheme.typography.bodySmall)
             Text(if(state.itemVaults[item.id].orEmpty().isEmpty())"Telegram cloud storage is not end-to-end encrypted by this app for this file." else "Content and metadata belong to an encrypted vault.",style=MaterialTheme.typography.bodySmall)
         }},confirmButton={TextButton(onClick=onDismiss){Text("Done")}})
-        else->ModalBottomSheet(onDismissRequest={if(!busy)onDismiss()}){Column(Modifier.fillMaxWidth().heightIn(max=650.dp).verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+        else->com.infinity.drive.presentation.components.DriveBottomSheet(onDismissRequest={if(!busy)onDismiss()}){Column(Modifier.fillMaxWidth().heightIn(max=650.dp).verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
             Text(item.name,style=MaterialTheme.typography.titleLarge,maxLines=2,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
             error?.let{Text(it,color=MaterialTheme.colorScheme.error)}
@@ -151,7 +151,7 @@ internal fun nameError(value:String):String?=runCatching{cleanName(value)}.excep
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun VersionSheet(item:Item,state:LibraryState,bundle:SessionBundle,onDismiss:()->Unit){
     val form=rememberFormAction()
-    ModalBottomSheet(onDismissRequest={if(!form.busy)onDismiss()}){LazyColumn(Modifier.fillMaxWidth().heightIn(max=600.dp),contentPadding=PaddingValues(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+    com.infinity.drive.presentation.components.DriveBottomSheet(onDismissRequest={if(!form.busy)onDismiss()}){LazyColumn(Modifier.fillMaxWidth().heightIn(max=600.dp),contentPadding=PaddingValues(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
         item{SectionTitle("Content versions","Restoring retains the other content versions.");if(form.busy)LinearProgressIndicator(Modifier.fillMaxWidth());form.error?.let{Text(it,color=MaterialTheme.colorScheme.error)}}
         items(state.versions.filter{it.itemId==item.id}.sortedByDescending{it.createdAt},key={it.id}){version->DriveCard(Modifier.fillMaxWidth()){
             Column(Modifier.padding(16.dp)){Text(DateFormat.getDateTimeInstance().format(Date(version.createdAt)));Text(formatBytes(version.size),style=MaterialTheme.typography.bodySmall);if(version.id==item.versionId)Text("Current version",color=MaterialTheme.colorScheme.primary)else TextButton(enabled=!form.busy,onClick={form.run(onDismiss){bundle.actions.restoreVersion(item.id,version.id)}}){Text("Restore this version")}}
@@ -171,7 +171,7 @@ internal fun nameError(value:String):String?=runCatching{cleanName(value)}.excep
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun ImportSheet(state:LibraryState,bundle:SessionBundle,folder:String,onDismiss:()->Unit){
     var selected by androidx.compose.runtime.saveable.rememberSaveable{mutableStateOf(setOf<Long>())};val form=rememberFormAction()
-    ModalBottomSheet(onDismissRequest={if(!form.busy)onDismiss()}){Column(Modifier.fillMaxWidth().padding(20.dp)){
+    com.infinity.drive.presentation.components.DriveBottomSheet(onDismissRequest={if(!form.busy)onDismiss()}){Column(Modifier.fillMaxWidth().padding(20.dp)){
         if(form.busy)LinearProgressIndicator(Modifier.fillMaxWidth());form.error?.let{Text(it,color=MaterialTheme.colorScheme.error)}
         SectionTitle("Existing Saved Messages","Only selected references are imported. Original captions are retained.")
         DriveButton(onClick={val rows=state.incoming.filter{it.messageId in selected};form.run(onDismiss){rows.forEach{bundle.library.importMessage(it,folder)}}},enabled=selected.isNotEmpty()&&!form.busy){Text("Import ${selected.size} selected")}

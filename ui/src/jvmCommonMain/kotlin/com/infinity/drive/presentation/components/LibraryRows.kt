@@ -2,6 +2,7 @@ package com.infinity.drive.presentation.components
 
 import app.tgdrive.ui.*
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -22,23 +23,7 @@ import com.infinity.drive.presentation.common.Formatters
 fun LibraryRecentRow(file:DriveFile?,modifier:Modifier=Modifier,onClick:()->Unit={}) {
     val loading=file==null
     var options by rememberSaveable(file?.id){mutableStateOf(false)}
-    var info by remember{mutableStateOf(false)}
-    var failure by remember{mutableStateOf<String?>(null)}
-    val scope=rememberCoroutineScope()
-    if(options&&file!=null){
-        val repository=org.koin.compose.koinInject<com.infinity.drive.domain.repository.FileRepository>()
-        ModalBottomSheet(onDismissRequest={options=false}){
-            Column(Modifier.fillMaxWidth().padding(horizontal=16.dp).padding(bottom=24.dp)){
-                Text(file.name,style=MaterialTheme.typography.titleMedium,maxLines=2,modifier=Modifier.padding(16.dp))
-                ListItem(headlineContent={Text("Open")},leadingContent={Icon(DriveIcons.FileOpen,null)},modifier=Modifier.clickable{options=false;onClick()})
-                ListItem(headlineContent={Text(if(file.isFavorite)"Remove from favorites"else"Add to favorites")},leadingContent={Icon(DriveIcons.Star,null)},modifier=Modifier.clickable{scope.launch{runCatching{repository.setFilesFavorite(listOf(file.id),!file.isFavorite)}.onFailure{failure="Couldn't update this file. Try again."};options=false}})
-                ListItem(headlineContent={Text(if(file.isArchived)"Unarchive"else"Archive")},leadingContent={Icon(DriveIcons.Archive,null)},modifier=Modifier.clickable{scope.launch{runCatching{repository.setFilesArchived(listOf(file.id),!file.isArchived)}.onFailure{failure="Couldn't update this file. Try again."};options=false}})
-                ListItem(headlineContent={Text("File details")},leadingContent={Icon(DriveIcons.Info,null)},modifier=Modifier.clickable{options=false;info=true})
-            }
-        }
-    }
-    if(info&&file!=null)FileInfoSheet(file,onDismiss={info=false})
-    failure?.let{message->AlertDialog(onDismissRequest={failure=null},text={Text(message)},confirmButton={TextButton({failure=null}){Text("Close")}})}
+    if(options&&file!=null)FileActionsSheet(file,onDismiss={options=false},onOpen=onClick)
     Column {
     Row(modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable(enabled=!loading,onClick=onClick)
         .padding(vertical=LibraryLayout.HomeRowPadding),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(LibraryLayout.HomeRowGap)) {

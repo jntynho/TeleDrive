@@ -134,7 +134,7 @@ fun FilesPage(state: LibraryState,bundle: SessionBundle,system: SystemActions,on
             }
         }
     }
-    if(addSheet)ModalBottomSheet(onDismissRequest={addSheet=false}){Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+    if(addSheet)com.infinity.drive.presentation.components.DriveBottomSheet(onDismissRequest={addSheet=false}){Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
         SectionTitle("Add to your space")
         ActionRow("Upload files","Select multiple files",DriveIcons.Upload){addSheet=false;system.upload(folder,vault,"")}
         ActionRow("Scan a document","Capture or choose images, then create a PDF",DriveIcons.DocumentScanner){addSheet=false;system.scan(folder,vault)}

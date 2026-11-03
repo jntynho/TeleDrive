@@ -43,7 +43,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -533,7 +532,7 @@ private fun ProxyEditorSheet(
             portNumber in ProxyLink.MIN_PORT..ProxyLink.MAX_PORT &&
             (type != TelegramProxyType.MTPROTO || secret.isNotBlank())
 
-    ModalBottomSheet(
+    com.infinity.drive.presentation.components.DriveBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = formSheetState(),
         contentWindowInsets = { SheetTopInset }
@@ -685,7 +684,7 @@ private fun ProxyEditorSheet(
 private fun ImportLinkSheet(onImport: (String) -> Unit, onDismiss: () -> Unit) {
     var link by remember { mutableStateOf("") }
 
-    ModalBottomSheet(
+    com.infinity.drive.presentation.components.DriveBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = formSheetState(),
         contentWindowInsets = { SheetTopInset }

@@ -1,6 +1,9 @@
 // Modified for TG Drive: Android integration, safety fixes and visual adaptation; see third_party/driveinfinity/SOURCE.md.
 package com.infinity.drive.presentation.preview
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+
 import app.tgdrive.ui.DriveIcons
 import android.content.pm.ActivityInfo
 import androidx.activity.compose.LocalActivity
@@ -11,7 +14,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,7 +39,6 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -439,7 +440,8 @@ fun PlayerControls(
     }
 
     if (showSpeeds) {
-        ModalBottomSheet(onDismissRequest = { showSpeeds = false }) {
+        com.infinity.drive.presentation.components.DriveBottomSheet(onDismissRequest = { showSpeeds = false }) {
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
             Text(
                 text = stringResource(Res.string.preview_playback_speed),
                 style = MaterialTheme.typography.titleMedium,
@@ -474,6 +476,7 @@ fun PlayerControls(
                     .navigationBarsPadding()
                     .height(8.dp)
             )
+            }
         }
     }
 

@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -449,7 +452,7 @@ fun FilesScreen(
                         )
                     } else {
                         app.tgdrive.ui.ExpandableLibraryHeader(
-                            title=if(audioOnly)"Audio"else "All files",
+                            title=if(audioOnly)"Audio"else "All files",titleStyle=MaterialTheme.typography.titleLarge,
                             query=searchState.query,onQueryChange=searchModel::setQuery,expanded=searching,onExpandedChange={searching=it},placeholder="Search files",
                             navigationIcon = {
                                 onBack?.let {
@@ -462,16 +465,6 @@ fun FilesScreen(
                                 }
                             },
                             actions = {
-                                RefreshAction(
-                                    refreshing = refreshing,
-                                    onRefresh = viewModel::refresh
-                                )
-                                if(!audioOnly)IconButton(onClick = { showCreateFolder = true }) {
-                                    Icon(
-                                        DriveIcons.CreateNewFolder,
-                                        contentDescription = stringResource(Res.string.files_new_folder)
-                                    )
-                                }
                                 IconButton(onClick = { showSortMenu = true }) {
                                     Icon(
                                         DriveIcons.Sort,
@@ -481,6 +474,8 @@ fun FilesScreen(
                                 Box {
                                     IconButton({fileActions=true}){Icon(DriveIcons.MoreVert,"More file actions")}
                                     DropdownMenu(fileActions,{fileActions=false}){
+                                        DropdownMenuItem(text={Text("Refresh")},enabled=!refreshing,onClick={fileActions=false;viewModel.refresh()})
+                                        if(!audioOnly)DropdownMenuItem(text={Text("New folder")},onClick={fileActions=false;showCreateFolder=true})
                                         DropdownMenuItem(text={Text("New note")},onClick={fileActions=false;onNewNote(state.folderId)})
                                     }
                                 }
@@ -520,8 +515,15 @@ fun FilesScreen(
                         .padding(top = padding.calculateTopPadding())
                         .nestedScroll(fabScrollConnection)
                 ) {
-                    if (state.breadcrumbs.size > 1) {
-                        Breadcrumbs(crumbs = state.breadcrumbs, onOpen = onOpenCrumb)
+                    Breadcrumbs(crumbs = state.breadcrumbs, onOpen = onOpenCrumb)
+                    HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.35f))
+                    Row(Modifier.fillMaxWidth().heightIn(min=40.dp).padding(horizontal=20.dp),
+                        verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
+                        Text("${state.folders.size} folders · ${files.itemCount} loaded files",Modifier.weight(1f),maxLines=1,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(state.sortField.name.lowercase().replace('_',' ').replaceFirstChar(Char::uppercase)+
+                            if(state.sortDirection==SortDirection.ASCENDING)" ↑"else" ↓",
+                            modifier=Modifier.padding(start=12.dp).widthIn(max=120.dp),maxLines=1,overflow=TextOverflow.Ellipsis,
+                            style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     RefreshableContent(
                         isRefreshing = refreshing,
@@ -696,9 +698,11 @@ private fun Breadcrumbs(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
+            .heightIn(min=48.dp).padding(horizontal = 16.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        Icon(DriveIcons.CloudQueue,null,Modifier.size(20.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)
+        if(crumbs.isEmpty())Text("My drive",Modifier.padding(start=8.dp),style=MaterialTheme.typography.labelLarge)
         if (collapsed.isNotEmpty()) {
             Box {
                 CrumbLabel(
@@ -726,7 +730,7 @@ private fun Breadcrumbs(
         inline.forEachIndexed { index, crumb ->
             if (index > 0) CrumbSeparator()
             CrumbLabel(
-                text = crumb.name.resolve(),
+                text = if(crumb.id==null)"My drive"else crumb.name.resolve(),
                 current = index == inline.lastIndex,
                 onClick = { onOpen(crumb.id) },
                 modifier = Modifier.weight(1f, fill = false)
@@ -809,7 +813,7 @@ private fun FilesContent(
             .then(dragSelect),
         contentPadding = padding.add(horizontal = 12.dp, top = 12.dp, bottom = 100.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
         items(
             count = state.folders.size,
@@ -830,7 +834,7 @@ private fun FilesContent(
                         else onOpenFolder(folder.id)
                     },
                     onLongClick = { viewModel.toggleFolderSelection(folder.id) },
-                    modifier = Modifier.animateItem()
+                    modifier = Modifier.animateItem(placementSpec=null)
                 )
             } else {
                 FolderRow(
@@ -841,7 +845,7 @@ private fun FilesContent(
                         else onOpenFolder(folder.id)
                     },
                     onLongClick = { viewModel.toggleFolderSelection(folder.id) },
-                    modifier = Modifier.animateItem()
+                    modifier = Modifier.animateItem(placementSpec=null)
                 )
             }
         }
@@ -869,7 +873,7 @@ private fun FilesContent(
                         )
                     },
                     onLongClick = { viewModel.toggleSelection(file.id) },
-                    modifier = Modifier.animateItem()
+                    modifier = Modifier.animateItem(placementSpec=null)
                 )
             } else {
                 FileListItem(
@@ -889,7 +893,7 @@ private fun FilesContent(
                         )
                     },
                     onLongClick = { viewModel.toggleSelection(file.id) },
-                    modifier = Modifier.animateItem()
+                    modifier = Modifier.animateItem(placementSpec=null)
                 )
             }
         }

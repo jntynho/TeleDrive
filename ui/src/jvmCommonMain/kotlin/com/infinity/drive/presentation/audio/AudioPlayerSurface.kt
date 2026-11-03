@@ -235,7 +235,7 @@ private fun NowPlayingContent(file:DriveFile,onStop:()->Unit,modifier:Modifier=M
             catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}
             catch(_:Exception){queueError="Couldn't load the play queue."}
         }
-        ModalBottomSheet(onDismissRequest={showQueue=false}){
+        com.infinity.drive.presentation.components.DriveBottomSheet(onDismissRequest={showQueue=false}){
             Text("Play queue",Modifier.padding(24.dp),style=MaterialTheme.typography.titleLarge)
             if(queueError!=null)Column(Modifier.padding(24.dp)){Text(queueError!!);TextButton({queueRevision++}){Text("Retry")}}
             else if(queue==null)LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal=24.dp))

@@ -30,7 +30,8 @@ import androidx.compose.ui.unit.dp
 fun ExpandableLibraryHeader(
     title:String, query:String, onQueryChange:(String)->Unit, expanded:Boolean,
     onExpandedChange:(Boolean)->Unit, placeholder:String,
-    navigationIcon:@Composable ()->Unit={}, actions:@Composable RowScope.()->Unit={}
+    navigationIcon:@Composable ()->Unit={}, actions:@Composable RowScope.()->Unit={},
+    titleStyle:androidx.compose.ui.text.TextStyle?=null
 ) {
     val focus=LocalFocusManager.current
     val keyboard=LocalSoftwareKeyboardController.current
@@ -64,7 +65,7 @@ fun ExpandableLibraryHeader(
                          }
                     }else{
                         navigationIcon()
-                        Text(title,Modifier.weight(1f).padding(start=8.dp),style=MaterialTheme.typography.headlineLarge,maxLines=1,overflow=TextOverflow.Ellipsis)
+                        Text(title,Modifier.weight(1f).padding(start=8.dp),style=titleStyle?:MaterialTheme.typography.headlineLarge,maxLines=1,overflow=TextOverflow.Ellipsis)
                         IconButton({onExpandedChange(true)}){Icon(DriveIcons.Search,"Search ${title.lowercase()}")}
                         actions()
                     }

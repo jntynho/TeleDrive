@@ -1,5 +1,8 @@
 package com.infinity.drive.presentation.preview
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -112,10 +114,11 @@ fun TrackPickerSheet(
 ) {
     val unsupported = stringResource(Res.string.player_track_unsupported)
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    com.infinity.drive.presentation.components.DriveBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp)
         )
         if (offLabel != null) {
@@ -139,6 +142,7 @@ fun TrackPickerSheet(
                 .navigationBarsPadding()
                 .height(8.dp)
         )
+        }
     }
 }
 

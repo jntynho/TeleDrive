@@ -1,0 +1,9 @@
+# File browser and shared modal sheets
+
+All files uses continuous transparent rows, inset dividers, 48 dp rounded-square file covers and quieter folder rows. A persistent breadcrumb band is rendered at the root and in folders. The toolbar retains its height, uses smaller title typography, and moves refresh/new-folder commands into More while retaining sort/search. Sort and loaded-row information stays in a separate fixed band; the count explicitly describes loaded files, not an inferred full-library total. Existing paging keys, folder navigation and scroll restoration remain intact. List placement animations are disabled to avoid rows moving during page updates; fade behavior remains native. Existing selection and backup-state controls remain available.
+
+File row menus and Recent files share FileActionsSheet: thumbnail/title/metadata, Open, favorite, archive and details. Details replaces the action modal. Mutations disable duplicate requests and report failure; coroutine cancellation is propagated. No new destructive action is introduced.
+
+DriveBottomSheet is the single native modal entry point across active screens and retained legacy screens. It defines 28 dp top corners, a consistent drag handle, flat tonal surface, scrim and content colors. Default ListItem surfaces match their enclosing sheet rather than painting separate rectangles. Explicit sheet states/insets for keyboard forms are preserved. Speed and track lists now scroll when the window is short or text is large. Purpose-specific selection and form controls retain their behavior.
+
+Validation is static only: changed call sites, syntax parsing (the parser's pre-existing AudioPlayerSurface limitation is unchanged) and git diff checks. Per the user's request, no Gradle invocation, compilation, APK build, emulator test or workflow dispatch was performed. Runtime validation remains pending permission to build. This push uses [skip ci].

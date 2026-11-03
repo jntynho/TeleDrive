@@ -103,7 +103,7 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     CollectSnackbarMessages(viewModel.messages, snackbarHostState)
     CollectSnackbarMessages(uploads.messages, snackbarHostState)
-    if(showUploadSheet)androidx.compose.material3.ModalBottomSheet(onDismissRequest={showUploadSheet=false},sheetState=uploadSheetState){
+    if(showUploadSheet)com.infinity.drive.presentation.components.DriveBottomSheet(onDismissRequest={showUploadSheet=false},sheetState=uploadSheetState){
         Column(Modifier.fillMaxWidth().padding(horizontal=16.dp).padding(bottom=24.dp)){
             Text("Upload",style=MaterialTheme.typography.titleLarge,modifier=Modifier.padding(8.dp))
             androidx.compose.material3.ListItem(colors=androidx.compose.material3.ListItemDefaults.colors(containerColor=androidx.compose.ui.graphics.Color.Transparent),headlineContent={Text("Upload files")},leadingContent={Icon(DriveIcons.Description,null)},modifier=Modifier.clickable{

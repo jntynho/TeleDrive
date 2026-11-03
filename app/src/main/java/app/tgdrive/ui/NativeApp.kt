@@ -153,7 +153,7 @@ fun NativeApp(bundle: SessionBundle, pool: SessionPool, system: SystemActions,re
             }
         }
     }
-    if(accountSheet)ModalBottomSheet(onDismissRequest={accountSheet=false}){
+    if(accountSheet)com.infinity.drive.presentation.components.DriveBottomSheet(onDismissRequest={accountSheet=false}){
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
             Text("Your accounts",style=MaterialTheme.typography.headlineSmall)
             profiles.forEach { profile->DriveCard(onClick={pool.switch(profile.id);accountSheet=false},modifier=Modifier.fillMaxWidth().semantics{selected=profile.id==bundle.profile.id;role=Role.RadioButton}){
