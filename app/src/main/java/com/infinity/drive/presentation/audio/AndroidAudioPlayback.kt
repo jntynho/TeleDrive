@@ -43,6 +43,7 @@ class AndroidAudioPlayback(context:Context,private val resolver:PreviewContentRe
     private var sleepJob:Job?=null
     private var queue=emptyList<String>()
     private var requestedPlay=false
+    private var libraryContext:Pair<Long?,Boolean>?=null
     private val metadataSlots=Semaphore(2)
     private val metadataCache=object:LinkedHashMap<String,AudioMetadata>(128,.75f,true){
         override fun removeEldestEntry(eldest:MutableMap.MutableEntry<String,AudioMetadata>?)=size>128
@@ -87,6 +88,14 @@ class AndroidAudioPlayback(context:Context,private val resolver:PreviewContentRe
         scope.launch {
             val lyrics=withContext(Dispatchers.Default){streamedLyrics(metadata)}?:return@launch
             mutable.update{if(it.file?.id==track)it.copy(metadata=it.metadata.copy(lyrics=lyrics))else it}
+        }
+    }
+    override fun updateLibraryContext(chatId:Long?,signedIn:Boolean){
+        // Preference observers can resume off the UI thread; Media3 owns the main looper.
+        scope.launch {
+            val next=chatId to signedIn
+            if(libraryContext!=null&&libraryContext!=next)stop()
+            libraryContext=next
         }
     }
     override fun play(file:DriveFile){

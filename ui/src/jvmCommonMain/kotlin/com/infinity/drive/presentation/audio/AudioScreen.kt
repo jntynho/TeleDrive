@@ -43,12 +43,13 @@ fun AudioScreen(onOpenFile:(String,PreviewSequence)->Unit,viewModel:AudioViewMod
     var lastScope by rememberSaveable{mutableStateOf(scopeKey)}
     LaunchedEffect(scopeKey){if(lastScope!=scopeKey){listState.scrollToItem(0);lastScope=scopeKey}}
 
-    Scaffold(topBar={Column{
+    val filters=com.infinity.drive.presentation.components.rememberCollapsingFilters(query to filter){listState.canScrollBackward}
+    Scaffold(modifier=filters.scrollModifier,topBar={Column{
         ExpandableLibraryHeader("Audio",query,viewModel::search,searching,{searching=it},"Search audio",actions={Box {
             IconButton({sorting=true}){Icon(DriveIcons.Sort,"Sort audio",Modifier.size(24.dp))}
             SortMenu(sorting,prefs.audioSortField,prefs.audioSortDirection,{sorting=false},{field,direction->sorting=false;viewModel.sort(field,direction)},fields=listOf(FileSortField.NAME,FileSortField.DATE_ADDED,FileSortField.DATE_MODIFIED,FileSortField.SIZE))
         }})
-        androidx.compose.animation.AnimatedVisibility(!listState.canScrollBackward,enter=androidx.compose.animation.fadeIn()+androidx.compose.animation.expandVertically(),exit=androidx.compose.animation.fadeOut()+androidx.compose.animation.shrinkVertically()){
+        androidx.compose.animation.AnimatedVisibility(filters.visible,enter=androidx.compose.animation.fadeIn()+androidx.compose.animation.expandVertically(),exit=androidx.compose.animation.fadeOut()+androidx.compose.animation.shrinkVertically()){
             LibraryFilters(listOf("All","Favorites","On device"),filter.ordinal,{viewModel.filter(AudioFilter.entries[it])})
         }
     }}){padding->

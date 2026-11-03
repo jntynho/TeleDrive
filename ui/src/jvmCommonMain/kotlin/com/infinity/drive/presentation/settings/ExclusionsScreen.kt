@@ -33,6 +33,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import com.infinity.drive.presentation.components.PageHeader
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -168,9 +171,10 @@ fun ExclusionsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Switch(
+                    app.tgdrive.ui.DriveSwitch(
                         checked = exclusion.enabled,
-                        onCheckedChange = { viewModel.setEnabled(exclusion.id, it) }
+                        onCheckedChange = { viewModel.setEnabled(exclusion.id, it) },
+                        modifier=Modifier.semantics{contentDescription="Enable exclusion ${exclusion.value}"}
                     )
                     IconButton(onClick = { exclusionToRemove = exclusion }) {
                         Icon(
@@ -214,7 +218,7 @@ private fun AddExclusionDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(Res.string.settings_add_exclusion)) },
         text = {
-            Column {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -312,7 +316,7 @@ private fun AddExclusionDialog(
                     onAdd(type, if (type == ExclusionType.HIDDEN) "." else value.trim())
                 },
                 shapes = ButtonDefaults.shapes(),
-                enabled = type == ExclusionType.HIDDEN || value.isNotBlank()
+                enabled = type == ExclusionType.HIDDEN || (value.isNotBlank() && (type != ExclusionType.MAX_SIZE || (value.trim().toLongOrNull() ?: 0L) > 0L))
             ) { Text(stringResource(Res.string.settings_add)) }
         },
         dismissButton = {

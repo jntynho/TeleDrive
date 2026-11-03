@@ -46,7 +46,8 @@ fun ZoomableImage(model:Any,contentDescription:String?,modifier:Modifier=Modifie
     DisposableEffect(model){onDispose{animation?.cancel();zoomChanged(false)}}
     if(failed){
         LaunchedEffect(model){animation?.cancel();scale=1f;offset=Offset.Zero;zoomChanged(false)}
-        EmptyState(DriveIcons.BrokenImage,stringResource(Res.string.preview_image_undecodable),modifier=modifier);return}
+        EmptyState(DriveIcons.BrokenImage,stringResource(Res.string.preview_image_undecodable),modifier=modifier,
+            actionLabel="Retry",onAction={failed=false});return}
     Box(modifier.fillMaxSize().clipToBounds().onSizeChanged{viewport=it;offset=clamp(offset,scale)}
         .pointerInput(model){detectTapGestures(onTap={tap()},onDoubleTap={point->
             animation?.cancel()

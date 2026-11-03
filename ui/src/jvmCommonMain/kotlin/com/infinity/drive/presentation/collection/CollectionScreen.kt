@@ -219,6 +219,9 @@ fun CollectionScreen(
                     modifier = Modifier.animateItem()
                 )
             }
+            if(files.loadState.append is androidx.paging.LoadState.Error){
+                item("collection-load-retry"){com.infinity.drive.presentation.components.PagingRetryRow{files.retry()}}
+            }
         }
     }
 }

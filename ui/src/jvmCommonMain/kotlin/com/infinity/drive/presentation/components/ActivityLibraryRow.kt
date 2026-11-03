@@ -29,7 +29,7 @@ fun ActivityLibraryRow(
         .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer)) {
         Row(Modifier.fillMaxWidth().semantics { this.selected = selected }
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(start = 14.dp + (indent * 20).dp, end = 14.dp, top = 14.dp, bottom = 14.dp),
+            .padding(start = 14.dp + (indent.coerceIn(0, 3) * 12).dp, end = 14.dp, top = 14.dp, bottom = 14.dp),
             verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(52.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest),
                 contentAlignment = Alignment.Center) {

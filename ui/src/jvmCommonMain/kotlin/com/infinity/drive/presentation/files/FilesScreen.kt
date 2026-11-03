@@ -88,6 +88,7 @@ import com.infinity.drive.presentation.components.FolderInfoSheet
 import com.infinity.drive.presentation.components.FolderPickerDialog
 import com.infinity.drive.presentation.components.FolderRow
 import com.infinity.drive.presentation.components.LoadingState
+import com.infinity.drive.presentation.components.PagingRetryRow
 import com.infinity.drive.presentation.components.RefreshAction
 import com.infinity.drive.presentation.components.RenameDialog
 import com.infinity.drive.presentation.components.liftedTopAppBarColors
@@ -529,6 +530,8 @@ fun FilesScreen(
                     ) {
                         if (isLoading) {
                             LoadingState()
+                        } else if (files.loadState.refresh is androidx.paging.LoadState.Error && files.itemCount==0 && state.folders.isEmpty()) {
+                            com.infinity.drive.presentation.components.ErrorState("Couldn't load this folder.",onRetry={files.retry()})
                         } else if (isEmpty) {
                             EmptyState(
                                 icon = DriveIcons.FolderOff,
@@ -889,6 +892,9 @@ private fun FilesContent(
                     modifier = Modifier.animateItem()
                 )
             }
+        }
+        if(files.loadState.append is androidx.paging.LoadState.Error || files.loadState.refresh is androidx.paging.LoadState.Error){
+            item(key="file-load-retry",span={GridItemSpan(maxLineSpan)}){PagingRetryRow{files.retry()}}
         }
     }
 }

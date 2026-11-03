@@ -82,7 +82,7 @@ data class GalleryUiState(
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class GalleryViewModel(
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
     private val fileRepository: FileRepository,
     private val trashRepository: TrashRepository,
     private val transferRepository: TransferRepository,
@@ -97,11 +97,13 @@ class GalleryViewModel(
     private val albumFolderId: String? = route?.folderId
     private val isAlbumView: Boolean = route != null
 
-    private val tab = MutableStateFlow(GalleryTab.ALL)
-    val query = MutableStateFlow("")
-    fun setQuery(value:String) { query.value=value;clearSelection() }
+    private val tab = MutableStateFlow(runCatching{GalleryTab.valueOf(savedStateHandle.get<String>("gallery-tab")?:"ALL")}.getOrDefault(GalleryTab.ALL))
+    val query = MutableStateFlow(savedStateHandle.get<String>("gallery-query").orEmpty())
+    fun setQuery(value:String) { if(query.value==value)return;query.value=value;savedStateHandle["gallery-query"]=value;listPosition.remember(0,0);clearSelection() }
 
-    private val sort = MutableStateFlow(FileSortField.DATE_MODIFIED to SortDirection.DESCENDING)
+    private val sort = MutableStateFlow(
+        runCatching{FileSortField.valueOf(savedStateHandle.get<String>("gallery-sort")?:"DATE_MODIFIED")}.getOrDefault(FileSortField.DATE_MODIFIED) to
+        runCatching{SortDirection.valueOf(savedStateHandle.get<String>("gallery-direction")?:"DESCENDING")}.getOrDefault(SortDirection.DESCENDING))
 
     val listPosition = ListPosition(savedStateHandle)
 
@@ -239,12 +241,16 @@ class GalleryViewModel(
 
 
     fun setTab(value: GalleryTab) {
-        clearSelection()
+        if(tab.value==value)return
+        clearSelection();listPosition.remember(0,0)
+        savedStateHandle["gallery-tab"]=value.name
         tab.update { value }
     }
-
-    fun setSort(field: FileSortField, direction: SortDirection) =
-        sort.update { field to direction }
+    fun setSort(field: FileSortField, direction: SortDirection) {
+        if(sort.value==field to direction)return
+        savedStateHandle["gallery-sort"]=field.name;savedStateHandle["gallery-direction"]=direction.name
+        listPosition.remember(0,0);sort.value=field to direction
+    }
 
     fun zoomIn() = applyZoom(GridZoomLevel::zoomedIn)
 

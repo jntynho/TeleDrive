@@ -12,6 +12,9 @@ import com.infinity.drive.domain.repository.TransferRepository
 import com.infinity.drive.presentation.common.UiText
 import com.infinity.drive.presentation.common.toUiText
 import com.infinity.drive.presentation.navigation.Route
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,7 +28,9 @@ data class NoteEditorUiState(
     val body: String = "",
     val loading: Boolean = true,
     val saving: Boolean = false,
-    val isNew: Boolean = true
+    val isNew: Boolean = true,
+    val dirty: Boolean = false,
+    val loadError: String? = null
 )
 
 class NoteEditorViewModel(
@@ -42,57 +47,65 @@ class NoteEditorViewModel(
     private val _messages = MutableSharedFlow<UiText>(extraBufferCapacity = 2)
     val messages = _messages.asSharedFlow()
 
-    private val _saved = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    val saved = _saved.asSharedFlow()
+    private val _saved = Channel<Unit>(Channel.CONFLATED)
+    val saved = _saved.receiveAsFlow()
+    private var editingFileId = route.fileId
+    private var initialTitle = ""
+    private var initialBody = ""
 
     init {
         val fileId = route.fileId
         if (fileId == null) {
-            _uiState.update { it.copy(body = route.sharedText.orEmpty(), loading = false) }
+            _uiState.update { it.copy(body = route.sharedText.orEmpty(), loading = false, dirty = !route.sharedText.isNullOrBlank()) }
         } else {
             viewModelScope.launch { load(fileId) }
         }
     }
 
     private suspend fun load(fileId: String) {
-        when (val result = fileRepository.readNote(fileId)) {
-            is AppResult.Success -> _uiState.update {
-                it.copy(title = route.title.orEmpty(), body = result.value, loading = false)
-            }
-
-            is AppResult.Failure -> {
-                _messages.tryEmit(result.error.toUiText())
-                _uiState.update { it.copy(loading = false) }
-            }
-        }
-    }
-
-    fun setTitle(value: String) = _uiState.update { it.copy(title = value) }
-
-    fun setBody(value: String) = _uiState.update { it.copy(body = value) }
-
-    fun save() {
-        val state = _uiState.value
-        if (state.saving || state.body.isBlank()) return
-        _uiState.update { it.copy(saving = true) }
-        viewModelScope.launch {
-            val result = fileRepository.saveNote(
-                fileId = route.fileId,
-                folderId = route.folderId,
-                title = state.title.trim(),
-                body = state.body.trim()
-            )
-            when (result) {
+        try {
+            when (val result = fileRepository.readNote(fileId)) {
                 is AppResult.Success -> {
-                    transferRepository.enqueueUpload(result.value)
-                    _messages.tryEmit(UiText.Resource(Res.string.note_saved))
-                    _saved.tryEmit(Unit)
+                    initialTitle=route.title.orEmpty();initialBody=result.value
+                    _uiState.update{it.copy(title=initialTitle,body=initialBody,loading=false,dirty=false,loadError=null)}
                 }
-
-                is AppResult.Failure -> {
-                    _messages.tryEmit(result.error.toUiText())
-                    _uiState.update { it.copy(saving = false) }
+                is AppResult.Failure -> _uiState.update{it.copy(loading=false,loadError="Couldn't open this note. Your original file is unchanged.")}
+            }
+        }catch(cancel:CancellationException){throw cancel}
+        catch(_:Exception){_uiState.update{it.copy(loading=false,loadError="Couldn't open this note. Try again.")}}
+    }
+    fun retryLoad(){
+        val id=editingFileId?:return
+        if(_uiState.value.loading)return
+        _uiState.update{it.copy(loading=true,loadError=null)}
+        viewModelScope.launch{load(id)}
+    }
+    fun setTitle(value:String){_uiState.update{it.copy(title=value,dirty=value!=initialTitle||it.body!=initialBody)}}
+    fun setBody(value:String){_uiState.update{it.copy(body=value,dirty=it.title!=initialTitle||value!=initialBody)}}
+    fun save(){
+        val state=_uiState.value
+        if(state.saving||state.loading||state.loadError!=null||state.body.isBlank()||(!state.dirty&&!state.isNew))return
+        _uiState.update{it.copy(saving=true)}
+        viewModelScope.launch{
+            try {
+                when(val result=fileRepository.saveNote(editingFileId,route.folderId,state.title.trim(),state.body)){
+                    is AppResult.Success->{
+                        editingFileId=result.value
+                        initialTitle=state.title;initialBody=state.body
+                        _uiState.update{it.copy(isNew=false,dirty=false)}
+                        val queued=transferRepository.enqueueUpload(result.value)
+                        _uiState.update{it.copy(saving=false)}
+                        when(queued){
+                            is AppResult.Success->{_messages.tryEmit(UiText.Resource(Res.string.note_saved));_saved.trySend(Unit)}
+                            is AppResult.Failure->_messages.tryEmit(UiText.Plain("Saved on this device. Upload couldn't be queued; retry from the file's options."))
+                        }
+                    }
+                    is AppResult.Failure->{_uiState.update{it.copy(saving=false)};_messages.tryEmit(result.error.toUiText())}
                 }
+            }catch(cancel:CancellationException){throw cancel}
+            catch(_:Exception){
+                _uiState.update{it.copy(saving=false)}
+                _messages.tryEmit(UiText.Plain(if(editingFileId!=null&&!_uiState.value.dirty)"Saved locally, but upload couldn't be queued."else"Couldn't save this note. Your draft is still here."))
             }
         }
     }

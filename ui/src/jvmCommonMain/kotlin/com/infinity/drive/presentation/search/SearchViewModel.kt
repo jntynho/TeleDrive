@@ -2,26 +2,12 @@ package com.infinity.drive.presentation.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.infinity.drive.domain.model.FileQuerySpec
-import com.infinity.drive.domain.model.DriveFile
-import com.infinity.drive.domain.model.DriveFolder
-import com.infinity.drive.domain.model.FileCategory
-import com.infinity.drive.domain.model.FileSortField
-import com.infinity.drive.domain.model.SortDirection
+import com.infinity.drive.domain.model.*
 import com.infinity.drive.domain.repository.FileRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlin.time.Duration.Companion.milliseconds
 
 data class SearchFilters(
@@ -31,105 +17,64 @@ data class SearchFilters(
     val minSizeMb: Int? = null,
     val sortField: FileSortField = FileSortField.DATE_MODIFIED,
     val sortDirection: SortDirection = SortDirection.DESCENDING
-)
+) {
+    fun hasCriteria() = category != null || backedUpOnly || notBackedUpOnly || minSizeMb != null
+}
 
 data class SearchUiState(
-    val query: String = "",
-    val filters: SearchFilters = SearchFilters(),
-    val results: List<DriveFile> = emptyList(),
-    val folders: List<DriveFolder> = emptyList(),
-    val searching: Boolean = false,
-    val searched: Boolean = false
+    val query: String = "", val filters: SearchFilters = SearchFilters(),
+    val results: List<DriveFile> = emptyList(), val folders: List<DriveFolder> = emptyList(),
+    val searching: Boolean = false, val searched: Boolean = false, val error: String? = null
 )
 
-/**
- * Local-metadata search with debounced input. No remote calls happen while
- * typing; everything queries the Room index.
- */
-@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
-class SearchViewModel(
-    private val fileRepository: FileRepository
-) : ViewModel() {
+private data class SearchRequest(val text: String, val filters: SearchFilters, val retry: Int) {
+    val active get() = text.isNotBlank() || filters.hasCriteria()
+}
+private data class SearchSnapshot(val request: SearchRequest? = null,
+    val files: List<DriveFile> = emptyList(), val folders: List<DriveFolder> = emptyList(),
+    val loading: Boolean = false, val error: String? = null)
 
+/** One cancellable request owns both result types, loading and error; stale results never escape. */
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
+class SearchViewModel(private val fileRepository: FileRepository) : ViewModel() {
     private val query = MutableStateFlow("")
     private val filters = MutableStateFlow(SearchFilters())
-    private val searching = MutableStateFlow(false)
-
-    private val results = combine(
-        query.debounce(250.milliseconds).distinctUntilChanged(),
-        filters
-    ) { text, filterValues -> text to filterValues }
-        .flatMapLatest { (text, filterValues) ->
-            if (text.isBlank() && filterValues.category == null &&
-                !filterValues.backedUpOnly && !filterValues.notBackedUpOnly &&
-                filterValues.minSizeMb == null
-            ) {
-                flowOf(emptyList())
-            } else {
-                searching.update { true }
-                fileRepository.observeFiles(
-                    FileQuerySpec(
-                        nameQuery = text.takeIf { it.isNotBlank() },
-                        categories = filterValues.category?.let { listOf(it) } ?: emptyList(),
-                        backedUpOnly = filterValues.backedUpOnly,
-                        notBackedUpOnly = filterValues.notBackedUpOnly,
-                        minSizeBytes = filterValues.minSizeMb?.let { it.toLong() * 1024 * 1024 },
-                        sortField = filterValues.sortField,
-                        sortDirection = filterValues.sortDirection
-                    )
-                ).map { list ->
-                    searching.update { false }
-                    list.take(500)
-                }
+    private val retry = MutableStateFlow(0)
+    private val results = combine(query, filters, retry) { text, filter, revision -> SearchRequest(text.trim(), filter, revision) }
+        .distinctUntilChanged().debounce(250.milliseconds)
+        .flatMapLatest { request ->
+            if (!request.active) flowOf(SearchSnapshot(request))
+            else {
+                flow {
+                val filter=request.filters
+                val files=fileRepository.observeFiles(FileQuerySpec(
+                    nameQuery=request.text.takeIf(String::isNotBlank),
+                    categories=filter.category?.let{listOf(it)}.orEmpty(),
+                    backedUpOnly=filter.backedUpOnly,notBackedUpOnly=filter.notBackedUpOnly,
+                    minSizeBytes=filter.minSizeMb?.toLong()?.times(1024*1024),
+                    sortField=filter.sortField,sortDirection=filter.sortDirection))
+                val folders=if(request.text.isBlank()||filter.hasCriteria())flowOf(emptyList())
+                    else fileRepository.searchFolders(request.text)
+                emitAll(combine(files,folders){fileRows,folderRows->SearchSnapshot(request,fileRows.take(500),folderRows.take(500))})
+                }.onStart{emit(SearchSnapshot(request,loading=true))}
+                    .catch { error ->
+                        if(error is CancellationException)throw error
+                        emit(SearchSnapshot(request,error="Couldn't search your library. Try again."))
+                    }
             }
-        }
-
-    private val folderResults = combine(
-        query.debounce(250.milliseconds).distinctUntilChanged(),
-        filters
-    ) { text, filterValues -> text to filterValues }
-        .flatMapLatest { (text, filterValues) ->
-            val fileOnlyFilterActive = filterValues.category != null ||
-                    filterValues.backedUpOnly ||
-                    filterValues.notBackedUpOnly ||
-                    filterValues.minSizeMb != null
-            if (text.isBlank() || fileOnlyFilterActive) {
-                flowOf(emptyList())
-            } else {
-                fileRepository.searchFolders(text)
-            }
-        }
-
-    val uiState: StateFlow<SearchUiState> = combine(
-        query,
-        filters,
-        results,
-        searching,
-        folderResults
-    ) { text, filterValues, resultList, isSearching, folderList ->
-        SearchUiState(
-            query = text,
-            filters = filterValues,
-            results = resultList,
-            folders = folderList,
-            searching = isSearching,
-            searched = text.isNotBlank() || filterValues != SearchFilters()
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SearchUiState())
-
-    fun setQuery(value: String) = query.update { value }
-
-    fun setCategory(category: FileCategory?) = filters.update { it.copy(category = category) }
-
-    fun setBackedUpOnly(value: Boolean) = filters.update {
-        it.copy(backedUpOnly = value, notBackedUpOnly = if (value) false else it.notBackedUpOnly)
-    }
-
-    fun setNotBackedUpOnly(value: Boolean) = filters.update {
-        it.copy(notBackedUpOnly = value, backedUpOnly = if (value) false else it.backedUpOnly)
-    }
-
-    fun setSort(field: FileSortField, direction: SortDirection) = filters.update {
-        it.copy(sortField = field, sortDirection = direction)
-    }
+        }.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5_000),SearchSnapshot())
+    val uiState: StateFlow<SearchUiState> = combine(query,filters,retry,results){text,filter,revision,snapshot->
+        val request=SearchRequest(text.trim(),filter,revision)
+        val current=request==snapshot.request
+        SearchUiState(query=text,filters=filter,
+            results=if(current)snapshot.files else emptyList(),folders=if(current)snapshot.folders else emptyList(),
+            searching=request.active&&(!current||snapshot.loading),searched=request.active,
+            error=if(current)snapshot.error else null)
+    }.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5_000),SearchUiState())
+    fun setQuery(value:String){query.value=value}
+    fun retry(){retry.update{it+1}}
+    fun setCategory(category:FileCategory?){filters.update{it.copy(category=category)}}
+    fun setBackedUpOnly(value:Boolean){filters.update{it.copy(backedUpOnly=value,notBackedUpOnly=if(value)false else it.notBackedUpOnly)}}
+    fun setNotBackedUpOnly(value:Boolean){filters.update{it.copy(notBackedUpOnly=value,backedUpOnly=if(value)false else it.backedUpOnly)}}
+    fun setSort(field:FileSortField,direction:SortDirection){filters.update{it.copy(sortField=field,sortDirection=direction)}}
 }

@@ -253,6 +253,7 @@ fun PreviewScreen(
         }
     }
 
+    WithVideoOrientation {
     Scaffold(
         contentWindowInsets = WindowInsets(0),
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -296,12 +297,12 @@ fun PreviewScreen(
 
             AnimatedVisibility(
                 visible = chromeShown,
-                enter = slideInVertically { height -> -height } + fadeIn(),
-                exit = slideOutVertically { height -> -height } + fadeOut(),
+                enter = fadeIn(tween(160)),
+                exit = fadeOut(tween(120)),
                 modifier = Modifier.align(Alignment.TopCenter).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(if(immersive)androidx.compose.ui.graphics.Color.Black.copy(alpha=.65f)else androidx.compose.ui.graphics.Color.Transparent,androidx.compose.ui.graphics.Color.Transparent)))
             ) {
                 TopAppBar(
-                    expandedHeight=if(currentFile.category==FileCategory.AUDIO)com.infinity.drive.presentation.audio.audioHeaderHeight() else 52.dp,
+                    expandedHeight=if(currentFile.category==FileCategory.AUDIO)com.infinity.drive.presentation.audio.audioHeaderHeight() else maxOf(52.dp,(28*androidx.compose.ui.platform.LocalDensity.current.fontScale).dp),
                     title = {
                         if(currentFile.category==FileCategory.AUDIO){
                             com.infinity.drive.presentation.audio.AudioNowPlayingTitle(currentFile)
@@ -453,6 +454,7 @@ fun PreviewScreen(
                 )
             }
         }
+    }
     }
 
     renameTarget?.let { file ->

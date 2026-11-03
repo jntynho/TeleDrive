@@ -320,28 +320,22 @@ private fun AccountSection(
     onLogout: () -> Unit
 ) {
     val indexedSoFar by viewModel.indexedSoFar.collectAsStateWithLifecycle()
+    val authorization by viewModel.authorization.collectAsStateWithLifecycle()
 
     SettingsGroup {
         add {
             androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(20.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
-                if(state.user?.photoPath!=null)coil3.compose.AsyncImage(state.user?.photoPath,"Telegram profile photo",Modifier.size(56.dp).then(Modifier.clip(androidx.compose.foundation.shape.CircleShape)),contentScale=androidx.compose.ui.layout.ContentScale.Crop)
-                else Icon(DriveIcons.AccountCircle,null,Modifier.size(56.dp),tint=MaterialTheme.colorScheme.primary)
-                Column(Modifier.padding(start=16.dp)){
-                    Text(state.user?.let{listOf(it.firstName,it.lastName).filter(String::isNotBlank).joinToString(" ")}?:"Telegram account",style=MaterialTheme.typography.titleLarge)
-                    Text(state.user?.username?.let{"@$it"}?:"Your personal cloud",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                com.infinity.drive.presentation.components.TelegramProfileAvatar(state.user?.photoPath,Modifier.size(56.dp))
+                Column(Modifier.weight(1f).padding(start=16.dp)){
+                    Text(state.user?.let{listOf(it.firstName,it.lastName).filter(String::isNotBlank).joinToString(" ")}?.takeIf(String::isNotBlank)?:"Telegram account",style=MaterialTheme.typography.titleLarge,maxLines=2,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Text(state.user?.username?.takeIf(String::isNotBlank)?.let{"@$it"}?:"Your personal cloud",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 }
             }
         }
         add { Text(buildString {
-                    state.user?.phoneNumber?.let { append("+$it · ") }
+                    state.user?.phoneNumber?.let { append("+${it.trimStart('+')} · ") }
                     append(
-                        when (state.connection) {
-                            TelegramConnectionState.READY -> stringResource(Res.string.settings_state_connected)
-                            TelegramConnectionState.UPDATING -> stringResource(Res.string.settings_state_syncing)
-                            TelegramConnectionState.CONNECTING -> stringResource(Res.string.settings_state_connecting)
-                            TelegramConnectionState.WAITING_FOR_NETWORK ->
-                                stringResource(Res.string.settings_state_waiting_network)
-                        }
+                        accountConnectionLabel(authorization,state.connection)
                     )
                     if (state.user?.isPremium == true) append(" · Premium (4 GB uploads)")
                 },style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(20.dp)) }
@@ -358,6 +352,7 @@ private fun AccountSection(
                     else -> stringResource(Res.string.settings_restores_file_list)
                 },
                 onClick = { if (!state.syncing) viewModel.resync() },
+                enabled = !state.syncing,
                 trailing = if (state.syncing) {
                     { LoadingIndicator(modifier = Modifier.size(24.dp)) }
                 } else null

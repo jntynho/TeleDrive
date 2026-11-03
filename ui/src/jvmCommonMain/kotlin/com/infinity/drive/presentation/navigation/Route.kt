@@ -39,6 +39,9 @@ sealed interface Route {
         val localCopiesOnly: Boolean = false,
         val hiddenOnly: Boolean = false,
         val archivedOnly: Boolean = false,
+        val backedUpOnly: Boolean = false,
+        val notBackedUpOnly: Boolean = false,
+        val minSizeBytes: Long? = null,
         val sortField: String? = null,
         val sortDescending: Boolean = false
     ) : Route

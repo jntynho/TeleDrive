@@ -554,7 +554,7 @@ private fun CredentialsStep(
     onSubmit: (String, String) -> Unit
 ) {
     var apiId by rememberSaveable { mutableStateOf("") }
-    var apiHash by rememberSaveable { mutableStateOf("") }
+    var apiHash by remember { mutableStateOf("") }
     var showGuide by rememberSaveable { mutableStateOf(false) }
 
     OnboardingPage(
@@ -1168,7 +1168,7 @@ private fun EmailCodeStep(
     codeLength: Int?,
     onSubmit: (String) -> Unit
 ) {
-    var code by rememberSaveable { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
     OnboardingPage(
         icon = DriveIcons.Email,
         title = stringResource(Res.string.onboarding_email_code_title),
@@ -1205,7 +1205,7 @@ private fun CodeStep(
     onSubmit: (String) -> Unit,
     onResend: () -> Unit
 ) {
-    var code by rememberSaveable { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
     OnboardingPage(
         icon = DriveIcons.Sms,
         title = stringResource(Res.string.onboarding_enter_code),
@@ -1244,7 +1244,7 @@ private fun PasswordStep(
     hint: String?,
     onSubmit: (String) -> Unit
 ) {
-    var password by rememberSaveable { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     OnboardingPage(
         icon = DriveIcons.Lock,
         title = stringResource(Res.string.onboarding_two_step_verification),

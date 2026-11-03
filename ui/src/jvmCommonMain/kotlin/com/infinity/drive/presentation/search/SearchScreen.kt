@@ -5,6 +5,8 @@ import com.infinity.drive.presentation.components.resultReveal
 import app.tgdrive.ui.DriveIcons
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -67,7 +69,8 @@ fun SearchScreen(
     val listState = rememberLazyListState()
     val lifted by rememberToolbarLift(listState)
 
-    Scaffold(modifier=modifier,contentWindowInsets=if(showHeader)androidx.compose.material3.ScaffoldDefaults.contentWindowInsets else androidx.compose.foundation.layout.WindowInsets(0),
+    val keyboardVisible=androidx.compose.foundation.layout.WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current)>0
+    Scaffold(modifier=modifier.imePadding(),contentWindowInsets=if(showHeader)androidx.compose.material3.ScaffoldDefaults.contentWindowInsets else androidx.compose.foundation.layout.WindowInsets(0),
         topBar = {
             if(showHeader)app.tgdrive.ui.ExpandableLibraryHeader(
                 title="Search",query=state.query,onQueryChange=viewModel::setQuery,
@@ -112,6 +115,7 @@ fun SearchScreen(
 
             when {
                 state.searching -> LoadingState()
+                state.error != null -> com.infinity.drive.presentation.components.ErrorState(state.error!!, onRetry = viewModel::retry)
                 !state.searched -> EmptyState(
                     icon = DriveIcons.Search,
                     title = stringResource(Res.string.app_search_drive),
@@ -131,7 +135,7 @@ fun SearchScreen(
                         start = 12.dp,
                         end = 12.dp,
                         top = 12.dp,
-                        bottom = 12.dp + padding.calculateBottomPadding()+com.infinity.drive.presentation.navigation.LocalBottomBarInset.current
+                        bottom = 12.dp + padding.calculateBottomPadding()+if(keyboardVisible)0.dp else com.infinity.drive.presentation.navigation.LocalBottomBarInset.current
                     )
                 ) {
                     if (state.folders.isNotEmpty()) {
@@ -170,6 +174,9 @@ fun SearchScreen(
                                         categories = state.filters.category
                                             ?.let { category -> listOf(category) }
                                             .orEmpty(),
+                                        backedUpOnly = state.filters.backedUpOnly,
+                                        notBackedUpOnly = state.filters.notBackedUpOnly,
+                                        minSizeBytes = state.filters.minSizeMb?.toLong()?.times(1024*1024),
                                         sortField = state.filters.sortField,
                                         sortDirection = state.filters.sortDirection
                                     )

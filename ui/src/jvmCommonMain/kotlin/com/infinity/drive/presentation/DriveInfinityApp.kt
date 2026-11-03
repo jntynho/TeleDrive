@@ -148,18 +148,13 @@ fun DriveInfinityApp(
         }
     }
 
-    val systemDefault = remember { java.util.Locale.getDefault() }
-    remember(state.language) {
-        java.util.Locale.setDefault(
-            when (state.language) {
-                AppLanguage.SYSTEM -> systemDefault
-                AppLanguage.ENGLISH -> java.util.Locale.forLanguageTag("en")
-                AppLanguage.RUSSIAN -> java.util.Locale.forLanguageTag("ru")
-                AppLanguage.PORTUGUESE_BR -> java.util.Locale.forLanguageTag("pt-BR")
-            }
-        )
-        true
+    DisposableEffect(targetLocaleList){
+        val previous=java.util.Locale.getDefault()
+        java.util.Locale.setDefault(java.util.Locale.forLanguageTag(targetLocaleList[0].toLanguageTag()))
+        onDispose{java.util.Locale.setDefault(previous)}
     }
+    val navigationState=androidx.compose.runtime.saveable.rememberSaveableStateHolder()
+    LaunchedEffect(state.loading,state.onboardingComplete){if(!state.loading&&!state.onboardingComplete)navigationState.removeState("library")}
 
     DriveInfinityTheme(
         darkTheme = darkTheme,
@@ -180,7 +175,8 @@ fun DriveInfinityApp(
             when {
                 state.loading -> Unit
                 state.locked -> LockScreen(onUnlocked = viewModel::unlock)
-                else -> MainScaffold(
+                else -> navigationState.SaveableStateProvider(if(state.onboardingComplete)"library"else"sign-in") {
+                MainScaffold(
                     pendingShare = pendingShare,
                     onboardingComplete = state.onboardingComplete,
                     notificationDestination = notificationDestination,
@@ -188,12 +184,13 @@ fun DriveInfinityApp(
                     onUpdateRequested = { viewModel.checkForUpdate(force = true) },
                     driveMissing = viewModel.driveMissing
                 )
+                }
             }
             }
             androidx.compose.animation.AnimatedVisibility(visibleState=warmup,enter=fadeIn(tween(200)),exit=fadeOut(tween(360))){com.infinity.drive.presentation.components.StartupSurface()}
             }
-            if(upgradeNotice!=null&&!state.loading&&!preparing)androidx.compose.material3.AlertDialog(onDismissRequest=viewModel::dismissUpgradeNotice,title={Text("Previous library preserved")},text={Text(upgradeNotice.orEmpty())},confirmButton={androidx.compose.material3.TextButton(viewModel::dismissUpgradeNotice){Text("Continue")}})
-            if (sessionBroken&&!preparing) {
+            if(upgradeNotice!=null&&!state.loading&&!state.locked&&!preparing)androidx.compose.material3.AlertDialog(onDismissRequest=viewModel::dismissUpgradeNotice,title={Text("Previous library preserved")},text={Text(upgradeNotice.orEmpty())},confirmButton={androidx.compose.material3.TextButton(viewModel::dismissUpgradeNotice){Text("Continue")}})
+            if (sessionBroken&&!state.locked&&!preparing) {
                 SessionBrokenDialog(onSignInAgain = viewModel::resetSession)
             }
             pendingUpdate?.takeIf { !state.loading && !state.locked&&!preparing }?.let { release ->
@@ -224,6 +221,9 @@ private fun MainScaffold(
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
+    val navigationFocus=androidx.compose.ui.platform.LocalFocusManager.current
+    val navigationKeyboard=androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    LaunchedEffect(backStackEntry?.id){navigationFocus.clearFocus();navigationKeyboard?.hide()}
     var requestedTab by remember { mutableStateOf<TopLevelDestination?>(null) }
     LaunchedEffect(requestedTab,backStackEntry) {
         val target=requestedTab ?: return@LaunchedEffect

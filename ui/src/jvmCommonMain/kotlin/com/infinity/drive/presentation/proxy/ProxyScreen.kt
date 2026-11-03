@@ -345,7 +345,7 @@ private fun RoutingCard(
                 }
             }
             Spacer(Modifier.width(16.dp))
-            Switch(checked = enabled, onCheckedChange = onChange)
+            app.tgdrive.ui.DriveSwitch(checked = enabled, onCheckedChange = onChange)
         }
     }
 }
@@ -613,6 +613,7 @@ private fun ProxyEditorSheet(
                     if (mtproto) {
                         OutlinedTextField(
                             value = secret,
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                             onValueChange = { secret = it.trim() },
                             label = { Text(stringResource(Res.string.proxy_secret)) },
                             singleLine = true,
@@ -629,6 +630,7 @@ private fun ProxyEditorSheet(
                         Spacer(Modifier.height(12.dp))
                         OutlinedTextField(
                             value = password,
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                             onValueChange = { password = it },
                             label = { Text(stringResource(Res.string.proxy_password_optional)) },
                             singleLine = true,

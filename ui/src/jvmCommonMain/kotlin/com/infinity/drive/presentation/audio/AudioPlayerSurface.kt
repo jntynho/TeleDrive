@@ -39,6 +39,7 @@ fun LibraryAudioMiniPlayer(){
     val state by player.state.collectAsStateWithLifecycle()
     var last by remember{mutableStateOf(AudioPlaybackState())}
     var expanded by rememberSaveable{mutableStateOf(false)}
+    LaunchedEffect(state.file?.id){if(state.file==null)expanded=false}
     LaunchedEffect(state.file,state.metadata){if(state.file!=null)last=state}
     AnimatedVisibility(state.file!=null,enter=expandVertically(tween(260))+fadeIn(tween(220)),exit=shrinkVertically(tween(200))+fadeOut(tween(160))){
         val current=if(state.file!=null)state else last
@@ -226,10 +227,18 @@ private fun NowPlayingContent(file:DriveFile,onStop:()->Unit,modifier:Modifier=M
     if(showInfo)com.infinity.drive.presentation.components.FileInfoSheet(file,{showInfo=false})
     if(showQueue){
         var queue by remember{mutableStateOf<List<DriveFile>?>(null)}
-        LaunchedEffect(playback.file?.id){queue=player.queuedFiles()}
+        var queueError by remember{mutableStateOf<String?>(null)}
+        var queueRevision by remember{mutableIntStateOf(0)}
+        LaunchedEffect(playback.file?.id,queueRevision){
+            queue=null;queueError=null
+            try{queue=player.queuedFiles()}
+            catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}
+            catch(_:Exception){queueError="Couldn't load the play queue."}
+        }
         ModalBottomSheet(onDismissRequest={showQueue=false}){
             Text("Play queue",Modifier.padding(24.dp),style=MaterialTheme.typography.titleLarge)
-            if(queue==null)LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal=24.dp))
+            if(queueError!=null)Column(Modifier.padding(24.dp)){Text(queueError!!);TextButton({queueRevision++}){Text("Retry")}}
+            else if(queue==null)LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal=24.dp))
             else if(queue!!.isEmpty())Text("No other tracks in this queue",Modifier.padding(24.dp))
             else LazyColumn(Modifier.fillMaxWidth().heightIn(max=420.dp)){
                 items(queue!!,key={it.id}){track->

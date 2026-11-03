@@ -5,6 +5,10 @@ object FileNameUtils {
 
     private val invalidChars = Regex("[\\\\/:*?\"<>|\\x00-\\x1F]")
 
+    fun isValidName(name: String): Boolean = name.trim().let {
+        it.isNotEmpty() && it != "." && it != ".." && it.length <= 180 && !invalidChars.containsMatchIn(it)
+    }
+
     fun sanitize(name: String): String =
         invalidChars.replace(name.trim(), "_").take(180).takeUnless { it.isEmpty() || it=="." || it==".." } ?: "unnamed"
 

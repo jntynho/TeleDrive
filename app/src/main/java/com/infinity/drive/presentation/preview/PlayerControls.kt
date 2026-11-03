@@ -41,6 +41,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -104,6 +105,7 @@ fun PlayerControls(
     onCycleResizeMode: () -> Unit,
     onInteraction: () -> Unit,
     onScrubbingChanged:(Boolean)->Unit={},
+    onOverlayChanged:(Boolean)->Unit={},
     onPreferredAudioLanguage: (String) -> Unit = {},
     onPreferredSubtitleLanguage: (String) -> Unit = {},
     modifier: Modifier = Modifier
@@ -123,7 +125,9 @@ fun PlayerControls(
     }
     var tracks by remember(player) { mutableStateOf(player.currentTracks) }
     var subtitlesOn by remember(player) { mutableStateOf(false) }
-    var rotation by remember { mutableStateOf(PlayerRotation.AUTO) }
+    val orientationOwner=LocalVideoOrientation.current
+    var fallbackRotation by rememberSaveable { mutableStateOf(PlayerRotation.AUTO) }
+    val rotation=orientationOwner?.rotation?.value?:fallbackRotation
     var expanded by remember { mutableStateOf(false) }
     var showSpeeds by remember { mutableStateOf(false) }
     var showAudioTracks by remember { mutableStateOf(false) }
@@ -179,12 +183,14 @@ fun PlayerControls(
         onDispose { player.removeListener(listener) }
     }
 
-    DisposableEffect(activity) {
-        val previous=activity?.requestedOrientation
+    val previousOrientation=rememberSaveable{activity?.requestedOrientation?:ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED}
+    DisposableEffect(activity,orientationOwner) {
         onDispose {
-            activity?.requestedOrientation = previous ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            if(orientationOwner==null&&activity!=null&&!activity.isChangingConfigurations)activity.requestedOrientation=previousOrientation
         }
     }
+    LaunchedEffect(showSpeeds,showAudioTracks,showTextTracks){onOverlayChanged(showSpeeds||showAudioTracks||showTextTracks)}
+    DisposableEffect(player){onDispose{onOverlayChanged(false)}}
 
     LaunchedEffect(player, visible, playing) {
         while (visible) {
@@ -251,8 +257,9 @@ fun PlayerControls(
                                 active = rotation != PlayerRotation.AUTO,
                                 onClick = {
                                     onInteraction()
-                                    rotation = rotation.next()
-                                    activity?.requestedOrientation = rotation.orientation
+                                    val next=rotation.next()
+                                    if(orientationOwner!=null)orientationOwner.select(next)
+                                    else{fallbackRotation=next;activity?.requestedOrientation=next.orientation}
                                 }
                             )
                             if (!audioOnly) {
@@ -671,7 +678,7 @@ enum class PlayerResizeMode(val icon: ImageVector, val description: String) {
 }
 
 /** Screen orientation while a video is open, cycled from the controls. */
-private enum class PlayerRotation(
+internal enum class PlayerRotation(
     val icon: ImageVector,
     val description: String,
     val orientation: Int

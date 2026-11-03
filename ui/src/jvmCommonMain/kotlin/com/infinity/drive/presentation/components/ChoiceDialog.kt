@@ -1,5 +1,8 @@
 package com.infinity.drive.presentation.components
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -38,11 +41,11 @@ fun <T> ChoiceDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 options.forEach { (value, label) ->
                     Row(
                         modifier = Modifier
-                            .fillMaxWidth()
+                            .fillMaxWidth().heightIn(min=48.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .selectable(
                                 selected = value == selected,

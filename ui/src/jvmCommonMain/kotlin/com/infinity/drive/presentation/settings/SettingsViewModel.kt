@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -140,11 +141,20 @@ class SettingsViewModel(
                 }
             }
         }
+        viewModelScope.launch {runCatching{cacheRepository.refreshStats()}}
         viewModelScope.launch {
-            cacheRepository.refreshStats()
-            when (val result = telegramAuthRepository.getCurrentUser()) {
-                is AppResult.Success -> user.value = result.value
-                is AppResult.Failure -> Unit
+            telegramAuthRepository.authState.collectLatest { authorization ->
+                when(authorization){
+                    com.infinity.drive.core.telegram.TelegramAuthState.Ready -> {
+                        when(val result=telegramAuthRepository.getCurrentUser()){
+                            is AppResult.Success->user.value=result.value
+                            is AppResult.Failure->Unit
+                        }
+                    }
+                    com.infinity.drive.core.telegram.TelegramAuthState.Closed,
+                    com.infinity.drive.core.telegram.TelegramAuthState.Uninitialized -> user.value=null
+                    else->Unit
+                }
             }
         }
     }

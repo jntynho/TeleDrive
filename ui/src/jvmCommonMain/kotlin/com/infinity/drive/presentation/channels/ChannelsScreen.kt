@@ -103,6 +103,9 @@ fun ChannelsScreen(
     viewModel: ChannelsViewModel = koinViewModel()
 ) {
     val channels by viewModel.channels.collectAsStateWithLifecycle()
+    val loading by viewModel.loading.collectAsStateWithLifecycle()
+    val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
+    val loadError by viewModel.error.collectAsStateWithLifecycle()
     val working by viewModel.working.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -170,7 +173,7 @@ fun ChannelsScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = viewModel::refresh) {
+                    IconButton(onClick = viewModel::refresh,enabled=!refreshing) {
                         Icon(
                             DriveIcons.Refresh,
                             contentDescription = stringResource(Res.string.channels_look_drives)
@@ -187,6 +190,12 @@ fun ChannelsScreen(
             )
         }
     ) { padding ->
+        if(channels.isEmpty()&&(loading||refreshing)){
+            com.infinity.drive.presentation.components.LoadingState(Modifier.padding(padding));return@Scaffold
+        }
+        if(channels.isEmpty()&&loadError!=null){
+            com.infinity.drive.presentation.components.ErrorState(loadError!!,Modifier.padding(padding),viewModel::refresh);return@Scaffold
+        }
         if (channels.isEmpty()) {
             EmptyState(
                 icon = DriveIcons.CloudQueue,

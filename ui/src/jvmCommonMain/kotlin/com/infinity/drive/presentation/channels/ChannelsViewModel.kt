@@ -24,12 +24,29 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ChannelsViewModel(
     private val channelRepository: ChannelRepository
 ) : ViewModel() {
 
-    val channels: StateFlow<List<DriveChannel>> = channelRepository.observeChannels()
+    private val _loading=MutableStateFlow(true)
+    val loading:StateFlow<Boolean> = _loading.asStateFlow()
+    private val _refreshing=MutableStateFlow(false)
+    val refreshing:StateFlow<Boolean> = _refreshing.asStateFlow()
+    private val _error=MutableStateFlow<String?>(null)
+    val error:StateFlow<String?> = _error.asStateFlow()
+    private val observationRevision=MutableStateFlow(0)
+    val channels: StateFlow<List<DriveChannel>> = observationRevision.flatMapLatest {
+        channelRepository.observeChannels()
+            .onEach{_loading.value=false}
+            .catch{if(it is CancellationException)throw it;_loading.value=false;_error.value="Couldn't read your drives.";emit(emptyList())}
+    }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _working = MutableStateFlow<UiText?>(null)
@@ -42,23 +59,21 @@ class ChannelsViewModel(
         refresh()
     }
 
-    fun refresh() = run(UiText.Resource(Res.string.channels_looking_for_drives)) {
-        val pruned = channelRepository.pruneDeleted()
-        if (pruned is AppResult.Success && pruned.value > 0) {
-            _messages.tryEmit(
-                UiText.Resource(Res.string.channels_removed_missing, pruned.value)
-            )
-        }
-        val result = channelRepository.refresh()
-        if (result is AppResult.Success && result.value.isEmpty()) {
-            channelRepository.create(DEFAULT_DRIVE_LABEL).let { created ->
-                if (created is AppResult.Success) {
-                    channelRepository.switchTo(created.value.chatId)
-                    _messages.tryEmit(UiText.Resource(Res.string.app_drive_recreated))
+    fun refresh(){
+        if(_refreshing.value||_working.value!=null)return
+        _refreshing.value=true;_error.value=null;observationRevision.value++
+        viewModelScope.launch {
+            try {
+                val pruned=channelRepository.pruneDeleted()
+                if(pruned is AppResult.Success&&pruned.value>0)_messages.tryEmit(UiText.Resource(Res.string.channels_removed_missing,pruned.value))
+                when(val result=channelRepository.refresh()){
+                    is AppResult.Success->Unit
+                    is AppResult.Failure->{_error.value="Couldn't refresh your drives. Check the connection and retry.";_messages.tryEmit(result.error.toUiText())}
                 }
-            }
+            }catch(cancel:CancellationException){throw cancel}
+            catch(_:Exception){_error.value="Couldn't refresh your drives. Try again."}
+            finally{_refreshing.value=false}
         }
-        result
     }
 
     fun create(label: String) = run(UiText.Resource(Res.string.channels_creating_drive)) {
@@ -91,13 +106,13 @@ class ChannelsViewModel(
         if (_working.value != null) return
         _working.value = label
         viewModelScope.launch {
-            val result = block()
-            _working.value = null
-            if (result is AppResult.Failure) _messages.tryEmit(result.error.toUiText())
+            try {
+                val result=block()
+                if(result is AppResult.Failure)_messages.tryEmit(result.error.toUiText())
+            }catch(cancel:CancellationException){throw cancel}
+            catch(_:Exception){_messages.tryEmit(UiText.Plain("Couldn't complete this action. Your drives have been preserved."))}
+            finally{_working.value=null}
         }
     }
 
-    private companion object {
-        const val DEFAULT_DRIVE_LABEL = ""
-    }
 }

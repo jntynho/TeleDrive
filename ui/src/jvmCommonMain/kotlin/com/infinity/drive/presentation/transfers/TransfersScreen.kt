@@ -230,6 +230,16 @@ fun TransfersScreen(
                     if(active>0||state.pausedTotal>0)Text(listOfNotNull(if(active>0)"$active active"else null,if(state.pausedTotal>0)"${state.pausedTotal} paused"else null).joinToString(" · "),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+            val filteredEmpty=when(filter){
+                "Active"->state.active.isEmpty()&&state.paused.isEmpty()
+                "Done"->state.completed.isEmpty()
+                "Failed"->state.failed.isEmpty()
+                else->false
+            }
+            if(filteredEmpty)item("empty-filter"){
+                Text("No ${filter.lowercase()} transfers",style=MaterialTheme.typography.bodyLarge,
+                    color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.fillMaxWidth().padding(vertical=32.dp),textAlign=TextAlign.Center)
+            }
             if(filter=="All transfers"||filter=="Active") section("active", activeTitle, state.active, state.activeTotal,visibleTaskIds) { transfer ->
                 TransferRow(
                     transfer = transfer,

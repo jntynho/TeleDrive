@@ -658,18 +658,18 @@
     <string name="settings_nothing_to_remove">Nothing to remove</string>
 
     <!-- Settings: appearance -->
-    <string name="settings_archived_shortcut">Archived shortcut</string>
+    <string name="settings_archived_shortcut">Show archived media</string>
     <string name="settings_compact_layout">Compact layout</string>
     <string name="settings_dynamic_color">Dynamic color</string>
     <string name="settings_gallery_grid_columns">Gallery grid columns</string>
     <string name="settings_gallery_grid_view">Grid view in gallery</string>
     <string name="settings_grid_columns">Files grid columns</string>
     <string name="settings_grid_view">Grid view in files</string>
-    <string name="settings_hidden_shortcut">Hidden shortcut</string>
+    <string name="settings_hidden_shortcut">Show hidden items</string>
     <string name="settings_recent_files">Recent files</string>
     <string name="settings_recent_files_subtitle">Shows recently added files on the home screen</string>
-    <string name="settings_shows_archived_collection_home">Shows the Archived collection on the home screen</string>
-    <string name="settings_shows_hidden_collection_home">Shows the Hidden collection on the home screen</string>
+    <string name="settings_shows_archived_collection_home">Include archived items in the gallery. The Archived collection is always available.</string>
+    <string name="settings_shows_hidden_collection_home">Include hidden items in files and gallery. The private collection remains in Security.</string>
     <string name="settings_theme">Theme</string>
     <string name="settings_language">Language</string>
     <string name="language_system">System default</string>

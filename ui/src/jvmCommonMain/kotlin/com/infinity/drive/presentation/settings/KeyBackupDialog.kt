@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -57,10 +59,10 @@ fun KeyBackupDialog(
     val tooShort = passphrase.isNotEmpty() && passphrase.length < MIN_LENGTH
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {if(!working)onDismiss()},
         title = { Text(stringResource(Res.string.settings_back_encryption_key)) },
         text = {
-            Column {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
                     text = stringResource(Res.string.settings_required_encryption_key_wrapped),
                     style = MaterialTheme.typography.bodyMedium,
@@ -69,6 +71,7 @@ fun KeyBackupDialog(
                 Spacer(Modifier.height(16.dp))
                 OutlinedTextField(
                     value = passphrase,
+                    enabled = !working,
                     onValueChange = { passphrase = it },
                     label = { Text(stringResource(Res.string.settings_passphrase)) },
                     singleLine = true,
@@ -90,6 +93,7 @@ fun KeyBackupDialog(
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = repeated,
+                    enabled = !working,
                     onValueChange = { repeated = it },
                     label = { Text(stringResource(Res.string.settings_repeat_passphrase)) },
                     singleLine = true,
@@ -104,6 +108,7 @@ fun KeyBackupDialog(
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = hint,
+                    enabled = !working,
                     onValueChange = { hint = it },
                     label = { Text(stringResource(Res.string.settings_hint_optional)) },
                     singleLine = true,
@@ -122,6 +127,7 @@ fun KeyBackupDialog(
         dismissButton = {
             OutlinedButton(
                 onClick = onDismiss,
+                enabled = !working,
                 shapes = ButtonDefaults.shapes()
             ) { Text(stringResource(Res.string.common_cancel)) }
         }
@@ -139,10 +145,10 @@ fun KeyRestoreDialog(
 ) {
     var passphrase by remember { mutableStateOf("") }
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {if(!working)onDismiss()},
         title = { Text(stringResource(Res.string.settings_restore_encryption_key)) },
         text = {
-            Column {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
                     text = stringResource(Res.string.settings_enter_passphrase_used_backing),
                     style = MaterialTheme.typography.bodyMedium,
@@ -177,6 +183,7 @@ fun KeyRestoreDialog(
                 Spacer(Modifier.height(16.dp))
                 OutlinedTextField(
                     value = passphrase,
+                    enabled = !working,
                     onValueChange = { passphrase = it },
                     label = { Text(stringResource(Res.string.settings_passphrase)) },
                     singleLine = true,
@@ -196,6 +203,7 @@ fun KeyRestoreDialog(
         dismissButton = {
             OutlinedButton(
                 onClick = onDismiss,
+                enabled = !working,
                 shapes = ButtonDefaults.shapes()
             ) { Text(stringResource(Res.string.common_cancel)) }
         }

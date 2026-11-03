@@ -18,6 +18,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -58,6 +61,7 @@ import com.infinity.drive.core.media.ThumbnailModel
 import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.player_codec_unsupported
 import com.infinity.drive.resources.player_playback_failed
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration.Companion.milliseconds
@@ -91,6 +95,11 @@ fun MediaPlayer(
     val audioLanguage by rememberUpdatedState(preferredAudioLanguage)
     val subtitleLanguage by rememberUpdatedState(preferredSubtitleLanguage)
 
+    var resumePosition by rememberSaveable(content){mutableLongStateOf(0L)}
+    var resumePlaying by rememberSaveable(content){mutableStateOf(true)}
+    var resumeSpeed by rememberSaveable(content){mutableFloatStateOf(1f)}
+    var resumeVolume by rememberSaveable(content){mutableFloatStateOf(1f)}
+    val activity=androidx.activity.compose.LocalActivity.current
     val holder = remember(content) { mutableStateOf<ExoPlayer?>(null) }
     val player = holder.value
 
@@ -125,15 +134,25 @@ fun MediaPlayer(
 
                 else -> Unit
             }
+            seekTo(resumePosition)
+            setPlaybackSpeed(resumeSpeed)
+            volume=resumeVolume
             prepare()
-            playWhenReady = true
+            playWhenReady = resumePlaying
         }
     }
 
     DisposableEffect(holder) {
-        onDispose { holder.value?.release() }
+        onDispose { holder.value?.let{resumePosition=it.currentPosition.coerceAtLeast(0);resumePlaying=it.playWhenReady;resumeSpeed=it.playbackParameters.speed;resumeVolume=it.volume;it.release()} }
     }
 
+    LaunchedEffect(player,isActivePage){
+        if(player!=null&&isActivePage)while(kotlinx.coroutines.currentCoroutineContext().isActive){
+            resumePosition=player.currentPosition.coerceAtLeast(0);resumePlaying=player.playWhenReady
+            resumeSpeed=player.playbackParameters.speed;resumeVolume=player.volume
+            delay(500)
+        }
+    }
     DisposableEffect(player, isActivePage) {
         if (!isActivePage) player?.pause()
         onDispose { }
@@ -143,8 +162,9 @@ fun MediaPlayer(
     val backgroundAllowed by rememberUpdatedState(allowBackgroundPlayback)
     DisposableEffect(lifecycleOwner,player) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP && !backgroundAllowed) {
-                player?.pause()
+            if (event == Lifecycle.Event.ON_STOP) {
+                if(!backgroundAllowed&&activity?.isChangingConfigurations!=true)player?.pause()
+                player?.let{resumePosition=it.currentPosition.coerceAtLeast(0);resumePlaying=it.playWhenReady;resumeSpeed=it.playbackParameters.speed;resumeVolume=it.volume}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -159,8 +179,9 @@ fun MediaPlayer(
 
     var interactionTick by remember { mutableIntStateOf(0) }
     var scrubbing by remember { mutableStateOf(false) }
+    var overlayOpen by remember { mutableStateOf(false) }
     val visibleControls by rememberUpdatedState(controlsVisible)
-    var resizeMode by remember { mutableStateOf(PlayerResizeMode.FIT) }
+    var resizeMode by rememberSaveable { mutableStateOf(PlayerResizeMode.FIT) }
     var playing by remember(player) { mutableStateOf(player?.isPlaying == true) }
     var sized by remember(player) { mutableStateOf((player?.videoSize?.width ?: 0) > 0) }
     var decoderFailed by remember(player) { mutableStateOf(false) }
@@ -194,8 +215,8 @@ fun MediaPlayer(
         onDispose { player.removeListener(listener) }
     }
 
-    LaunchedEffect(controlsVisible, playing, interactionTick, activePage, audioOnly,scrubbing) {
-        if (!controlsVisible || !playing || !activePage || audioOnly || scrubbing) return@LaunchedEffect
+    LaunchedEffect(controlsVisible, playing, interactionTick, activePage, audioOnly,scrubbing,overlayOpen) {
+        if (!controlsVisible || !playing || !activePage || audioOnly || scrubbing || overlayOpen) return@LaunchedEffect
         delay(CONTROLLER_TIMEOUT_MS.milliseconds)
         notifyControls(false)
     }
@@ -290,6 +311,7 @@ fun MediaPlayer(
                 onCycleResizeMode = { resizeMode = resizeMode.next() },
                 onInteraction = { interactionTick++ },
                 onScrubbingChanged={scrubbing=it},
+                onOverlayChanged={overlayOpen=it},
                 onPreferredAudioLanguage = onPreferredAudioLanguage,
                 onPreferredSubtitleLanguage = onPreferredSubtitleLanguage
             )

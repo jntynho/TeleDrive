@@ -1,5 +1,12 @@
 package com.infinity.drive.presentation.components
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -27,11 +34,9 @@ import com.infinity.drive.resources.common_retry
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun LoadingState(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
+    StatusLayout(modifier.semantics(mergeDescendants=true){
+        contentDescription="Loading";progressBarRangeInfo=ProgressBarRangeInfo.Indeterminate;liveRegion=LiveRegionMode.Polite
+    }) {
         app.tgdrive.ui.SkeletonScene {
             Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 app.tgdrive.ui.SkeletonBlock(Modifier.size(48.dp),16.dp)
@@ -51,13 +56,7 @@ fun EmptyState(
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
+    StatusLayout(modifier) {
         Icon(
             imageVector = icon,
             contentDescription = null,
@@ -95,13 +94,7 @@ fun ErrorState(
     modifier: Modifier = Modifier,
     onRetry: (() -> Unit)? = null
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
+    StatusLayout(modifier) {
         Text(
             text = message,
             style = MaterialTheme.typography.bodyLarge,
@@ -115,5 +108,17 @@ fun ErrorState(
                 shapes = ButtonDefaults.shapes()
             ) { Text(stringResource(Res.string.common_retry)) }
         }
+    }
+}
+
+/** Center when there is space; scroll instead of clipping actions at large font sizes or in landscape. */
+@Composable
+private fun StatusLayout(modifier:Modifier,content:@Composable ColumnScope.()->Unit){
+    BoxWithConstraints(modifier.fillMaxSize()){
+        val scroll=rememberScrollState()
+        val bounded=if(constraints.hasBoundedHeight)Modifier.verticalScroll(scroll).heightIn(min=maxHeight)else Modifier
+        // A lazy-list item is already scrollable and has unbounded height.
+        Column(Modifier.fillMaxWidth().then(bounded).padding(32.dp),
+            horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center,content=content)
     }
 }

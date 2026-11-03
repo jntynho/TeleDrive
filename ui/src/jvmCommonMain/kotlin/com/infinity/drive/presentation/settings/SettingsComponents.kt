@@ -99,12 +99,14 @@ fun SettingsClickRow(
     subtitle: String? = null,
     titleColor: Color? = null,
     trailing: (@Composable () -> Unit)? = null,
-    icon: ImageVector? = null
+    icon: ImageVector? = null,
+    enabled: Boolean = true
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth().heightIn(min=56.dp).searchTarget(title)
-            .clickable(onClick = onClick)
+            .graphicsLayer{alpha=if(enabled)1f else .5f}
+            .clickable(enabled=enabled,onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

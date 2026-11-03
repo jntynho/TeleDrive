@@ -1,5 +1,8 @@
 package app.tgdrive.ui
 
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.flow.first
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -32,11 +35,13 @@ fun ExpandableLibraryHeader(
     val focus=LocalFocusManager.current
     val keyboard=LocalSoftwareKeyboardController.current
     val requester=remember{FocusRequester()}
+    val owner=LocalLifecycleOwner.current
+    LaunchedEffect(expanded){if(!expanded){focus.clearFocus();keyboard?.hide()}}
     fun close(){focus.clearFocus();keyboard?.hide();onQueryChange("");onExpandedChange(false)}
     Surface(color=MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxWidth().statusBarsPadding().height(64.dp)) {
             AnimatedContent(expanded,modifier=Modifier.fillMaxSize(),transitionSpec={
-                (fadeIn(tween(280))+slideInHorizontally(tween(280)){it/32} togetherWith fadeOut(tween(180)))
+                (fadeIn(tween(180)) togetherWith fadeOut(tween(180)))
                     .using(SizeTransform(clip=true){_,_->androidx.compose.animation.core.snap()})
             },label="toolbarSearch"){ searching ->
                 Row(Modifier.fillMaxSize().padding(horizontal=8.dp),verticalAlignment=Alignment.CenterVertically) {
@@ -50,7 +55,13 @@ fun ExpandableLibraryHeader(
                             modifier=Modifier.weight(1f).heightIn(min=48.dp).focusRequester(requester).semantics{contentDescription=placeholder},
                             decorationBox={input->Box(contentAlignment=Alignment.CenterStart){if(query.isEmpty())Text(placeholder,color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodyLarge);input()}})
                         if(query.isNotEmpty())IconButton({onQueryChange("")}){Icon(DriveIcons.Close,"Clear search")}
-                        LaunchedEffect(Unit){kotlinx.coroutines.delay(280);requester.requestFocus();keyboard?.show()}
+                        LaunchedEffect(expanded,owner){
+                             if(expanded){
+                                 owner.lifecycle.currentStateFlow.first{it.isAtLeast(Lifecycle.State.RESUMED)}
+                                 kotlinx.coroutines.delay(180)
+                                 requester.requestFocus();keyboard?.show()
+                             }
+                         }
                     }else{
                         navigationIcon()
                         Text(title,Modifier.weight(1f).padding(start=8.dp),style=MaterialTheme.typography.headlineLarge,maxLines=1,overflow=TextOverflow.Ellipsis)

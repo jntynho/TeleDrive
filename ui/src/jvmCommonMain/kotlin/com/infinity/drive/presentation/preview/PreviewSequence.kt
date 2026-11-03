@@ -18,6 +18,9 @@ data class PreviewSequence(
     val localCopiesOnly: Boolean = false,
     val hiddenOnly: Boolean = false,
     val archivedOnly: Boolean = false,
+    val backedUpOnly: Boolean = false,
+    val notBackedUpOnly: Boolean = false,
+    val minSizeBytes: Long? = null,
     val sortField: FileSortField = FileSortField.NAME,
     val sortDirection: SortDirection = SortDirection.ASCENDING
 ) {
@@ -33,6 +36,9 @@ data class PreviewSequence(
         localCopiesOnly = localCopiesOnly,
         hiddenOnly = hiddenOnly,
         archivedOnly = archivedOnly,
+        backedUpOnly = backedUpOnly,
+        notBackedUpOnly = notBackedUpOnly,
+        minSizeBytes = minSizeBytes,
         sortField = sortField.name,
         sortDescending = sortDirection == SortDirection.DESCENDING
     )

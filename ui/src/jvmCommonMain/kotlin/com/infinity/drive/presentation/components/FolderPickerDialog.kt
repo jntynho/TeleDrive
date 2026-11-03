@@ -176,7 +176,7 @@ fun FolderPickerDialog(
                         onCreateFolder(currentId, name.trim())
                         naming = false
                     },
-                    enabled = name.isNotBlank(),
+                    enabled = com.infinity.drive.core.files.FileNameUtils.isValidName(name),
                     shapes = ButtonDefaults.shapes()
                 ) { Text(stringResource(Res.string.common_create)) }
             },

@@ -96,6 +96,7 @@ import com.infinity.drive.presentation.components.EmptyState
 import com.infinity.drive.presentation.components.FileGridItem
 import com.infinity.drive.presentation.components.FileListItem
 import com.infinity.drive.presentation.components.LoadingState
+import com.infinity.drive.presentation.components.PagingRetryRow
 import com.infinity.drive.presentation.components.RenameDialog
 import com.infinity.drive.presentation.components.liftedTopAppBarColors
 import com.infinity.drive.presentation.components.pinchZoom
@@ -134,13 +135,14 @@ private fun AlbumGrid(
     onOpenAlbum: (MediaAlbum) -> Unit,
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
-    loading:Boolean=false
+    loading:Boolean=false,
+    searching:Boolean=false
 ) {
     if (albums.isEmpty()) {
         EmptyState(
             icon = DriveIcons.PhotoLibrary,
-            title = stringResource(Res.string.gallery_no_albums),
-            description = stringResource(Res.string.gallery_albums_appear_organise_media)
+            title = if(searching) "No matching albums" else stringResource(Res.string.gallery_no_albums),
+            description = if(searching) "Try another album name." else stringResource(Res.string.gallery_albums_appear_organise_media)
         )
         return
     }
@@ -235,8 +237,13 @@ fun GalleryScreen(
         mediaGridState.rememberPosition(viewModel.listPosition, media.itemCount)
     }
     val lifted by rememberToolbarLift(scrolled)
+    val scopeKey=listOf(query,state.tab.name,state.sortField.name,state.sortDirection.name).joinToString("\u0000")
+    var lastScope by rememberSaveable{mutableStateOf(scopeKey)}
+    LaunchedEffect(scopeKey){if(lastScope!=scopeKey){mediaListState.scrollToItem(0);mediaGridState.scrollToItem(0);lastScope=scopeKey}}
 
+    val filters=com.infinity.drive.presentation.components.rememberCollapsingFilters(query to state.tab){scrolled.canScrollBackward}
     Scaffold(
+        modifier=filters.scrollModifier,
         topBar = { Column {
             if (state.selectionMode) {
                 PageHeader(
@@ -367,7 +374,7 @@ fun GalleryScreen(
         } }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(top=padding.calculateTopPadding())) {
-            androidx.compose.animation.AnimatedVisibility(!state.isAlbumView && !state.selectionMode && state.tab!=GalleryTab.ALBUMS && !lifted,enter=androidx.compose.animation.fadeIn()+androidx.compose.animation.expandVertically(),exit=androidx.compose.animation.fadeOut()+androidx.compose.animation.shrinkVertically()) {
+            androidx.compose.animation.AnimatedVisibility(!state.isAlbumView && !state.selectionMode && state.tab!=GalleryTab.ALBUMS && filters.visible,enter=androidx.compose.animation.fadeIn()+androidx.compose.animation.expandVertically(),exit=androidx.compose.animation.fadeOut()+androidx.compose.animation.shrinkVertically()) {
                 GalleryTabSelector(selected=state.tab,onSelect=viewModel::setTab)
             }
 
@@ -382,7 +389,8 @@ fun GalleryScreen(
                     bottomPadding = padding.calculateBottomPadding() + LocalBottomBarInset.current,
                     onOpenAlbum = onOpenAlbum,
                     onZoomIn = viewModel::zoomAlbumsIn,
-                    onZoomOut = viewModel::zoomAlbumsOut
+                    onZoomOut = viewModel::zoomAlbumsOut,
+                    searching = albumQuery.isNotBlank()
                 )
                 return@Column
             }
@@ -472,6 +480,7 @@ fun GalleryScreen(
                                 null -> Unit
                             }
                         }
+                        if(media.loadState.append is androidx.paging.LoadState.Error){item("gallery-load-retry"){PagingRetryRow{media.retry()}}}
                     }
 
                     else -> LazyVerticalGrid(
@@ -531,6 +540,9 @@ fun GalleryScreen(
 
                                 null -> Unit
                             }
+                        }
+                        if(media.loadState.append is androidx.paging.LoadState.Error){
+                            item(key="gallery-load-retry",span={GridItemSpan(maxLineSpan)}){PagingRetryRow{media.retry()}}
                         }
                     }
                 }

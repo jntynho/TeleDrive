@@ -56,7 +56,7 @@ fun SettingsScreen(onBack:(()->Unit)?,onOpenSection:(SettingsSectionType)->Unit,
             if(query.isBlank()) {
                 Card(onClick={onOpenSection(SettingsSectionType.ACCOUNT)},modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp),shape=DriveStyle.CardShape,colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)) {
                     Row(Modifier.padding(18.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
-                        if(state.user?.photoPath!=null)coil3.compose.AsyncImage(state.user?.photoPath,"Telegram profile photo",Modifier.size(44.dp).clip(androidx.compose.foundation.shape.CircleShape),contentScale=androidx.compose.ui.layout.ContentScale.Crop)else Icon(DriveIcons.AccountCircle,null,Modifier.size(44.dp),tint=MaterialTheme.colorScheme.primary)
+                        com.infinity.drive.presentation.components.TelegramProfileAvatar(state.user?.photoPath,Modifier.size(44.dp))
                         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
                             Text(state.user?.let{listOf(it.firstName,it.lastName).filter(String::isNotBlank).joinToString(" ")}?.takeIf(String::isNotBlank)?:"Telegram account",style=MaterialTheme.typography.titleMedium)
                             val connection=accountConnectionLabel(authorization,state.connection)

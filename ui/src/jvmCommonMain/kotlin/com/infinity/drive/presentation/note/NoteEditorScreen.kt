@@ -24,6 +24,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import com.infinity.drive.presentation.components.PageHeader
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -75,7 +78,14 @@ fun NoteEditorScreen(
     val linkUrl = stringResource(Res.string.note_link_url)
 
     CollectSnackbarMessages(viewModel.messages, snackbarHostState)
-    LaunchedEffect(Unit) { viewModel.saved.collect { onBack() } }
+    var confirmDiscard by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    val owner=androidx.lifecycle.compose.LocalLifecycleOwner.current
+    fun requestBack(){if(state.saving)return;if(state.dirty)confirmDiscard=true else onBack()}
+    com.infinity.drive.presentation.common.AppBackHandler(state.dirty||state.saving){requestBack()}
+    LaunchedEffect(viewModel,owner){owner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED){viewModel.saved.collect{onBack()}}}
+    if(confirmDiscard)com.infinity.drive.presentation.components.ConfirmDialog(
+        title="Discard changes?",message="Your changes have not been saved.",confirmLabel="Discard",destructive=true,
+        onConfirm={confirmDiscard=false;onBack()},onDismiss={confirmDiscard=false})
 
     Scaffold(
         modifier = Modifier.imePadding(),
@@ -90,7 +100,7 @@ fun NoteEditorScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = ::requestBack, enabled = !state.saving) {
                         Icon(
                             DriveIcons.ArrowBack,
                             contentDescription = stringResource(Res.string.common_back)
@@ -100,10 +110,11 @@ fun NoteEditorScreen(
             )
         },
         floatingActionButton = {
-            if (!state.loading) {
-                val canSave = body.text.isNotBlank() && !state.saving
+            if (!state.loading && state.loadError==null) {
+                val canSave = body.text.isNotBlank() && !state.saving && (state.dirty || state.isNew)
                 FloatingActionButton(
                     onClick = { if (canSave) viewModel.save() },
+                    modifier=Modifier.semantics{if(!canSave)disabled()},
                     containerColor = if (canSave) {
                         MaterialTheme.colorScheme.primaryContainer
                     } else {
@@ -125,6 +136,10 @@ fun NoteEditorScreen(
     ) { padding ->
         if (state.loading) {
             LoadingState(modifier = Modifier.padding(padding))
+            return@Scaffold
+        }
+        if(state.loadError!=null){
+            com.infinity.drive.presentation.components.ErrorState(state.loadError!!,Modifier.padding(padding),viewModel::retryLoad)
             return@Scaffold
         }
         Column(

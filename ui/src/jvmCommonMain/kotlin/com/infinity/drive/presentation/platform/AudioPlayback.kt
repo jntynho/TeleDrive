@@ -20,6 +20,7 @@ interface AudioPlayback {
     fun next()
     fun stop()
     fun seek(positionMs:Long)
+    fun updateLibraryContext(chatId:Long?,signedIn:Boolean) {}
     fun cycleRepeat() {}
     fun setSleepTimer(minutes:Int?) {}
     suspend fun queuedFiles():List<DriveFile> = emptyList()

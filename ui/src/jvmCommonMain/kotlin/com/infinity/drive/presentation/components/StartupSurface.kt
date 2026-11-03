@@ -1,5 +1,9 @@
 package com.infinity.drive.presentation.components
 
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.semantics.*
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloat
@@ -18,7 +22,9 @@ import com.infinity.drive.presentation.platform.LocalAppIcon
 @Composable
 fun StartupSurface(modifier:Modifier=Modifier){
     val background by animateColorAsState(MaterialTheme.colorScheme.background,tween(320),label="startupBackground")
-    Surface(modifier.fillMaxSize().clickable(indication=null,interactionSource=remember{MutableInteractionSource()}){},color=background){
+    Surface(modifier.fillMaxSize().pointerInput(Unit){
+            awaitPointerEventScope{while(true){awaitPointerEvent(PointerEventPass.Initial).changes.forEach{it.consume()}}}
+        }.clearAndSetSemantics{contentDescription="Preparing TeleDrive";progressBarRangeInfo=ProgressBarRangeInfo.Indeterminate;liveRegion=LiveRegionMode.Polite},color=background){
         Column(Modifier.fillMaxSize().systemBarsPadding().padding(32.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){
             val transition=androidx.compose.animation.core.rememberInfiniteTransition(label="startupBreath")
             val scale=transition.animateFloat(.96f,1f,androidx.compose.animation.core.infiniteRepeatable(tween(1400),androidx.compose.animation.core.RepeatMode.Reverse),label="logoBreath")

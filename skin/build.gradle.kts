@@ -7,6 +7,6 @@ kotlin {
     jvmToolchain(21)
     android { namespace="app.tgdrive.skin"; compileSdk=37; minSdk=26 }
     sourceSets {
-        commonMain.dependencies { api(libs.cmp.runtime); api(libs.cmp.foundation); api(libs.cmp.ui); api(libs.cmp.material3) }
+        commonMain.dependencies { api(libs.cmp.runtime); api(libs.cmp.foundation); api(libs.cmp.ui); api(libs.cmp.material3); implementation(libs.jb.lifecycle.runtime.compose) }
     }
 }

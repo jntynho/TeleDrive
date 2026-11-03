@@ -4,7 +4,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.window.DialogProperties
 import com.infinity.drive.resources.Res
@@ -19,6 +20,14 @@ import com.infinity.drive.resources.session_broken_title
  */
 @Composable
 fun SessionBrokenDialog(onSignInAgain: () -> Unit) {
+    var confirmReset by rememberSaveable{mutableStateOf(false)}
+    if(confirmReset){
+        ConfirmDialog(title="Reset local session?",
+            message="This removes the local session, index and app-managed copies on this device. Files already uploaded to Telegram remain there. Keep another copy of files that have not been uploaded before continuing.",
+            confirmLabel="Reset session",destructive=true,
+            onConfirm={confirmReset=false;onSignInAgain()},onDismiss={confirmReset=false})
+        return
+    }
     AlertDialog(
         onDismissRequest = {},
         properties = DialogProperties(
@@ -28,7 +37,7 @@ fun SessionBrokenDialog(onSignInAgain: () -> Unit) {
         title = { Text(stringResource(Res.string.session_broken_title)) },
         text = { Text(stringResource(Res.string.session_broken_message)) },
         confirmButton = {
-            Button(onClick = onSignInAgain, shapes = ButtonDefaults.shapes()) {
+            Button(onClick = {confirmReset=true}, shapes = ButtonDefaults.shapes()) {
                 Text(stringResource(Res.string.session_broken_action))
             }
         }

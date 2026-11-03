@@ -30,6 +30,8 @@ fun PreviousLibraryScreen(onBack:()->Unit) {
     val reader=remember(context,telegram) { PreviousLibraryReader(context,telegram) }
     val scope=rememberCoroutineScope()
     var listing by remember { mutableStateOf<PreviousLibraryReader.Listing?>(null) }
+    var loading by remember{mutableStateOf(true)}
+    var loadFailure by remember{mutableStateOf<String?>(null)}
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf<String?>(null) }
     var pending by remember { mutableStateOf<PreviousLibraryReader.Entry?>(null) }
@@ -39,8 +41,10 @@ fun PreviousLibraryScreen(onBack:()->Unit) {
     var generation by remember { mutableIntStateOf(0) }
     DisposableEffect(reader) { onDispose { reader.close() } }
     LaunchedEffect(reader,generation) {
+        loading=true;loadFailure=null
         try { listing=reader.list() } catch(e:CancellationException) { throw e }
-        catch(e:Exception) { error=e.message ?: "The previous library could not be read. Its data is preserved." }
+        catch(e:Exception) { loadFailure="The previous library could not be read. Its data is preserved." }
+        finally{loading=false}
     }
     val save=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         val entry=pending;pending=null
@@ -60,10 +64,11 @@ fun PreviousLibraryScreen(onBack:()->Unit) {
             finally { busy=null }
         }
     }
-    Scaffold(topBar={TopAppBar(title={Text("Previous library")},navigationIcon={IconButton(onBack){Icon(DriveIcons.ArrowBack,"Back")}})}) { padding ->
+    Scaffold(topBar={com.infinity.drive.presentation.components.PageHeader(title={Text("Previous library")},navigationIcon={IconButton(onBack){Icon(DriveIcons.ArrowBack,"Back")}})}) { padding ->
         LazyColumn(modifier=Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
             item { Text("Your previous Saved Messages files stay untouched. Save a copy here, then add it to a private-channel drive when you are ready.",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant) }
-            if(listing==null&&error==null)item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+            if(loading)item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+            if(loadFailure!=null)item { Column{Text(loadFailure!!);TextButton({generation++}){Text("Retry")}} }
             if(listing?.files?.isEmpty()==true&&listing?.locked?.isEmpty()==true)item { Text("No previous files were found in this installation for the signed-in Telegram account.") }
             listing?.locked?.let { locked -> items(locked,key={"vault-${it.id}"}) { vault ->
                 OutlinedCard(onClick={if(busy==null){unlocking=vault;password="";recovery=false}},modifier=Modifier.fillMaxWidth()) {

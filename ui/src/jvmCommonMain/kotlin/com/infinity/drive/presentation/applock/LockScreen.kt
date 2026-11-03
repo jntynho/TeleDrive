@@ -3,6 +3,11 @@ package com.infinity.drive.presentation.applock
 
 import app.tgdrive.ui.DriveIcons
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -58,11 +63,9 @@ fun LockScreen(onUnlocked: () -> Unit) {
     }
 
     Surface(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .safeDrawingPadding()
-                .padding(32.dp),
+            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min=maxHeight).padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -94,6 +97,7 @@ fun LockScreen(onUnlocked: () -> Unit) {
                 Spacer(Modifier.size(8.dp))
                 Text(stringResource(Res.string.lock_unlock))
             }
+        }
         }
     }
 }

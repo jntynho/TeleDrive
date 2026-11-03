@@ -55,8 +55,10 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
     val resolver=koinInject<com.infinity.drive.presentation.preview.PreviewContentResolver>()
     val sources=koinInject<com.infinity.drive.core.media.TelegramDataSourceFactory>()
     val files=koinInject<com.infinity.drive.domain.repository.FileRepository>()
-    val audio=remember(context,resolver,sources,files){com.infinity.drive.presentation.audio.AndroidAudioPlayback(context,resolver,sources,files)}
-    androidx.compose.runtime.DisposableEffect(audio){onDispose{audio.release()}}
+    val audioOwner=androidx.lifecycle.viewmodel.compose.viewModel<com.infinity.drive.presentation.audio.AudioPlaybackOwner>(key="teledrive-audio"){
+        com.infinity.drive.presentation.audio.AudioPlaybackOwner(context.applicationContext,resolver,sources,files)
+    }
+    val audio=audioOwner.playback
 
     val prefs by settingsRepository.preferences.collectAsStateWithLifecycle(UserPreferences())
     val darkTheme = when (prefs.theme) {
@@ -67,14 +69,16 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
 
     val lifecycleOwner=androidx.lifecycle.compose.LocalLifecycleOwner.current
     val backgroundAllowed by androidx.compose.runtime.rememberUpdatedState(prefs.backgroundPlayback)
-    androidx.compose.runtime.DisposableEffect(lifecycleOwner,audio){
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner,audio,activity){
         val observer=androidx.lifecycle.LifecycleEventObserver{_,event->
-            if(event==androidx.lifecycle.Lifecycle.Event.ON_STOP&&!backgroundAllowed)audio.pause()
+            if(event==androidx.lifecycle.Lifecycle.Event.ON_STOP&&!backgroundAllowed&&activity?.isChangingConfigurations!=true)audio.pause()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose{lifecycleOwner.lifecycle.removeObserver(observer)}
     }
-    androidx.compose.runtime.LaunchedEffect(prefs.storageChatId,prefs.onboardingComplete){audio.stop()}
+    androidx.compose.runtime.LaunchedEffect(audio,settingsRepository){
+        settingsRepository.preferences.collect{audio.updateLibraryContext(it.storageChatId,it.onboardingComplete)}
+    }
 
     val urlOpener = remember(context) { UrlOpener { url -> openLink(context, url) } }
     val telegramLinkOpener = remember(context) { AndroidTelegramLinkOpener(context) }

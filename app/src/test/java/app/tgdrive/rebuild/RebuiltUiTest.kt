@@ -394,6 +394,76 @@ class RebuiltUiTest {
         org.junit.Assert.assertEquals(bounds,compose.onNodeWithTag("navigation-host").fetchSemanticsNode().boundsInRoot)
     }
 
+    @Test fun applicationLockRestoresTheMediaDestinationAndSearch(){
+        val pending=GlobalContext.get().get<PendingShare>()
+        compose.runOnUiThread{activity.get().setContent{ProvidePlatformActions{
+            androidx.compose.runtime.CompositionLocalProvider(
+                com.infinity.drive.presentation.platform.LocalDeviceOwnerGate provides com.infinity.drive.presentation.platform.DeviceOwnerGate { _,_,_,_-> }
+            ){DriveInfinityApp(pending)}
+        }}}
+        compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("navigation-gallery").performClick()
+        compose.onNodeWithText("Photos",substring=false).performClick()
+        compose.onNodeWithContentDescription("Search gallery").performClick()
+        compose.onNode(hasSetTextAction()).performTextInput("Photo")
+        val lock=GlobalContext.get().get<com.infinity.drive.core.security.AppLockManager>()
+        compose.runOnUiThread{lock.lockNow()}
+        compose.waitUntil(5_000){compose.onAllNodesWithText("Unlock",substring=false).fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("navigation-gallery").assertDoesNotExist()
+        compose.runOnUiThread{lock.unlock()}
+        compose.waitUntil(5_000){compose.onAllNodesWithTag("navigation-gallery").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("navigation-gallery").assertIsSelected()
+        compose.onNode(hasSetTextAction()).assertTextContains("Photo")
+        compose.onNode(hasText("Photos") and isSelectable()).assertIsSelected()
+    }
+
+    @Test fun dirtyNoteAsksBeforeLeavingAndCancelKeepsTheDraft(){
+        val repo=GlobalContext.get().get<com.infinity.drive.domain.repository.FileRepository>()
+        val id=runBlocking{(repo.saveNote(null,null,"Audit note","Original text") as com.infinity.drive.core.common.AppResult.Success).value}
+        compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("All files",substring=false).performClick()
+        compose.waitUntil(5_000){compose.onAllNodesWithText("Audit note.md",substring=false).fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("Audit note.md",substring=false).performClick()
+        compose.waitUntil(5_000){compose.onAllNodesWithContentDescription("Edit text").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithContentDescription("Edit text").performClick()
+        compose.waitUntil(5_000){compose.onAllNodesWithText("Original text",substring=false).fetchSemanticsNodes().isNotEmpty()}
+        compose.onNode(hasText("Original text") and hasSetTextAction()).performTextReplacement("Changed draft")
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithText("Discard changes?",substring=false).assertIsDisplayed()
+        compose.onNodeWithText("Cancel",substring=false).performClick()
+        compose.onNodeWithText("Changed draft",substring=false).assertIsDisplayed()
+        compose.runOnUiThread{activity.get().onBackPressedDispatcher.onBackPressed()}
+        compose.onNodeWithText("Discard",substring=false).performClick()
+        compose.onNodeWithContentDescription("Edit text").assertIsDisplayed()
+        org.junit.Assert.assertEquals("Original text",runBlocking{(repo.readNote(id) as com.infinity.drive.core.common.AppResult.Success).value})
+    }
+
+    @Test fun audioOwnershipSurvivesUiReplacementAndOnlyRealLibraryChangesStopIt(){
+        val pending=GlobalContext.get().get<PendingShare>()
+        var current:com.infinity.drive.presentation.platform.AudioPlayback?=null
+        fun install(){activity.get().setContent{ProvidePlatformActions{
+            current=com.infinity.drive.presentation.platform.LocalAudioPlayback.current
+            DriveInfinityApp(pending)
+        }}}
+        compose.runOnUiThread{install()}
+        compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        val player=current!!
+        val file=runBlocking{GlobalContext.get().get<com.infinity.drive.domain.repository.FileRepository>().getFile("Song.mp3")}!!
+        compose.runOnUiThread{player.updateLibraryContext(null,true);player.play(file)}
+        compose.waitUntil(5_000){player.state.value.file?.id==file.id}
+        compose.runOnUiThread{activity.get().setContent{androidx.compose.material3.Text("Replacing UI")}}
+        compose.onNodeWithText("Replacing UI").assertIsDisplayed()
+        compose.runOnUiThread{install()}
+        compose.waitUntil(5_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        org.junit.Assert.assertSame(player,current)
+        org.junit.Assert.assertEquals(file.id,player.state.value.file?.id)
+        runBlocking{kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default){player.updateLibraryContext(null,true)}}
+        compose.waitForIdle()
+        org.junit.Assert.assertEquals(file.id,player.state.value.file?.id)
+        runBlocking{kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default){player.updateLibraryContext(99L,true)}}
+        compose.waitUntil(5_000){compose.waitForIdle();player.state.value.file==null}
+    }
+
     private fun capture(name:String) {
         compose.waitForIdle()
         val file=File("build/design-previews/refreshed-$name.png")
