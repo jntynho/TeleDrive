@@ -8,10 +8,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import com.infinity.drive.presentation.components.GradientCard as Card
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -54,7 +56,7 @@ fun SettingsScreen(onBack:(()->Unit)?,onOpenSection:(SettingsSectionType)->Unit,
             if(query.isBlank()) {
                 Card(onClick={onOpenSection(SettingsSectionType.ACCOUNT)},modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp),shape=DriveStyle.CardShape,colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)) {
                     Row(Modifier.padding(18.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
-                        Icon(DriveIcons.AccountCircle,null,Modifier.size(36.dp),tint=MaterialTheme.colorScheme.primary)
+                        if(state.user?.photoPath!=null)coil3.compose.AsyncImage(state.user?.photoPath,"Telegram profile photo",Modifier.size(44.dp).clip(androidx.compose.foundation.shape.CircleShape),contentScale=androidx.compose.ui.layout.ContentScale.Crop)else Icon(DriveIcons.AccountCircle,null,Modifier.size(44.dp),tint=MaterialTheme.colorScheme.primary)
                         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
                             Text(state.user?.let{listOf(it.firstName,it.lastName).filter(String::isNotBlank).joinToString(" ")}?.takeIf(String::isNotBlank)?:"Telegram account",style=MaterialTheme.typography.titleMedium)
                             val connection=accountConnectionLabel(authorization,state.connection)

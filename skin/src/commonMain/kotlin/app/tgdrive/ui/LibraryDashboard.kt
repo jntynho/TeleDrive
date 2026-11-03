@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -50,8 +51,8 @@ fun LibraryDashboard(usage:LibraryOverview,onAdd:()->Unit,showAddAction:Boolean=
     var collections by rememberSaveable{mutableStateOf(false)}
     val groups=List(4){usage.groups.getOrElse(it){0L}.coerceAtLeast(0)}
     val opacity by animateFloatAsState(if(collections)0f else 1f,tween(260),label="libraryFace")
-    Card(modifier=Modifier.fillMaxWidth().testTag("library-card"),shape=DriveStyle.CardShape,
-        colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)) {
+    Card(modifier=Modifier.fillMaxWidth().testTag("library-card").background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primaryContainer,MaterialTheme.colorScheme.surface)),DriveStyle.CardShape),shape=DriveStyle.CardShape,
+        colors=CardDefaults.cardColors(containerColor=Color.Transparent)) {
         Box(Modifier.fillMaxWidth().heightIn(min=if(shortcuts.isEmpty())0.dp else 224.dp)) {
             val front=Modifier.fillMaxWidth().graphicsLayer{alpha=opacity}
 
@@ -59,7 +60,7 @@ fun LibraryDashboard(usage:LibraryOverview,onAdd:()->Unit,showAddAction:Boolean=
             Column(front.padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 Row(Modifier.padding(end=if(shortcuts.isEmpty())0.dp else 40.dp),verticalAlignment=Alignment.CenterVertically){
                     Text("Your library",Modifier.weight(1f).skeleton(loading),style=MaterialTheme.typography.titleMedium)
-                    IconButton(onClick={details=true},enabled=!collections&&!loading,modifier=Modifier.size(48.dp)){Icon(DriveIcons.Info,"About library storage",Modifier.size(20.dp).skeleton(loading))}
+
                 }
                 Column(verticalArrangement=Arrangement.spacedBy(2.dp)) {
                     Text(if(loading)"42.8 GB"else formatBytes(usage.bytes),Modifier.skeleton(loading),style=MaterialTheme.typography.displaySmall,maxLines=1)
@@ -118,7 +119,7 @@ private fun formatBytes(bytes:Long):String {
 
 @Composable
 private fun CollectionsFace(visible:Boolean,shortcuts:List<LibraryShortcut>,modifier:Modifier){
-    AnimatedVisibility(visible,modifier=modifier,enter=fadeIn(tween(260)),exit=fadeOut(tween(160))){
+    AnimatedVisibility(visible,modifier=modifier,enter=fadeIn(tween(320)),exit=fadeOut(tween(220))){
                 Column(Modifier.fillMaxSize().padding(18.dp)) {
                     Text("Your shortcuts",Modifier.padding(end=40.dp),style=MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(8.dp))

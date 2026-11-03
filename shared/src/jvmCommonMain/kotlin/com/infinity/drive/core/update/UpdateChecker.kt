@@ -16,24 +16,25 @@ import java.net.URL
  * endpoint, so a check reveals no more than visiting the releases page.
  */
 class UpdateChecker(
-    private val currentVersion: String
+    private val currentVersion: String,
+    private val currentBuild: Int = 0
 ) {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    suspend fun newerRelease(): AppRelease? = withContext(Dispatchers.IO) {
-        val payload = runCatching { fetchLatest() }
-            .onFailure { SafeLog.w(TAG, "Update check failed", it) }
-            .getOrNull()
-            ?: return@withContext null
+    suspend fun newerRelease(strict:Boolean=false): AppRelease? = withContext(Dispatchers.IO) {
+        val payload=try{fetchLatest()}catch(e:Exception){
+            if(e is kotlinx.coroutines.CancellationException || strict)throw e
+            SafeLog.w(TAG,"Update check failed",e);return@withContext null
+        }
 
         val release = runCatching {
             json.decodeFromString(GitHubRelease.serializer(), payload)
-        }.getOrNull() ?: return@withContext null
+        }.getOrElse{if(strict)throw it;return@withContext null}
 
         if (release.draft || release.preRelease) return@withContext null
         val latest = release.tag.removePrefix("v").trim()
-        if (!isNewer(latest, currentVersion)) return@withContext null
+        if (!isNewer(latest, if(currentBuild>0)"$currentVersion-build.$currentBuild"else currentVersion)) return@withContext null
 
         AppRelease(
             version = latest,
@@ -47,6 +48,8 @@ class UpdateChecker(
             requestMethod = "GET"
             connectTimeout = TIMEOUT_MS
             readTimeout = TIMEOUT_MS
+            useCaches = false
+            setRequestProperty("Cache-Control", "no-cache")
             setRequestProperty("Accept", "application/vnd.github+json")
             setRequestProperty("User-Agent", USER_AGENT)
         }
@@ -88,7 +91,7 @@ class UpdateChecker(
     private companion object {
         const val TAG = "UpdateChecker"
         const val RELEASES_URL =
-            "https://api.github.com/repos/jntynho/TG-Drive/releases/latest"
+            "https://api.github.com/repos/jntynho/TeleDrive/releases/latest"
         const val USER_AGENT = "TGDrive"
         const val TIMEOUT_MS = 15_000
     }

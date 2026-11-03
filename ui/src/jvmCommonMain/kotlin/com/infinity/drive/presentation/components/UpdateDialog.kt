@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import app.tgdrive.ui.DriveIcons
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +35,8 @@ fun UpdateDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        icon={Icon(DriveIcons.Download,null)},
+        containerColor=MaterialTheme.colorScheme.surfaceContainerHigh,
         title = { Text(stringResource(Res.string.about_update_title, release.version)) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {

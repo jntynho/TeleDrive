@@ -28,7 +28,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
+import com.infinity.drive.presentation.components.GradientCard as Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -233,7 +233,7 @@ fun HomeScreen(
             androidx.compose.animation.AnimatedVisibility(visible=!searching&&!state.loading,enter=fadeIn(androidx.compose.animation.core.tween(240)),exit=fadeOut(androidx.compose.animation.core.tween(160))){
                 androidx.compose.material3.FloatingActionButton(onClick={showUploadSheet=true},shape=CircleShape,containerColor=MaterialTheme.colorScheme.primary,contentColor=MaterialTheme.colorScheme.onPrimary,
                     modifier=Modifier.padding(bottom=LocalBottomBarInset.current)){
-                    Icon(DriveIcons.CloudUpload,"Upload",Modifier.size(26.dp))
+                    Icon(DriveIcons.DriveFolderUpload,"Upload",Modifier.size(26.dp))
                 }
             }
         },

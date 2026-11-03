@@ -147,7 +147,7 @@ private fun AlbumGrid(
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns),
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxSize().resultReveal(albums.map{it.folderId})
             .pinchZoom(onZoomIn = onZoomIn, onZoomOut = onZoomOut),
         contentPadding = PaddingValues(
             start = 12.dp,
@@ -367,7 +367,7 @@ fun GalleryScreen(
         } }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(top=padding.calculateTopPadding())) {
-            androidx.compose.animation.AnimatedVisibility(!state.isAlbumView && !state.selectionMode && state.tab!=GalleryTab.ALBUMS,enter=androidx.compose.animation.fadeIn()+androidx.compose.animation.expandVertically(),exit=androidx.compose.animation.fadeOut()+androidx.compose.animation.shrinkVertically()) {
+            androidx.compose.animation.AnimatedVisibility(!state.isAlbumView && !state.selectionMode && state.tab!=GalleryTab.ALBUMS && !lifted,enter=androidx.compose.animation.fadeIn()+androidx.compose.animation.expandVertically(),exit=androidx.compose.animation.fadeOut()+androidx.compose.animation.shrinkVertically()) {
                 GalleryTabSelector(selected=state.tab,onSelect=viewModel::setTab)
             }
 

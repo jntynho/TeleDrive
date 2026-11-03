@@ -5,7 +5,7 @@ import com.infinity.drive.domain.model.DriveFile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-data class AudioMetadata(val title:String?=null,val artist:String?=null,val durationMs:Long?=null)
+data class AudioMetadata(val title:String?=null,val artist:String?=null,val durationMs:Long?=null,val artworkColors:List<Long> = emptyList(),val lyrics:String?=null)
 data class AudioPlaybackState(val file:DriveFile?=null,val playing:Boolean=false,val loading:Boolean=false,val playRequested:Boolean=false,
     val error:String?=null,val metadata:AudioMetadata=AudioMetadata(),val positionMs:Long=0,val durationMs:Long=0,val canSkipPrevious:Boolean=false,val canSkipNext:Boolean=false)
 interface AudioPlayback {

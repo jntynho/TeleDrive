@@ -126,7 +126,7 @@ class RebuiltUiTest {
     @Test fun audioSortDoesNotChangeTheFileBrowserOrder() {
         compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithTag("navigation-audio").performClick()
-        compose.onNodeWithText("Sort",substring=false).performClick()
+        compose.onNodeWithContentDescription("Sort audio").performClick()
         compose.onNodeWithText("Size",substring=false).performClick()
         compose.waitUntil(10_000){compose.waitForIdle();runBlocking{GlobalContext.get().get<SettingsRepository>().preferences.first().audioSortField==com.infinity.drive.domain.model.FileSortField.SIZE}}
         val prefs=runBlocking{GlobalContext.get().get<SettingsRepository>().preferences.first()}
@@ -279,7 +279,7 @@ class RebuiltUiTest {
         compose.waitUntil(15_000){compose.onAllNodesWithText("Midnight City",substring=false).fetchSemanticsNodes().isNotEmpty()}
         compose.runOnUiThread{playback.value=playback.value.copy(playing=true)}
         compose.onNodeWithText("Midnight City",substring=false).performClick()
-        compose.onNodeWithText("NOW PLAYING",substring=false).assertIsDisplayed()
+        compose.onNodeWithContentDescription("Back to library").assertIsDisplayed()
         capture("now-playing")
         compose.onNodeWithContentDescription("Previous audio").performClick()
         compose.onNodeWithContentDescription("Next audio").performClick()
@@ -327,6 +327,23 @@ class RebuiltUiTest {
         compose.onNodeWithTag("navigation-gallery").performClick()
         compose.onNodeWithTag("navigation-audio").performClick()
         compose.onNodeWithText("Track 25",substring=false).assertIsDisplayed()
+    }
+
+    @Test fun allThreeThemesKeepSearchAndNavigationReachable(){
+        compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        val settings=GlobalContext.get().get<SettingsRepository>()
+        listOf(com.infinity.drive.domain.model.AppTheme.LIGHT,com.infinity.drive.domain.model.AppTheme.DARK,com.infinity.drive.domain.model.AppTheme.AMOLED).forEach{theme->
+            runBlocking{settings.update{it.copy(theme=theme,dynamicColor=false)}}
+            compose.waitForIdle()
+            compose.onNodeWithContentDescription("Search home").performClick()
+            compose.onNode(hasSetTextAction()).assertIsDisplayed()
+            compose.onNodeWithContentDescription("Close search").performClick()
+            compose.onNodeWithTag("navigation-gallery").performClick()
+            compose.onNodeWithContentDescription("Search gallery").assertIsDisplayed()
+            capture("gallery-${theme.name.lowercase()}")
+            compose.onNodeWithTag("navigation-home").performClick()
+            compose.onNodeWithText("Your library").assertIsDisplayed()
+        }
     }
 
     private fun capture(name:String) {

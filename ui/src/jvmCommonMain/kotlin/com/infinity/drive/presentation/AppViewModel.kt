@@ -55,6 +55,7 @@ class AppViewModel(
     private val appLockManager: AppLockManager,
     private val localDataWiper: LocalDataWiper,
     private val updateChecker: UpdateChecker,
+    private val fileRepository:com.infinity.drive.domain.repository.FileRepository,
     private val upgrade:com.infinity.drive.core.common.AppUpgrade
 ) : ViewModel() {
 
@@ -91,6 +92,7 @@ class AppViewModel(
         viewModelScope.launch {
             try {
                 _upgradeNotice.value=upgrade.prepare()
+                kotlinx.coroutines.withTimeoutOrNull(400){fileRepository.observeRecent(12).first()}
                 appLockManager.onAppStarted()
                 backupRepository.refreshActiveSession()
                 val started = telegramAuthRepository.startFromStoredCredentials()
@@ -139,12 +141,15 @@ class AppViewModel(
     fun checkForUpdate(force: Boolean = false) {
         viewModelScope.launch {
             val prefs = settingsRepository.preferences.first()
-            if (!prefs.onboardingComplete) return@launch
+            if (!prefs.onboardingComplete || (!force&&!prefs.updateCheckEnabled)) return@launch
             val elapsed = System.currentTimeMillis() - prefs.lastUpdateCheckAt
             if (!force && elapsed < UPDATE_CHECK_INTERVAL_MS) return@launch
 
+            val release=try{updateChecker.newerRelease(strict=true)}catch(e:Exception){
+                if(e is kotlinx.coroutines.CancellationException)throw e
+                return@launch
+            }
             settingsRepository.update { it.copy(lastUpdateCheckAt = System.currentTimeMillis()) }
-            val release = updateChecker.newerRelease()
             if (!force && release?.version == prefs.skippedUpdateVersion) return@launch
             _pendingUpdate.value = release
         }

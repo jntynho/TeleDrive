@@ -41,7 +41,7 @@ fun AlbumCard(
     val albumName = album.name ?: stringResource(Res.string.album_not_in_folder)
     Column(
         modifier = modifier
-            .clip(MaterialTheme.shapes.large)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .clickable(enabled=!loading,onClick = onClick)
             .padding(6.dp)
@@ -50,7 +50,7 @@ fun AlbumCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
-                .clip(MaterialTheme.shapes.medium)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(9.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh).skeleton(loading,12.dp),
             contentAlignment = Alignment.Center
         ) {

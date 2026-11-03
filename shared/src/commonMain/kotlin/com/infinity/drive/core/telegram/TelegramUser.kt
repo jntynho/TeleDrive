@@ -6,5 +6,6 @@ data class TelegramUser(
     val lastName: String,
     val username: String?,
     val phoneNumber: String,
-    val isPremium: Boolean
+    val isPremium: Boolean,
+    val photoPath: String? = null
 )

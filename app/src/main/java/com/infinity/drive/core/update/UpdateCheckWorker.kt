@@ -26,7 +26,7 @@ class UpdateCheckWorker(
         val prefs = settingsRepository.preferences.first()
         if (!prefs.onboardingComplete || !prefs.updateCheckEnabled) return Result.success()
 
-        val release = updateChecker.newerRelease()
+        val release = try{updateChecker.newerRelease(strict=true)}catch(e:Exception){if(e is kotlinx.coroutines.CancellationException)throw e;return Result.retry()}
         settingsRepository.update { it.copy(lastUpdateCheckAt = System.currentTimeMillis()) }
         if (release == null) return Result.success()
         if (release.version == prefs.notifiedUpdateVersion) return Result.success()

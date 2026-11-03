@@ -298,7 +298,7 @@ fun PreviewScreen(
                 visible = chromeShown,
                 enter = slideInVertically { height -> -height } + fadeIn(),
                 exit = slideOutVertically { height -> -height } + fadeOut(),
-                modifier = Modifier.align(Alignment.TopCenter)
+                modifier = Modifier.align(Alignment.TopCenter).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(if(immersive)androidx.compose.ui.graphics.Color.Black.copy(alpha=.65f)else androidx.compose.ui.graphics.Color.Transparent,androidx.compose.ui.graphics.Color.Transparent)))
             ) {
                 TopAppBar(
                     expandedHeight=52.dp,
@@ -443,7 +443,10 @@ fun PreviewScreen(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,scrolledContainerColor=Color.Transparent
+                        containerColor = Color.Transparent,scrolledContainerColor=Color.Transparent,
+                        titleContentColor=if(immersive)Color.White else MaterialTheme.colorScheme.onSurface,
+                        navigationIconContentColor=if(immersive)Color.White else MaterialTheme.colorScheme.onSurface,
+                        actionIconContentColor=if(immersive)Color.White else MaterialTheme.colorScheme.onSurface
                     )
                 )
             }

@@ -81,7 +81,7 @@ fun FileThumbnail(
         }
 
         if (file.category == FileCategory.VIDEO) {
-            if(!galleryTile)Box(
+            Box(
                 modifier = Modifier
                     .size(badgeSize)
                     .background(color = SCRIM, shape = CircleShape),

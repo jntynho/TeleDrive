@@ -10,6 +10,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 @Composable
 fun Modifier.resultReveal(revision:Any?):Modifier {
     val opacity=remember{Animatable(1f)}
-    LaunchedEffect(revision){opacity.snapTo(.82f);opacity.animateTo(1f,tween(260))}
+    LaunchedEffect(revision){opacity.snapTo(.9f);opacity.animateTo(1f,tween(300))}
     return graphicsLayer{alpha=opacity.value}
 }

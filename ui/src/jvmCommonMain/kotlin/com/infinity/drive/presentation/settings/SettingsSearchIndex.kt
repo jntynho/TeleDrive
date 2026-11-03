@@ -30,8 +30,6 @@ fun settingsSearchEntries():List<SettingsSearchEntry> = listOf(
     SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_theme),
     SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_language),
     SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_dynamic_color),
-    SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_grid_view),
-    SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_grid_columns),
     SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_gallery_grid_view),
     SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_gallery_grid_columns),
     SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_compact_layout),

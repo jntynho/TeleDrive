@@ -36,7 +36,7 @@ fun ExpandableLibraryHeader(
     Surface(color=MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxWidth().statusBarsPadding().height(64.dp)) {
             AnimatedContent(expanded,modifier=Modifier.fillMaxSize(),transitionSpec={
-                (fadeIn(tween(220)) togetherWith fadeOut(tween(140)))
+                (fadeIn(tween(280))+slideInHorizontally(tween(280)){it/32} togetherWith fadeOut(tween(180)))
                     .using(SizeTransform(clip=true){_,_->androidx.compose.animation.core.snap()})
             },label="toolbarSearch"){ searching ->
                 Row(Modifier.fillMaxSize().padding(horizontal=8.dp),verticalAlignment=Alignment.CenterVertically) {
@@ -50,7 +50,7 @@ fun ExpandableLibraryHeader(
                             modifier=Modifier.weight(1f).heightIn(min=48.dp).focusRequester(requester).semantics{contentDescription=placeholder},
                             decorationBox={input->Box(contentAlignment=Alignment.CenterStart){if(query.isEmpty())Text(placeholder,color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodyLarge);input()}})
                         if(query.isNotEmpty())IconButton({onQueryChange("")}){Icon(DriveIcons.Close,"Clear search")}
-                        LaunchedEffect(Unit){kotlinx.coroutines.delay(220);requester.requestFocus();keyboard?.show()}
+                        LaunchedEffect(Unit){kotlinx.coroutines.delay(280);requester.requestFocus();keyboard?.show()}
                     }else{
                         navigationIcon()
                         Text(title,Modifier.weight(1f).padding(start=8.dp),style=MaterialTheme.typography.headlineLarge,maxLines=1,overflow=TextOverflow.Ellipsis)

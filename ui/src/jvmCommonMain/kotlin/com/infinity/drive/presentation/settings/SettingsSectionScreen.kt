@@ -34,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import org.jetbrains.compose.resources.StringArrayResource
 import org.jetbrains.compose.resources.stringArrayResource
 import org.jetbrains.compose.resources.pluralStringResource
@@ -322,12 +323,16 @@ private fun AccountSection(
 
     SettingsGroup {
         add {
-            SettingsClickRow(
-                title = state.user?.let {
-                    listOf(it.firstName, it.lastName).filter(String::isNotBlank)
-                        .joinToString(" ")
-                } ?: stringResource(Res.string.settings_telegram_account),
-                subtitle = buildString {
+            androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(20.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
+                if(state.user?.photoPath!=null)coil3.compose.AsyncImage(state.user?.photoPath,"Telegram profile photo",Modifier.size(56.dp).then(Modifier.clip(androidx.compose.foundation.shape.CircleShape)),contentScale=androidx.compose.ui.layout.ContentScale.Crop)
+                else Icon(DriveIcons.AccountCircle,null,Modifier.size(56.dp),tint=MaterialTheme.colorScheme.primary)
+                Column(Modifier.padding(start=16.dp)){
+                    Text(state.user?.let{listOf(it.firstName,it.lastName).filter(String::isNotBlank).joinToString(" ")}?:"Telegram account",style=MaterialTheme.typography.titleLarge)
+                    Text(state.user?.username?.let{"@$it"}?:"Your personal cloud",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        add { Text(buildString {
                     state.user?.phoneNumber?.let { append("+$it · ") }
                     append(
                         when (state.connection) {
@@ -339,10 +344,7 @@ private fun AccountSection(
                         }
                     )
                     if (state.user?.isPremium == true) append(" · Premium (4 GB uploads)")
-                },
-                onClick = { }
-            )
-        }
+                },style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(20.dp)) }
         add {
             SettingsClickRow(
                 title = stringResource(Res.string.settings_rebuild_index_telegram),
@@ -978,25 +980,6 @@ private fun AppearanceSection(state: SettingsUiState, viewModel: SettingsViewMod
                 subtitle = stringResource(Res.string.settings_use_wallpaper_colors_available),
                 checked = prefs.dynamicColor,
                 onChange = { value -> viewModel.update { it.copy(dynamicColor = value) } }
-            )
-        }
-        add {
-            SettingsSwitchRow(
-                title = stringResource(Res.string.settings_grid_view),
-                checked = prefs.viewMode == ViewMode.GRID,
-                onChange = { value ->
-                    viewModel.update {
-                        it.copy(viewMode = if (value) ViewMode.GRID else ViewMode.LIST)
-                    }
-                }
-            )
-        }
-        add(visible = prefs.viewMode == ViewMode.GRID) {
-            SettingsSliderRow(
-                title = stringResource(Res.string.settings_grid_columns),
-                value = prefs.gridSize,
-                range = 2..6,
-                onChange = { value -> viewModel.update { it.copy(gridSize = value) } }
             )
         }
         add {

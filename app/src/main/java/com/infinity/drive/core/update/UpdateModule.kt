@@ -7,6 +7,6 @@ import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 
 val updateModule = module {
-    single { UpdateChecker(BuildConfig.VERSION_NAME) }
+    single { UpdateChecker(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE) }
     workerOf(::UpdateCheckWorker)
 }

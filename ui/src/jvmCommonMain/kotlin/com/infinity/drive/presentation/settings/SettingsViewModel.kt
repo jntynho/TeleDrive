@@ -356,7 +356,12 @@ class SettingsViewModel(
         if (_updateState.value is UpdateState.Checking) return
         viewModelScope.launch {
             _updateState.value = UpdateState.Checking
-            val release = updateChecker.newerRelease()
+            val release = try{updateChecker.newerRelease(strict=true)}catch(e:Exception){
+                if(e is CancellationException)throw e
+                _messages.tryEmit(UiText.Plain("Couldn't check for updates. Check your connection and try again."))
+                _updateState.value=UpdateState.Idle
+                return@launch
+            }
             settingsRepository.update { it.copy(notifiedUpdateVersion = release?.version ?: "") }
             settingsRepository.update { it.copy(lastUpdateCheckAt = System.currentTimeMillis()) }
             _updateState.value = if (release == null) {

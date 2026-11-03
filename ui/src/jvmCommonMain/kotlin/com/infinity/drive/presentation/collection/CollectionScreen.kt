@@ -176,7 +176,7 @@ fun CollectionScreen(
             onStart = viewModel::startRangeSelection,
             onRange = { range ->
                 viewModel.extendRangeSelection(
-                    range.mapNotNull { index -> files.peek(index)?.id }
+                    range.mapNotNull { index -> if(index>0)files.peek(index-1)?.id else null }
                 )
             },
             onEnd = viewModel::endRangeSelection
@@ -194,6 +194,9 @@ fun CollectionScreen(
                 bottom = 8.dp + padding.calculateBottomPadding()
             )
         ) {
+            item("collection-summary"){
+                Text(stringResource(viewModel.type.subtitleRes),style=androidx.compose.material3.MaterialTheme.typography.bodyMedium,color=androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(horizontal=12.dp,vertical=16.dp))
+            }
             items(
                 count = files.itemCount,
                 key = files.itemKey { it.id }

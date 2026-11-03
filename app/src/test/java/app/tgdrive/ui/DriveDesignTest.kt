@@ -290,8 +290,7 @@ class DriveDesignTest {
             }
         }
         compose.onNodeWithText("Add files").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithContentDescription("About library storage").performScrollTo().performClick()
-        compose.onNodeWithText("Your indexed library").assertIsDisplayed()
+        compose.onNodeWithContentDescription("About library storage").assertDoesNotExist()
     }
 
     @Test fun activityUsesOneFilterAndKeepsPerFileActionsReachable() {

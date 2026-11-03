@@ -16,6 +16,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -40,6 +44,8 @@ fun FileGridItem(
     compact: Boolean = false,
     galleryTile:Boolean=false
 ) {
+    val checkAlpha by animateFloatAsState(if(selected)1f else 0f,tween(180),label="selectionBadge")
+    val selectionScale by animateFloatAsState(if(selected).94f else 1f,tween(200),label="selectionScale")
     Column(
         modifier = modifier
             .clip(if(galleryTile)androidx.compose.ui.graphics.RectangleShape else MaterialTheme.shapes.large)
@@ -55,16 +61,16 @@ fun FileGridItem(
                 galleryTile=galleryTile,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(if(galleryTile)app.tgdrive.ui.LibraryLayout.GalleryAspect else 1f)
+                    .aspectRatio(if(galleryTile)app.tgdrive.ui.LibraryLayout.GalleryAspect else 1f).graphicsLayer{scaleX=selectionScale;scaleY=selectionScale}
             )
-            if (selected) {
+            if (selected || checkAlpha>0f) {
                 Icon(
                     imageVector = DriveIcons.CheckCircle,
                     contentDescription = stringResource(Res.string.common_content_description_selected),
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(6.dp)
-                        .size(22.dp),
+                        .size(22.dp).graphicsLayer{alpha=checkAlpha},
                     tint = MaterialTheme.colorScheme.primary
                 )
             }

@@ -13,6 +13,10 @@ import com.infinity.drive.domain.model.TransferStage
 @Dao
 interface TransferDao {
 
+    @Query("SELECT COUNT(*) FROM transfers WHERE state = 'COMPLETED' AND completedAt >= :startedAt")
+    suspend fun completedSince(startedAt:Long):Int
+
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(transfer: TransferEntity)
 

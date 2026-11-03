@@ -377,7 +377,11 @@ internal class TdLibTelegramClient(
             username = user.usernames?.editableUsername?.takeIf { it.isNotEmpty() }
                 ?: user.usernames?.activeUsernames?.firstOrNull(),
             phoneNumber = user.phoneNumber,
-            isPremium = user.isPremium
+            isPremium = user.isPremium,
+            photoPath = user.profilePhoto?.small?.let { photo ->
+                if(photo.local.isDownloadingCompleted)photo.local.path.takeIf{it.isNotBlank()}
+                else runCatching { kotlinx.coroutines.withTimeoutOrNull(1500){send<TdApi.File>(TdApi.DownloadFile(photo.id,1,0,0,true)).local.path.takeIf{it.isNotBlank()}} }.getOrNull()
+            }
         )
     }
 

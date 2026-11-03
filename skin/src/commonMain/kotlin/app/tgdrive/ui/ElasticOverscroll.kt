@@ -62,7 +62,12 @@ internal class ElasticOverscrollEffect:OverscrollEffect {
     private fun unwind(delta:Float,current:Float):Float =
         if(current!=0f&&sign(delta)!=sign(current))sign(delta)*minOf(abs(delta),abs(current))else 0f
     override fun applyToScroll(delta:Offset,source:NestedScrollSource,performScroll:(Offset)->Offset):Offset {
-        if(source!=NestedScrollSource.UserInput)return performScroll(delta)
+        if(source!=NestedScrollSource.UserInput){
+            val consumed=performScroll(delta)
+            val remaining=delta-consumed
+            if(remaining.getDistance()>.5f){raw+=remaining*.35f;update()}
+            return consumed
+        }
         if(settling?.isActive==true){raw=Offset(restore(offset.x,width),restore(offset.y,height));settling?.cancel()}
         val released=Offset(unwind(delta.x,raw.x),unwind(delta.y,raw.y))
         raw+=released

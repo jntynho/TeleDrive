@@ -45,10 +45,12 @@ fun AudioScreen(onOpenFile:(String,PreviewSequence)->Unit,viewModel:AudioViewMod
 
     Scaffold(topBar={Column{
         ExpandableLibraryHeader("Audio",query,viewModel::search,searching,{searching=it},"Search audio",actions={Box {
-            TextButton({sorting=true}){Icon(DriveIcons.Sort,null,Modifier.size(20.dp));Spacer(Modifier.width(6.dp));Text("Sort")}
+            IconButton({sorting=true}){Icon(DriveIcons.Sort,"Sort audio",Modifier.size(24.dp))}
             SortMenu(sorting,prefs.audioSortField,prefs.audioSortDirection,{sorting=false},{field,direction->sorting=false;viewModel.sort(field,direction)},fields=listOf(FileSortField.NAME,FileSortField.DATE_ADDED,FileSortField.DATE_MODIFIED,FileSortField.SIZE))
         }})
-        LibraryFilters(listOf("All","Favorites","On device"),filter.ordinal,{viewModel.filter(AudioFilter.entries[it])})
+        androidx.compose.animation.AnimatedVisibility(!listState.canScrollBackward,enter=androidx.compose.animation.fadeIn()+androidx.compose.animation.expandVertically(),exit=androidx.compose.animation.fadeOut()+androidx.compose.animation.shrinkVertically()){
+            LibraryFilters(listOf("All","Favorites","On device"),filter.ordinal,{viewModel.filter(AudioFilter.entries[it])})
+        }
     }}){padding->
         val bottom=padding.calculateBottomPadding()+LocalBottomBarInset.current
         when {
@@ -59,7 +61,7 @@ fun AudioScreen(onOpenFile:(String,PreviewSequence)->Unit,viewModel:AudioViewMod
 
                 items(audio.itemCount,key=audio.itemKey{it.id}){index->
                     val file=audio[index]?:return@items
-                    AudioLibraryRow(file,playback.file?.id==file.id&&playback.playing,playback.metadata.takeIf{playback.file?.id==file.id},modifier=Modifier.animateItem(fadeInSpec=androidx.compose.animation.core.tween(240)),onPlay={viewModel.play(file,player)},onFavorite={viewModel.favorite(file)}){
+                    AudioLibraryRow(file,playback.file?.id==file.id&&playback.playing,playback.metadata.takeIf{playback.file?.id==file.id},modifier=Modifier.animateItem(fadeInSpec=androidx.compose.animation.core.tween(240)),onPlay={viewModel.play(file,player);onOpenFile(file.id,PreviewSequence(categories=listOf(FileCategory.AUDIO),localCopiesOnly=filter==AudioFilter.ON_DEVICE,favoritesOnly=filter==AudioFilter.FAVORITES,nameQuery=query.trim().takeIf{it.isNotBlank()},sortField=prefs.audioSortField,sortDirection=prefs.audioSortDirection))},onFavorite={viewModel.favorite(file)}){
                         onOpenFile(file.id,PreviewSequence(categories=listOf(FileCategory.AUDIO),nameQuery=query.trim().takeIf{it.isNotBlank()},favoritesOnly=filter==AudioFilter.FAVORITES,localCopiesOnly=filter==AudioFilter.ON_DEVICE,sortField=prefs.audioSortField,sortDirection=prefs.audioSortDirection))
                     }
                 }
@@ -83,15 +85,16 @@ fun AudioLibraryRow(file:DriveFile?,playing:Boolean=false,currentMetadata:AudioM
     val storedMetadata by produceState(AudioMetadata(),file?.id,file?.modifiedAt,file?.localPath){if(file!=null)value=player.metadata(file)}
     val meta=if(currentMetadata!=null)AudioMetadata(currentMetadata.title?:storedMetadata.title,currentMetadata.artist?:storedMetadata.artist,currentMetadata.durationMs?:storedMetadata.durationMs)else storedMetadata
     var menu by remember{mutableStateOf(false)}
+    Column {
     Row(modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(enabled=!loading,onClick=onPlay).padding(vertical=LibraryLayout.AudioRowPadding),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(LibraryLayout.AudioRowGap)){
         if(file!=null)FileThumbnail(file,Modifier.size(LibraryLayout.AudioCover).clip(RoundedCornerShape(LibraryLayout.CoverCorner)))
         else SkeletonBlock(Modifier.size(LibraryLayout.AudioCover),LibraryLayout.CoverCorner)
         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)){
             Text(meta.title?.takeIf{it.isNotBlank()}?:file?.name?.substringBeforeLast('.')?:"Midnight City",Modifier.skeleton(loading),style=MaterialTheme.typography.titleSmall,color=if(playing)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,maxLines=1,overflow=TextOverflow.Ellipsis)
-            Text(meta.artist?.takeIf{it.isNotBlank()}?:file?.extension?.uppercase()?.ifBlank{"Audio"}?:"Artist name",Modifier.skeleton(loading),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
+            Text(meta.artist?.takeIf{it.isNotBlank()}?:if(loading)"Artist name"else "Unknown artist",Modifier.skeleton(loading),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
         }
         val duration=meta.durationMs?:file?.durationMs
-        if(duration!=null||loading)Text(if(loading)"3:42"else Formatters.duration(duration!!),Modifier.skeleton(loading),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(if(loading)"3:42"else if(duration!=null)Formatters.duration(duration)else "—",Modifier.skeleton(loading),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         if(playing)Icon(DriveIcons.Audiotrack,"Playing",Modifier.size(20.dp),tint=MaterialTheme.colorScheme.primary)
         Box {
             IconButton({menu=true},enabled=!loading){Icon(DriveIcons.MoreVert,"Audio options for ${file?.name.orEmpty()}",Modifier.skeleton(loading))}
@@ -100,5 +103,7 @@ fun AudioLibraryRow(file:DriveFile?,playing:Boolean=false,currentMetadata:AudioM
                 DropdownMenuItem(text={Text("Open player & file options")},onClick={menu=false;onDetails()})
             }
         }
+    }
+    HorizontalDivider(Modifier.padding(start=LibraryLayout.AudioCover+LibraryLayout.AudioRowGap),color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.4f))
     }
 }

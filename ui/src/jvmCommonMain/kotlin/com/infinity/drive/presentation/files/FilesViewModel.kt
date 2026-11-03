@@ -252,7 +252,7 @@ class FilesViewModel(
             folders = folders,
             selection = selected,
             folderSelection = selectedFolders,
-            viewMode = if(audioOnly)ViewMode.LIST else prefs.viewMode,
+            viewMode = ViewMode.LIST,
             gridSize = prefs.gridSize,
             sortField = prefs.sortField,
             sortDirection = prefs.sortDirection,

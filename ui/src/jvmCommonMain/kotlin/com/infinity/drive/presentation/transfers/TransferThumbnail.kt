@@ -43,8 +43,8 @@ fun TransferThumbnail(
 
     Box(
         modifier = modifier
-            .size(44.dp)
-            .clip(MaterialTheme.shapes.medium)
+            .size(52.dp)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHighest),
         contentAlignment = Alignment.Center
     ) {

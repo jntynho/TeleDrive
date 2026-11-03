@@ -10,6 +10,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -178,8 +180,9 @@ fun PlayerControls(
     }
 
     DisposableEffect(activity) {
+        val previous=activity?.requestedOrientation
         onDispose {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            activity?.requestedOrientation = previous ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
     }
 
@@ -210,18 +213,18 @@ fun PlayerControls(
         Box(modifier = Modifier.fillMaxSize()) {
             Row(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .statusBarsPadding()
-                    .padding(top = TOP_BAR_HEIGHT, start = 12.dp, end = 12.dp)
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .background(Brush.verticalGradient(listOf(androidx.compose.ui.graphics.Color.Transparent,androidx.compose.ui.graphics.Color.Black.copy(alpha=.65f))))
+                    .padding(bottom = 108.dp, start = 12.dp, end = 12.dp)
                     .fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                 verticalAlignment = Alignment.Top
             ) {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                    FlowRow(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.Start),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    Row(
+                        modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.Start)
                     ) {
                         CompositionLocalProvider(
                             LocalLayoutDirection provides LayoutDirection.Ltr
@@ -384,7 +387,7 @@ fun PlayerControls(
                 app.tgdrive.ui.SlimSlider(
                     enabled=duration>0,
                     trackHeight=3.dp,thumbSize=12.dp,
-                    value = scrubTarget ?: position.toFloat(),
+                    value = scrubTarget ?: position.coerceIn(0,duration.coerceAtLeast(0)).toFloat(),
                     onValueChange = { value ->
                         onInteraction()
                         onScrubbingChanged(true)
@@ -407,21 +410,21 @@ fun PlayerControls(
                     Text(
                         text = Formatters.duration(scrubTarget?.toLong() ?: position),
                         style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = androidx.compose.ui.graphics.Color.White
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     if (speed != 1f) {
                         Text(
                             text = speedLabel(speed),
                             style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = androidx.compose.ui.graphics.Color.White.copy(alpha=.8f)
                         )
                         Spacer(modifier = Modifier.weight(1f))
                     }
                     Text(
                         text = Formatters.duration(duration),
                         style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = androidx.compose.ui.graphics.Color.White.copy(alpha=.8f)
                     )
                 }
             }
@@ -552,9 +555,9 @@ private fun TransportRow(
                 player.seekTo((player.currentPosition - SEEK_STEP_MS).coerceAtLeast(0))
             },
             colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surface
+                containerColor = androidx.compose.ui.graphics.Color.Black
                     .copy(alpha = TRANSPORT_ALPHA),
-                contentColor = MaterialTheme.colorScheme.onSurface
+                contentColor = androidx.compose.ui.graphics.Color.White
             )
         ) {
             Icon(
@@ -576,9 +579,9 @@ private fun TransportRow(
                 }
             },
             colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surface
+                containerColor = androidx.compose.ui.graphics.Color.Black
                     .copy(alpha = TRANSPORT_ALPHA),
-                contentColor = MaterialTheme.colorScheme.onSurface
+                contentColor = androidx.compose.ui.graphics.Color.White
             ),
             modifier = Modifier.size(PLAY_BUTTON_SIZE)
         ) {
@@ -610,9 +613,9 @@ private fun TransportRow(
                 player.seekTo((player.currentPosition + SEEK_STEP_MS).coerceAtMost(limit))
             },
             colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surface
+                containerColor = androidx.compose.ui.graphics.Color.Black
                     .copy(alpha = TRANSPORT_ALPHA),
-                contentColor = MaterialTheme.colorScheme.onSurface
+                contentColor = androidx.compose.ui.graphics.Color.White
             )
         ) {
             Icon(
@@ -649,9 +652,9 @@ private fun ControlButton(
             containerColor = if (active) {
                 MaterialTheme.colorScheme.primary.copy(alpha = SURFACE_ALPHA)
             } else {
-                MaterialTheme.colorScheme.surface.copy(alpha = SURFACE_ALPHA)
+                androidx.compose.ui.graphics.Color.Black.copy(alpha = SURFACE_ALPHA)
             },
-            contentColor = MaterialTheme.colorScheme.onSurface
+            contentColor = androidx.compose.ui.graphics.Color.White
         )
     ) {
         Icon(imageVector = icon, contentDescription = description)

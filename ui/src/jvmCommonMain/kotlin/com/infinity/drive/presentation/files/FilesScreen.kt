@@ -802,7 +802,7 @@ private fun FilesContent(
         columns = GridCells.Fixed(columns),
         modifier = Modifier
             .fillMaxSize()
-            .pinchZoom(onZoomIn = viewModel::zoomIn, onZoomOut = viewModel::zoomOut)
+
             .then(dragSelect),
         contentPadding = padding.add(horizontal = 12.dp, top = 12.dp, bottom = 100.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),

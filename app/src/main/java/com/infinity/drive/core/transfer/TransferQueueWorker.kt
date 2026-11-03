@@ -14,12 +14,14 @@ import com.infinity.drive.core.common.AppNotifications
 import com.infinity.drive.data.local.dao.TransferDao
 import com.infinity.drive.domain.model.TransferType
 import com.infinity.drive.domain.repository.SettingsRepository
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
 
 /**
  * Runs the shared transfer queue drain as expedited work with a dataSync
  * foreground service, so long transfers survive app death.
  */
+@OptIn(kotlinx.coroutines.FlowPreview::class)
 class TransferQueueWorker(
     appContext: Context,
     params: WorkerParameters,
@@ -34,7 +36,14 @@ class TransferQueueWorker(
         appNotifications.createChannels()
         runCatching { setForeground(getForegroundInfo()) }
 
-        val result = drainer.drain(
+        val startedAt=System.currentTimeMillis()
+        val monitor=CoroutineScope(currentCoroutineContext()).launch {
+            combine(transferDao.observeActive(100),transferDao.observeActiveCount()){active,count->active to count}.sample(1000).collectLatest { (active,count) ->
+                if(active.isNotEmpty())runCatching { setForeground(progressInfo(active,count)) }
+                delay(800)
+            }
+        }
+        val result = try { drainer.drain(
             isStopped = { isStopped },
             onTerminalFailure = { transfer ->
                 if (settingsRepository.preferences.first().failureNotifications) {
@@ -53,6 +62,12 @@ class TransferQueueWorker(
                 }
             }
         )
+        } finally { monitor.cancelAndJoin() }
+        val completed=transferDao.observeCompleted(100).first().filter{(it.completedAt?:0)>=startedAt}
+        val completedCount=transferDao.completedSince(startedAt)
+        if(completedCount>0&&settingsRepository.preferences.first().backupNotifications){
+            appNotifications.notifyBackupResult("$completedCount transfers completed",completed.take(4).joinToString(" · "){it.displayName})
+        }
         return when (result) {
             TransferDrainResult.COMPLETED -> Result.success()
             TransferDrainResult.INTERRUPTED -> Result.retry()
@@ -84,6 +99,21 @@ class TransferQueueWorker(
             )
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
+
+    private fun progressInfo(tasks:List<com.infinity.drive.data.local.entity.TransferEntity>,count:Int):ForegroundInfo {
+        val total=tasks.sumOf{it.sizeBytes.coerceAtLeast(0).toDouble()}
+        val done=tasks.sumOf{it.transferredBytes.coerceIn(0,it.sizeBytes.coerceAtLeast(0)).toDouble()}
+        val percent=if(total>0)(done/total*100).toInt().coerceIn(0,100)else 0
+        val style=NotificationCompat.InboxStyle()
+        tasks.take(5).forEach{style.addLine("${it.displayName} · ${if(it.sizeBytes>0)(it.transferredBytes.toDouble()/it.sizeBytes*100).toInt().coerceIn(0,100).toString()+"%"else "Preparing"}")}
+        val notification=NotificationCompat.Builder(applicationContext,AppNotifications.CHANNEL_TRANSFERS)
+            .setSmallIcon(R.drawable.ic_notification).setContentTitle("$count active transfers")
+            .setContentText("$percent% · ${tasks.firstOrNull()?.displayName.orEmpty()}").setStyle(style)
+            .setProgress(100,percent,total<=0).setOnlyAlertOnce(true).setOngoing(true)
+            .setContentIntent(appNotifications.screenIntent(AppNotifications.DESTINATION_TRANSFERS,QUEUE_REQUEST_CODE)).build()
+        return if(Build.VERSION.SDK_INT>=29)ForegroundInfo(AppNotifications.NOTIFICATION_ID_TRANSFER_QUEUE,notification,ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        else ForegroundInfo(AppNotifications.NOTIFICATION_ID_TRANSFER_QUEUE,notification)
+    }
 
     companion object {
         const val UNIQUE_NAME = "transfer_queue"

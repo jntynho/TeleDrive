@@ -65,7 +65,7 @@ fun GroupedList(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = horizontalPadding)
-            .then(if(connected)Modifier.clip(RoundedCornerShape(OUTER_CORNER)).background(MaterialTheme.colorScheme.surfaceContainer)else Modifier)
+            .then(if(connected)Modifier.clip(RoundedCornerShape(OUTER_CORNER)).background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(MaterialTheme.colorScheme.surfaceContainerHigh,MaterialTheme.colorScheme.surfaceContainer)))else Modifier)
     ) {
         items.forEachIndexed { index, item ->
             val position = visibleIndices.indexOf(index)

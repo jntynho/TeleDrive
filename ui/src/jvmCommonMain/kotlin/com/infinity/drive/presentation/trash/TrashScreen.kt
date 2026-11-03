@@ -99,7 +99,7 @@ fun TrashScreen(
         onRange = { range ->
             viewModel.extendRangeSelection(
                 range.mapNotNull { index ->
-                    state.rows.getOrNull(index)?.takeIf { it.selectable }?.item?.id
+                    state.rows.getOrNull(index-1)?.takeIf { it.selectable }?.item?.id
                 }
             )
         },
@@ -202,6 +202,9 @@ fun TrashScreen(
                 .then(dragSelect),
             contentPadding = padding.add(horizontal = 12.dp, top = 12.dp, bottom = 12.dp)
         ) {
+            item("trash-summary"){
+                Text(if(state.autoClearDays>0)"Restore items before they are removed after ${state.autoClearDays} days."else"Restore items, or remove them permanently when you are ready.",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(horizontal=12.dp,vertical=16.dp))
+            }
             items(
                 state.rows,
                 key = { it.key }
