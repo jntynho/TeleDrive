@@ -27,7 +27,6 @@ import com.infinity.drive.domain.model.DriveFile
 import com.infinity.drive.presentation.common.Formatters
 import com.infinity.drive.presentation.components.FileThumbnail
 import com.infinity.drive.presentation.platform.*
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,8 +35,6 @@ fun LibraryAudioMiniPlayer(){
     val state by player.state.collectAsStateWithLifecycle()
     var last by remember{mutableStateOf(AudioPlaybackState())}
     var expanded by rememberSaveable{mutableStateOf(false)}
-    val sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)
-    val scope=rememberCoroutineScope()
     LaunchedEffect(state.file,state.metadata){if(state.file!=null)last=state}
     AnimatedVisibility(state.file!=null,enter=expandVertically(tween(260))+fadeIn(tween(220)),exit=shrinkVertically(tween(200))+fadeOut(tween(160))){
         val current=if(state.file!=null)state else last

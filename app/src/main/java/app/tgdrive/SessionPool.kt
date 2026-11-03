@@ -24,7 +24,7 @@ class SessionBundle(context: Context, val profile: AccountProfile, allowAccount:
         // Compatibility objects are never background writers in the rebuilt application.
         library.changed = null
         transfers.wake = null
-        transfers.external = { task -> if (task.kind == TaskKind.OCR) DocumentTools(library).recognize(task) else connections.execute(task) }
+        transfers.external = { task -> connections.execute(task) }
         transfers.completed = { task -> backups.onCompleted(task); connections.forget(task) }
     }
 }

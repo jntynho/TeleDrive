@@ -19,7 +19,7 @@ kotlin {
             api(libs.androidx.paging.common)
             api(libs.androidx.room.runtime)
             api(libs.androidx.room.paging)
-            api(libs.androidx.sqlite.bundled)
+            api(libs.androidx.sqlite.framework)
             api(libs.androidx.datastore.preferences.core)
         }
         val jvmCommonMain=create("jvmCommonMain") { dependsOn(commonMain.get()) }

@@ -1,3 +1,5 @@
+> Historical report for the retired 0.x engine. It is not the feature list of the current private-channel application. Bundled OCR is no longer shipped; saved legacy metadata and vault recovery remain supported.
+
 > Historical 0.x engine inventory. The active 1.0 rebuild is documented in [REBUILD-PARITY.md](REBUILD-PARITY.md).
 
 # Android 0.2.0 implementation

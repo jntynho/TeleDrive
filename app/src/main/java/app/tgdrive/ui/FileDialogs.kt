@@ -137,7 +137,6 @@ internal fun nameError(value:String):String?=runCatching{cleanName(value)}.excep
                 ActionRow("Upload new content version",icon=DriveIcons.Upload){onDismiss();system.upload(item.folderId,state.itemVaults[item.id].orEmpty(),item.id)}
                 }
                 DriveGroup {
-                if(item.mime.startsWith("image/")||item.mime=="application/pdf")ActionRow("Extract text on this device","Latin text · up to 50 PDF pages",DriveIcons.DocumentScanner){perform{bundle.transfers.enqueue(TaskKind.OCR,item);system.startTransfers()}}
                 if(state.preferences.sharingUrl.isNotBlank())ActionRow("Create public copy link","Requires your optional sharing server",DriveIcons.Link){mode="share"}
                 if(state.preferences.webDavUrl.isNotBlank())ActionRow("Copy to WebDAV","Requires your optional HTTPS endpoint",DriveIcons.CloudUpload){mode="webdav"}
                 }

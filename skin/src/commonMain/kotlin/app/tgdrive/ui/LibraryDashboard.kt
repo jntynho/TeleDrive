@@ -47,7 +47,6 @@ fun libraryArcShares(groups:List<Long>):List<Float> {
 fun LibraryDashboard(usage:LibraryOverview,onAdd:()->Unit,showAddAction:Boolean=true,
     shortcuts:List<LibraryShortcut> = emptyList(),loading:Boolean=false
 ) {
-    var details by remember{mutableStateOf(false)}
     var collections by rememberSaveable{mutableStateOf(false)}
     val groups=List(4){usage.groups.getOrElse(it){0L}.coerceAtLeast(0)}
     val opacity by animateFloatAsState(if(collections)0f else 1f,tween(260),label="libraryFace")
@@ -93,7 +92,6 @@ fun LibraryDashboard(usage:LibraryOverview,onAdd:()->Unit,showAddAction:Boolean=
         }
     }
     if(showAddAction)Button(onAdd,Modifier.fillMaxWidth().heightIn(min=52.dp).padding(top=8.dp),shape=DriveStyle.PillShape){Icon(DriveIcons.Add,null);Spacer(Modifier.width(8.dp));Text("Add files")}
-    if(details)AlertDialog(onDismissRequest={details=false},title={Text("Your indexed library")},text={Text("These sizes describe your visible active files, not a Telegram storage limit. Trash, previous versions and locked vaults are excluded.\n\n${formatBytes(usage.offlineBytes)} is stored offline on this device.",Modifier.verticalScroll(rememberScrollState()))},confirmButton={TextButton({details=false}){Text("Done")}})
 }
 
 @Composable private fun UsageLegend(index:Int,bytes:Long,loading:Boolean=false) {
@@ -106,9 +104,6 @@ fun LibraryDashboard(usage:LibraryOverview,onAdd:()->Unit,showAddAction:Boolean=
     }
 }
 
-@Composable private fun DashboardCard(onClick:()->Unit,modifier:Modifier,content:@Composable ()->Unit) {
-    Card(onClick,modifier,shape=DriveStyle.CardShape,colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)){content()}
-}
 private fun formatBytes(bytes:Long):String {
     val units=listOf("B","KB","MB","GB","TB")
     var amount=bytes.coerceAtLeast(0).toDouble();var index=0

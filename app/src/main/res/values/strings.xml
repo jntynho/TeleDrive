@@ -31,8 +31,6 @@
     <string name="delete_body">“%1$s” and its original message will be deleted from Telegram Saved Messages. There is no trash or undo.</string>
     <string name="delete">Delete</string>
     <string name="sign_out_body">Your cloud files will stay in Telegram. Finish any transfers before signing out.</string>
-    <string name="welcome">Your files.\nYour Telegram.</string>
-    <string name="welcome_body">A calm space for the files you keep in Saved Messages. Connect your account to get started.</string>
     <string name="configure">Connect your own app</string>
     <string name="configure_body">This build has no Telegram API credentials. Create an application at my.telegram.org, then enter its API ID and hash here. These are app credentials, not a bot token.</string>
     <string name="continue_label">Continue</string>

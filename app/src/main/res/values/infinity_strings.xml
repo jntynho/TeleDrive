@@ -1,22 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-
     <string name="app_name">Drive∞</string>
-
-
-    <string name="common_actions">More actions</string>
-    <string name="common_back">Back</string>
-    <string name="common_download">Download</string>
-    <string name="common_free_space">Free up space</string>
-    <string name="common_move_trash">Move to trash</string>
-    <string name="common_rename">Rename</string>
-    <string name="common_rename_file">Rename file</string>
-    <string name="common_upload">Upload</string>
-
-
-    <string name="note_edit_action">Edit text</string>
-
-
     <string name="transfer_error_decryption_failed">Decryption failed</string>
     <string name="transfer_error_download_ended">Download ended unexpectedly</string>
     <string name="transfer_error_download_stalled">Download stopped responding</string>
@@ -30,8 +14,6 @@
     <string name="transfer_error_save_failed">Could not save the download</string>
     <string name="transfer_error_upload_ended">Upload ended unexpectedly</string>
     <string name="transfer_error_upload_stalled">Upload stopped responding</string>
-
-
     <string name="notification_backup_complete">Backup complete</string>
     <string name="notification_backup_summary">%1$d of %2$d files backed up</string>
     <string name="notification_channel_backup">Backup</string>

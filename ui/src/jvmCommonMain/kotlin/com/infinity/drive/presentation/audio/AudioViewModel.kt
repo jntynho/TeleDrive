@@ -35,11 +35,5 @@ class AudioViewModel(private val handle:SavedStateHandle,private val files:FileR
             if(player.state.value.file?.id==file.id)player.setQueue(ids)
         }
     }
-    fun playAll(player:AudioPlayback){
-        queueJob?.cancel()
-        queueJob=viewModelScope.launch {
-            val ids=files.fileIds(spec.first())
-            ids.firstOrNull()?.let{files.getFile(it)}?.let{player.play(it);player.setQueue(ids)}
-        }
-    }
+
 }

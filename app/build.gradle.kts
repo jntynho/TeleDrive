@@ -64,7 +64,8 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    packaging { jniLibs.useLegacyPackaging = false }
+    // Compress native libraries for smaller APK downloads; Android extracts them at install.
+    packaging { jniLibs.useLegacyPackaging = true }
     testOptions {
         unitTests.isIncludeAndroidResources = true
         unitTests.all { test ->
@@ -87,7 +88,6 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.google.android.material)
     implementation(libs.androidx.compose.material3.adaptive)
-    implementation(libs.androidx.compose.material3.adaptive.navigation.suite)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -122,7 +122,6 @@ dependencies {
     // Existing native TDLib and Tink retain access to installed TG Drive sessions/vaults.
     implementation("io.github.tdlib-android:core:0.1.1")
     implementation("com.google.crypto.tink:tink-android:1.18.0")
-    implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
