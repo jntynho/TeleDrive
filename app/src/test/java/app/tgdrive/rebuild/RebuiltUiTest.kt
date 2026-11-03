@@ -188,7 +188,7 @@ class RebuiltUiTest {
         compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
         val before=compose.onNodeWithTag("library-card").fetchSemanticsNode().boundsInRoot
         compose.onNodeWithContentDescription("Show collections").performClick()
-        compose.onNodeWithText("Your shortcuts").assertIsDisplayed()
+        compose.onNodeWithText("Your collections").assertIsDisplayed()
         val after=compose.onNodeWithTag("library-card").fetchSemanticsNode().boundsInRoot
         org.junit.Assert.assertEquals(before,after)
         listOf("Favorites","Archived","Trash").forEach{compose.onNodeWithText(it,substring=false).assertIsDisplayed()}

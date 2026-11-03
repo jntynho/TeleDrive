@@ -1,105 +1,161 @@
 package app.tgdrive.ui
 
-import androidx.compose.foundation.clickable
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.platform.testTag
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.draw.clip
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 data class LibraryShortcut(val label:String,val icon:ImageVector,val onClick:()->Unit)
-
 data class LibraryOverview(val count:Int,val bytes:Long,val groups:List<Long>,val offlineBytes:Long=0,val lockedVaults:Int=0)
 
-private val usageLabels=listOf("Photos","Videos","Audio","Files")
-private val usageColors=listOf(Color(0xFF37C8F0),Color(0xFF0087FF),Color(0xFFC49AF5),Color(0xFF969FA8))
-
-/** Each angle is a share of indexed bytes, never an inferred Telegram storage quota. */
+/** Retained for callers that calculate category proportions; these are not storage quotas. */
 fun libraryArcShares(groups:List<Long>):List<Float> {
     val total=groups.sumOf{it.coerceAtLeast(0).toDouble()}
     return groups.map{if(total==0.0)0f else (it.coerceAtLeast(0)/total*180).toFloat()}
 }
 
+private val PassInk=Color(0xFF241F2E)
+private val PassShape=RoundedCornerShape(topStart=12.dp,topEnd=32.dp,bottomEnd=12.dp,bottomStart=32.dp)
+
+/** Both faces stay measured. Only draw properties animate, so surrounding rows never move. */
 @Composable
 fun LibraryDashboard(usage:LibraryOverview,onAdd:()->Unit,showAddAction:Boolean=true,
-    shortcuts:List<LibraryShortcut> = emptyList(),loading:Boolean=false
+    shortcuts:List<LibraryShortcut> = emptyList(),loading:Boolean=false,onBrowse:(()->Unit)?=null
 ) {
     var collections by rememberSaveable{mutableStateOf(false)}
-    val groups=List(4){usage.groups.getOrElse(it){0L}.coerceAtLeast(0)}
-    val opacity by animateFloatAsState(if(collections)0f else 1f,tween(260),label="libraryFace")
-    Card(modifier=Modifier.fillMaxWidth().testTag("library-card").background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primaryContainer,MaterialTheme.colorScheme.surface)),DriveStyle.CardShape),shape=DriveStyle.CardShape,
-        colors=CardDefaults.cardColors(containerColor=Color.Transparent)) {
-        Box(Modifier.fillMaxWidth().heightIn(min=if(shortcuts.isEmpty())0.dp else 224.dp)) {
-            val front=Modifier.fillMaxWidth().graphicsLayer{alpha=opacity}
-
-                .then(if(collections)Modifier.clearAndSetSemantics{}else Modifier)
-            Column(front.padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                Row(Modifier.padding(end=if(shortcuts.isEmpty())0.dp else 40.dp),verticalAlignment=Alignment.CenterVertically){
-                    Text("Your library",Modifier.weight(1f).skeleton(loading),style=MaterialTheme.typography.titleMedium)
-
+    val showingCollections=collections&&shortcuts.isNotEmpty()
+    val progress by animateFloatAsState(if(showingCollections)1f else 0f,
+        tween(340,easing=FastOutSlowInEasing),label="libraryFace")
+    val travel=with(LocalDensity.current){8.dp.toPx()}
+    val stackOffset=with(LocalDensity.current){6.dp.toPx()}
+    CompositionLocalProvider(LocalContentColor provides PassInk) {
+        Box(Modifier.fillMaxWidth().testTag("library-card").padding(bottom=6.dp)) {
+            Box(Modifier.matchParentSize().padding(horizontal=6.dp).graphicsLayer{translationY=stackOffset}
+                .background(Color(0xFFB7A1D3),PassShape))
+            Column(Modifier.fillMaxWidth().clip(PassShape).background(Brush.linearGradient(
+                listOf(Color(0xFFFFE5C3),Color(0xFFF0B8D3),Color(0xFFB7ACE8))))
+                .drawBehind {
+                    val fold=Path().apply {
+                        moveTo(size.width*.68f,size.height)
+                        lineTo(size.width*.84f,size.height*.36f)
+                        lineTo(size.width,size.height*.26f)
+                        lineTo(size.width,size.height)
+                        close()
+                    }
+                    drawPath(fold,PassInk.copy(alpha=.035f))
+                }.padding(20.dp)) {
+                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) {
+                        Text("Your library",Modifier.graphicsLayer{alpha=1-progress}
+                            .then(if(showingCollections)Modifier.clearAndSetSemantics{}else Modifier).skeleton(loading),
+                            style=MaterialTheme.typography.titleMedium)
+                        Text("Your collections",Modifier.graphicsLayer{alpha=progress}
+                            .then(if(!showingCollections)Modifier.clearAndSetSemantics{}else Modifier).skeleton(loading),
+                            style=MaterialTheme.typography.titleMedium)
+                    }
+                    if(shortcuts.isNotEmpty()) TextButton(onClick={collections=!collections},enabled=!loading,
+                        modifier=Modifier.width(146.dp).heightIn(min=48.dp).semantics {
+                            contentDescription=if(showingCollections)"Show library overview"else"Show collections"
+                        },colors=ButtonDefaults.textButtonColors(contentColor=PassInk,disabledContentColor=PassInk.copy(alpha=.4f))) {
+                        Icon(if(showingCollections)DriveIcons.ArrowBack else DriveIcons.GridView,null,Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(if(showingCollections)"Overview"else"Collections",style=MaterialTheme.typography.labelMedium)
+                    }
                 }
-                Column(verticalArrangement=Arrangement.spacedBy(2.dp)) {
-                    Text(if(loading)"42.8 GB"else formatBytes(usage.bytes),Modifier.skeleton(loading),style=MaterialTheme.typography.displaySmall,maxLines=1)
-                    Text(if(loading)"1,284 files"else "${usage.count} files",Modifier.skeleton(loading),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                Box(Modifier.fillMaxWidth().heightIn(min=132.dp),contentAlignment=Alignment.Center) {
+                    Column(Modifier.fillMaxWidth().graphicsLayer{alpha=1-progress;translationX=-travel*progress}
+                        .then(if(showingCollections)Modifier.clearAndSetSemantics{}else Modifier)) {
+                        val compact=LocalDensity.current.fontScale>1.3f
+                        Text(if(loading)"42.8 GB"else formatBytes(usage.bytes),Modifier.skeleton(loading),
+                            style=if(compact)MaterialTheme.typography.headlineMedium else MaterialTheme.typography.displayMedium,
+                            maxLines=1,overflow=TextOverflow.Ellipsis)
+                        Text(if(loading)"1,284 files"else "${usage.count} files",Modifier.skeleton(loading),
+                            style=MaterialTheme.typography.bodyMedium,color=PassInk.copy(alpha=.75f))
+                        Spacer(Modifier.height(20.dp))
+                        HorizontalDivider(color=PassInk.copy(alpha=.2f))
+                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                            .clickable(enabled=!loading&&!showingCollections&&onBrowse!=null){onBrowse?.invoke()}
+                            .heightIn(min=48.dp),verticalAlignment=Alignment.CenterVertically) {
+                            Icon(DriveIcons.CloudQueue,null,Modifier.size(22.dp).skeleton(loading))
+                            Text("Explore your files",Modifier.weight(1f).padding(horizontal=10.dp).skeleton(loading),
+                                style=MaterialTheme.typography.bodyMedium)
+                            Icon(DriveIcons.ChevronRight,null,Modifier.size(22.dp))
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth().graphicsLayer{alpha=progress;translationX=travel*(1-progress)}
+                        .then(if(!showingCollections)Modifier.clearAndSetSemantics{}else Modifier),
+                        horizontalArrangement=Arrangement.spacedBy(4.dp),verticalAlignment=Alignment.CenterVertically) {
+                        shortcuts.forEach { shortcut ->
+                            Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
+                                .clickable(enabled=showingCollections&&!loading,onClick=shortcut.onClick)
+                                .heightIn(min=112.dp).padding(horizontal=4.dp,vertical=16.dp),
+                                horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                                Icon(shortcut.icon,null,Modifier.size(28.dp))
+                                Text(shortcut.label,style=MaterialTheme.typography.labelMedium,
+                                    textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+                            }
+                        }
+                    }
                 }
-                val shares=remember(groups){libraryArcShares(groups)}
-                val emptyColor=MaterialTheme.colorScheme.outlineVariant
-                Canvas(Modifier.fillMaxWidth().height(12.dp).clip(DriveStyle.PillShape).skeleton(loading).semantics{contentDescription="File sizes by category; not a storage limit"}) {
-                    if(groups.sum()==0L)drawRect(emptyColor)
-                    else {var x=0f;shares.forEachIndexed{index,share->
-                        val width=size.width*share/180f
-                        if(width>0)drawRect(usageColors[index],Offset(x,0f),androidx.compose.ui.geometry.Size(width,size.height))
-                        x+=width
-                    }}
-                }
-                BoxWithConstraints {
-                    val stacked=maxWidth<280.dp||LocalDensity.current.fontScale>1.25f
-                    if(stacked)Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                        listOf(0 to 1,2 to 3).forEach{(a,b)->Row(Modifier.fillMaxWidth()){
-                            Box(Modifier.weight(1f)){UsageLegend(a,groups[a],loading)}
-                            Box(Modifier.weight(1f)){UsageLegend(b,groups[b],loading)}
-                        }}
-                    }else Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){groups.indices.forEach{UsageLegend(it,groups[it],loading)}}
-                }
-            }
-            CollectionsFace(collections,shortcuts,Modifier.matchParentSize())
-            if(shortcuts.isNotEmpty())IconButton({collections=!collections},enabled=!loading,modifier=Modifier.align(Alignment.TopEnd).padding(4.dp)){
-                Icon(if(collections)DriveIcons.Storage else DriveIcons.GridView,if(collections)"Show library overview"else"Show collections",Modifier.size(22.dp).skeleton(loading))
             }
         }
     }
-    if(showAddAction)Button(onAdd,Modifier.fillMaxWidth().heightIn(min=52.dp).padding(top=8.dp),shape=DriveStyle.PillShape){Icon(DriveIcons.Add,null);Spacer(Modifier.width(8.dp));Text("Add files")}
+    if(showAddAction)Button(onAdd,Modifier.fillMaxWidth().heightIn(min=52.dp).padding(top=8.dp),shape=CircleShape){
+        Icon(DriveIcons.Add,null);Spacer(Modifier.width(8.dp));Text("Add files")
+    }
 }
 
-@Composable private fun UsageLegend(index:Int,bytes:Long,loading:Boolean=false) {
-    Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(5.dp)) {
-        Box(Modifier.size(11.dp).skeleton(loading).background(usageColors[index],CircleShape))
-        Column(verticalArrangement=Arrangement.spacedBy(2.dp)) {
-            Text(usageLabels[index],Modifier.skeleton(loading),style=MaterialTheme.typography.labelMedium)
-            Text(if(loading)"7.2 GB"else formatBytes(bytes),Modifier.skeleton(loading),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+/** Category destinations are outside the pass so they stay available on either face. */
+@Composable
+fun LibraryCategories(groups:List<Long>,onOpen:(Int)->Unit,loading:Boolean=false) {
+    val labels=listOf("Photos","Videos","Audio","Files")
+    val colors=listOf(Color(0xFF77D2D0),Color(0xFF84C2F4),Color(0xFFD4AFE9),Color(0xFFE7D3A3))
+    val icons=listOf(DriveIcons.Image,DriveIcons.PlayCircle,DriveIcons.MusicNotes,DriveIcons.Description)
+    Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+        Text("Browse your library",Modifier.skeleton(loading),style=MaterialTheme.typography.titleLarge)
+        repeat(2){row->
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                repeat(2){column->
+                    val index=row*2+column
+                    Row(Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .clickable(enabled=!loading){onOpen(index)}.heightIn(min=64.dp).padding(12.dp),
+                        verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                        Box(Modifier.size(34.dp).clip(RoundedCornerShape(9.dp)).background(colors[index].copy(alpha=.15f)),contentAlignment=Alignment.Center) {
+                            Icon(icons[index],null,Modifier.size(23.dp).skeleton(loading),tint=if(MaterialTheme.colorScheme.background.luminance()>.5f)MaterialTheme.colorScheme.primary else colors[index])
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text(labels[index],Modifier.skeleton(loading),style=MaterialTheme.typography.labelLarge)
+                            Text(if(loading)"18.6 GB"else formatBytes(groups.getOrElse(index){0}),Modifier.skeleton(loading),
+                                style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -110,21 +166,4 @@ private fun formatBytes(bytes:Long):String {
     while(amount>=1024&&index<units.lastIndex){amount/=1024;index++}
     val rounded=kotlin.math.round(amount*10).toLong()
     return if(index==0)"${bytes.coerceAtLeast(0)} B" else "${rounded/10}.${rounded%10} ${units[index]}"
-}
-
-@Composable
-private fun CollectionsFace(visible:Boolean,shortcuts:List<LibraryShortcut>,modifier:Modifier){
-    AnimatedVisibility(visible,modifier=modifier,enter=fadeIn(tween(320)),exit=fadeOut(tween(220))){
-                Column(Modifier.fillMaxSize().padding(18.dp)) {
-                    Text("Your shortcuts",Modifier.padding(end=40.dp),style=MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(8.dp))
-                    shortcuts.forEach{shortcut->
-                        Row(Modifier.weight(1f).fillMaxWidth().clip(MaterialTheme.shapes.small).clickable(enabled=visible,onClick=shortcut.onClick).padding(horizontal=6.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
-                            Icon(shortcut.icon,null,Modifier.size(24.dp),tint=MaterialTheme.colorScheme.primary)
-                            Text(shortcut.label,Modifier.weight(1f),style=MaterialTheme.typography.titleSmall)
-                            Icon(DriveIcons.KeyboardArrowRight,null,Modifier.size(18.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-    }
 }

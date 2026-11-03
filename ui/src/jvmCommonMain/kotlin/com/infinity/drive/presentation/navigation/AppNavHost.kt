@@ -69,6 +69,14 @@ fun AppNavHost(
                     },
                     onOpenFolder = { navController.navigateOnce(Route.Files(it)) },
                     onOpenFiles={navController.navigateOnce(Route.Files())},
+                    onBrowseCategory={index->
+                        when(index){
+                            0->navController.navigateOnce(Route.Gallery(initialTab="PHOTOS"))
+                            1->navController.navigateOnce(Route.Gallery(initialTab="VIDEOS"))
+                            2->navController.navigateOnce(Route.Audio(true))
+                            else->navController.navigateOnce(Route.Files())
+                        }
+                    },
                     onOpenTransfers = { navController.navigateOnce(Route.Transfers) },
                     onOpenTrash = { navController.navigateOnce(Route.Trash) },
                     onOpenChannels = { navController.navigateOnce(Route.Channels) },

@@ -56,11 +56,20 @@ fun LibraryRecentRow(file:DriveFile?,modifier:Modifier=Modifier,onClick:()->Unit
 }
 @Composable
 fun HomeQuickLinks(links:List<LibraryShortcut>,loading:Boolean=false){
-    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
-        links.forEach{link->
-            Column(Modifier.weight(1f).clip(MaterialTheme.shapes.small).clickable(enabled=!loading,onClick=link.onClick).padding(vertical=12.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(8.dp)){
-                Icon(link.icon,null,Modifier.size(25.dp).skeleton(loading))
-                Text(link.label,Modifier.skeleton(loading),style=MaterialTheme.typography.labelMedium)
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val stacked=maxWidth<340.dp||androidx.compose.ui.platform.LocalDensity.current.fontScale>1.2f
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){
+            links.forEach{link->
+                val modifier=Modifier.weight(1f).clip(MaterialTheme.shapes.small)
+                    .clickable(enabled=!loading,onClick=link.onClick).heightIn(min=48.dp).padding(8.dp)
+                if(stacked) Column(modifier,horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                    Icon(link.icon,null,Modifier.size(22.dp).skeleton(loading))
+                    Text(link.label,Modifier.skeleton(loading),style=MaterialTheme.typography.labelMedium,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+                } else Row(modifier,verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.Center) {
+                    Icon(link.icon,null,Modifier.size(20.dp).skeleton(loading))
+                    Spacer(Modifier.width(6.dp))
+                    Text(link.label,Modifier.skeleton(loading),style=MaterialTheme.typography.labelMedium)
+                }
             }
         }
     }

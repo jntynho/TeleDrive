@@ -48,3 +48,7 @@ The public app name is **TeleDrive**. Keep `app.tgdrive.next`, the existing sign
 - Audio has Activity-retained ViewModel ownership and application context. Same-library preference emissions do not stop playback; actual library/sign-in changes stop it on Media3's main thread. Video has one viewer-level orientation owner, with saved resume position, playback intent, speed, volume and scaling. Track/speed menus suspend controls timeout.
 - Empty/error/lock surfaces and shared dialogs scroll when content cannot fit. File/folder names are validated before confirmation. Deep folder indentation is bounded. Telegram avatars have a missing-file fallback and account details follow authorization readiness. Drives refresh never creates a channel implicitly.
 - See [the Arabic audit and coverage report](UI_UX_AUDIT_2026_11.ar.md) for findings, fixes, test scope and device-validation limits.
+
+## Approved library pass
+
+Home now uses the warm asymmetric [library pass](LIBRARY-PASS.md). Overview and Collections share measured bounds and a draw-only 340 ms fade with restrained horizontal travel. Category navigation is below the pass. The loading layout uses the same components. This change has static verification only; building and device validation are deferred at the user's request.

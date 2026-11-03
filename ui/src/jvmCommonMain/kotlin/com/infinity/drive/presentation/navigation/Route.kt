@@ -15,7 +15,7 @@ sealed interface Route {
     data class Files(val folderId: String? = null,val upload:Boolean=false) : Route
 
     @Serializable
-    data object Gallery : Route
+    data class Gallery(val initialTab: String? = null) : Route
 
     @Serializable
     data class Audio(val audioTab:Boolean) : Route

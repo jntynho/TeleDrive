@@ -72,6 +72,7 @@ fun HomeScreen(
     onOpenCollection: (CollectionType) -> Unit,
     onOpenBackupSettings: () -> Unit,
     onOpenFiles:()->Unit={},
+    onBrowseCategory:(Int)->Unit={},
     viewModel: HomeViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -158,7 +159,9 @@ fun HomeScreen(
                     app.tgdrive.ui.LibraryShortcut("Favorites",DriveIcons.Star){onOpenCollection(CollectionType.FAVORITES)},
                     app.tgdrive.ui.LibraryShortcut("Archived",DriveIcons.Archive){onOpenCollection(CollectionType.ARCHIVED)},
                     app.tgdrive.ui.LibraryShortcut("Trash",DriveIcons.Delete,onOpenTrash)
-                ))
+                ),onBrowse=onOpenFiles)
+                Spacer(Modifier.height(20.dp))
+                app.tgdrive.ui.LibraryCategories(groups,onBrowseCategory)
             }
             item {
                 com.infinity.drive.presentation.components.HomeQuickLinks(listOf(
