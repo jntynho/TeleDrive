@@ -1,8 +1,8 @@
 // Modified for TG Drive: Android integration, safety fixes and visual adaptation; see third_party/driveinfinity/SOURCE.md.
 package com.infinity.drive.presentation.note
 
+import app.tgdrive.ui.elasticHorizontalScroll as horizontalScroll
 import app.tgdrive.ui.DriveIcons
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row

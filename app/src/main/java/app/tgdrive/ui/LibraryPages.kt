@@ -2,9 +2,11 @@
 
 package app.tgdrive.ui
 
+import app.tgdrive.ui.elasticHorizontalScroll as horizontalScroll
+import app.tgdrive.ui.ElasticLazyVerticalGrid as LazyVerticalGrid
+import app.tgdrive.ui.ElasticLazyColumn as LazyColumn
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,7 +18,6 @@ import java.util.Date
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.material3.*

@@ -1,5 +1,6 @@
 package com.infinity.drive.presentation.audio
 
+import app.tgdrive.ui.ElasticLazyColumn as LazyColumn
 import app.tgdrive.ui.DriveIcons
 import androidx.compose.animation.*
 import androidx.compose.animation.core.snap
@@ -7,7 +8,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*

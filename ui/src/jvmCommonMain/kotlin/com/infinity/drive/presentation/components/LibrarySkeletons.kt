@@ -1,8 +1,9 @@
 package com.infinity.drive.presentation.components
 
+import app.tgdrive.ui.ElasticLazyVerticalGrid as LazyVerticalGrid
+import app.tgdrive.ui.ElasticLazyColumn as LazyColumn
 import app.tgdrive.ui.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text

@@ -1,5 +1,6 @@
 package com.infinity.drive.presentation.preview
 
+import app.tgdrive.ui.ElasticLazyColumn as LazyColumn
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.RectF
@@ -24,7 +25,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect

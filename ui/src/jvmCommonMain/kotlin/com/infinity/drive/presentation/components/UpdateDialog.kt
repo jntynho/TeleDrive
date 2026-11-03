@@ -1,10 +1,10 @@
 package com.infinity.drive.presentation.components
 
+import app.tgdrive.ui.elasticVerticalScroll as verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import app.tgdrive.ui.DriveIcons

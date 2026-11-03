@@ -1,12 +1,14 @@
 package app.tgdrive.ui
 
+import app.tgdrive.ui.elasticVerticalScroll as verticalScroll
+import app.tgdrive.ui.ElasticLazyRow as LazyRow
+import app.tgdrive.ui.ElasticLazyColumn as LazyColumn
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier

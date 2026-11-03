@@ -1,12 +1,12 @@
 // Modified for TG Drive; see third_party/driveinfinity/SOURCE.md.
 package com.infinity.drive.presentation.settings
 
+import app.tgdrive.ui.elasticVerticalScroll as verticalScroll
 import com.infinity.drive.presentation.components.resultReveal
 import app.tgdrive.ui.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import com.infinity.drive.presentation.components.GradientCard as Card
 import androidx.compose.runtime.*

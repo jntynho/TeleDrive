@@ -52,3 +52,7 @@ The public app name is **TeleDrive**. Keep `app.tgdrive.next`, the existing sign
 ## Approved library pass
 
 Home now uses the warm asymmetric [library pass](LIBRARY-PASS.md). Overview and Collections share measured bounds and a draw-only 340 ms fade with restrained horizontal travel. Category navigation is below the pass. The loading layout uses the same components. This change has static verification only; building and device validation are deferred at the user's request.
+
+## Elastic scrolling refinement
+
+The [shared elastic adapters](ELASTIC-SCROLL.md) add distance-aware edge approach and bounded axis stretching. Native list/grid/scroll-state containers own a single effect; no pointer handler is layered over selection, zoom or seek gestures. Touch regression checks verify that near-edge rendering returns without changing the logical scroll position and that the final grid item remains reachable.

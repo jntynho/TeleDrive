@@ -1,9 +1,9 @@
 package com.infinity.drive.presentation.components
 
+import app.tgdrive.ui.elasticVerticalScroll as verticalScroll
 import app.tgdrive.ui.DriveIcons
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 /** Shared by Recent files and the browser; details replace the menu instead of stacking modals. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FileActionsSheet(file: DriveFile, onDismiss: () -> Unit, onOpen: () -> Unit) {
     var details by remember { mutableStateOf(false) }

@@ -2,6 +2,8 @@
 
 package app.tgdrive.ui
 
+import app.tgdrive.ui.ElasticLazyRow as LazyRow
+import app.tgdrive.ui.ElasticLazyColumn as LazyColumn
 import androidx.compose.ui.graphics.graphicsLayer
 
 import androidx.compose.animation.AnimatedVisibility

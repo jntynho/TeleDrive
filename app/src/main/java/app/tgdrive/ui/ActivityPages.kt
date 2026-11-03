@@ -2,6 +2,8 @@
 
 package app.tgdrive.ui
 
+import app.tgdrive.ui.ElasticLazyRow as LazyRow
+import app.tgdrive.ui.ElasticLazyColumn as LazyColumn
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role

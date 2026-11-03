@@ -1,7 +1,7 @@
 package com.infinity.drive.presentation.preview
 
+import app.tgdrive.ui.elasticVerticalScroll as verticalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column

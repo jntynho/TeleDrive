@@ -1,5 +1,6 @@
 package app.tgdrive.ui
 
+import app.tgdrive.ui.elasticVerticalScroll as verticalScroll
 import androidx.compose.animation.*
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.tween
