@@ -1,0 +1,42 @@
+name: Verify and promote release 49
+on:
+  push:
+    branches: [codex/promote-release-49]
+    paths: [.github/workflows/promote-release49.yml]
+permissions:
+  contents: write
+jobs:
+  promote:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: v1.0.0-build.49
+    steps:
+      - name: Verify existing release assets and promote the verified build
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GH_REPO/releases/tags/$RELEASE_TAG" > release.json
+          python3 - <<'PY'
+          import json
+          r=json.load(open('release.json'))
+          assert r['tag_name']=='v1.0.0-build.49' and not r['draft'] and not r['prerelease']
+          assert {a['name'] for a in r['assets']}=={'tg-drive-arm64-v8a.apk','tg-drive-armeabi-v7a.apk'}
+          assert all(a['state']=='uploaded' and a['size']>1_000_000 for a in r['assets'])
+          print('Verified both published ARM assets; no application rebuild or asset replacement.')
+          PY
+          release_id="$(python3 -c "import json;print(json.load(open('release.json'))['id'])")"
+          for attempt in 1 2 3; do
+            if gh api --method PATCH "repos/$GH_REPO/releases/$release_id" -f make_latest=true -F draft=false > promoted.json; then
+              latest="$(gh api "repos/$GH_REPO/releases/latest" --jq '.tag_name')"
+              if [[ "$latest" == "$RELEASE_TAG" ]]; then
+                echo "### Verified latest release: https://github.com/$GH_REPO/releases/tag/$RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
+            fi
+            sleep 3
+          done
+          echo '::error::Could not mark the already-published verified release as latest.'
+          exit 1
