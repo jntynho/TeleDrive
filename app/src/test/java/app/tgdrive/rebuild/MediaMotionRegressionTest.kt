@@ -102,4 +102,28 @@ class MediaMotionRegressionTest {
         compose.waitUntil(3000){!visible}
         assertEquals(1,dismissed)
     }
+    @Test fun consecutiveDuplicateNamesAlwaysOpenANewUsableSheet(){
+        fun conflict(name:String):com.infinity.drive.presentation.upload.UploadCoordinator.Conflict {
+            val file=com.infinity.drive.domain.model.DriveFile(name,null,name,10,"application/pdf",com.infinity.drive.domain.model.FileCategory.DOCUMENT,null,null,null,null,null,null,
+                com.infinity.drive.domain.model.BackupState.NONE,false,false,false,false,null,null,null,null,createdAt=1,modifiedAt=1,addedAt=1)
+            return com.infinity.drive.presentation.upload.UploadCoordinator.Conflict(name,10,file,"My Drive","copy-$name",2,kotlinx.coroutines.CompletableDeferred())
+        }
+        var request by mutableStateOf<com.infinity.drive.presentation.upload.UploadCoordinator.Conflict?>(conflict("first.pdf"))
+        var answers=0
+        activity.get().setContent{DriveInfinityTheme{
+            request?.let{com.infinity.drive.presentation.upload.UploadConflictSheet(it){answer->
+                assertEquals(com.infinity.drive.presentation.upload.UploadCoordinator.Choice.SKIP,answer.choice)
+                answers++
+                // Deliberately omit a null frame: the next request can arrive immediately.
+                request=if(answers==1)conflict("second.pdf")else null
+            }}
+        }}
+        compose.onNodeWithText("Skip",substring=false).performScrollTo().performClick()
+        compose.waitUntil(3000){answers==1}
+        compose.onNodeWithText("“second.pdf” is already in My Drive").assertIsDisplayed()
+        compose.onNodeWithText("Skip",substring=false).performScrollTo().performClick()
+        compose.waitUntil(3000){answers==2}
+        compose.onAllNodes(isDialog()).assertCountEquals(0)
+    }
+
 }
