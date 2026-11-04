@@ -55,9 +55,10 @@ val DriveColors = darkColorScheme(
 )
 
 private fun type(size: Int, height: Int, weight: FontWeight = FontWeight.Normal) = TextStyle(
-    fontFamily = FontFamily.SansSerif, fontWeight = weight,
+    fontFamily = AppFontFamily, fontWeight = weight,
     fontSize = size.sp, lineHeight = height.sp, letterSpacing = 0.sp,
 )
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private val DriveTypography = Typography(
     displayLarge = type(48, 54, FontWeight.Bold), displayMedium = type(40, 46, FontWeight.Bold),
     displaySmall = type(34, 40, FontWeight.Bold),
@@ -68,7 +69,25 @@ private val DriveTypography = Typography(
     bodyLarge = type(16, 24), bodyMedium = type(14, 21), bodySmall = type(13, 19),
     labelLarge = type(16, 22, FontWeight.Bold), labelMedium = type(13, 18, FontWeight.SemiBold),
     labelSmall = type(12, 17, FontWeight.Medium),
-)
+).let { base ->
+    base.copy(
+        displayLargeEmphasized=base.displayLargeEmphasized.copy(fontFamily=AppFontFamily),
+        displayMediumEmphasized=base.displayMediumEmphasized.copy(fontFamily=AppFontFamily),
+        displaySmallEmphasized=base.displaySmallEmphasized.copy(fontFamily=AppFontFamily),
+        headlineLargeEmphasized=base.headlineLargeEmphasized.copy(fontFamily=AppFontFamily),
+        headlineMediumEmphasized=base.headlineMediumEmphasized.copy(fontFamily=AppFontFamily),
+        headlineSmallEmphasized=base.headlineSmallEmphasized.copy(fontFamily=AppFontFamily),
+        titleLargeEmphasized=base.titleLargeEmphasized.copy(fontFamily=AppFontFamily),
+        titleMediumEmphasized=base.titleMediumEmphasized.copy(fontFamily=AppFontFamily),
+        titleSmallEmphasized=base.titleSmallEmphasized.copy(fontFamily=AppFontFamily),
+        bodyLargeEmphasized=base.bodyLargeEmphasized.copy(fontFamily=AppFontFamily),
+        bodyMediumEmphasized=base.bodyMediumEmphasized.copy(fontFamily=AppFontFamily),
+        bodySmallEmphasized=base.bodySmallEmphasized.copy(fontFamily=AppFontFamily),
+        labelLargeEmphasized=base.labelLargeEmphasized.copy(fontFamily=AppFontFamily),
+        labelMediumEmphasized=base.labelMediumEmphasized.copy(fontFamily=AppFontFamily),
+        labelSmallEmphasized=base.labelSmallEmphasized.copy(fontFamily=AppFontFamily)
+    )
+}
 
 @Composable
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)

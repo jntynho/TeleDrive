@@ -164,9 +164,6 @@ fun PreviewScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val infoTarget by viewModel.infoTarget.collectAsStateWithLifecycle()
     val backgroundPlayback by viewModel.backgroundPlayback.collectAsStateWithLifecycle()
-    val preferredAudioLanguage by viewModel.preferredAudioLanguage.collectAsStateWithLifecycle()
-    val preferredSubtitleLanguage by
-    viewModel.preferredSubtitleLanguage.collectAsStateWithLifecycle()
     val storedTextScale by viewModel.textScale.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -267,16 +264,19 @@ fun PreviewScreen(
     WithVideoOrientation {
     Scaffold(
         contentWindowInsets = WindowInsets(0),
+        containerColor=if(immersive)Color.Black else MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { _ ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            HorizontalPager(
+        Box(modifier = Modifier.fillMaxSize().background(if(immersive)Color.Black else MaterialTheme.colorScheme.background)) {
+            if(pagedFile.category==FileCategory.AUDIO){
+                com.infinity.drive.presentation.audio.FullscreenAudioPlayer(currentFile,true,Modifier.fillMaxSize())
+            }else HorizontalPager(
                 state = pagerState,
                 beyondViewportPageCount = 1,
                 userScrollEnabled=!imageZoomed && !videoScrubbing,
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surfaceContainerLowest),
+                    .background(if(immersive)Color.Black else MaterialTheme.colorScheme.background),
                 key = { state.files[it].id }
             ) { page ->
                 val file = state.files[page]
@@ -294,10 +294,7 @@ fun PreviewScreen(
                     interactionBlocked = showOverflow,
                     onVideoScrubbing = { videoScrubbing = it },
                     allowBackgroundPlayback = backgroundPlayback,
-                    preferredAudioLanguage = preferredAudioLanguage,
-                    preferredSubtitleLanguage = preferredSubtitleLanguage,
-                    onPreferredAudioLanguage = viewModel::setPreferredAudioLanguage,
-                    onPreferredSubtitleLanguage = viewModel::setPreferredSubtitleLanguage,
+
                     onToggleChrome = { if(!imageZoomed)chromeVisible = !chromeVisible },
                     onAudioTrackChanged={id->
                         val index=state.files.indexOfFirst{it.id==id}
@@ -335,6 +332,7 @@ fun PreviewScreen(
                         }
                     },
                     actions = {
+                        if (currentFile.category != FileCategory.AUDIO) {
                         // Only text has anything the note editor can open.
                         if (MimeTypes.isText(currentFile.mimeType)) {
                             IconButton(
@@ -359,6 +357,7 @@ fun PreviewScreen(
                                 )
                             }
 
+                        }
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -418,10 +417,7 @@ private fun PreviewPage(
     interactionBlocked: Boolean,
     onVideoScrubbing: (Boolean) -> Unit,
     allowBackgroundPlayback: Boolean,
-    preferredAudioLanguage: String,
-    preferredSubtitleLanguage: String,
-    onPreferredAudioLanguage: (String) -> Unit,
-    onPreferredSubtitleLanguage: (String) -> Unit,
+
     onToggleChrome: () -> Unit,
     onImageZoomChanged:(Boolean)->Unit={},
     onAudioTrackChanged:(String)->Unit={},
@@ -490,12 +486,9 @@ private fun PreviewPage(
             )
         }
 
-        is PreviewContent.Image -> ZoomableImage(
-            model = content.model,
-            contentDescription = file.name,
-            onTap = onToggleChrome,
-            onZoomChanged=onImageZoomChanged
-        )
+        is PreviewContent.Image -> Box(Modifier.fillMaxSize().background(Color.Black)) {
+            ZoomableImage(model=content.model,contentDescription=file.name,onTap=onToggleChrome,onZoomChanged=onImageZoomChanged)
+        }
 
         is PreviewContent.LocalMedia,
         is PreviewContent.StreamedMedia ->
@@ -509,10 +502,7 @@ private fun PreviewPage(
                 interactionBlocked = interactionBlocked,
                 onGestureInProgress = onVideoScrubbing,
                 allowBackgroundPlayback = allowBackgroundPlayback,
-                preferredAudioLanguage = preferredAudioLanguage,
-                preferredSubtitleLanguage = preferredSubtitleLanguage,
-                onPreferredAudioLanguage = onPreferredAudioLanguage,
-                onPreferredSubtitleLanguage = onPreferredSubtitleLanguage,
+
                 onControlsVisibilityChanged = onChromeRequested
             )
 

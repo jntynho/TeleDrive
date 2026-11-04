@@ -78,10 +78,6 @@ fun MediaPlayer(
     isActivePage: Boolean,
     controlsVisible: Boolean = true,
     allowBackgroundPlayback: Boolean = false,
-    preferredAudioLanguage: String = "",
-    preferredSubtitleLanguage: String = "",
-    onPreferredAudioLanguage: (String) -> Unit = {},
-    onPreferredSubtitleLanguage: (String) -> Unit = {},
     onControlsVisibilityChanged: (Boolean) -> Unit = {},
     interactionBlocked: Boolean = false,
     onGestureInProgress: (Boolean) -> Unit = {},
@@ -90,8 +86,6 @@ fun MediaPlayer(
     val context = LocalContext.current
     val activePage by rememberUpdatedState(isActivePage)
     val notifyControls by rememberUpdatedState(onControlsVisibilityChanged)
-    val audioLanguage by rememberUpdatedState(preferredAudioLanguage)
-    val subtitleLanguage by rememberUpdatedState(preferredSubtitleLanguage)
 
     val checkpoint = rememberSaveable(fileId, saver = VideoPlaybackCheckpoint.Saver) { VideoPlaybackCheckpoint() }
     val holder = remember(fileId) { mutableStateOf<ExoPlayer?>(null) }
@@ -119,9 +113,8 @@ fun MediaPlayer(
                         .setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
                     setHandleAudioBecomingNoisy(true)
                     trackSelectionParameters = trackSelectionParameters.buildUpon()
-                        .setPreferredAudioLanguage(audioLanguage.ifEmpty { null })
-                        .setPreferredTextLanguage(subtitleLanguage.ifEmpty { null })
-                        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, subtitleLanguage.isEmpty()).build()
+                        .setPreferredTextLanguage(null)
+                        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build()
                     when (content) {
                         is PreviewContent.LocalMedia -> setMediaItem(MediaItem.fromUri(android.net.Uri.fromFile(java.io.File(content.path))))
                         is PreviewContent.StreamedMedia -> {
@@ -231,7 +224,7 @@ fun MediaPlayer(
         notifyControls(false)
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black)) {
         if (audioOnly && player != null) {
             AudioStage(
                 player = player,
@@ -339,9 +332,7 @@ fun MediaPlayer(
                 onCycleResizeMode = { resizeMode = resizeMode.next() },
                 onInteraction = { interactionTick++ },
                 onScrubbingChanged={scrubbing=it;onGestureInProgress(it)},
-                onOverlayChanged={overlayOpen=it},
-                onPreferredAudioLanguage = onPreferredAudioLanguage,
-                onPreferredSubtitleLanguage = onPreferredSubtitleLanguage
+                onOverlayChanged={overlayOpen=it}
             )
         }
     }

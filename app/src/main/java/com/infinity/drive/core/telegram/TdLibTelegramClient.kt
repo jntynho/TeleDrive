@@ -1214,7 +1214,12 @@ internal class TdLibTelegramClient(
             send<TdApi.Chats>(TdApi.GetChats(TdApi.ChatListMain(),100)).chatIds
         }
         return ids.toList().mapNotNull { id ->
-            try { val chat=send<TdApi.Chat>(TdApi.GetChat(id));TelegramChat(chat.id,chat.title) }
+            try {
+                val chat=send<TdApi.Chat>(TdApi.GetChat(id))
+                val photo=chat.photo?.small
+                TelegramChat(chat.id,chat.title,photo?.id,
+                    photo?.local?.path?.takeIf { it.isNotEmpty() && File(it).isFile })
+            }
             catch(cancel:CancellationException){throw cancel}
             catch(_:TelegramException){null}
         }

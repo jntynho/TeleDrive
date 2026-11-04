@@ -11,6 +11,7 @@ private const val SCALE = 0.9f
 private fun TextUnit.scaled(): TextUnit = if (isSpecified) this * SCALE else this
 
 private fun TextStyle.scaled(): TextStyle = copy(
+    fontFamily = app.tgdrive.ui.AppFontFamily,
     fontSize = fontSize.scaled(),
     lineHeight = lineHeight.scaled()
 )

@@ -40,6 +40,7 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
     private var queue=emptyList<String>()
     private var desiredIndex=-1
     private var requestedPlay=false
+    private var playbackEpoch=0L
     private var libraryContext:Pair<Long?,Boolean>?=null
     private val metadataSlots=Semaphore(2)
     private val metadataInFlight=mutableMapOf<String,Deferred<AudioMetadata>>()
@@ -49,12 +50,14 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
     init {
         observeCurrentFile()
         player.addListener(object:Player.Listener {
-            override fun onIsPlayingChanged(isPlaying:Boolean){mutable.update{it.copy(playing=isPlaying)}}
+            override fun onIsPlayingChanged(isPlaying:Boolean){if(player.currentMediaItem?.mediaId==mutable.value.file?.id)mutable.update{it.copy(playing=isPlaying)}}
             override fun onPlayWhenReadyChanged(playWhenReady:Boolean,reason:Int){
+                if(player.currentMediaItem?.mediaId!=mutable.value.file?.id)return
                 requestedPlay=playWhenReady
                 mutable.update{it.copy(playRequested=playWhenReady)}
             }
             override fun onPlaybackStateChanged(playbackState:Int){
+                if(player.currentMediaItem?.mediaId!=mutable.value.file?.id)return
                 mutable.update{it.copy(loading=playbackState==Player.STATE_BUFFERING,durationMs=knownDuration())}
                 if(playbackState==Player.STATE_ENDED&&requestedPlay){
                     if(mutable.value.repeatMode==AudioRepeatMode.ONE){player.seekTo(0);player.play()}
@@ -63,11 +66,13 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
             }
             override fun onMediaMetadataChanged(metadata:MediaMetadata){
                 val track=mutable.value.file?:return
+                if(player.currentMediaItem?.mediaId!=track.id)return
+                val epoch=playbackEpoch
                 scope.launch {
                     val artwork=metadata.artworkData?.takeIf{it.size<=5*1024*1024}?.let { bytes ->
                         withContext(ioDispatcher){artworkColors(bytes) to saveArtwork(track,bytes)}
                     }
-                    if(mutable.value.file?.id==track.id){
+                    if(playbackEpoch==epoch&&mutable.value.file?.id==track.id){
                         mutable.update{it.copy(metadata=it.metadata.copy(
                             title=metadata.title?.toString()?.takeIf(String::isNotBlank)?:it.metadata.title,
                             artist=metadata.artist?.toString()?.takeIf(String::isNotBlank)?:it.metadata.artist,
@@ -105,9 +110,11 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
     private fun metadataKey(file:DriveFile)="${file.id}:${file.modifiedAt}:${file.localPath}"
     private fun acceptLyricsMetadata(metadata:Metadata){
         val track=mutable.value.file?:return
+        if(player.currentMediaItem?.mediaId!=track.id)return
+        val epoch=playbackEpoch
         scope.launch {
             val lyrics=withContext(Dispatchers.Default){streamedLyrics(metadata)}?:return@launch
-            if(mutable.value.file?.id==track.id){
+            if(playbackEpoch==epoch&&mutable.value.file?.id==track.id){
                 mutable.update{it.copy(metadata=it.metadata.copy(lyrics=lyrics))}
                 synchronized(metadataCache){metadataCache[metadataKey(track)]=mutable.value.metadata}
             }
@@ -120,6 +127,7 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
     }}
     override fun play(file:DriveFile){queueJob?.cancel();start(file,true)}
     private fun start(file:DriveFile,autoplay:Boolean){
+        val epoch=++playbackEpoch
         resolveJob?.cancel();metadataJob?.cancel()
         if(file.id !in queue)queue=listOf(file.id)
         desiredIndex=queue.indexOf(file.id)
@@ -133,7 +141,7 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
         runCatching { appContext.startService(android.content.Intent(appContext,TeleDriveAudioService::class.java)) }
         metadataJob=scope.launch {
             val info=metadata(file)
-            if(mutable.value.file?.id==file.id)mutable.update{it.copy(metadata=mergeMetadata(it.metadata,info),durationMs=knownDuration())}
+            if(playbackEpoch==epoch&&mutable.value.file?.id==file.id)mutable.update{it.copy(metadata=mergeMetadata(it.metadata,info),durationMs=knownDuration())}
         }
         resolveJob=scope.launch {
             try {
@@ -207,7 +215,7 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
             catch(_:Exception){mutable.update{it.copy(queueError="Couldn't load the next track. Try Next again.")}}
         }
     }
-    override fun stop(){sleepJob?.cancel();sleepJob=null;resolveJob?.cancel();metadataJob?.cancel();queueJob?.cancel();requestedPlay=false;player.stop();player.clearMediaItems();queue=emptyList();desiredIndex=-1;mutable.value=AudioPlaybackState()}
+    override fun stop(){playbackEpoch++;sleepJob?.cancel();sleepJob=null;resolveJob?.cancel();metadataJob?.cancel();queueJob?.cancel();requestedPlay=false;player.stop();player.clearMediaItems();queue=emptyList();desiredIndex=-1;mutable.value=AudioPlaybackState()}
     override fun seek(positionMs:Long){val target=positionMs.coerceIn(0,knownDuration());player.seekTo(target);mutable.update{it.copy(positionMs=target)}}
     override fun cycleRepeat(){mutable.update{it.copy(repeatMode=AudioRepeatMode.entries[(it.repeatMode.ordinal+1)%AudioRepeatMode.entries.size])};refreshQueueState()}
     override fun setSleepTimer(minutes:Int?){

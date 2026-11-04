@@ -8,6 +8,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.layout.ContentScale
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import androidx.compose.ui.unit.dp
 import com.infinity.drive.core.telegram.*
 import com.infinity.drive.domain.repository.SettingsRepository
@@ -22,6 +31,7 @@ import org.koin.compose.koinInject
 @Composable
 fun TelegramChatPicker(title:String,onDismiss:()->Unit,onSelected:(TelegramChat)->Unit) {
     val client=koinInject<TelegramClient>()
+    val photoSlots=remember(client){Semaphore(2)}
     var query by remember{mutableStateOf("")}
     var rows by remember{mutableStateOf<List<TelegramChat>?>(null)}
     var error by remember{mutableStateOf<String?>(null)}
@@ -33,18 +43,45 @@ fun TelegramChatPicker(title:String,onDismiss:()->Unit,onSelected:(TelegramChat)
         catch(_:Exception){error="Couldn't load your chats. Check your connection and retry."}
     }
     DriveBottomSheet(onDismissRequest=onDismiss) {
-        Text(title,Modifier.padding(horizontal=24.dp,vertical=12.dp),style=MaterialTheme.typography.titleLarge)
-        OutlinedTextField(query,{query=it},singleLine=true,placeholder={Text("Search your chats")},leadingIcon={Icon(DriveIcons.Search,null)},modifier=Modifier.fillMaxWidth().padding(horizontal=24.dp))
+        Row(Modifier.fillMaxWidth().padding(start=24.dp,end=12.dp,top=4.dp,bottom=8.dp),verticalAlignment=Alignment.CenterVertically){
+            Text(title,Modifier.weight(1f),style=MaterialTheme.typography.titleLarge)
+            IconButton(onDismiss){Icon(DriveIcons.Close,"Close chat picker")}
+        }
+        TextField(query,{query=it},singleLine=true,placeholder={Text("Search your chats")},
+            leadingIcon={Icon(DriveIcons.Search,null)},shape=RoundedCornerShape(14.dp),
+            colors=TextFieldDefaults.colors(focusedIndicatorColor=androidx.compose.ui.graphics.Color.Transparent,
+                unfocusedIndicatorColor=androidx.compose.ui.graphics.Color.Transparent),
+            modifier=Modifier.fillMaxWidth().padding(horizontal=24.dp))
         Spacer(Modifier.height(12.dp))
         LazyColumn(Modifier.fillMaxWidth().heightIn(max=440.dp)) {
             if(error!=null)item{Column(Modifier.padding(24.dp)){Text(error!!);TextButton({retry++}){Text("Retry")}}}
             else if(rows==null)item{LinearProgressIndicator(Modifier.fillMaxWidth().padding(24.dp))}
             else if(rows!!.isEmpty())item{Text("No matching chats",Modifier.padding(24.dp))}
             else items(rows!!,key={it.id}){chat->
-                ListItem(headlineContent={Text(chat.title)},leadingContent={Icon(DriveIcons.Person,null)},trailingContent={Icon(DriveIcons.ChevronRight,null)},modifier=Modifier.clickable{onSelected(chat)})
+                ListItem(headlineContent={Text(chat.title,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)},
+                    leadingContent={TelegramChatAvatar(chat){photoSlots.withPermit{withTimeoutOrNull(8_000){client.fetchChannelPhoto(chat.id)}}}},
+                    trailingContent={Icon(DriveIcons.ChevronRight,null)},modifier=Modifier.clickable{onSelected(chat)})
             }
         }
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+/** Photos never block chat selection and never replace another chat's identity on row reuse. */
+@Composable
+fun TelegramChatAvatar(chat:TelegramChat,load:suspend ()->String?) {
+    val loader by rememberUpdatedState(load)
+    var photo by remember(chat.id,chat.photoFileId,chat.photoPath){mutableStateOf(chat.photoPath)}
+    LaunchedEffect(chat.id,chat.photoFileId,chat.photoPath){
+        if(photo==null&&chat.photoFileId!=null)try{photo=loader()}
+        catch(cancel:CancellationException){throw cancel}
+        catch(_:Exception){photo=null}
+    }
+    val initials=remember(chat.title){chat.title.trim().split(Regex("\\s+")).filter{it.isNotEmpty()}.take(2)
+        .joinToString(""){it.substring(0,it.offsetByCodePoints(0,1))}.uppercase().ifBlank{"?"}}
+    Box(Modifier.size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),contentAlignment=Alignment.Center){
+        Text(initials,color=MaterialTheme.colorScheme.onSecondaryContainer,style=MaterialTheme.typography.titleMedium)
+        if(photo!=null)coil3.compose.AsyncImage(photo,null,Modifier.fillMaxSize().testTag("chat-avatar-photo"),contentScale=ContentScale.Crop)
     }
 }
 

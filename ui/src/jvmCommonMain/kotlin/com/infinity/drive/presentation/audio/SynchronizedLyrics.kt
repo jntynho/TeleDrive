@@ -12,6 +12,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,27 +39,39 @@ private fun cueText(cue: LyricCue, positionMs: Long, active: Boolean, color: Col
         }
     }
 
+private data class LyricWindow(val track:String?,val index:Int,val previous:LyricCue?,val current:LyricCue?,val next:LyricCue?)
+
+/** Three fixed rows; only draw properties animate as the active line advances. */
 @Composable
-internal fun LyricsSnippet(lyrics: AudioLyrics, positionMs: Long, onOpen: () -> Unit, modifier: Modifier = Modifier) {
-    val active = lyrics.activeIndex(positionMs)
-    val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale.coerceAtLeast(1f)
-    Box(modifier.height((108 * fontScale).dp).clickable(enabled = lyrics.plainText.isNotBlank(),
-        onClickLabel = "Open lyrics", onClick = onOpen), contentAlignment = Alignment.CenterStart) {
-        if (lyrics.plainText.isBlank()) Text("No embedded lyrics available", color = Color.White.copy(alpha = .65f),
-            style = MaterialTheme.typography.bodyMedium)
-        else if (lyrics.cues.isEmpty()) Text(lyrics.plainText, maxLines = 3, overflow = TextOverflow.Ellipsis,
-            color = Color.White.copy(alpha = .8f), style = MaterialTheme.typography.bodyLarge)
-        else AnimatedContent(active, transitionSpec = {
-            (fadeIn(tween(200)) togetherWith fadeOut(tween(200))).using(SizeTransform(clip = true) { _, _ -> snap() })
-        }, label = "lyricLine") { index ->
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                for (line in index-1..index+1) {
-                    if(line !in lyrics.cues.indices){Text(" ",style=MaterialTheme.typography.bodyLarge);continue}
-                    val selected = line == index
-                    val color = Color.White.copy(alpha = if (selected) 1f else .7f)
-                    Text(cueText(lyrics.cues[line], positionMs, selected, color), maxLines = 1,
-                        overflow = TextOverflow.Ellipsis, color = color,
-                        style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+internal fun LyricsSnippet(lyrics:AudioLyrics,positionMs:Long,onOpen:()->Unit,modifier:Modifier=Modifier,trackKey:String?=null){
+    val active=lyrics.activeIndex(positionMs)
+    val window=remember(lyrics,active,trackKey){LyricWindow(trackKey,active,
+        lyrics.cues.getOrNull(active-1),lyrics.cues.getOrNull(active),lyrics.cues.getOrNull(active+1))}
+    Box(modifier.then(if(lyrics.plainText.isNotBlank())Modifier.semantics{contentDescription="Open lyrics"}else Modifier).clickable(enabled=lyrics.plainText.isNotBlank(),
+        interactionSource=remember{androidx.compose.foundation.interaction.MutableInteractionSource()},indication=null,
+        onClickLabel="Open lyrics",onClick=onOpen),contentAlignment=Alignment.Center){
+        when{
+            lyrics.plainText.isBlank()->Text("No embedded lyrics available",color=Color.White.copy(alpha=.5f),style=MaterialTheme.typography.bodySmall)
+            lyrics.cues.isEmpty()->Text(lyrics.plainText,maxLines=3,overflow=TextOverflow.Ellipsis,
+                color=Color.White.copy(alpha=.8f),style=MaterialTheme.typography.bodyLarge,
+                textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+            else->AnimatedContent(window,modifier=Modifier.fillMaxSize(),contentKey={it.track to it.index},transitionSpec={
+                ((fadeIn(tween(220))+slideInVertically(tween(220)){minOf(it/6,8)}) togetherWith
+                    (fadeOut(tween(150))+slideOutVertically(tween(180)){-minOf(it/6,8)}))
+                    .using(SizeTransform(clip=true){_,_->snap()})
+            },label="lyricWindow"){shown->
+                Column(Modifier.fillMaxSize(),horizontalAlignment=Alignment.CenterHorizontally){
+                    listOf(shown.previous,shown.current,shown.next).forEachIndexed{index,cue->
+                        val selected=index==1
+                        Box(Modifier.weight(1f).fillMaxWidth(),contentAlignment=Alignment.Center){
+                            val color=Color.White.copy(alpha=if(selected)1f else .38f)
+                            Text(cue?.let{cueText(it,positionMs,selected,color)}?:AnnotatedString(" "),
+                                Modifier.blur(if(selected)0.dp else 1.dp),maxLines=1,overflow=TextOverflow.Ellipsis,
+                                color=color,style=if(selected)MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
+                                fontWeight=if(selected)FontWeight.SemiBold else FontWeight.Normal,
+                                textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+                        }
+                    }
                 }
             }
         }

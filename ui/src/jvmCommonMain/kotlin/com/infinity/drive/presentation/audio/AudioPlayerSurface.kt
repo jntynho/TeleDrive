@@ -1,75 +1,81 @@
 package com.infinity.drive.presentation.audio
 
-import app.tgdrive.ui.elasticVerticalScroll as verticalScroll
-import app.tgdrive.ui.ElasticLazyColumn as LazyColumn
 import app.tgdrive.ui.*
+import coil3.request.crossfade
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import kotlinx.coroutines.launch
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.foundation.lazy.items
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.infinity.drive.domain.model.DriveFile
+import com.infinity.drive.domain.repository.FileRepository
 import com.infinity.drive.presentation.common.Formatters
 import com.infinity.drive.presentation.components.FileThumbnail
 import com.infinity.drive.presentation.platform.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryAudioMiniPlayer(){
     val player=LocalAudioPlayback.current
     val state by player.state.collectAsStateWithLifecycle()
     var last by remember{mutableStateOf(AudioPlaybackState())}
     var expanded by rememberSaveable{mutableStateOf(false)}
+    SideEffect { if(state.file!=null)last=state }
     LaunchedEffect(state.file?.id){if(state.file==null)expanded=false}
-    LaunchedEffect(state.file,state.metadata){if(state.file!=null)last=state}
     AnimatedVisibility(state.file!=null,enter=expandVertically(tween(260))+fadeIn(tween(220)),exit=shrinkVertically(tween(200))+fadeOut(tween(160))){
         val current=if(state.file!=null)state else last
         val file=current.file
         if(file!=null){
+            val first by animateColorAsState(artworkTone(current.metadata,0),tween(800),label="miniFirst")
+            val second by animateColorAsState(artworkTone(current.metadata,1),tween(800),label="miniSecond")
             val pause=(current.playing||current.playRequested)&&current.error==null
-            Surface(modifier=Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=8.dp),shape=RoundedCornerShape(20.dp),color=MaterialTheme.colorScheme.surface){
-                Column {
-                    Row(Modifier.fillMaxWidth().clickable(onClickLabel="Open now playing"){expanded=true}.padding(start=12.dp,end=4.dp,top=10.dp,bottom=8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)){
-                        AudioArtwork(file,current.metadata,Modifier.size(44.dp).clip(RoundedCornerShape(11.dp)))
-                        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)){
+            Surface(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=8.dp),shape=RoundedCornerShape(18.dp),color=Color.Transparent,contentColor=Color.White){
+                Column(Modifier.background(Brush.linearGradient(listOf(first,second)))
+                    .border(1.dp,Color.White.copy(alpha=.08f),RoundedCornerShape(18.dp)).testTag("audio-mini-player")){
+                    Row(Modifier.fillMaxWidth().height(66.dp).clickable(onClickLabel="Open now playing"){expanded=true}
+                        .padding(start=10.dp,end=4.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)){
+                        TrackArtwork(file,current.metadata,Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)))
+                        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(2.dp)){
                             Text(current.metadata.title?.takeIf(String::isNotBlank)?:file.name.substringBeforeLast('.'),style=MaterialTheme.typography.titleSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
-                            Text(current.error?:if(current.loading)"Loading audio…"else current.metadata.artist?.takeIf(String::isNotBlank)?:"Unknown artist",style=MaterialTheme.typography.bodySmall,color=if(current.error!=null)MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
+                            Text(current.error?:current.metadata.artist?.takeIf(String::isNotBlank)?:"Unknown artist",style=MaterialTheme.typography.bodySmall,
+                                color=Color.White.copy(alpha=.7f),maxLines=1,overflow=TextOverflow.Ellipsis)
                         }
-                        FilledIconButton(player::toggle,shape=CircleShape,colors=IconButtonDefaults.filledIconButtonColors(containerColor=MaterialTheme.colorScheme.primary,contentColor=MaterialTheme.colorScheme.onPrimary)){
-                            Icon(if(pause)DriveIcons.Pause else DriveIcons.PlayArrow,if(current.error!=null)"Retry audio"else if(pause)"Pause audio"else"Play audio")
-                        }
-                        IconButton(player::stop){Icon(DriveIcons.Close,"Close audio player",Modifier.size(20.dp))}
+                        IconButton(player::toggle){Icon(if(pause)DriveIcons.Pause else DriveIcons.PlayArrow,
+                            if(current.error!=null)"Retry audio"else if(pause)"Pause audio"else"Play audio",Modifier.size(24.dp))}
+                        IconButton(player::next,enabled=current.canSkipNext){Icon(DriveIcons.SkipNext,"Next audio",Modifier.size(24.dp),tint=Color.White.copy(alpha=if(current.canSkipNext)1f else .35f))}
                     }
-                    LinearProgressIndicator(progress={if(current.durationMs>0)current.positionMs.toFloat()/current.durationMs else 0f},modifier=Modifier.fillMaxWidth().height(2.dp),gapSize=0.dp,drawStopIndicator={})
+                    LinearProgressIndicator(progress={if(current.durationMs>0)(current.positionMs.toFloat()/current.durationMs).coerceIn(0f,1f)else 0f},
+                        modifier=Modifier.fillMaxWidth().padding(horizontal=12.dp).height(2.dp),color=Color.White.copy(alpha=.85f),trackColor=Color.White.copy(alpha=.2f),gapSize=0.dp,drawStopIndicator={})
+                    Spacer(Modifier.height(6.dp))
                 }
             }
         }
     }
     if(expanded&&state.file!=null){
         androidx.compose.ui.window.Dialog(onDismissRequest={expanded=false},properties=androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth=false,decorFitsSystemWindows=false)){
-            Surface(Modifier.fillMaxSize()){
+            Surface(Modifier.fillMaxSize(),color=Color.Black){
                 Box(Modifier.fillMaxSize().ambientArtwork(state).systemBarsPadding()){
-                    NowPlayingContent(state.file!!,onStop={expanded=false;player.stop()},modifier=Modifier.fillMaxSize().padding(top=audioHeaderHeight()))
+                    NowPlayingContent(state.file!!,modifier=Modifier.fillMaxSize().padding(top=audioHeaderHeight()))
                     Row(Modifier.fillMaxWidth().height(audioHeaderHeight()).padding(end=24.dp),verticalAlignment=Alignment.CenterVertically){
                         IconButton({expanded=false}){Icon(DriveIcons.ArrowBack,"Back to library",tint=Color.White)}
                         AudioNowPlayingTitle(state.file!!,Modifier.weight(1f))
@@ -82,30 +88,29 @@ fun LibraryAudioMiniPlayer(){
 
 @Composable
 fun FullscreenAudioPlayer(file:DriveFile,isActivePage:Boolean,modifier:Modifier=Modifier,onTrackChanged:(String)->Unit={}){
-    val player=LocalAudioPlayback.current
-    val state by player.state.collectAsStateWithLifecycle()
-
+    val state by LocalAudioPlayback.current.state.collectAsStateWithLifecycle()
     Box(modifier.fillMaxSize().ambientArtwork(state).systemBarsPadding().padding(top=audioHeaderHeight())){
-        NowPlayingContent(if(isActivePage)state.file?:file else file,player::stop,Modifier.fillMaxSize())
+        NowPlayingContent(if(isActivePage)state.file?:file else file,Modifier.fillMaxSize())
     }
 }
 
 @Composable
-fun audioHeaderHeight() = maxOf(72.dp,(52 * androidx.compose.ui.platform.LocalDensity.current.fontScale).dp)
+fun audioHeaderHeight()=maxOf(72.dp,(52*androidx.compose.ui.platform.LocalDensity.current.fontScale).dp)
 
 @Composable
 fun AudioNowPlayingTitle(file:DriveFile,modifier:Modifier=Modifier){
     val state by LocalAudioPlayback.current.state.collectAsStateWithLifecycle()
     val metadata=state.metadata.takeIf{state.file?.id==file.id}
-    Column(modifier,verticalArrangement=Arrangement.spacedBy(2.dp)){
-        Text(metadata?.title?.takeIf(String::isNotBlank)?:file.name.substringBeforeLast('.'),color=Color.White,
-            style=MaterialTheme.typography.titleLarge,maxLines=1,overflow=TextOverflow.Ellipsis)
-        Text(metadata?.artist?.takeIf(String::isNotBlank)?:"Unknown artist",color=Color.White.copy(alpha=.65f),
-            style=MaterialTheme.typography.bodyMedium,maxLines=1,overflow=TextOverflow.Ellipsis)
+    val labels=(metadata?.title?.takeIf(String::isNotBlank)?:file.name.substringBeforeLast('.')) to
+        (metadata?.artist?.takeIf(String::isNotBlank)?:"Unknown artist")
+    Crossfade(labels,modifier=modifier,animationSpec=tween(200),label="audioTitle"){(title,artist)->
+        Column(verticalArrangement=Arrangement.spacedBy(2.dp)){
+            Text(title,color=Color.White,style=MaterialTheme.typography.titleLarge,maxLines=1,overflow=TextOverflow.Ellipsis)
+            Text(artist,color=Color.White.copy(alpha=.65f),style=MaterialTheme.typography.bodyMedium,maxLines=1,overflow=TextOverflow.Ellipsis)
+        }
     }
 }
 
-/** Shared seek state is committed only on release; lyric seeking uses this same player. */
 @Composable
 internal fun AudioSeekBar(state:AudioPlaybackState){
     val player=LocalAudioPlayback.current
@@ -120,145 +125,120 @@ internal fun AudioSeekBar(state:AudioPlaybackState){
             activeColor=Color.White,inactiveColor=Color.White.copy(alpha=.25f),
             modifier=Modifier.fillMaxWidth().semantics{contentDescription="Seek audio"})
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){
-            Text(Formatters.duration(position),style=MaterialTheme.typography.labelSmall,color=Color.White.copy(alpha=.65f))
-            Text(Formatters.duration(duration),style=MaterialTheme.typography.labelSmall,color=Color.White.copy(alpha=.65f))
+            Text(Formatters.duration(position),style=MaterialTheme.typography.labelSmall,color=Color.White.copy(alpha=.65f),maxLines=1)
+            Text(Formatters.duration(duration),style=MaterialTheme.typography.labelSmall,color=Color.White.copy(alpha=.65f),maxLines=1)
         }
     }
 }
 
 @Composable
-internal fun AudioTransport(state:AudioPlaybackState){
+internal fun AudioTransport(state:AudioPlaybackState,isFavorite:Boolean?=null,favoriteEnabled:Boolean=true,onFavorite:()->Unit={}){
     val player=LocalAudioPlayback.current
     val active=state.file?.id==player.state.value.file?.id
     val pause=active&&((state.playing||state.playRequested)&&state.error==null)
-    Row(Modifier.fillMaxWidth().height(72.dp),verticalAlignment=Alignment.CenterVertically,
-        horizontalArrangement=Arrangement.spacedBy(32.dp,Alignment.CenterHorizontally)){
+    Row(Modifier.fillMaxWidth().height(72.dp).testTag("audio-transport"),verticalAlignment=Alignment.CenterVertically,
+        horizontalArrangement=if(isFavorite!=null)Arrangement.SpaceBetween else Arrangement.spacedBy(32.dp,Alignment.CenterHorizontally)){
+        if(isFavorite!=null)IconButton(player::cycleRepeat,enabled=active){
+            Icon(if(state.repeatMode==AudioRepeatMode.ONE)DriveIcons.RepeatOne else DriveIcons.Repeat,
+                "Repeat: ${state.repeatMode.name.lowercase()}",Modifier.size(21.dp),tint=Color.White.copy(alpha=if(state.repeatMode==AudioRepeatMode.OFF).55f else 1f))
+        }
         IconButton(player::previous,enabled=active&&(state.canSkipPrevious||state.positionMs>3000)){
-            Icon(DriveIcons.SkipPrevious,"Previous audio",Modifier.size(30.dp))
+            Icon(DriveIcons.SkipPrevious,"Previous audio",Modifier.size(26.dp))
         }
-        IconButton(onClick={if(!active)state.file?.let(player::play)else player.toggle()},modifier=Modifier.size(68.dp)){
+        IconButton(onClick={if(!active)state.file?.let(player::play)else player.toggle()},modifier=Modifier.size(56.dp).testTag("audio-play")){
             Icon(if(pause)DriveIcons.Pause else DriveIcons.PlayArrow,
-                if(pause)"Pause audio"else if(active&&state.error!=null)"Retry audio"else"Play audio",Modifier.size(38.dp))
+                if(pause)"Pause audio"else if(active&&state.error!=null)"Retry audio"else"Play audio",Modifier.size(36.dp))
         }
-        IconButton(player::next,enabled=active&&state.canSkipNext){Icon(DriveIcons.SkipNext,"Next audio",Modifier.size(30.dp))}
+        IconButton(player::next,enabled=active&&state.canSkipNext){Icon(DriveIcons.SkipNext,"Next audio",Modifier.size(26.dp))}
+        if(isFavorite!=null)IconButton(onFavorite,enabled=active&&favoriteEnabled){
+            Icon(DriveIcons.Favorite,if(isFavorite)"Remove from favorites"else"Add to favorites",Modifier.size(23.dp),
+                tint=if(isFavorite)Color(0xFFFFADBC)else Color.White)
+        }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Geometry depends on window/font size only, never lyrics, loading messages or the current file. */
 @Composable
-private fun NowPlayingContent(file:DriveFile,onStop:()->Unit,modifier:Modifier=Modifier){
+internal fun NowPlayingContent(file:DriveFile,modifier:Modifier=Modifier){
     val player=LocalAudioPlayback.current
     val playback by player.state.collectAsStateWithLifecycle()
     val active=playback.file?.id==file.id
     val state=if(active)playback else AudioPlaybackState(file=file,durationMs=file.durationMs?:0L)
-    var showLyrics by rememberSaveable(file.id){mutableStateOf(false)}
-    var showInfo by rememberSaveable(file.id){mutableStateOf(false)}
-    var recoveryMessage by remember(file.id){mutableStateOf<String?>(null)}
-    val transferRepository=org.koin.compose.koinInject<com.infinity.drive.domain.repository.TransferRepository>()
-    val recoveryScope=rememberCoroutineScope()
-    var showQueue by rememberSaveable(file.id){mutableStateOf(false)}
-    var options by remember(file.id){mutableStateOf(false)}
-    var timer by remember(file.id){mutableStateOf(false)}
+    val repository=org.koin.compose.koinInject<FileRepository>()
+    var showLyrics by rememberSaveable{mutableStateOf(false)}
+    var favoriteBusy by remember(file.id){mutableStateOf(false)}
+    var favoriteOverride by remember(file.id,file.isFavorite){mutableStateOf<Boolean?>(null)}
+    var favoriteError by remember(file.id){mutableStateOf<String?>(null)}
+    val scope=rememberCoroutineScope()
     val lyrics=remember(state.metadata.lyrics){AudioLyricsParser.parse(state.metadata.lyrics)}
     val lyricPosition=if(lyrics.cues.isNotEmpty())interpolatedAudioPosition(state)else state.positionMs
     CompositionLocalProvider(LocalContentColor provides Color.White){
         BoxWithConstraints(modifier.padding(horizontal=24.dp)){
             val fontScale=androidx.compose.ui.platform.LocalDensity.current.fontScale.coerceAtLeast(1f)
             val wide=maxWidth>maxHeight
-            val cover=if(wide)minOf(maxHeight-24.dp,maxWidth*.43f).coerceAtLeast(80.dp)
-                else minOf(maxWidth,(maxHeight-(360*fontScale).dp).coerceAtLeast(96.dp),420.dp)
-            val artwork:@Composable ()->Unit={
-                Crossfade(file to state.metadata.artworkPath,animationSpec=tween(320),label="audioCover"){(shown,artwork)->
-                    AudioArtwork(shown,state.metadata.copy(artworkPath=artwork),Modifier.size(cover).clip(RoundedCornerShape(12.dp)))
+            val lyricHeight=minOf((120*fontScale).dp,maxHeight*.24f).coerceAtLeast(56.dp)
+            val transportHeight=(132+18*fontScale).dp
+            val cover=if(wide)minOf(maxHeight-24.dp,maxWidth*.43f).coerceAtLeast(48.dp)
+                else minOf(maxWidth,(maxHeight-transportHeight-lyricHeight-40.dp).coerceAtLeast(48.dp),420.dp)
+            val artwork:@Composable ()->Unit={TrackArtwork(file,state.metadata,Modifier.size(cover).clip(RoundedCornerShape(14.dp)).testTag("audio-cover"))}
+            val favorite= favoriteOverride?:file.isFavorite
+            val controls:@Composable ()->Unit={
+                Column(Modifier.fillMaxWidth().testTag("audio-controls")){
+                    AudioSeekBar(state)
+                    AudioTransport(state,favorite,!favoriteBusy){
+                        val next=!favorite
+                        favoriteOverride=next;favoriteBusy=true;favoriteError=null
+                        scope.launch{
+                            try{repository.setFilesFavorite(listOf(file.id),next)}
+                            catch(cancel:CancellationException){throw cancel}
+                            catch(_:Exception){favoriteOverride=null;favoriteError="Couldn't update favorites. Try again."}
+                            finally{favoriteBusy=false}
+                        }
+                    }
                 }
             }
-            val controls:@Composable ()->Unit={
-                Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(8.dp)){
-                    LyricsSnippet(lyrics,lyricPosition,{showLyrics=true},Modifier.fillMaxWidth())
-                    if(state.error!=null)Column{
-                        Text(state.error,color=Color(0xFFFFC7C2),style=MaterialTheme.typography.bodySmall)
-                        Row{
-                            TextButton(player::toggle){Text("Retry",color=Color.White)}
-                            TextButton({recoveryScope.launch{
-                                try {recoveryMessage=if(transferRepository.enqueueDownload(file.id).isSuccess)"Download queued in Activity. Retry after it finishes."else"Couldn't queue a download."}
-                                catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}
-                                catch(_:Exception){recoveryMessage="Couldn't queue a download."}
-                            }}){Text("Download",color=Color.White)}
+            val lyricPanel:@Composable ()->Unit={
+                Box(Modifier.fillMaxWidth().height(lyricHeight).testTag("audio-lyrics-slot"),contentAlignment=Alignment.Center){
+                    if(state.error!=null||state.queueError!=null||favoriteError!=null){
+                        Column(horizontalAlignment=Alignment.CenterHorizontally){
+                            Text(state.error?:state.queueError?:favoriteError.orEmpty(),maxLines=2,overflow=TextOverflow.Ellipsis,color=Color.White.copy(alpha=.75f),style=MaterialTheme.typography.bodySmall)
+                            if(state.error!=null)TextButton(player::toggle){Text("Retry audio",color=Color.White)}
                         }
-                    }
-                    else if(state.loading)Text("Loading audio…",color=Color.White.copy(alpha=.7f),style=MaterialTheme.typography.bodySmall)
-                    state.queueError?.let{Text(it,color=Color.White.copy(alpha=.7f),style=MaterialTheme.typography.bodySmall)}
-                    recoveryMessage?.let{Text(it,color=Color.White.copy(alpha=.7f),style=MaterialTheme.typography.bodySmall)}
-                    AudioSeekBar(state)
-                    AudioTransport(state)
-                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){
-                        IconButton(player::cycleRepeat,enabled=active){
-                            Icon(if(state.repeatMode==AudioRepeatMode.ONE)DriveIcons.RepeatOne else DriveIcons.Repeat,
-                                "Repeat: ${state.repeatMode.name.lowercase()}",Modifier.size(23.dp),
-                                tint=Color.White.copy(alpha=if(state.repeatMode==AudioRepeatMode.OFF).55f else 1f))
-                        }
-                        Box {
-                            IconButton({timer=true},enabled=active){Icon(DriveIcons.Update,"Sleep timer",Modifier.size(23.dp),
-                                tint=Color.White.copy(alpha=if(state.sleepTimerMinutes==null).55f else 1f))}
-                            DropdownMenu(timer,{timer=false}){
-                                listOf(15,30,60).forEach{minutes->DropdownMenuItem(text={Text("$minutes minutes")},onClick={timer=false;player.setSleepTimer(minutes)})}
-                                if(state.sleepTimerMinutes!=null)DropdownMenuItem(text={Text("Cancel sleep timer")},onClick={timer=false;player.setSleepTimer(null)})
-                            }
-                        }
-                        IconButton({showLyrics=true},enabled=lyrics.plainText.isNotBlank()){
-                            Icon(DriveIcons.Subtitles,"Show lyrics",Modifier.size(23.dp))
-                        }
-                        IconButton({showQueue=true},enabled=active){Icon(DriveIcons.FormatListBulleted,"Play queue",Modifier.size(23.dp))}
-                        Box {
-                            IconButton({options=true}){Icon(DriveIcons.MoreHoriz,"Playback options",Modifier.size(23.dp))}
-                            DropdownMenu(options,{options=false}){
-                                DropdownMenuItem(text={Text("File options")},onClick={options=false;showInfo=true})
-                                DropdownMenuItem(text={Text("Stop playback")},onClick={options=false;onStop()},enabled=active)
-                            }
-                        }
-                    }
+                    }else LyricsSnippet(lyrics,lyricPosition,{showLyrics=true},Modifier.fillMaxSize(),trackKey=file.id)
                 }
             }
             if(wide){
                 Row(Modifier.fillMaxSize().padding(vertical=12.dp),horizontalArrangement=Arrangement.spacedBy(24.dp),verticalAlignment=Alignment.CenterVertically){
-                    artwork();Box(Modifier.weight(1f).verticalScroll(rememberScrollState())){controls()}
+                    artwork()
+                    Box(Modifier.weight(1f).fillMaxHeight()){
+                        Box(Modifier.fillMaxWidth().padding(bottom=transportHeight).align(Alignment.Center)){lyricPanel()}
+                        Box(Modifier.align(Alignment.BottomCenter)){controls()}
+                    }
                 }
             }else{
-                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top=16.dp,bottom=12.dp),
-                    horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(24.dp)){
-                    artwork();controls()
-                }
+                Box(Modifier.align(Alignment.TopCenter).padding(top=12.dp)){artwork()}
+                Box(Modifier.align(Alignment.BottomCenter).padding(bottom=transportHeight+12.dp)){lyricPanel()}
+                Box(Modifier.align(Alignment.BottomCenter)){controls()}
             }
         }
     }
     if(showLyrics&&active)SynchronizedLyrics(lyrics,{showLyrics=false})
-    if(showInfo)com.infinity.drive.presentation.components.FileActionsSheet(file,onDismiss={showInfo=false},onOpen={showInfo=false})
-    if(showQueue){
-        var queue by remember{mutableStateOf<List<DriveFile>?>(null)}
-        var queueError by remember{mutableStateOf<String?>(null)}
-        var queueRevision by remember{mutableIntStateOf(0)}
-        LaunchedEffect(playback.file?.id,playback.queueRevision,queueRevision){
-            queue=null;queueError=null
-            try{queue=player.queuedFiles()}
-            catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}
-            catch(_:Exception){queueError="Couldn't load the play queue."}
-        }
-        com.infinity.drive.presentation.components.DriveBottomSheet(onDismissRequest={showQueue=false}){
-            Text("Play queue${queue?.let{" · ${it.size} tracks"}.orEmpty()}",Modifier.padding(24.dp),style=MaterialTheme.typography.titleLarge)
-            if(queueError!=null)Column(Modifier.padding(24.dp)){Text(queueError!!);TextButton({queueRevision++}){Text("Retry")}}
-            else if(queue==null)LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal=24.dp))
-            else if(queue!!.isEmpty())Text("No other tracks in this queue",Modifier.padding(24.dp))
-            else LazyColumn(Modifier.fillMaxWidth().heightIn(max=420.dp)){
-                items(queue!!,key={it.id}){track->
-                    ListItem(headlineContent={Text(track.name.substringBeforeLast('.'),maxLines=1,overflow=TextOverflow.Ellipsis)},
-                        leadingContent={FileThumbnail(track,Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)))},
-                        trailingContent={if(track.id==playback.file?.id)Icon(DriveIcons.Audiotrack,"Playing")},
-                        modifier=Modifier.clickable{showQueue=false;player.play(track)})
-                }
-            }
-            Spacer(Modifier.height(24.dp))
-        }
+}
+
+/** Frozen target snapshot keeps the outgoing artwork attached to the correct song during a fade. */
+private data class ArtworkFrame(val file:DriveFile,val metadata:AudioMetadata)
+@Composable
+private fun TrackArtwork(file:DriveFile,metadata:AudioMetadata,modifier:Modifier){
+    val frame=remember(file.id,metadata.artworkPath){ArtworkFrame(file,metadata)}
+    Crossfade(frame,modifier=modifier,animationSpec=tween(280),label="trackArtwork"){
+        AudioArtwork(it.file,it.metadata,Modifier.fillMaxSize())
     }
+}
+
+private fun artworkTone(metadata:AudioMetadata,index:Int):Color{
+    val base=Color(0xFF11202C)
+    val color=metadata.artworkColors.getOrNull(index)?.let{Color(it.toInt())}?:if(index==0)Color(0xFF286180)else Color(0xFF615485)
+    return androidx.compose.ui.graphics.lerp(base,color,.38f)
 }
 
 /** Slow draw-layer movement; playback/lifecycle pause cancels it without changing the layout. */
@@ -295,7 +275,13 @@ internal fun Modifier.ambientArtwork(state:AudioPlaybackState):Modifier {
 
 @Composable
 private fun AudioArtwork(file:DriveFile,metadata:AudioMetadata,modifier:Modifier){
-    if(metadata.artworkPath!=null)coil3.compose.AsyncImage(model=metadata.artworkPath,contentDescription=file.name,
-        modifier=modifier,contentScale=androidx.compose.ui.layout.ContentScale.Crop)
-    else FileThumbnail(file,modifier)
+    val context=coil3.compose.LocalPlatformContext.current
+    val model=remember(file.id,file.modifiedAt,file.localPath,metadata.artworkPath){
+        metadata.artworkPath?:if(file.hasLocalCopy||file.hasRemoteCopy)
+            coil3.request.ImageRequest.Builder(context).data(com.infinity.drive.core.media.ThumbnailModel(file.id)).crossfade(160).build()else null
+    }
+    Box(modifier.background(Brush.linearGradient(listOf(artworkTone(metadata,0),artworkTone(metadata,1)))),contentAlignment=Alignment.Center){
+        Icon(DriveIcons.MusicNotes,null,Modifier.size(56.dp),tint=Color.White.copy(alpha=.5f))
+        if(model!=null)coil3.compose.AsyncImage(model,file.name,Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Crop)
+    }
 }

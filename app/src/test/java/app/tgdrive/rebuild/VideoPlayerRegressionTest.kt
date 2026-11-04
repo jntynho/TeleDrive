@@ -110,14 +110,13 @@ class VideoPlayerRegressionTest {
         compose.runOnUiThread{video.duration=120_000;video.seekable=false;video.notifyChange()}
         compose.onNodeWithContentDescription("Seek video").assertIsNotEnabled()
     }
-    @Test fun seeksAreClampedAndMuteRestoresThePreviousVolume() {
+    @Test fun seeksAreClampedAndRemovedTrackToolsStayAbsent() {
         val video=FakeVideo().apply{position=115_000;state=Player.STATE_READY};install(video)
         compose.onNodeWithContentDescription("Forward 10 seconds").performClick()
         assertEquals(120_000,video.position)
-        compose.onNodeWithContentDescription("Mute").performClick()
-        assertEquals(0f,video.volume)
-        compose.onNodeWithContentDescription("Unmute").performClick()
-        assertEquals(.35f,video.volume)
+        compose.onNodeWithContentDescription("Audio track").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Subtitles").assertDoesNotExist()
+        compose.onNodeWithContentDescription("More controls").assertDoesNotExist()
     }
     @Test fun compactControlsDoNotOverlapTheSeekTrack() {
         val video=FakeVideo();install(video,compact=true)
@@ -127,6 +126,14 @@ class VideoPlayerRegressionTest {
         val screenshot=File("build/design-previews/video-controls-compact.png")
         screenshot.parentFile?.mkdirs()
         screenshot.outputStream().use { compose.onRoot().captureToImage().asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG,100,it) }
+    }
+    @Test fun landscapeTransportIsSmallerButKeepsComfortableTouchTargets() {
+        val video=FakeVideo()
+        install(video)
+        val portrait=compose.onNodeWithTag("video-play").fetchSemanticsNode().boundsInRoot
+        install(video,compact=true)
+        val landscape=compose.onNodeWithTag("video-play").assertHeightIsAtLeast(48.dp).fetchSemanticsNode().boundsInRoot
+        assertTrue(landscape.width<portrait.width)
     }
     @Test fun lifecycleSuspensionPreservesIntentAndTheUserPausedState() {
         val video=FakeVideo();val checkpoint=VideoPlaybackCheckpoint()

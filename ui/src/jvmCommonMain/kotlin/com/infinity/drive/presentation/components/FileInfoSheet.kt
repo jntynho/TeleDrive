@@ -141,7 +141,7 @@ private fun InfoRow(label: String, value: String, monospace: Boolean = false) {
         Text(
             text = value,
             style = if (monospace) {
-                MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+                MaterialTheme.typography.bodySmall
             } else {
                 MaterialTheme.typography.bodyMedium
             },
