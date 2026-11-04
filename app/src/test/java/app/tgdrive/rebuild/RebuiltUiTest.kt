@@ -132,8 +132,11 @@ class RebuiltUiTest {
         val prefs=runBlocking{GlobalContext.get().get<SettingsRepository>().preferences.first()}
         org.junit.Assert.assertEquals(com.infinity.drive.domain.model.FileSortField.NAME,prefs.sortField)
         compose.onNodeWithText("Favorites",substring=false).performClick()
+        // Room/Paging runs outside Compose's idling clock; wait for the filtered result.
+        compose.waitUntil(10_000){compose.onNodeWithText("No favorites yet").isDisplayed()}
         compose.onNodeWithText("No favorites yet").assertIsDisplayed()
         compose.onNodeWithText("On device",substring=false).performClick()
+        compose.waitUntil(10_000){compose.onNodeWithText("No audio on this device").isDisplayed()}
         compose.onNodeWithText("No audio on this device").assertIsDisplayed()
     }
 
