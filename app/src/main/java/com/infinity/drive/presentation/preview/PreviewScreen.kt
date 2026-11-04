@@ -233,7 +233,8 @@ fun PreviewScreen(
             currentFile.category == FileCategory.VIDEO
     var chromeVisible by remember { mutableStateOf(true) }
     var imageZoomed by remember { mutableStateOf(false) }
-    LaunchedEffect(pagerState.currentPage){imageZoomed=false;chromeVisible=true;showOverflow=false}
+    var videoScrubbing by remember { mutableStateOf(false) }
+    LaunchedEffect(pagerState.currentPage){imageZoomed=false;videoScrubbing=false;chromeVisible=true;showOverflow=false}
     val chromeShown = (chromeVisible&&!imageZoomed) || !immersive
 
     val view = LocalView.current
@@ -272,7 +273,7 @@ fun PreviewScreen(
             HorizontalPager(
                 state = pagerState,
                 beyondViewportPageCount = 1,
-                userScrollEnabled=!imageZoomed,
+                userScrollEnabled=!imageZoomed && !videoScrubbing,
                 modifier = Modifier
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.surfaceContainerLowest),
@@ -286,10 +287,12 @@ fun PreviewScreen(
                     onTextScaleChange = viewModel::setTextScale,
                     file = file,
                     content = content,
-                    isActivePage = !pagerState.isScrollInProgress && pagerState.settledPage == page,
+                    isActivePage = pagerState.settledPage == page,
                     dataSourceFactory = dataSourceFactory,
                     onDownload = { viewModel.download(file) },
                     chromeVisible = chromeVisible,
+                    interactionBlocked = showOverflow,
+                    onVideoScrubbing = { videoScrubbing = it },
                     allowBackgroundPlayback = backgroundPlayback,
                     preferredAudioLanguage = preferredAudioLanguage,
                     preferredSubtitleLanguage = preferredSubtitleLanguage,
@@ -301,7 +304,7 @@ fun PreviewScreen(
                         if(index>=0&&index!=pagerState.currentPage)mediaScope.launch{pagerState.scrollToPage(index)}
                     },
                     onImageZoomChanged={zoomed->if(pagerState.currentPage==page){imageZoomed=zoomed;chromeVisible=!zoomed}},
-                    onChromeRequested = { visible -> chromeVisible = visible }
+                    onChromeRequested = { visible -> if (pagerState.settledPage == page) chromeVisible = visible }
                 )
             }
 
@@ -412,6 +415,8 @@ private fun PreviewPage(
     dataSourceFactory: TelegramDataSourceFactory,
     onDownload: () -> Unit,
     chromeVisible: Boolean,
+    interactionBlocked: Boolean,
+    onVideoScrubbing: (Boolean) -> Unit,
     allowBackgroundPlayback: Boolean,
     preferredAudioLanguage: String,
     preferredSubtitleLanguage: String,
@@ -501,6 +506,8 @@ private fun PreviewPage(
                 dataSourceFactory = dataSourceFactory,
                 isActivePage = isActivePage,
                 controlsVisible = chromeVisible,
+                interactionBlocked = interactionBlocked,
+                onGestureInProgress = onVideoScrubbing,
                 allowBackgroundPlayback = allowBackgroundPlayback,
                 preferredAudioLanguage = preferredAudioLanguage,
                 preferredSubtitleLanguage = preferredSubtitleLanguage,

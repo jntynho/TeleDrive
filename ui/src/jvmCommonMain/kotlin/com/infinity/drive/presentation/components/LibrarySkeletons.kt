@@ -17,11 +17,15 @@ import kotlin.math.ceil
 @Composable
 fun HomeSkeleton(modifier:Modifier=Modifier,bottomPadding:androidx.compose.ui.unit.Dp=0.dp){
     SkeletonScene(modifier){LazyColumn(contentPadding=PaddingValues(start=16.dp,end=16.dp,top=8.dp,bottom=96.dp+bottomPadding),verticalArrangement=Arrangement.spacedBy(16.dp)){
-        item{Column { LibraryDashboard(LibraryOverview(0,0,emptyList()),{},showAddAction=false,loading=true,
-            shortcuts=listOf(LibraryShortcut("Favorites",DriveIcons.Star){},LibraryShortcut("Archived",DriveIcons.Archive){},LibraryShortcut("Trash",DriveIcons.Delete){}))
+        item{Column {
+            LibraryDashboard(LibraryOverview(0,0,emptyList()),{},showAddAction=false,loading=true)
             Spacer(Modifier.height(20.dp))
-            LibraryCategories(emptyList(),{},loading=true)}}
-        item{HomeQuickLinks(listOf(LibraryShortcut("All files",DriveIcons.Folder){},LibraryShortcut("Activity",DriveIcons.SwapVert){},LibraryShortcut("Backups",DriveIcons.Backup){}),loading=true)}
+            LibraryBrowse(listOf(
+                LibraryShortcut("All files",DriveIcons.Folder){}, LibraryShortcut("Activity",DriveIcons.SwapVert){},
+                LibraryShortcut("Favorites",DriveIcons.Star){}, LibraryShortcut("Archived",DriveIcons.Archive){},
+                LibraryShortcut("Hidden",DriveIcons.VisibilityOff){}, LibraryShortcut("Trash",DriveIcons.Delete){}
+            ),loading=true)
+        }}
         item{RecentSectionHeader(loading=true)}
         items(6){LibraryRecentRow(null)}
     }}

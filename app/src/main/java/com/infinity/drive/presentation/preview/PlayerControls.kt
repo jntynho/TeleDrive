@@ -3,6 +3,7 @@ package com.infinity.drive.presentation.preview
 
 import app.tgdrive.ui.elasticHorizontalScroll as horizontalScroll
 import app.tgdrive.ui.elasticVerticalScroll as verticalScroll
+import androidx.compose.foundation.verticalScroll as plainVerticalScroll
 import androidx.compose.foundation.rememberScrollState
 
 import app.tgdrive.ui.DriveIcons
@@ -16,6 +17,12 @@ import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -24,6 +31,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -36,11 +44,9 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.Composable
@@ -60,6 +66,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLayoutDirection
 import org.jetbrains.compose.resources.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -88,7 +96,6 @@ import com.infinity.drive.resources.preview_forward_10_seconds
 import com.infinity.drive.resources.preview_playback_speed
 import com.infinity.drive.presentation.common.Formatters
 import kotlinx.coroutines.delay
-import kotlin.math.abs
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -118,14 +125,15 @@ fun PlayerControls(
     var duration by remember(player) { mutableLongStateOf(player.duration.coerceAtLeast(0)) }
     var position by remember(player) { mutableLongStateOf(player.currentPosition.coerceAtLeast(0)) }
     var scrubTarget by remember(player) { mutableStateOf<Float?>(null) }
-    var pendingSeek by remember(player) { mutableStateOf<Long?>(null) }
     var speed by remember(player) { mutableFloatStateOf(player.playbackParameters.speed) }
+    var lastVolume by remember(player) { mutableFloatStateOf(player.volume.takeIf { it > 0f } ?: 1f) }
+    var seekable by remember(player) { mutableStateOf(player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) }
     var muted by remember(player) { mutableStateOf(player.volume == 0f) }
     var repeatOne by remember(player) {
         mutableStateOf(player.repeatMode == Player.REPEAT_MODE_ONE)
     }
     var tracks by remember(player) { mutableStateOf(player.currentTracks) }
-    var subtitlesOn by remember(player) { mutableStateOf(false) }
+    var subtitlesOn by remember(player) { mutableStateOf(player.currentTracks.groups.any { it.type == C.TRACK_TYPE_TEXT && it.isSelected }) }
     val orientationOwner=LocalVideoOrientation.current
     var fallbackRotation by rememberSaveable { mutableStateOf(PlayerRotation.AUTO) }
     val rotation=orientationOwner?.rotation?.value?:fallbackRotation
@@ -141,8 +149,7 @@ fun PlayerControls(
      * take a moment. Showing play there reads as "nothing happened", so the
      * button reports that the player is waiting on data instead.
      */
-    val waitingForData = playbackState == Player.STATE_BUFFERING ||
-            (playWhenReady && !playing && !ended && playbackState != Player.STATE_IDLE)
+    val waitingForData = playbackState == Player.STATE_BUFFERING && playWhenReady
 
     val trackWord = stringResource(Res.string.player_track)
     val textTracks = tracks.playerTracks(C.TRACK_TYPE_TEXT, trackWord)
@@ -150,6 +157,14 @@ fun PlayerControls(
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
+            override fun onEvents(player: Player, events: Player.Events) {
+                speed = player.playbackParameters.speed
+                muted = player.volume == 0f
+                if (!muted) lastVolume = player.volume
+                repeatOne = player.repeatMode == Player.REPEAT_MODE_ONE
+                seekable = player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
+                duration = player.duration.coerceAtLeast(0)
+            }
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 playing = isPlaying
             }
@@ -165,10 +180,7 @@ fun PlayerControls(
                 newPosition: Player.PositionInfo,
                 reason: Int
             ) {
-                if (reason == Player.DISCONTINUITY_REASON_SEEK) {
-                    position = newPosition.positionMs.coerceAtLeast(0)
-                    pendingSeek = null
-                }
+                position = newPosition.positionMs.coerceAtLeast(0)
             }
 
             override fun onPlayWhenReadyChanged(playWhenReadyNow: Boolean, reason: Int) {
@@ -195,19 +207,14 @@ fun PlayerControls(
 
     LaunchedEffect(player, visible, playing) {
         while (visible) {
-            val current = player.currentPosition.coerceAtLeast(0)
-            val target = pendingSeek
-            if (target == null || abs(current - target) <= SEEK_TOLERANCE_MS) {
-                pendingSeek = null
-                position = current
-            }
+            position = player.currentPosition.coerceAtLeast(0)
             duration = player.duration.coerceAtLeast(0)
             delay(PROGRESS_INTERVAL_MS.milliseconds)
         }
     }
 
     LaunchedEffect(visible) {
-        if (!visible) {expanded = false;scrubTarget=null;onScrubbingChanged(false)}
+        if (!visible) {expanded = false;scrubTarget=null;onScrubbingChanged(false);showSpeeds=false;showAudioTracks=false;showTextTracks=false}
     }
     DisposableEffect(player){onDispose{onScrubbingChanged(false)}}
 
@@ -217,144 +224,9 @@ fun PlayerControls(
         exit = fadeOut(),
         modifier = modifier.fillMaxSize()
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .navigationBarsPadding()
-                    .background(Brush.verticalGradient(listOf(androidx.compose.ui.graphics.Color.Transparent,androidx.compose.ui.graphics.Color.Black.copy(alpha=.65f))))
-                    .padding(bottom = 108.dp, start = 12.dp, end = 12.dp)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                verticalAlignment = Alignment.Top
-            ) {
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                    Row(
-                        modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.Start)
-                    ) {
-                        CompositionLocalProvider(
-                            LocalLayoutDirection provides LayoutDirection.Ltr
-                        ) {
-                            ControlButton(
-                                icon = if (muted) {
-                                    DriveIcons.VolumeOff
-                                } else {
-                                    DriveIcons.VolumeUp
-                                },
-                                description = if (muted) stringResource(Res.string.player_unmute) else stringResource(
-                                    Res.string.player_mute
-                                ),
-                                active = muted,
-                                onClick = {
-                                    onInteraction()
-                                    muted = !muted
-                                    player.volume = if (muted) 0f else 1f
-                                }
-                            )
-                            ControlButton(
-                                icon = rotation.icon,
-                                description = rotation.description,
-                                active = rotation != PlayerRotation.AUTO,
-                                onClick = {
-                                    onInteraction()
-                                    val next=rotation.next()
-                                    if(orientationOwner!=null)orientationOwner.select(next)
-                                    else{fallbackRotation=next;activity?.requestedOrientation=next.orientation}
-                                }
-                            )
-                            if (!audioOnly) {
-                                ControlButton(
-                                    icon = resizeMode.icon,
-                                    description = resizeMode.description,
-                                    onClick = {
-                                        onInteraction()
-                                        onCycleResizeMode()
-                                    }
-                                )
-                            }
-                            ExtraControl(expanded) {
-                                ControlButton(
-                                    icon = DriveIcons.SlowMotionVideo,
-                                    description = stringResource(Res.string.preview_playback_speed),
-                                    active = speed != 1f,
-                                    onClick = {
-                                        onInteraction()
-                                        showSpeeds = true
-                                    }
-                                )
-                            }
-                            ExtraControl(expanded) {
-                                ControlButton(
-                                    icon = if (repeatOne) {
-                                        DriveIcons.RepeatOne
-                                    } else {
-                                        DriveIcons.Repeat
-                                    },
-                                    description = if (repeatOne) stringResource(Res.string.player_repeat_off) else stringResource(
-                                        Res.string.player_repeat_one
-                                    ),
-                                    active = repeatOne,
-                                    onClick = {
-                                        onInteraction()
-                                        repeatOne = !repeatOne
-                                        player.repeatMode = if (repeatOne) {
-                                            Player.REPEAT_MODE_ONE
-                                        } else {
-                                            Player.REPEAT_MODE_OFF
-                                        }
-                                    }
-                                )
-                            }
-                            if (!audioOnly) {
-                                ExtraControl(expanded || textTracks.isNotEmpty()) {
-                                    ControlButton(
-                                        icon = if (subtitlesOn) {
-                                            DriveIcons.Subtitles
-                                        } else {
-                                            DriveIcons.SubtitlesOff
-                                        },
-                                        description = if (subtitlesOn) {
-                                            stringResource(Res.string.player_hide_subtitles)
-                                        } else {
-                                            stringResource(Res.string.player_show_subtitles)
-                                        },
-                                        active = subtitlesOn,
-                                        enabled = textTracks.isNotEmpty(),
-                                        onClick = {
-                                            onInteraction()
-                                            showTextTracks = true
-                                        }
-                                    )
-                                }
-                            }
-                            ExtraControl(expanded || audioTracks.size > 1) {
-                                ControlButton(
-                                    icon = DriveIcons.Audiotrack,
-                                    description = stringResource(Res.string.player_audio_track),
-                                    enabled = audioTracks.isNotEmpty(),
-                                    onClick = {
-                                        onInteraction()
-                                        showAudioTracks = true
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-                ControlButton(
-                    icon = if (expanded) DriveIcons.ChevronRight else DriveIcons.ChevronLeft,
-                    description = if (expanded) stringResource(Res.string.player_fewer_controls) else stringResource(
-                        Res.string.player_more_controls
-                    ),
-                    onClick = {
-                        onInteraction()
-                        expanded = !expanded
-                    }
-                )
-            }
-
-            if (!audioOnly) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val compact = maxHeight < 400.dp
+            if (!audioOnly && !compact) {
                 TransportRow(
                     player = player,
                     playing = playing,
@@ -369,18 +241,154 @@ fun PlayerControls(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
+                    .then(if (compact) Modifier.heightIn(max = (maxHeight - 80.dp).coerceAtLeast(96.dp))
+                        .plainVerticalScroll(rememberScrollState()) else Modifier)
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                MaterialTheme.colorScheme.scrim.copy(alpha = 0f),
-                                MaterialTheme.colorScheme.scrim.copy(alpha = SCRIM_ALPHA)
+                                androidx.compose.ui.graphics.Color.Transparent,
+                                androidx.compose.ui.graphics.Color.Black.copy(alpha = .8f)
                             )
                         )
                     )
-                    .navigationBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
             ) {
-                if (audioOnly) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                        Row(
+                            modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.Start)
+                        ) {
+                            CompositionLocalProvider(
+                                LocalLayoutDirection provides LayoutDirection.Ltr
+                            ) {
+                                ControlButton(
+                                    icon = if (muted) {
+                                        DriveIcons.VolumeOff
+                                    } else {
+                                        DriveIcons.VolumeUp
+                                    },
+                                    description = if (muted) stringResource(Res.string.player_unmute) else stringResource(
+                                        Res.string.player_mute
+                                    ),
+                                    active = muted,
+                                    onClick = {
+                                        onInteraction()
+                                        if (player.volume > 0f) {
+                                            lastVolume = player.volume
+                                            player.volume = 0f
+                                        } else player.volume = lastVolume
+                                    }
+                                )
+                                ControlButton(
+                                    icon = rotation.icon,
+                                    description = rotation.description,
+                                    active = rotation != PlayerRotation.AUTO,
+                                    onClick = {
+                                        onInteraction()
+                                        val next=rotation.next()
+                                        if(orientationOwner!=null)orientationOwner.select(next)
+                                        else{fallbackRotation=next;activity?.requestedOrientation=next.orientation}
+                                    }
+                                )
+                                if (!audioOnly) {
+                                    ControlButton(
+                                        icon = resizeMode.icon,
+                                        description = resizeMode.description,
+                                        onClick = {
+                                            onInteraction()
+                                            onCycleResizeMode()
+                                        }
+                                    )
+                                }
+                                ExtraControl(expanded) {
+                                    ControlButton(
+                                        icon = DriveIcons.SlowMotionVideo,
+                                        description = stringResource(Res.string.preview_playback_speed),
+                                        active = speed != 1f,
+                                        onClick = {
+                                            onInteraction()
+                                            showSpeeds = true
+                                        }
+                                    )
+                                }
+                                ExtraControl(expanded) {
+                                    ControlButton(
+                                        icon = if (repeatOne) {
+                                            DriveIcons.RepeatOne
+                                        } else {
+                                            DriveIcons.Repeat
+                                        },
+                                        description = if (repeatOne) stringResource(Res.string.player_repeat_off) else stringResource(
+                                            Res.string.player_repeat_one
+                                        ),
+                                        active = repeatOne,
+                                        onClick = {
+                                            onInteraction()
+                                            repeatOne = !repeatOne
+                                            player.repeatMode = if (repeatOne) {
+                                                Player.REPEAT_MODE_ONE
+                                            } else {
+                                                Player.REPEAT_MODE_OFF
+                                            }
+                                        }
+                                    )
+                                }
+                                if (!audioOnly) {
+                                    ExtraControl(expanded || textTracks.isNotEmpty()) {
+                                        ControlButton(
+                                            icon = if (subtitlesOn) {
+                                                DriveIcons.Subtitles
+                                            } else {
+                                                DriveIcons.SubtitlesOff
+                                            },
+                                            description = if (subtitlesOn) {
+                                                stringResource(Res.string.player_hide_subtitles)
+                                            } else {
+                                                stringResource(Res.string.player_show_subtitles)
+                                            },
+                                            active = subtitlesOn,
+                                            enabled = textTracks.isNotEmpty(),
+                                            onClick = {
+                                                onInteraction()
+                                                showTextTracks = true
+                                            }
+                                        )
+                                    }
+                                }
+                                ExtraControl(expanded || audioTracks.size > 1) {
+                                    ControlButton(
+                                        icon = DriveIcons.Audiotrack,
+                                        description = stringResource(Res.string.player_audio_track),
+                                        enabled = audioTracks.isNotEmpty(),
+                                        onClick = {
+                                            onInteraction()
+                                            showAudioTracks = true
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    ControlButton(
+                        icon = if (expanded) DriveIcons.ChevronRight else DriveIcons.ChevronLeft,
+                        description = if (expanded) stringResource(Res.string.player_fewer_controls) else stringResource(
+                            Res.string.player_more_controls
+                        ),
+                        onClick = {
+                            onInteraction()
+                            expanded = !expanded
+                        }
+                    )
+                }
+
+                if (audioOnly || compact) {
                     TransportRow(
                         player = player,
                         playing = playing,
@@ -393,7 +401,10 @@ fun PlayerControls(
                     )
                 }
                 app.tgdrive.ui.SlimSlider(
-                    enabled=duration>0,
+                    enabled=duration>0 && seekable,
+                    modifier=Modifier.semantics { contentDescription="Seek video" },
+                    activeColor=androidx.compose.ui.graphics.Color.White,
+                    inactiveColor=androidx.compose.ui.graphics.Color.White.copy(alpha=.28f),
                     trackHeight=3.dp,thumbSize=12.dp,
                     value = scrubTarget ?: position.coerceIn(0,duration.coerceAtLeast(0)).toFloat(),
                     onValueChange = { value ->
@@ -403,9 +414,8 @@ fun PlayerControls(
                     },
                     onValueChangeFinished = {
                         scrubTarget?.let { target ->
-                            val millis = target.toLong()
+                            val millis = videoSeekTarget(target.toLong(), 0, duration)
                             position = millis
-                            pendingSeek = millis
                             player.seekTo(millis)
                         }
                         scrubTarget = null
@@ -536,7 +546,7 @@ fun PlayerControls(
                     .setPreferredTextLanguage(track.language.ifEmpty { null })
                     .build()
                 subtitlesOn = true
-                onPreferredSubtitleLanguage(track.language)
+                onPreferredSubtitleLanguage(track.language.ifEmpty { "und" })
             },
             onDismiss = { showTextTracks = false }
         )
@@ -554,15 +564,18 @@ private fun TransportRow(
     onInteraction: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val seekable = player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM) && player.duration > 0
+    val requested = player.playWhenReady && !ended
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(24.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(
+            enabled = seekable,
             onClick = {
                 onInteraction()
-                player.seekTo((player.currentPosition - SEEK_STEP_MS).coerceAtLeast(0))
+                player.seekTo(videoSeekTarget(player.currentPosition, -SEEK_STEP_MS, player.duration))
             },
             colors = IconButtonDefaults.filledTonalIconButtonColors(
                 containerColor = androidx.compose.ui.graphics.Color.Black
@@ -584,7 +597,7 @@ private fun TransportRow(
                         player.play()
                     }
 
-                    player.isPlaying -> player.pause()
+                    player.playWhenReady -> player.pause()
                     else -> player.play()
                 }
             },
@@ -595,32 +608,30 @@ private fun TransportRow(
             ),
             modifier = Modifier.size(PLAY_BUTTON_SIZE)
         ) {
-            if (waiting) {
-                LoadingIndicator(
-                    color = LocalContentColor.current,
-                    modifier = Modifier.size(PLAY_ICON_SIZE)
+            Box(contentAlignment = Alignment.Center) {
+                if (waiting) androidx.compose.material3.CircularProgressIndicator(
+                    color = LocalContentColor.current.copy(alpha = .6f),
+                    strokeWidth = 2.dp, modifier = Modifier.size(48.dp)
                 )
-            } else {
                 Icon(
                     imageVector = when {
                         ended -> DriveIcons.Replay
-                        playing -> DriveIcons.Pause
+                        requested -> DriveIcons.Pause
                         else -> DriveIcons.PlayArrow
                     },
                     contentDescription = when {
                         ended -> stringResource(Res.string.player_replay)
-                        playing -> stringResource(Res.string.player_pause)
+                        requested -> stringResource(Res.string.player_pause)
                         else -> stringResource(Res.string.player_play)
-                    },
-                    modifier = Modifier.size(PLAY_ICON_SIZE)
+                    }, modifier = Modifier.size(PLAY_ICON_SIZE)
                 )
             }
         }
         IconButton(
+            enabled = seekable,
             onClick = {
                 onInteraction()
-                val limit = player.duration.coerceAtLeast(0)
-                player.seekTo((player.currentPosition + SEEK_STEP_MS).coerceAtMost(limit))
+                player.seekTo(videoSeekTarget(player.currentPosition, SEEK_STEP_MS, player.duration))
             },
             colors = IconButtonDefaults.filledTonalIconButtonColors(
                 containerColor = androidx.compose.ui.graphics.Color.Black
@@ -711,12 +722,7 @@ private fun speedLabel(speed: Float): String =
 private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
 private const val SEEK_STEP_MS = 10_000L
 private const val PROGRESS_INTERVAL_MS = 250L
-private const val SEEK_TOLERANCE_MS = 500L
-private const val SCRIM_ALPHA = 0.35f
 private const val SURFACE_ALPHA = 0.35f
 private const val TRANSPORT_ALPHA = 0.7f
-private val THUMB_WIDTH = 5.dp
-private val THUMB_HEIGHT = 26.dp
 private val PLAY_BUTTON_SIZE = 72.dp
 private val PLAY_ICON_SIZE = 36.dp
-private val TOP_BAR_HEIGHT = 64.dp

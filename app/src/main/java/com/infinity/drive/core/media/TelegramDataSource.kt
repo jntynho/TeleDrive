@@ -32,12 +32,12 @@ class TelegramDataSource(
         position = dataSpec.position
 
         val totalSize = runTelegram("resolve") { source.size() }
-        bytesRemaining = if (dataSpec.length != C.LENGTH_UNSET.toLong()) {
-            dataSpec.length
-        } else {
-            totalSize - position
+        if (position > totalSize) {
+            source.close()
+            throw androidx.media3.datasource.DataSourceException(androidx.media3.common.PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE)
         }
-        if (bytesRemaining < 0) throw IOException("Position beyond end of file")
+        val available = (totalSize - position).coerceAtLeast(0)
+        bytesRemaining = if (dataSpec.length != C.LENGTH_UNSET.toLong()) minOf(dataSpec.length, available) else available
 
         opened = true
         transferStarted(dataSpec)
@@ -50,7 +50,7 @@ class TelegramDataSource(
 
         val toRead = minOf(length.toLong(), bytesRemaining).toInt()
         val data = runTelegram("read") { source.read(position, toRead) }
-        if (data.isEmpty()) return C.RESULT_END_OF_INPUT
+        if (data.isEmpty()) throw java.io.EOFException("Telegram media ended before the requested range was available")
 
         System.arraycopy(data, 0, buffer, offset, data.size)
         position += data.size
@@ -62,12 +62,15 @@ class TelegramDataSource(
     override fun getUri(): Uri? = uri
 
     override fun close() {
-        if (opened) {
-            opened = false
-            runCatching { source.close() }
-            transferEnded()
+        try {
+            source.close()
+        } finally {
+            if (opened) {
+                opened = false
+                transferEnded()
+            }
+            uri = null
         }
-        uri = null
     }
 
     private fun <T> runTelegram(stage: String, block: suspend () -> T): T = try {

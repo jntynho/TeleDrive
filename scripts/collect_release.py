@@ -9,7 +9,7 @@ import zipfile
 
 root = pathlib.Path('app/build/outputs/apk/release')
 metadata = json.loads((root / 'output-metadata.json').read_text())
-expected = {'arm64-v8a', 'armeabi-v7a', 'x86_64'}
+expected = {'arm64-v8a', 'armeabi-v7a'}
 variants = {}
 versions = set()
 for entry in metadata['elements']:
@@ -41,7 +41,7 @@ for abi in sorted(expected):
         assert any(n.endswith('/libtdjni.so') for n in libraries), abi
         assert not any('mlkit' in n.lower() or n.endswith('/libsqliteJni.so') for n in libraries), abi
 
-print('Matching code/resources/assets and correct native ABI verified for all three APKs.')
+print('Matching code/resources/assets and correct native ABI verified for both ARM APKs.')
 assert sys.argv[1:] in ([], ['--verify-only']), 'Supported option: --verify-only'
 if sys.argv[1:]:
     raise SystemExit(0)
@@ -59,4 +59,4 @@ for abi, source in sorted(variants.items()):
     checksums.append(line)
     print(f'{abi}: {target.stat().st_size / 1024**2:.1f} MiB')
 (dest / 'SHA256SUMS').write_text(''.join(checksums))
-print(f'Shared code/resources/assets and three standalone APKs verified; package app.tgdrive.next, version {version} ({code}).')
+print(f'Shared code/resources/assets and two standalone ARM APKs verified; package app.tgdrive.next, version {version} ({code}).')

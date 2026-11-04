@@ -3,7 +3,7 @@ package com.infinity.drive.core.media
 import com.infinity.drive.core.telegram.TelegramClient
 import com.infinity.drive.core.telegram.TelegramFileInfo
 import kotlin.time.Duration.Companion.milliseconds
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 
@@ -64,7 +64,9 @@ class TelegramMediaByteSource(
             telegramClient.requestFileRange(fileId, readPosition, 0)
         }
         withTimeout(BUFFER_TIMEOUT_MS.milliseconds) {
-            telegramClient.fileUpdates(fileId).first { covers(it, readPosition, count) }
+            // File updates are a hot stream. Completion can arrive before a collector
+            // subscribes; bounded local TDLib queries also recover that missed update.
+            while (!covers(telegramClient.getFileInfo(fileId), readPosition, count)) delay(100)
         }
     }
 
@@ -79,6 +81,8 @@ class TelegramMediaByteSource(
         if (fileId != 0) {
             runCatching { runBlocking { telegramClient.cancelFileDownload(fileId) } }
         }
+        fileId = 0
+        totalSize = -1
     }
 
     private companion object {

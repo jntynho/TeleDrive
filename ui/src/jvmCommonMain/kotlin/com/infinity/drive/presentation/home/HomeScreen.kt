@@ -145,19 +145,23 @@ fun HomeScreen(
                     state.storage.filter{it.category==com.infinity.drive.domain.model.FileCategory.AUDIO}.sumOf{it.totalBytes},
                     state.storage.filter{it.category !in setOf(com.infinity.drive.domain.model.FileCategory.IMAGE,com.infinity.drive.domain.model.FileCategory.VIDEO,com.infinity.drive.domain.model.FileCategory.AUDIO)}.sumOf{it.totalBytes}
                 )
-                app.tgdrive.ui.LibraryDashboard(app.tgdrive.ui.LibraryOverview(state.storage.sumOf{it.fileCount},groups.sum(),groups,state.localBytes),{showUploadSheet=true},showAddAction=false,shortcuts=listOf(
-                    app.tgdrive.ui.LibraryShortcut("Favorites",DriveIcons.Star){onOpenCollection(CollectionType.FAVORITES)},
-                    app.tgdrive.ui.LibraryShortcut("Archived",DriveIcons.Archive){onOpenCollection(CollectionType.ARCHIVED)},
-                    app.tgdrive.ui.LibraryShortcut("Trash",DriveIcons.Delete,onOpenTrash)
-                ),onBrowse=onOpenFiles)
+                val lastUpload = state.recentFiles.filter { it.remoteFileId != null || it.messageId != null }
+                    .maxOfOrNull { it.addedAt }
+                app.tgdrive.ui.LibraryDashboard(
+                    app.tgdrive.ui.LibraryOverview(state.backedUpCount, state.remoteBytes, groups, state.localBytes),
+                    { showUploadSheet = true }, showAddAction = false,
+                    updatedLabel = lastUpload?.let { "Added ${com.infinity.drive.presentation.common.Formatters.date(it)}" }
+                        ?: state.lastBackupAt?.let { "Backup ${com.infinity.drive.presentation.common.Formatters.date(it)}" }
+                        ?: if (state.backedUpCount > 0) "In your drive" else "No uploads yet"
+                )
                 Spacer(Modifier.height(20.dp))
-                app.tgdrive.ui.LibraryCategories(groups,onBrowseCategory)
-            }
-            item {
-                com.infinity.drive.presentation.components.HomeQuickLinks(listOf(
-                    app.tgdrive.ui.LibraryShortcut("All files",DriveIcons.Folder,onOpenFiles),
-                    app.tgdrive.ui.LibraryShortcut("Activity",DriveIcons.SwapVert,onOpenTransfers),
-                    app.tgdrive.ui.LibraryShortcut("Backups",DriveIcons.Backup,onOpenBackupSettings)
+                app.tgdrive.ui.LibraryBrowse(listOf(
+                    app.tgdrive.ui.LibraryShortcut("All files", DriveIcons.Folder, onOpenFiles),
+                    app.tgdrive.ui.LibraryShortcut("Activity", DriveIcons.SwapVert, onOpenTransfers),
+                    app.tgdrive.ui.LibraryShortcut("Favorites", DriveIcons.Star) { onOpenCollection(CollectionType.FAVORITES) },
+                    app.tgdrive.ui.LibraryShortcut("Archived", DriveIcons.Archive) { onOpenCollection(CollectionType.ARCHIVED) },
+                    app.tgdrive.ui.LibraryShortcut("Hidden", DriveIcons.VisibilityOff) { onOpenCollection(CollectionType.HIDDEN) },
+                    app.tgdrive.ui.LibraryShortcut("Trash", DriveIcons.Delete, onOpenTrash)
                 ))
             }
             if (state.autoBackupEnabled && state.missingPermissions.isNotEmpty()) {

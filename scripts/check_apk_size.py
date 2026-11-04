@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 import zipfile
 
-EXPECTED = {"arm64-v8a", "armeabi-v7a", "x86_64"}
+EXPECTED = {"arm64-v8a", "armeabi-v7a"}
 BUDGET_BYTES = 20 * 1024 * 1024
 
 
@@ -36,7 +36,7 @@ def main(paths):
             rows.append(f"| {abi} | {size / 1048576:.2f} MiB |")
     if seen != EXPECTED:
         raise SystemExit(f"Missing architectures: {EXPECTED - seen}")
-    report = "## APK size validation\n\n| Architecture | APK size |\n|---|---:|\n" + "\n".join(rows) + "\n\nAll three APKs retain TDLib, use compressed native libraries and exclude retired OCR/models and bundled SQLite.\n"
+    report = "## APK size validation\n\n| Architecture | APK size |\n|---|---:|\n" + "\n".join(rows) + "\n\nBoth ARM APKs retain TDLib, use compressed native libraries and exclude retired OCR/models and bundled SQLite.\n"
     print(report)
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:

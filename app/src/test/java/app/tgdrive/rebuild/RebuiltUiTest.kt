@@ -184,23 +184,18 @@ class RebuiltUiTest {
         compose.onNodeWithText("Your library").assertIsDisplayed()
     }
 
-    @Test fun libraryCollectionsKeepTheCardBoundsAndRemainReachable() {
+    @Test fun sixLibraryDestinationsRemainReachableOutsideTheSummaryCard() {
         compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
-        val before=compose.onNodeWithTag("library-card").fetchSemanticsNode().boundsInRoot
-        compose.onNodeWithContentDescription("Show collections").performClick()
-        compose.onNodeWithText("Your collections").assertIsDisplayed()
-        val after=compose.onNodeWithTag("library-card").fetchSemanticsNode().boundsInRoot
-        org.junit.Assert.assertEquals(before,after)
-        listOf("Favorites","Archived","Trash").forEach{compose.onNodeWithText(it,substring=false).assertIsDisplayed()}
+        compose.onNodeWithText("Stored in Telegram").assertIsDisplayed()
+        listOf("All files", "Activity", "Favorites", "Archived", "Hidden", "Trash").forEach {
+            compose.onNodeWithText(it, substring=false).performScrollTo().assertIsDisplayed()
+        }
+        compose.onNodeWithContentDescription("Show collections").assertDoesNotExist()
         capture("library-shortcuts")
-        compose.onNodeWithContentDescription("Show library overview").performClick()
-        compose.onNodeWithText("Your library").assertIsDisplayed()
-        org.junit.Assert.assertEquals(before,compose.onNodeWithTag("library-card").fetchSemanticsNode().boundsInRoot)
-        compose.onNodeWithContentDescription("Show collections").performClick()
-        compose.onNodeWithText("Archived",substring=false).performClick()
-        compose.onNodeWithText("Archived",substring=false).assertIsDisplayed()
+        compose.onNodeWithText("Hidden", substring=false).performClick()
+        compose.onNodeWithText("Hidden", substring=false).assertIsDisplayed()
         compose.onNodeWithContentDescription("Back").performClick()
-        compose.onNodeWithContentDescription("Show library overview").assertIsDisplayed()
+        compose.onNodeWithText("Your library").assertIsDisplayed()
     }
 
     @Test fun homeUploadOpensOnlyTheRequestedPickerWithoutChangingDestination() {
@@ -365,7 +360,6 @@ class RebuiltUiTest {
             dao.upsert(dao.byId("Report.pdf")!!.copy(trashedAt=System.currentTimeMillis()))
         }
         compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithContentDescription("Show collections").performClick()
         listOf("Favorites" to "Photo.jpg","Archived" to "Song.mp3","Trash" to "Report.pdf").forEach { (collection,name)->
             compose.onNodeWithText(collection,substring=false).performClick()
             compose.waitUntil(10_000){compose.onAllNodesWithText(name,substring=false).fetchSemanticsNodes().isNotEmpty()}

@@ -5,9 +5,9 @@ import app.tgdrive.ui.DriveIcons
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import androidx.annotation.OptIn
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,8 +19,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -33,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -48,7 +45,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -87,6 +83,8 @@ fun MediaPlayer(
     onPreferredAudioLanguage: (String) -> Unit = {},
     onPreferredSubtitleLanguage: (String) -> Unit = {},
     onControlsVisibilityChanged: (Boolean) -> Unit = {},
+    interactionBlocked: Boolean = false,
+    onGestureInProgress: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -95,80 +93,82 @@ fun MediaPlayer(
     val audioLanguage by rememberUpdatedState(preferredAudioLanguage)
     val subtitleLanguage by rememberUpdatedState(preferredSubtitleLanguage)
 
-    var resumePosition by rememberSaveable(content){mutableLongStateOf(0L)}
-    var resumePlaying by rememberSaveable(content){mutableStateOf(true)}
-    var resumeSpeed by rememberSaveable(content){mutableFloatStateOf(1f)}
-    var resumeVolume by rememberSaveable(content){mutableFloatStateOf(1f)}
-    val activity=androidx.activity.compose.LocalActivity.current
-    val holder = remember(content) { mutableStateOf<ExoPlayer?>(null) }
+    val checkpoint = rememberSaveable(fileId, saver = VideoPlaybackCheckpoint.Saver) { VideoPlaybackCheckpoint() }
+    val holder = remember(fileId) { mutableStateOf<ExoPlayer?>(null) }
     val player = holder.value
+    val audioPlayback = com.infinity.drive.presentation.platform.LocalAudioPlayback.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val backgroundAllowed by rememberUpdatedState(allowBackgroundPlayback)
+    var retryInitialization by remember(fileId) { mutableIntStateOf(0) }
+    val touchExploration = app.tgdrive.ui.rememberTouchExploration()
+    var initializationFailed by remember(content, isActivePage, retryInitialization) { mutableStateOf(false) }
 
-    LaunchedEffect(holder, isActivePage) {
-        if (!isActivePage || holder.value != null) return@LaunchedEffect
-        val renderers = DefaultRenderersFactory(context)
-            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
-        holder.value = ExoPlayer.Builder(context, renderers).build().apply {
-            setAudioAttributes(androidx.media3.common.AudioAttributes.Builder().setUsage(androidx.media3.common.C.USAGE_MEDIA).setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE).build(),true)
-            setHandleAudioBecomingNoisy(true)
-            trackSelectionParameters = trackSelectionParameters.buildUpon()
-                .setPreferredAudioLanguage(audioLanguage.ifEmpty { null })
-                .setPreferredTextLanguage(subtitleLanguage.ifEmpty { null })
-                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, subtitleLanguage.isEmpty())
-                .build()
-            when (content) {
-                is PreviewContent.LocalMedia -> {
-                    setMediaItem(MediaItem.fromUri("file://${content.path}"))
-                }
-
-                is PreviewContent.StreamedMedia -> {
-                    val factory = if (content.parts.isNotEmpty()) {
-                        dataSourceFactory.createParted(
-                            parts = content.parts,
-                            encrypted = content.encrypted
-                        )
-                    } else {
-                        dataSourceFactory.create(content.remoteFileId)
+    DisposableEffect(content, isActivePage, retryInitialization) {
+        var owned: ExoPlayer? = null
+        if (isActivePage) {
+            try {
+                // Pause the application-owned music queue before video claims audio focus.
+                audioPlayback.pause()
+                val renderers = DefaultRenderersFactory(context.applicationContext)
+                    .setEnableDecoderFallback(true)
+                    .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+                val created = ExoPlayer.Builder(context.applicationContext, renderers).build()
+                owned = created
+                created.apply {
+                    setAudioAttributes(androidx.media3.common.AudioAttributes.Builder()
+                        .setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
+                    setHandleAudioBecomingNoisy(true)
+                    trackSelectionParameters = trackSelectionParameters.buildUpon()
+                        .setPreferredAudioLanguage(audioLanguage.ifEmpty { null })
+                        .setPreferredTextLanguage(subtitleLanguage.ifEmpty { null })
+                        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, subtitleLanguage.isEmpty()).build()
+                    when (content) {
+                        is PreviewContent.LocalMedia -> setMediaItem(MediaItem.fromUri(android.net.Uri.fromFile(java.io.File(content.path))))
+                        is PreviewContent.StreamedMedia -> {
+                            val factory = if (content.parts.isNotEmpty()) {
+                                dataSourceFactory.createParted(content.parts, content.encrypted)
+                            } else dataSourceFactory.create(content.remoteFileId)
+                            setMediaSource(ProgressiveMediaSource.Factory(factory)
+                                .createMediaSource(MediaItem.fromUri("telegram://stream")))
+                        }
+                        else -> Unit
                     }
-                    val source = ProgressiveMediaSource.Factory(factory)
-                        .createMediaSource(MediaItem.fromUri("telegram://stream"))
-                    setMediaSource(source)
+                    checkpoint.restore(this)
+                    prepare()
+                    if (!lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) && !backgroundAllowed) {
+                        checkpoint.suspend(this)
+                    }
                 }
-
-                else -> Unit
+                holder.value = created
+            } catch (_: Exception) {
+                owned?.release()
+                owned = null
+                initializationFailed = true
+                notifyControls(true)
             }
-            seekTo(resumePosition)
-            setPlaybackSpeed(resumeSpeed)
-            volume=resumeVolume
-            prepare()
-            playWhenReady = resumePlaying
+        }
+        onDispose {
+            owned?.let {
+                checkpoint.capture(it)
+                // Do not leave offscreen decoders and Telegram range loaders alive.
+                holder.value = null
+                it.release()
+            }
         }
     }
 
-    DisposableEffect(holder) {
-        onDispose { holder.value?.let{resumePosition=it.currentPosition.coerceAtLeast(0);resumePlaying=it.playWhenReady;resumeSpeed=it.playbackParameters.speed;resumeVolume=it.volume;it.release()} }
-    }
-
-    LaunchedEffect(player,isActivePage){
-        if(player!=null&&isActivePage)while(kotlinx.coroutines.currentCoroutineContext().isActive){
-            resumePosition=player.currentPosition.coerceAtLeast(0);resumePlaying=player.playWhenReady
-            resumeSpeed=player.playbackParameters.speed;resumeVolume=player.volume
+    LaunchedEffect(player) {
+        if (player != null) while (isActive) {
+            checkpoint.capture(player)
             delay(500)
         }
     }
-    DisposableEffect(player, isActivePage) {
-        if (!isActivePage) {
-            player?.let { resumePosition=it.currentPosition.coerceAtLeast(0);resumePlaying=it.playWhenReady;it.pause() }
-        } else if(player!=null) player.playWhenReady=resumePlaying
-        onDispose { }
-    }
-
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val backgroundAllowed by rememberUpdatedState(allowBackgroundPlayback)
-    DisposableEffect(lifecycleOwner,player) {
+    DisposableEffect(lifecycleOwner, player) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) {
-                if(!backgroundAllowed&&activity?.isChangingConfigurations!=true)player?.pause()
-                player?.let{resumePosition=it.currentPosition.coerceAtLeast(0);resumePlaying=it.playWhenReady;resumeSpeed=it.playbackParameters.speed;resumeVolume=it.volume}
+            if (player != null) when (event) {
+                Lifecycle.Event.ON_STOP -> if (!backgroundAllowed) checkpoint.suspend(player)
+                Lifecycle.Event.ON_START -> if (activePage) checkpoint.resume(player)
+                else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -187,9 +187,10 @@ fun MediaPlayer(
     val visibleControls by rememberUpdatedState(controlsVisible)
     var resizeMode by rememberSaveable { mutableStateOf(PlayerResizeMode.FIT) }
     var playing by remember(player) { mutableStateOf(player?.isPlaying == true) }
-    var sized by remember(player) { mutableStateOf((player?.videoSize?.width ?: 0) > 0) }
+    var buffering by remember(player) { mutableStateOf(player?.playbackState == Player.STATE_BUFFERING) }
+    var firstFrame by remember(player) { mutableStateOf(false) }
     var decoderFailed by remember(player) { mutableStateOf(false) }
-    var playbackFailed by remember(player) { mutableStateOf(false) }
+    var playbackFailed by remember(player) { mutableStateOf(player?.playerError != null) }
 
     DisposableEffect(player) {
         if (player == null) return@DisposableEffect onDispose { }
@@ -198,12 +199,17 @@ fun MediaPlayer(
                 playing = isPlaying
             }
 
-            override fun onVideoSizeChanged(videoSize: VideoSize) {
-                sized = videoSize.width > 0 && videoSize.height > 0
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                buffering = playbackState == Player.STATE_BUFFERING
+                if (playbackState == Player.STATE_ENDED && activePage) notifyControls(true)
+            }
+
+            override fun onRenderedFirstFrame() {
+                firstFrame = true
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                notifyControls(true)
+                if (activePage) notifyControls(true)
                 when (error.errorCode) {
                     PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
                     PlaybackException.ERROR_CODE_DECODING_FAILED,
@@ -219,8 +225,8 @@ fun MediaPlayer(
         onDispose { player.removeListener(listener) }
     }
 
-    LaunchedEffect(controlsVisible, playing, interactionTick, activePage, audioOnly,scrubbing,overlayOpen) {
-        if (!controlsVisible || !playing || !activePage || audioOnly || scrubbing || overlayOpen) return@LaunchedEffect
+    LaunchedEffect(controlsVisible, playing, interactionTick, activePage, audioOnly,scrubbing,overlayOpen,interactionBlocked,touchExploration) {
+        if (!controlsVisible || !playing || !activePage || audioOnly || scrubbing || overlayOpen || interactionBlocked || touchExploration) return@LaunchedEffect
         delay(CONTROLLER_TIMEOUT_MS.milliseconds)
         notifyControls(false)
     }
@@ -239,12 +245,14 @@ fun MediaPlayer(
                     (android.view.LayoutInflater.from(viewContext).inflate(app.tgdrive.R.layout.teledrive_video_surface,null,false) as PlayerView).apply {
                         useController = false
                         this.player = player
+                        importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
                         setBackgroundColor(Color.TRANSPARENT)
                         setShutterBackgroundColor(Color.TRANSPARENT)
                     }
                 },
                 update = { view ->
                     view.player = player
+                    view.keepScreenOn = isActivePage && (playing || buffering)
                     view.resizeMode = when (resizeMode) {
                         PlayerResizeMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
                         PlayerResizeMode.ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
@@ -255,11 +263,11 @@ fun MediaPlayer(
                 onRelease={it.player=null}
             )
         }
-        if (!audioOnly && !sized) {
+        if (!audioOnly && !firstFrame) {
             Box(
                 modifier = Modifier
                     .matchParentSize()
-                    .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                    .background(androidx.compose.ui.graphics.Color.Black)
             ) {
                 AsyncImage(
                     model = ThumbnailModel(fileId),
@@ -269,11 +277,17 @@ fun MediaPlayer(
                 )
             }
         }
-        if (decoderFailed || playbackFailed) {
+        if (buffering && !controlsVisible && !playbackFailed && !decoderFailed) {
+            androidx.compose.material3.CircularProgressIndicator(
+                Modifier.align(Alignment.Center).size(32.dp), color = androidx.compose.ui.graphics.Color.White,
+                strokeWidth = 2.dp
+            )
+        }
+        if (initializationFailed || decoderFailed || playbackFailed) {
             Column(
                 modifier = Modifier
                     .matchParentSize()
-                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f))
+                    .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.8f))
                     .padding(horizontal = 32.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -295,19 +309,28 @@ fun MediaPlayer(
                     modifier = Modifier.padding(top = 16.dp),
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = androidx.compose.ui.graphics.Color.White
                 )
-                if(!decoderFailed)androidx.compose.material3.TextButton(onClick={playbackFailed=false;decoderFailed=false;player?.prepare();player?.play()}){Text("Retry")}
+                if (!decoderFailed) androidx.compose.material3.TextButton(onClick = {
+                    if (player == null) retryInitialization++ else {
+                        playbackFailed = false
+                        player.seekTo(player.currentPosition.coerceAtLeast(0))
+                        player.prepare()
+                        player.play()
+                    }
+                }) { Text("Retry", color = androidx.compose.ui.graphics.Color.White) }
             }
         }
-        if(!decoderFailed&&!playbackFailed)Box(
+        if (!initializationFailed && !decoderFailed && !playbackFailed) Box(
             modifier = Modifier
                 .matchParentSize()
-                .pointerInput(Unit) {
-                    detectTapGestures { notifyControls(!visibleControls) }
-                }
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                    onClickLabel = if (controlsVisible) "Hide video controls" else "Show video controls"
+                ) { notifyControls(!visibleControls) }
         )
-        if (player != null) {
+        if (player != null && !decoderFailed && !playbackFailed) {
             PlayerControls(
                 player = player,
                 visible = controlsVisible,
@@ -315,7 +338,7 @@ fun MediaPlayer(
                 resizeMode = resizeMode,
                 onCycleResizeMode = { resizeMode = resizeMode.next() },
                 onInteraction = { interactionTick++ },
-                onScrubbingChanged={scrubbing=it},
+                onScrubbingChanged={scrubbing=it;onGestureInProgress(it)},
                 onOverlayChanged={overlayOpen=it},
                 onPreferredAudioLanguage = onPreferredAudioLanguage,
                 onPreferredSubtitleLanguage = onPreferredSubtitleLanguage

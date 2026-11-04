@@ -20,6 +20,7 @@ class DriveDataSource(private val pool: SessionPool) : BaseDataSource(true) {
     private var openedUri:Uri?=null
     private var position=0L;private var remaining=0L
     private var repository:LibraryRepository?=null;private var version:Version?=null;private var vault=""
+    private var accountId=0L
     private var channel:SeekableByteChannel?=null;private var channelIndex=-1;private var started=false
     override fun getUri()=openedUri
     override fun open(dataSpec:DataSpec):Long {
@@ -30,7 +31,7 @@ class DriveDataSource(private val pool: SessionPool) : BaseDataSource(true) {
         val bundle=pool.bundle(profile);val state=bundle.library.state.value
         val item=state.items.firstOrNull{it.id==itemId}?:throw IOException("Open the app and unlock this file before playback.")
         val content=state.versions.firstOrNull{it.id==versionId&&it.itemId==item.id}?:throw IOException("Content version is unavailable.")
-        repository=bundle.library;version=content;vault=state.itemVaults[item.id].orEmpty()
+        repository=bundle.library;version=content;vault=state.itemVaults[item.id].orEmpty();accountId=state.accountId
         if(!bundle.library.vaults.isUnlocked(vault))throw IOException("Unlock the vault before playback.")
         if(dataSpec.position>content.size)throw EOFException("Playback position exceeds the file size.")
         lease=repository!!.cache!!.lease(content.id)
@@ -42,6 +43,7 @@ class DriveDataSource(private val pool: SessionPool) : BaseDataSource(true) {
         if(remaining<=0)return C.RESULT_END_OF_INPUT
         val content=version?:throw IOException("Media source is closed")
         val repo=repository?:throw IOException("Media source is closed")
+        if(repo.state.value.accountId!=accountId||!repo.state.value.loaded)throw IOException("The library account changed. Reopen the video.")
         if(!repo.vaults.isUnlocked(vault))throw IOException("The vault was locked. Unlock it before resuming playback.")
         var base=0L
         val index=content.parts.indexOfFirst { part->if(position<base+part.plainSize)true else {base+=part.plainSize;false} }
@@ -51,17 +53,25 @@ class DriveDataSource(private val pool: SessionPool) : BaseDataSource(true) {
             if(channelIndex!=index){
                 channel?.close()
                 val raw=repo.cache!!.cachedRaw(content,part)?.let{FileInputStream(it).channel}?:RemotePartChannel(repo.remote,part)
-                channel=if(part.encrypted)repo.vaults.decryptingChannel(vault,raw,"${content.itemId}/${content.id}/$index") else raw
+                channel=try { if(part.encrypted)repo.vaults.decryptingChannel(vault,raw,"${content.itemId}/${content.id}/$index") else raw } catch(e:Exception) { raw.close(); throw e }
                 channelIndex=index
             }
             channel!!.position(position-base)
             val wanted=minOf(length.toLong(),remaining,part.plainSize-(position-base)).toInt()
             val count=channel!!.read(ByteBuffer.wrap(buffer,offset,wanted))
+            if(repo.state.value.accountId!=accountId||!repo.state.value.loaded)throw IOException("The library account changed during playback.")
             if(count<=0)throw EOFException("The requested media range ended early.")
             position+=count;remaining-=count;bytesTransferred(count);return count
         }catch(e:Exception){throw IOException("Could not read the media range. Check connectivity and vault availability.",e)}
     }
-    override fun close(){channel?.close();lease?.close();lease=null;channel=null;channelIndex=-1;repository=null;version=null;openedUri=null;if(started){started=false;transferEnded()}}
+    override fun close(){
+        try { channel?.close() } finally {
+            try { lease?.close() } finally {
+                lease=null;channel=null;channelIndex=-1;accountId=0;repository=null;version=null;openedUri=null
+                if(started){started=false;transferEnded()}
+            }
+        }
+    }
     class Factory(private val pool:SessionPool):DataSource.Factory{override fun createDataSource():DataSource=DriveDataSource(pool)}
 }
 
@@ -77,7 +87,7 @@ private class RemotePartChannel(private val storage:TelegramStorage,private val 
     override fun truncate(size:Long):SeekableByteChannel=throw java.nio.channels.NonWritableChannelException()
     override fun write(src:ByteBuffer):Int=throw java.nio.channels.NonWritableChannelException()
     override fun read(dst:ByteBuffer):Int{
-        check(open);if(offset>=part.storedSize)return -1
+        check(open);if(!dst.hasRemaining())return 0;if(offset>=part.storedSize)return -1
         val count=minOf(dst.remaining().toLong(),part.storedSize-offset,512*1024L).toInt()
         val data=runBlocking{scope.async{storage.range(part.messageId,offset,count,native)}.await()}
         if(data.isEmpty())return -1

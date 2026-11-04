@@ -73,8 +73,11 @@ private fun trackLabel(format: Format, fallback: String): String {
 
 private fun channelLabel(channels: Int): String? = when {
     channels == Format.NO_VALUE || channels <= 0 -> null
-    channels >= 6 -> "${channels - 1}.1"
-    else -> "$channels.0"
+    channels == 1 -> "Mono"
+    channels == 2 -> "Stereo"
+    channels == 6 -> "5.1"
+    channels == 8 -> "7.1"
+    else -> "$channels channels"
 }
 
 private fun codecLabel(mimeType: String?): String? = when (mimeType) {
@@ -134,6 +137,7 @@ fun TrackPickerSheet(
                 label = track.label,
                 detail = if (track.supported) null else unsupported,
                 selected = track.selected,
+                enabled = track.supported,
                 onClick = { onSelect(track) }
             )
         }
@@ -151,16 +155,17 @@ private fun TrackRow(
     label: String,
     detail: String?,
     selected: Boolean,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = 24.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        RadioButton(selected = selected, onClick = null)
+        RadioButton(selected = selected, onClick = null, enabled = enabled)
         Column(modifier = Modifier.padding(start = 16.dp)) {
             Text(text = label, style = MaterialTheme.typography.bodyLarge)
             if (detail != null) {

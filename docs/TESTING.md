@@ -1,6 +1,6 @@
 > Signing recovery: the legacy signing step failed before Gradle. The authorized replacement is `app.tgdrive.next`, installed beside the original app with a separately pinned certificate. The app suite was rerun for that identity: 178 passed. The signing initializer was checked for first creation, reuse and refusal to replace a missing initialized key. Its signed-install gate replaces the old same-package upgrade gate.
 
-> Release output scope is now three standalone APKs: ARM64, ARM32 and x86_64. Five-APK/AAB results below record checks completed before that reduction; those extra outputs are no longer produced by CI.
+> Release output scope is now two standalone ARM APKs: ARM64 and ARM32. x86_64 releases are disabled; the emulator debug test build remains internal. Five-APK/AAB results below record checks completed before that reduction; those extra outputs are no longer produced by CI.
 
 # Validation — Android private-channel rebuild
 
@@ -12,7 +12,6 @@ The active engine is the pinned DriveInfinity derivative described in [REBUILD-P
 ./gradlew --max-workers=1 :shared:allTests :app:testDebugUnitTest
 ./gradlew --max-workers=1 :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
 ./gradlew --max-workers=1 :app:lintRelease :app:assembleRelease -PsplitApks=true
-./gradlew --max-workers=1 :app:bundleRelease -PbundleOnly=true
 python3 scripts/check_native_alignment.py app/build/outputs/apk/release/*.apk
 python3 scripts/collect_release.py --verify-only
 python3 scripts/generate_launcher.py --check
@@ -28,7 +27,7 @@ The current suite includes **178 app tests and 66 shared host tests**, with no T
 
 `assembleDebugAndroidTest` compiles the native device suite. `connectedDebugAndroidTest` must run on a phone or accelerated emulator. Tests cover actual application startup/Keystore wiring, native TDLib loading, the rebuilt navigation, Room DAO behavior and retained compatibility component/media tests. A compiled test APK does not mean the device tests were executed.
 
-The release workflow requires device tests, local suites, release lint/R8, ABI/native payload consistency, the existing signing certificate, ZIP/ELF page alignment, and a signed in-place upgrade before publication. The upgrade gate seeds synthetic app-owned data on a disposable emulator; it does not authenticate a real session. Only signed releases with the original certificate can update installed release builds normally.
+The release workflow requires device tests, local suites, release lint/R8, ABI/native payload consistency, the existing signing certificate, ZIP/ELF page alignment, and signed ARM manifest validation before publication. The package gate checks the signed ARM files statically; it does not install them on the x86_64 test emulator or authenticate a real session. Only signed releases with the original certificate can update installed release builds normally.
 
 No KVM device is attached in this workspace. No real Telegram account or release signing key was supplied. Live authentication, private-channel creation, large uploads through a disconnect, backup under Android process eviction, encrypted streaming and recovery on a second physical phone remain manual acceptance cases. Telegram's dynamic rate limits cannot be disproved by fake-wire timing tests. See [SECURITY.md](SECURITY.md) before relying on encrypted storage.
 

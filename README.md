@@ -29,25 +29,23 @@
 </p>
 <p align="center">
   <a href="https://github.com/jntynho/TG-Drive/releases/latest/download/tg-drive-armeabi-v7a.apk"><img src="https://img.shields.io/badge/Older_phones-ARM32-475569?style=for-the-badge&logo=android&logoColor=white" alt="Download latest ARM32 APK for older phones"></a>
-  <a href="https://github.com/jntynho/TG-Drive/releases/latest/download/tg-drive-x86_64.apk"><img src="https://img.shields.io/badge/Intel-x86__64-475569?style=for-the-badge&logo=android&logoColor=white" alt="Download latest x86_64 APK"></a>
 </p>
 
 | Your device | Choose |
 | --- | --- |
 | Most modern Android phones and tablets | **[ARM64 · arm64-v8a](https://github.com/jntynho/TG-Drive/releases/latest/download/tg-drive-arm64-v8a.apk)** |
 | Older devices running a 32-bit ARM system | [ARM32 · armeabi-v7a](https://github.com/jntynho/TG-Drive/releases/latest/download/tg-drive-armeabi-v7a.apk) |
-| Intel devices and emulators | [x86_64](https://github.com/jntynho/TG-Drive/releases/latest/download/tg-drive-x86_64.apk) |
 
 All variants require **Android 8.0 or later** and install independently. Download **one `.apk`**; no ZIP extraction or split-APK installer is needed. The buttons always target the latest published release.
 
-Only these three standalone APKs are published. Universal, x86 and AAB builds are disabled in the release workflow. GitHub's automatic source ZIP/TAR downloads contain source code; choose an APK to install.
+Only these two ARM standalone APKs are published. Universal, x86, x86_64 and AAB release builds are disabled in the release workflow. GitHub's automatic source ZIP/TAR downloads contain source code; choose an APK to install.
 
 
-**New signing identity:** these releases install as **TG Drive Next** (`app.tgdrive.next`) alongside the original TG Drive. Keep the old app and its data; sign in again in Next. Subsequent Next releases use the pinned Next certificate. See the [release guide](docs/RELEASING.md).
+**Installation:** these releases install as **TeleDrive** (`app.tgdrive.next`) alongside the original TG Drive. Keep the old app and its data; sign in again in Next. Subsequent Next releases use the pinned Next certificate. See the [release guide](docs/RELEASING.md).
 
 ## Features
 
-The Android rebuild uses the real [DriveInfinity](https://github.com/ZHINFINITY/DriveInfinity) engine and presentation modules, adapted to TG Drive's dark visual system, Solar Linear icons, semicircle dashboard and four-tab navigation.
+The Android rebuild uses the real [DriveInfinity](https://github.com/ZHINFINITY/DriveInfinity) engine and presentation modules, adapted to TG Drive's dark visual system, Solar Linear icons, Sand library dashboard and four-tab navigation.
 
 | Area | Available options |
 | --- | --- |

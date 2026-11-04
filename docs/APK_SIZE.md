@@ -8,6 +8,6 @@ Android Room continues using the framework SQLite path and all existing migratio
 
 Native libraries are compressed in APKs with `jniLibs.useLegacyPackaging = true`. Android extracts them during installation. This reduces download size; installed storage also contains extracted libraries, so it must not be equated to the APK size. Do not recompress or strip a signed APK manually.
 
-`python3 scripts/check_apk_size.py` checks the actual three release outputs. It requires exactly one ABI per APK, retains TDLib, rejects bundled OCR/models and SQLite, checks compressed native entries and enforces a 20 MiB APK budget. GitHub Actions publishes the measured sizes in its summary and verifies signing/alignment and emulator installation before release publication.
+`python3 scripts/check_apk_size.py` checks the actual two ARM release outputs. It requires exactly one ABI per APK, retains TDLib, rejects bundled OCR/models and SQLite, checks compressed native entries and enforces a 20 MiB APK budget. GitHub Actions publishes the measured sizes in its summary and verifies signing/alignment and both ARM package manifests before release publication.
 
 Compare release APKs for the same ABI. Debug APKs include additional unoptimized code/tooling and are not a valid distribution-size baseline. Documents, media caches, user databases, saved sessions and vault keys are not size-cleanup targets.

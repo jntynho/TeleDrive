@@ -5,7 +5,7 @@ import com.infinity.drive.core.telegram.TelegramClient
 import com.infinity.drive.core.telegram.TelegramFileInfo
 import java.io.IOException
 import kotlin.time.Duration.Companion.milliseconds
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 
@@ -35,6 +35,7 @@ class PartedMediaByteSource(
     )
 
     private var open: OpenPart? = null
+    private var preloadedFileId: Int? = null
     private var preloaded: Int = -1
     private var frameIndex: Int = -1
     private var frame: ByteArray? = null
@@ -91,9 +92,10 @@ class PartedMediaByteSource(
                 streamCrypto.frameStoredSize(StreamCrypto.CHUNK_SIZE).toLong(),
                 active.storedSize - start
             )
-            val sealed = readDownloaded(active.fileId, start, span) ?: run {
+            val buffered = readDownloaded(active.fileId, start, span)
+            val sealed = if (buffered?.size?.toLong() == span) buffered else {
                 awaitAvailable(active.fileId, start, span)
-                telegramClient.readFilePart(active.fileId, start, span)
+                readFully(active.fileId, start, span.toInt(), buffered ?: ByteArray(0))
             }
             frame = streamCrypto.decryptFrame(key, salt, wanted, sealed)
             frameIndex = wanted
@@ -104,6 +106,20 @@ class PartedMediaByteSource(
         if (insideFrame >= plain.size) return ByteArray(0)
         val take = minOf(count, plain.size - insideFrame)
         return plain.copyOfRange(insideFrame, insideFrame + take)
+    }
+
+    /** A native ranged read may be short. Authentication requires the entire sealed frame. */
+    private suspend fun readFully(fileId: Int, position: Long, count: Int, initial: ByteArray = ByteArray(0)): ByteArray {
+        val result = ByteArray(count)
+        initial.copyInto(result)
+        var filled = initial.size
+        while (filled < count) {
+            val bytes = telegramClient.readFilePart(fileId, position + filled, (count - filled).toLong())
+            if (bytes.isEmpty() || bytes.size > count - filled) throw IOException("Encrypted media range ended early")
+            bytes.copyInto(result, filled)
+            filled += bytes.size
+        }
+        return result
     }
 
     private suspend fun openPart(part: MediaPart): OpenPart {
@@ -118,7 +134,7 @@ class PartedMediaByteSource(
         val salt = if (encrypted) {
             val headerSize = streamCrypto.headerSize().toLong()
             awaitAvailable(info.fileId, 0, headerSize)
-            streamCrypto.saltOf(telegramClient.readFilePart(info.fileId, 0, headerSize))
+            streamCrypto.saltOf(readFully(info.fileId, 0, headerSize.toInt()))
         } else {
             null
         }
@@ -141,7 +157,11 @@ class PartedMediaByteSource(
         val remoteFileId = next.remoteFileId
         runCatching {
             val info = telegramClient.resolveFile(remoteFileId)
+            preloadedFileId?.takeIf { it != open?.fileId && it != info.fileId }?.let {
+                telegramClient.cancelFileDownload(it)
+            }
             telegramClient.requestFileRange(info.fileId, 0, 0)
+            preloadedFileId = info.fileId
             preloaded = nextIndex
         }
     }
@@ -158,7 +178,9 @@ class PartedMediaByteSource(
             telegramClient.requestFileRange(fileId, readPosition, 0)
         }
         withTimeout(BUFFER_TIMEOUT_MS.milliseconds) {
-            telegramClient.fileUpdates(fileId).first { covers(it, readPosition, count) }
+            // File updates are a hot stream. Completion can arrive before a collector
+            // subscribes; bounded local TDLib queries also recover that missed update.
+            while (!covers(telegramClient.getFileInfo(fileId), readPosition, count)) delay(100)
         }
     }
 
@@ -173,6 +195,10 @@ class PartedMediaByteSource(
         open?.let { active ->
             runCatching { runBlocking { telegramClient.cancelFileDownload(active.fileId) } }
         }
+        preloadedFileId?.takeIf { it != open?.fileId }?.let { fileId ->
+            runCatching { runBlocking { telegramClient.cancelFileDownload(fileId) } }
+        }
+        preloadedFileId = null
         open = null
         frame = null
         frameIndex = -1
