@@ -160,6 +160,7 @@ object DriveIcons {
     val ZoomOutMap: ImageVector get() = solarFullScreenLinear
     val SkipPrevious: ImageVector get() = solarSkipPreviousLinear
     val SkipNext: ImageVector get() = solarSkipNextLinear
+    val PhotoCamera: ImageVector get() = solarCameraLinear
     private val solarAddFolderLinear: ImageVector by lazy {
         ImageVector.Builder("solar:add-folder-linear",24.dp,24.dp,24f,24f).apply {
             addPath(PathParser().parsePathString("M10 14H12M12 14H14M12 14V16M12 14V12").toNodes(),fill=null,stroke=SolidColor(Color.Black),strokeLineWidth=1.5f,strokeLineCap=StrokeCap.Round,strokeLineJoin=StrokeJoin.Miter,pathFillType=PathFillType.NonZero,fillAlpha=1f,strokeAlpha=1f)
@@ -218,6 +219,13 @@ object DriveIcons {
             addPath(PathParser().parsePathString("M2.44853 11.4113L3.18962 12.6295C5.22275 15.9716 8.02819 18.7771 11.3703 20.8103L12.5886 21.5514C14.4872 22.5206 16.9425 21.898 18.0027 19.89C18.5037 18.9411 18.9798 17.8777 19.2819 16.821C20.1903 13.6432 19.8572 10.8584 19.8572 10.8584L13.1415 4.14263C13.1415 4.14263 10.3567 3.80954 7.17896 4.71798C6.12226 5.02007 5.05883 5.49617 4.11001 5.99715C2.10201 7.05737 1.47943 9.51271 2.44853 11.4113Z").toNodes(),fill=null,stroke=SolidColor(Color.Black),strokeLineWidth=1.5f,strokeLineCap=StrokeCap.Round,strokeLineJoin=StrokeJoin.Miter,pathFillType=PathFillType.NonZero,fillAlpha=1f,strokeAlpha=1f)
             addPath(PathParser().parsePathString("M22 2L19.6426 4.35742").toNodes(),fill=null,stroke=SolidColor(Color.Black),strokeLineWidth=1.5f,strokeLineCap=StrokeCap.Round,strokeLineJoin=StrokeJoin.Miter,pathFillType=PathFillType.NonZero,fillAlpha=1f,strokeAlpha=1f)
             addPath(PathParser().parsePathString("M13.3564 4.35767C15.0924 2.62172 17.9069 2.62163 19.6428 4.35759C21.3788 6.09355 21.3788 8.90817 19.6429 10.6441").toNodes(),fill=null,stroke=SolidColor(Color.Black),strokeLineWidth=1.5f,strokeLineCap=StrokeCap.Round,strokeLineJoin=StrokeJoin.Miter,pathFillType=PathFillType.NonZero,fillAlpha=1f,strokeAlpha=1f)
+        }.build()
+    }
+    private val solarCameraLinear: ImageVector by lazy {
+        ImageVector.Builder("solar:camera-linear",24.dp,24.dp,24f,24f).apply {
+            addPath(PathParser().parsePathString("M9,13a3,3 0 1 0 6,0a3,3 0 1 0 -6,0Z").toNodes(),fill=null,stroke=SolidColor(Color.Black),strokeLineWidth=1.5f,strokeLineCap=StrokeCap.Round,strokeLineJoin=StrokeJoin.Miter,pathFillType=PathFillType.NonZero,fillAlpha=1f,strokeAlpha=1f)
+            addPath(PathParser().parsePathString("M9.77778 21H14.2222C17.3433 21 18.9038 21 20.0248 20.2646C20.51 19.9462 20.9267 19.5371 21.251 19.0607C22 17.9601 22 16.4279 22 13.3636C22 10.2994 22 8.76721 21.251 7.6666C20.9267 7.19014 20.51 6.78104 20.0248 6.46268C19.3044 5.99013 18.4027 5.82123 17.022 5.76086C16.3631 5.76086 15.7959 5.27068 15.6667 4.63636C15.4728 3.68489 14.6219 3 13.6337 3H10.3663C9.37805 3 8.52715 3.68489 8.33333 4.63636C8.20412 5.27068 7.63685 5.76086 6.978 5.76086C5.59733 5.82123 4.69555 5.99013 3.97524 6.46268C3.48995 6.78104 3.07328 7.19014 2.74902 7.6666C2 8.76721 2 10.2994 2 13.3636C2 16.4279 2 17.9601 2.74902 19.0607C3.07328 19.5371 3.48995 19.9462 3.97524 20.2646C5.09624 21 6.65675 21 9.77778 21Z").toNodes(),fill=null,stroke=SolidColor(Color.Black),strokeLineWidth=1.5f,strokeLineCap=StrokeCap.Round,strokeLineJoin=StrokeJoin.Miter,pathFillType=PathFillType.NonZero,fillAlpha=1f,strokeAlpha=1f)
+            addPath(PathParser().parsePathString("M19 10H18").toNodes(),fill=null,stroke=SolidColor(Color.Black),strokeLineWidth=1.5f,strokeLineCap=StrokeCap.Round,strokeLineJoin=StrokeJoin.Miter,pathFillType=PathFillType.NonZero,fillAlpha=1f,strokeAlpha=1f)
         }.build()
     }
     private val solarChatRoundLineLinear: ImageVector by lazy {

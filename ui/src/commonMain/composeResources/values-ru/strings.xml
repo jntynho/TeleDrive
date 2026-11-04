@@ -718,7 +718,7 @@
     <string name="settings_debug_logging">Журнал отладки</string>
     <string name="settings_link_previews">Предпросмотр ссылок</string>
     <string name="settings_link_previews_subtitle">Telegram загружает заголовок и картинку для сохраненных ссылок</string>
-    <string name="settings_parallel_transfers">Параллельные передачи</string>
+    <string name="settings_parallel_transfers">Параллельные загрузки</string>
     <string name="settings_proxy">Прокси</string>
     <string name="settings_proxy_subtitle">Обход блокировок Telegram</string>
     <string name="settings_retry_attempts">Количество повторов</string>

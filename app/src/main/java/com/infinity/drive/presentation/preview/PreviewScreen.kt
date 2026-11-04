@@ -206,17 +206,27 @@ fun PreviewScreen(
         initialPage = state.initialIndex.coerceAtMost(state.files.lastIndex),
         pageCount = { state.files.size }
     )
-    val pagedFile = state.files[pagerState.currentPage.coerceAtMost(state.files.lastIndex)]
+    val pagedFile = state.files[pagerState.settledPage.coerceAtMost(state.files.lastIndex)]
     /* The pager holds a snapshot, so the open row is read live: a rename or an
        edit made elsewhere shows without reopening. */
     val liveFile by viewModel.observeFile(pagedFile.id)
         .collectAsStateWithLifecycle(initialValue = pagedFile)
-    val currentFile = liveFile ?: pagedFile
     val backgroundAudio=com.infinity.drive.presentation.platform.LocalAudioPlayback.current
+    val audioState by backgroundAudio.state.collectAsStateWithLifecycle()
+    val currentFile = if(pagedFile.category==FileCategory.AUDIO) audioState.file?.takeIf{it.category==FileCategory.AUDIO} ?: liveFile ?: pagedFile else liveFile ?: pagedFile
     val mediaScope=rememberCoroutineScope()
-    LaunchedEffect(currentFile.id){
-        if(currentFile.category!=FileCategory.AUDIO)backgroundAudio.pause()
-        else backgroundAudio.setQueue(state.files.filter{it.category==FileCategory.AUDIO}.map{it.id})
+    LaunchedEffect(pagerState.settledPage){
+        val settled=state.files[pagerState.settledPage]
+        if(settled.category==FileCategory.AUDIO){
+            if(!backgroundAudio.containsQueuedFile(settled.id)) backgroundAudio.setQueue(state.files.filter{it.category==FileCategory.AUDIO}.map{it.id})
+            if(backgroundAudio.state.value.file?.id!=settled.id)backgroundAudio.play(settled)
+        }
+    }
+    LaunchedEffect(audioState.file?.id){
+        if(pagedFile.category==FileCategory.AUDIO&&!pagerState.isScrollInProgress){
+            val index=state.files.indexOfFirst{it.id==audioState.file?.id}
+            if(index>=0&&index!=pagerState.settledPage)pagerState.scrollToPage(index)
+        }
     }
 
     val immersive = currentFile.category == FileCategory.IMAGE ||
@@ -269,14 +279,14 @@ fun PreviewScreen(
                 key = { state.files[it].id }
             ) { page ->
                 val file = state.files[page]
-                val content by viewModel.contentFor(file).collectAsStateWithLifecycle()
+                val content = if(file.category==FileCategory.AUDIO)PreviewContent.Loading else viewModel.contentFor(file).collectAsStateWithLifecycle().value
                 PreviewPage(
                     loadLinkMetadata = { url -> viewModel.linkPreview(url) },
                     storedTextScale = storedTextScale,
                     onTextScaleChange = viewModel::setTextScale,
                     file = file,
                     content = content,
-                    isActivePage = pagerState.currentPage == page,
+                    isActivePage = !pagerState.isScrollInProgress && pagerState.settledPage == page,
                     dataSourceFactory = dataSourceFactory,
                     onDownload = { viewModel.download(file) },
                     chromeVisible = chromeVisible,
@@ -345,104 +355,7 @@ fun PreviewScreen(
                                     contentDescription = stringResource(Res.string.common_actions)
                                 )
                             }
-                            DropdownMenu(
-                                expanded = showOverflow,
-                                onDismissRequest = { showOverflow = false }
-                            ) {
-                                DropdownMenuItem(text={Text(stringResource(Res.string.preview_file_info))},onClick={showOverflow=false;viewModel.showInfo(currentFile)})
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            if (currentFile.isFavorite) stringResource(Res.string.preview_remove_favorites)
-                                            else stringResource(Res.string.preview_add_favorites)
-                                        )
-                                    },
-                                    onClick = {
-                                        showOverflow = false
-                                        viewModel.setFavorite(
-                                            currentFile,
-                                            !currentFile.isFavorite
-                                        )
-                                    }
-                                )
-                                if (currentFile.hasLocalCopy) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(Res.string.preview_share_copy)) },
-                                        onClick = {
-                                            showOverflow = false
-                                            shareFile(context, currentFile, shareChooserTitle)
-                                        }
-                                    )
-                                }
-                                if (currentFile.hasRemoteCopy && !currentFile.hasLocalCopy) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(Res.string.common_download)) },
-                                        onClick = {
-                                            showOverflow = false
-                                            viewModel.download(currentFile)
-                                        }
-                                    )
-                                }
-                                if (!currentFile.hasRemoteCopy) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(Res.string.common_upload)) },
-                                        onClick = {
-                                            showOverflow = false
-                                            viewModel.upload(currentFile)
-                                        }
-                                    )
-                                }
-                                if (currentFile.hasRemoteCopy && currentFile.hasLocalCopy) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(Res.string.common_free_space)) },
-                                        onClick = {
-                                            showOverflow = false
-                                            viewModel.freeUpSpace(currentFile)
-                                        }
-                                    )
-                                }
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            if (currentFile.isHidden) stringResource(Res.string.files_unhide)
-                                            else stringResource(Res.string.files_hide)
-                                        )
-                                    },
-                                    onClick = {
-                                        showOverflow = false
-                                        viewModel.setHidden(currentFile, !currentFile.isHidden)
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            if (currentFile.isArchived) stringResource(Res.string.preview_unarchive)
-                                            else stringResource(Res.string.preview_archive)
-                                        )
-                                    },
-                                    onClick = {
-                                        showOverflow = false
-                                        viewModel.setArchived(
-                                            currentFile,
-                                            !currentFile.isArchived
-                                        )
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(Res.string.common_rename)) },
-                                    onClick = {
-                                        showOverflow = false
-                                        renameTarget = currentFile
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(Res.string.common_move_trash)) },
-                                    onClick = {
-                                        showOverflow = false
-                                        deleteTarget = currentFile
-                                    }
-                                )
-                            }
+
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -456,6 +369,8 @@ fun PreviewScreen(
         }
     }
     }
+
+    if(showOverflow)com.infinity.drive.presentation.components.FileActionsSheet(currentFile,onDismiss={showOverflow=false},onOpen={showOverflow=false})
 
     renameTarget?.let { file ->
         RenameDialog(
@@ -528,6 +443,7 @@ private fun PreviewPage(
             onTextScaleChange(textScale)
         }
     }
+    if(file.category==FileCategory.AUDIO){com.infinity.drive.presentation.audio.FullscreenAudioPlayer(file,isActivePage,Modifier.fillMaxSize(),onAudioTrackChanged);return}
     when (content) {
         is PreviewContent.Loading -> LoadingState()
         is PreviewContent.DownloadProgress -> Column(

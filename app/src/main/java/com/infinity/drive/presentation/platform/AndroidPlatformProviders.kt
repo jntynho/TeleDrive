@@ -55,10 +55,7 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
     val resolver=koinInject<com.infinity.drive.presentation.preview.PreviewContentResolver>()
     val sources=koinInject<com.infinity.drive.core.media.TelegramDataSourceFactory>()
     val files=koinInject<com.infinity.drive.domain.repository.FileRepository>()
-    val audioOwner=androidx.lifecycle.viewmodel.compose.viewModel<com.infinity.drive.presentation.audio.AudioPlaybackOwner>(key="teledrive-audio"){
-        com.infinity.drive.presentation.audio.AudioPlaybackOwner(context.applicationContext,resolver,sources,files)
-    }
-    val audio=audioOwner.playback
+    val audio=koinInject<com.infinity.drive.presentation.audio.AndroidAudioPlayback>()
 
     val prefs by settingsRepository.preferences.collectAsStateWithLifecycle(UserPreferences())
     val darkTheme = when (prefs.theme) {
@@ -146,6 +143,7 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
         }
         multiCallback.fire(uris.map { it.toString() })
     }
+    val deviceImports = rememberDeviceImportActions()
     val multiFilePicker = remember {
         MultiFilePicker { onPicked ->
             multiCallback.arm(onPicked)
@@ -235,6 +233,7 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
         LocalFolderPicker provides folderPicker,
         LocalFilePicker provides filePicker,
         LocalMultiFilePicker provides multiFilePicker,
+        LocalDeviceImportActions provides deviceImports,
         LocalFileSharer provides fileSharer,
         LocalDeleteConsentLauncher provides deleteConsentLauncher,
         LocalPermissionRequester provides permissionRequester,
@@ -293,7 +292,7 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
     }
 }
 
-private class CallbackHolder<T> {
+internal class CallbackHolder<T> {
 
     private var pending: ((T) -> Unit)? = null
 

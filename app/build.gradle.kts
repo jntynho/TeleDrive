@@ -123,6 +123,7 @@ dependencies {
     implementation(libs.androidx.exifinterface)
     implementation(libs.zip4j)
     implementation(libs.zxing.core)
+    implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0-beta1")
     implementation("androidx.fragment:fragment-ktx:1.8.8")
     // Existing native TDLib and Tink retain access to installed TG Drive sessions/vaults.
     implementation("io.github.tdlib-android:core:0.1.1")

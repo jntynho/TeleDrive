@@ -36,5 +36,7 @@ data class TransferEntity(
     val stage: TransferStage? = null,
     val createdAt: Long,
     val updatedAt: Long,
-    val completedAt: Long? = null
+    val completedAt: Long? = null,
+    @androidx.room.ColumnInfo(defaultValue = "0") val nextAttemptAt: Long = 0,
+    @androidx.room.ColumnInfo(defaultValue = "0") val retryCount: Int = 0
 )

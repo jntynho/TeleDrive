@@ -2,177 +2,110 @@ package com.infinity.drive.core.transfer
 
 import com.infinity.drive.core.network.NetworkMonitor
 import com.infinity.drive.core.network.NetworkStatus
+import com.infinity.drive.core.telegram.TelegramPacer
 import com.infinity.drive.data.local.dao.FileDao
 import com.infinity.drive.data.local.dao.TransferDao
 import com.infinity.drive.data.local.entity.TransferEntity
 import com.infinity.drive.domain.model.BackupState
 import com.infinity.drive.domain.model.TransferState
-import com.infinity.drive.domain.model.UserPreferences
 import com.infinity.drive.domain.repository.SettingsRepository
-import kotlin.time.Duration.Companion.milliseconds
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.joinAll
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 
-/**
- * Drains the transfer queue with bounded concurrency. Transient failures are
- * retried with exponential backoff up to the configured retry count; rate
- * limits honor the server-provided delay. Platform schedulers wrap this and
- * add whatever their environment needs, like a foreground service or
- * failure notifications.
- */
+/** Separate bounded upload/download lanes; every available slot starts immediately.
+ * Server waits are durable queued work and do not spend the network retry budget. */
 class TransferQueueDrainer(
     private val transferDao: TransferDao,
     private val fileDao: FileDao,
-    private val transferExecutor: TransferExecutor,
+    private val transferExecutor: TransferRunner,
     private val backupSessionTracker: BackupSessionTracker,
     private val settingsRepository: SettingsRepository,
-    private val networkMonitor: NetworkMonitor
+    private val networkMonitor: NetworkMonitor,
+    private val pacer: TelegramPacer,
+    private val nowMillis:()->Long = { System.currentTimeMillis() }
 ) {
-
-    suspend fun drain(
-        isStopped: () -> Boolean,
-        onTerminalFailure: suspend (TransferEntity) -> Unit
-    ): TransferDrainResult {
-        val claimLock = Mutex()
+    suspend fun drain(isStopped: () -> Boolean, onTerminalFailure: suspend (TransferEntity) -> Unit): TransferDrainResult {
         var interrupted = false
-
-        coroutineScope {
-            List(MAX_CONCURRENCY) { slot ->
-                launch {
-                    while (true) {
-                        if (isStopped()) {
-                            interrupted = true
-                            return@launch
-                        }
+        try {
+            coroutineScope {
+                List(6) { slot -> launch {
+                    val lane = if(slot<2)0 else if(slot==2)1 else 2
+                    val upload = lane != 2
+                    val laneSlot = if(lane==0)slot else if(lane==1)0 else slot-3
+                    while (isActive) {
+                        if (isStopped()) { interrupted = true; return@launch }
                         val prefs = settingsRepository.preferences.first()
-                        if (slot >= concurrencyOf(prefs)) {
-                            if (!awaitSlot(slot)) return@launch
-                            continue
+                        val network = networkMonitor.currentStatus()
+                        if (network == NetworkStatus.UNAVAILABLE || (network == NetworkStatus.METERED && !prefs.allowMeteredTransfers)) {
+                            interrupted = true; return@launch
                         }
-                        val status = networkMonitor.currentStatus()
-                        val blocked = status == NetworkStatus.UNAVAILABLE ||
-                                (status == NetworkStatus.METERED && !prefs.allowMeteredTransfers)
-                        if (blocked) {
-                            interrupted = true
-                            return@launch
+                        val queued = transferDao.queuedLane(lane)
+                        if (queued.isEmpty()) {
+                            // Keep each lane available while another lane is active, including newly imported chunks.
+                            if(transferDao.observeActiveCount().first()==0)return@launch
+                            delay(200);continue
                         }
-                        val next = claimLock.withLock { claimNextQueued() } ?: return@launch
-                        runTransfer(next, prefs.transferRetryCount, onTerminalFailure)
-                    }
-                }
-            }.joinAll()
-        }
-        if (interrupted) {
-            withContext(NonCancellable) {
-                transferDao.requeueRunning(System.currentTimeMillis())
-            }
-            return TransferDrainResult.INTERRUPTED
-        }
-        return TransferDrainResult.COMPLETED
-    }
-
-    private fun concurrencyOf(prefs: UserPreferences): Int =
-        prefs.transferConcurrency.coerceIn(1, MAX_CONCURRENCY)
-
-    /**
-     * Parks a slot the current setting has no room for. Raising the setting
-     * wakes it immediately, so a change applies to the backup already running
-     * instead of only to the next one. Returns false once the queue has
-     * drained, which lets a parked slot finish rather than hold the drain open.
-     */
-    private suspend fun awaitSlot(slot: Int): Boolean {
-        val widened = withTimeoutOrNull(SLOT_WAIT_MS.milliseconds) {
-            settingsRepository.preferences.first { slot < concurrencyOf(it) }
-        }
-        return widened != null || transferDao.nextQueued(1).isNotEmpty()
-    }
-
-    /**
-     * Marks one queued transfer as running before releasing the lock, so every
-     * slot in the pool picks a different row and starts as soon as it is free
-     * instead of waiting for the rest of a batch to finish.
-     */
-    private suspend fun claimNextQueued(): String? {
-        val next = transferDao.nextQueued(1).firstOrNull() ?: return null
-        transferDao.setState(next.id, TransferState.RUNNING, System.currentTimeMillis())
-        return next.id
-    }
-
-    private suspend fun runTransfer(
-        transferId: String,
-        maxRetries: Int,
-        onTerminalFailure: suspend (TransferEntity) -> Unit
-    ) {
-        var attempt = 0
-        while (true) {
-            val current = transferDao.byId(transferId) ?: return
-            if (current.state != TransferState.RUNNING) return
-
-            when (val outcome = transferExecutor.execute(current)) {
-                is TransferExecutor.Outcome.Completed -> {
-                    refreshSession(current.backupSessionId)
-                    return
-                }
-
-                is TransferExecutor.Outcome.Paused -> {
-                    markState(transferId, TransferState.PAUSED)
-                    return
-                }
-
-                is TransferExecutor.Outcome.Canceled -> {
-                    markState(transferId, TransferState.CANCELLED)
-                    refreshSession(current.backupSessionId)
-                    return
-                }
-
-                is TransferExecutor.Outcome.Failed -> {
-                    attempt++
-                    if (attempt > maxRetries) {
-                        withContext(NonCancellable) {
-                            transferDao.setFailed(
-                                transferId,
-                                TransferState.FAILED,
-                                outcome.message,
-                                System.currentTimeMillis()
-                            )
-                            current.fileId?.let { fileId ->
-                                fileDao.setBackupStateIfLocalOnly(fileId, BackupState.FAILED)
+                        val now = nowMillis()
+                        if (laneSlot >= (if(lane==0)prefs.transferConcurrency.coerceIn(1,2) else if(lane==1)1 else if(prefs.transferConcurrency==1)2 else 3) || (upload && pacer.floodWaitSeconds > 0)) {
+                            delay(500); continue
+                        }
+                        val next = TransferActivityRegistry.claim(transferDao,lane,now)
+                        if (next == null) { delay(500); continue }
+                        try {
+                        if(lane==1)delay(400)
+                        val current = transferDao.byId(next.id)?.takeIf{it.state==TransferState.RUNNING} ?: continue
+                        when (val outcome = controlled(current)) {
+                            TransferExecutor.Outcome.Completed -> refreshSession(current.backupSessionId)
+                            TransferExecutor.Outcome.Paused -> markState(current.id, TransferState.PAUSED)
+                            TransferExecutor.Outcome.Canceled -> { markState(current.id, TransferState.CANCELLED); refreshSession(current.backupSessionId) }
+                            is TransferExecutor.Outcome.Failed -> {
+                                val serverWait = outcome.retryAfterSeconds
+                                val attempt = current.retryCount + if (serverWait != null) 0 else 1
+                                if (serverWait != null || (outcome.retryable&&attempt <= prefs.transferRetryCount)) {
+                                    if (serverWait != null && upload) pacer.recordFloodWait(serverWait)
+                                    val seconds = serverWait?.coerceIn(1, 86_400)?.plus(1)
+                                        ?: listOf(5,20,60).getOrElse((attempt-1).coerceAtLeast(0)) { 60 }
+                                    current.fileId?.let{fileDao.setBackupStateIfLocalOnly(it,BackupState.QUEUED)}
+                                    transferDao.defer(current.id, nowMillis()+seconds*1000L, attempt,
+                                        if(serverWait != null) "Waiting for Telegram ($seconds seconds)" else outcome.message, nowMillis())
+                                } else {
+                                    if(transferDao.failRunning(current.id,outcome.message,nowMillis())==1){
+                                        current.fileId?.let { fileDao.setBackupStateIfLocalOnly(it, BackupState.FAILED) }
+                                        onTerminalFailure(current); refreshSession(current.backupSessionId)
+                                    }
+                                }
                             }
-                            onTerminalFailure(current)
                         }
-                        refreshSession(current.backupSessionId)
-                        return
+                        } finally {withContext(NonCancellable){TransferActivityRegistry.release(next.id)}}
                     }
-                    val backoffSeconds = outcome.retryAfterSeconds
-                        ?: (BASE_BACKOFF_SECONDS shl (attempt - 1)).coerceAtMost(MAX_BACKOFF_SECONDS)
-                    delay((backoffSeconds * 1000L).milliseconds)
+                } }.joinAll()
+            }
+        } finally {
+            // Also runs when WorkManager cancels the coroutine, before the next worker claims it.
+            withContext(NonCancellable) { TransferActivityRegistry.recover(transferDao,nowMillis()) }
+        }
+        return if(interrupted) TransferDrainResult.INTERRUPTED else TransferDrainResult.COMPLETED
+    }
+    private suspend fun controlled(task:TransferEntity):TransferExecutor.Outcome=coroutineScope {
+        val operation=async{transferExecutor.execute(task)}
+        val control=async{transferDao.observeById(task.id).first{it==null||it.state!=TransferState.RUNNING}}
+        try {
+            select {
+                operation.onAwait{it}
+                control.onAwait {
+                    operation.cancelAndJoin()
+                    when(transferDao.byId(task.id)?.state){
+                        TransferState.COMPLETED->TransferExecutor.Outcome.Completed
+                        TransferState.CANCELLED,null->TransferExecutor.Outcome.Canceled
+                        else->TransferExecutor.Outcome.Paused
+                    }
                 }
             }
-        }
+        } finally {control.cancelAndJoin();operation.cancelAndJoin()}
     }
-
-    private suspend fun refreshSession(sessionId: String?) {
-        withContext(NonCancellable) { backupSessionTracker.refresh(sessionId) }
-    }
-
-    private suspend fun markState(transferId: String, state: TransferState) {
-        withContext(NonCancellable) {
-            transferDao.setState(transferId, state, System.currentTimeMillis())
-        }
-    }
-
-    private companion object {
-        const val MAX_CONCURRENCY = 6
-        const val SLOT_WAIT_MS = 5_000L
-        const val BASE_BACKOFF_SECONDS = 2
-        const val MAX_BACKOFF_SECONDS = 300
-    }
+    private suspend fun refreshSession(id: String?) = withContext(NonCancellable) { backupSessionTracker.refresh(id) }
+    private suspend fun markState(id: String, state: TransferState) = withContext(NonCancellable) { transferDao.setRunningState(id,state,nowMillis()) }
 }

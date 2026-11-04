@@ -301,7 +301,9 @@ class FileRepositoryImpl(
                 remoteFileId = null,
                 remoteUniqueId = null,
                 backupState = BackupState.NONE,
-                localPath = duplicateLocalCopy(source.localPath, name),
+                localPath = if(source.remoteFileId!=null) null else duplicateLocalCopy(source.localPath, name),
+                offlinePinned = false,
+                uploadRequested = true,
                 trashedAt = null,
                 preTrashFolderId = null,
                 addedAt = now,
@@ -465,17 +467,30 @@ class FileRepositoryImpl(
         markFolderStateDirty()
     }
 
+    override suspend fun registerImport(source:com.infinity.drive.core.files.ImportedFile,folderId:String?,displayName:String,allowDuplicate:Boolean):AppResult<DriveFile> {
+        if(File(source.path).isFile)return importLocalFile(source.path,folderId,displayName,allowDuplicate)
+        val now=System.currentTimeMillis()
+        val mime=source.mimeType?:MimeTypes.fromFileName(displayName)
+        val entity=FileEntity(id=UUID.randomUUID().toString(),folderId=folderId,name=displayName,sizeBytes=source.sizeBytes,
+            mimeType=mime,category=FileCategory.fromMimeType(mime),localPath=null,importReference=source.path,
+            contentHash=null,chatId=activeChannel.id(),messageId=null,remoteFileId=null,remoteUniqueId=null,
+            backupState=BackupState.NONE,createdAt=now,modifiedAt=now,addedAt=now)
+        fileDao.upsert(entity)
+        return AppResult.Success(entity.toDomain())
+    }
+
     override suspend fun importLocalFile(
         localPath: String,
         folderId: String?,
-        displayName: String?
+        displayName: String?,
+        allowDuplicate: Boolean
     ): AppResult<DriveFile> {
         val source = File(localPath)
         if (!source.exists() || !source.isFile) return AppResult.Failure(AppError.NotFound)
-        fileDao.byLocalPath(localPath)?.takeIf { it.trashedAt == null }?.let {
+        if(!allowDuplicate)fileDao.byLocalPath(localPath)?.takeIf { it.trashedAt == null }?.let {
             return AppResult.Success(it.toDomain())
         }
-        reviveTrashedCopy(localPath, folderId)?.let { return AppResult.Success(it) }
+        if(!allowDuplicate)reviveTrashedCopy(localPath, folderId)?.let { return AppResult.Success(it) }
 
         val name = displayName ?: source.name
         val mime = MimeTypes.fromFileName(name)
@@ -499,6 +514,7 @@ class FileRepositoryImpl(
             addedAt = now
         )
         fileDao.upsert(entity)
+        fileImporter.registered(entity.localPath!!)
         return AppResult.Success(entity.toDomain())
     }
 
@@ -507,8 +523,8 @@ class FileRepositoryImpl(
 
     override suspend fun reconcileLocalCopies(ids: List<String>) {
         fileDao.byIds(ids)
-            .filter { entity -> entity.localPath?.let { !File(it).exists() } == true }
-            .forEach { entity -> fileDao.setLocalPath(entity.id, null) }
+            .filter { entity -> entity.localPath?.let { localCopyDeleter.isGone(it) } == true }
+            .forEach { entity -> fileDao.clearLocalPathIfMatches(entity.id,entity.localPath!!,true) }
     }
 
     override suspend fun saveNote(
@@ -603,7 +619,32 @@ class FileRepositoryImpl(
         return Markdown.plain(firstLine).take(NOTE_TITLE_LIMIT)
     }
 
-    override suspend fun findDuplicate(localPath: String): DriveFile? {
+    override suspend fun findNameClash(name:String,folderId:String?):DriveFile? =
+        fileDao.nameClash(name,folderId,activeChannel.id())?.toDomain()
+
+    override suspend fun setOfflinePinned(id:String,pinned:Boolean) {
+        val entity=fileDao.byId(id)?:error("This file no longer exists")
+        if(pinned&&entity.localPath!=null){
+            val retained=fileImporter.retainOffline(entity.localPath,id)?:error("Couldn't keep a private offline copy. Check free space and try again.")
+            fileDao.setLocalPath(id,retained)
+        }
+        fileDao.setOfflinePinned(id,pinned)
+    }
+
+    override suspend fun importTelegramFile(document:com.infinity.drive.core.telegram.RemoteDocument,folderId:String?,name:String):AppResult<DriveFile> {
+        val now=System.currentTimeMillis()
+        val entity=FileEntity(id=java.util.UUID.randomUUID().toString(),folderId=folderId,name=name,
+            sizeBytes=document.sizeBytes,mimeType=document.mimeType,category=FileCategory.fromMimeType(document.mimeType),
+            localPath=null,contentHash=null,chatId=activeChannel.id(),messageId=null,
+            remoteFileId=document.remoteFileId,remoteUniqueId=document.uniqueFileId,sourceChatId=document.chatId,sourceMessageId=document.messageId,backupState=BackupState.NONE,
+            createdAt=document.dateSeconds*1000L,modifiedAt=document.dateSeconds*1000L,addedAt=now)
+        fileDao.upsert(entity)
+        return AppResult.Success(entity.toDomain())
+    }
+
+    override suspend fun rememberContentHash(id:String,hash:String) {fileDao.setContentHash(id,hash)}
+
+    override suspend fun findDuplicate(localPath: String,knownHash:String?): DriveFile? {
         val source = File(localPath)
         if (!source.exists() || !source.isFile) return null
 
@@ -611,14 +652,17 @@ class FileRepositoryImpl(
            and it needs no hashing to recognize. Rows without a remote copy do
            not count: an interrupted upload must not block its own retry. */
         fileDao.byLocalPath(source.absolutePath)
-            ?.takeIf { it.trashedAt == null && it.messageId != null }
+            ?.takeIf { it.trashedAt == null }
             ?.let { return it.toDomain() }
 
         val candidates = fileDao.liveMatchesBySize(source.length(), activeChannel.id())
         if (candidates.isEmpty()) return null
 
-        val localHash = Hashing.sha256(source) ?: return null
-        return candidates.firstOrNull { it.contentHash == localHash }?.toDomain()
+        val localHash = knownHash ?: Hashing.sha256(source) ?: return null
+        return candidates.firstOrNull { candidate ->
+            val hash=candidate.contentHash ?: candidate.localPath?.let{Hashing.sha256(File(it))}?.also{fileDao.upsert(candidate.copy(contentHash=it))}
+            hash==localHash
+        }?.copy(contentHash=localHash)?.toDomain()
     }
 
     override suspend fun reviveTrashedCopy(localPath: String, folderId: String?): DriveFile? {
@@ -645,7 +689,7 @@ class FileRepositoryImpl(
 
     override suspend fun deleteLocalCopy(ids: List<String>): AppResult<LocalCleanup> {
         val candidates = fileDao.byIds(ids).filter { entity ->
-            entity.localPath != null &&
+            entity.localPath != null && !entity.offlinePinned &&
                     entity.messageId != null &&
                     entity.backupState == BackupState.BACKED_UP
         }
@@ -658,7 +702,7 @@ class FileRepositoryImpl(
         for (entity in candidates) {
             val path = entity.localPath ?: continue
             if (localCopyDeleter.isGone(path)) {
-                fileDao.setLocalPath(entity.id, null)
+                fileDao.clearLocalPathIfMatches(entity.id,path)
                 cleared++
             }
         }

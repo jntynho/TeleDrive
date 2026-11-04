@@ -23,6 +23,7 @@ data class DriveFile(
     val durationMs: Long?,
     val trashedAt: Long?,
     val iconFileId: String? = null,
+    val offlinePinned: Boolean = false,
     val createdAt: Long,
     val modifiedAt: Long,
     val addedAt: Long

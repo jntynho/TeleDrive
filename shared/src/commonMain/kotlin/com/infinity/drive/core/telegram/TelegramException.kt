@@ -23,7 +23,7 @@ class TelegramException(
         )
 
     companion object {
-        private val floodWaitRegex = Regex("retry after (\\d+)", RegexOption.IGNORE_CASE)
+        private val floodWaitRegex = Regex("(?:retry after |FLOOD_WAIT_|FLOOD_PREMIUM_WAIT_|SLOWMODE_WAIT_)(\\d+)", RegexOption.IGNORE_CASE)
 
         fun from(code: Int, message: String): TelegramException {
             val retryAfter = if (code == 429) {

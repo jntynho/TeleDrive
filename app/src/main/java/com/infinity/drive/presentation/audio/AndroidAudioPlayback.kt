@@ -3,22 +3,14 @@ package com.infinity.drive.presentation.audio
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
-import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
+import androidx.media3.common.*
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.infinity.drive.core.media.TelegramDataSourceFactory
 import com.infinity.drive.domain.model.DriveFile
 import com.infinity.drive.domain.repository.FileRepository
-import com.infinity.drive.presentation.platform.AudioRepeatMode
-import com.infinity.drive.presentation.platform.AudioMetadata
-import com.infinity.drive.presentation.platform.AudioPlayback
-import com.infinity.drive.presentation.platform.AudioPlaybackState
+import com.infinity.drive.presentation.platform.*
 import com.infinity.drive.presentation.preview.PreviewContent
 import com.infinity.drive.presentation.preview.PreviewContentResolver
 import kotlinx.coroutines.*
@@ -27,159 +19,249 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import java.io.File
 
-/** A single player survives tab changes; resolving or dismissing a track cancels its old work. */
+/** One application-owned player. Navigation observes playback; it never owns its lifetime. */
 @androidx.annotation.OptIn(UnstableApi::class)
-class AndroidAudioPlayback(context:Context,private val resolver:PreviewContentResolver,
-    private val sources:TelegramDataSourceFactory,private val files:FileRepository):AudioPlayback {
-    private val scope=CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate)
+class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentResolver,
+    private val sources:TelegramDataSourceFactory, private val files:FileRepository,
+    private val ioDispatcher:CoroutineDispatcher=Dispatchers.IO,ownerScope:CoroutineScope?=null):AudioPlayback {
+    private val appContext=context.applicationContext
+    private val scope=ownerScope?:CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate)
     private val mutable=MutableStateFlow(AudioPlaybackState())
     override val state:StateFlow<AudioPlaybackState> = mutable.asStateFlow()
-    private val player=ExoPlayer.Builder(context.applicationContext).build().apply {
+    internal val media3Player=ExoPlayer.Builder(appContext).build().apply {
         setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),true)
         setHandleAudioBecomingNoisy(true)
     }
+    private val player get()=media3Player
     private var resolveJob:Job?=null
+    private var metadataJob:Job?=null
     private var queueJob:Job?=null
     private var sleepJob:Job?=null
     private var queue=emptyList<String>()
+    private var desiredIndex=-1
     private var requestedPlay=false
     private var libraryContext:Pair<Long?,Boolean>?=null
     private val metadataSlots=Semaphore(2)
+    private val metadataInFlight=mutableMapOf<String,Deferred<AudioMetadata>>()
     private val metadataCache=object:LinkedHashMap<String,AudioMetadata>(128,.75f,true){
         override fun removeEldestEntry(eldest:MutableMap.MutableEntry<String,AudioMetadata>?)=size>128
     }
     init {
+        observeCurrentFile()
         player.addListener(object:Player.Listener {
             override fun onIsPlayingChanged(isPlaying:Boolean){mutable.update{it.copy(playing=isPlaying)}}
-            override fun onPlayWhenReadyChanged(playWhenReady:Boolean,reason:Int){mutable.update{it.copy(playRequested=playWhenReady)}}
+            override fun onPlayWhenReadyChanged(playWhenReady:Boolean,reason:Int){
+                requestedPlay=playWhenReady
+                mutable.update{it.copy(playRequested=playWhenReady)}
+            }
             override fun onPlaybackStateChanged(playbackState:Int){
-                mutable.update{it.copy(loading=playbackState==Player.STATE_BUFFERING,durationMs=player.duration.coerceAtLeast(0))}
-                if(playbackState==Player.STATE_ENDED&&requestedPlay&&player.playWhenReady){
+                mutable.update{it.copy(loading=playbackState==Player.STATE_BUFFERING,durationMs=knownDuration())}
+                if(playbackState==Player.STATE_ENDED&&requestedPlay){
                     if(mutable.value.repeatMode==AudioRepeatMode.ONE){player.seekTo(0);player.play()}
-                    else next()
+                    else skip(1,autoplay=true)
                 }
             }
             override fun onMediaMetadataChanged(metadata:MediaMetadata){
-                mutable.update{it.copy(metadata=it.metadata.copy(title=metadata.title?.toString()?:it.metadata.title,artist=metadata.artist?.toString()?:it.metadata.artist))}
-                metadata.artworkData?.takeIf{it.size<=5*1024*1024}?.let{picture->
-                    val track=mutable.value.file?.id
-                    scope.launch {
-                        val colors=withContext(Dispatchers.Default){artworkColors(picture)}
-                        mutable.update{if(it.file?.id==track&&colors.isNotEmpty())it.copy(metadata=it.metadata.copy(artworkColors=colors))else it}
+                val track=mutable.value.file?:return
+                scope.launch {
+                    val artwork=metadata.artworkData?.takeIf{it.size<=5*1024*1024}?.let { bytes ->
+                        withContext(ioDispatcher){artworkColors(bytes) to saveArtwork(track,bytes)}
+                    }
+                    if(mutable.value.file?.id==track.id){
+                        mutable.update{it.copy(metadata=it.metadata.copy(
+                            title=metadata.title?.toString()?.takeIf(String::isNotBlank)?:it.metadata.title,
+                            artist=metadata.artist?.toString()?.takeIf(String::isNotBlank)?:it.metadata.artist,
+                            artworkColors=artwork?.first?.takeIf{it.isNotEmpty()}?:it.metadata.artworkColors,
+                            artworkPath=artwork?.second?:it.metadata.artworkPath))}
+                        synchronized(metadataCache){metadataCache[metadataKey(track)]=mutable.value.metadata}
                     }
                 }
             }
-            override fun onTracksChanged(tracks:androidx.media3.common.Tracks){
+            override fun onTracksChanged(tracks:Tracks){
                 for(group in tracks.groups)for(index in 0 until group.length)if(group.isTrackSelected(index)){
                     group.getTrackFormat(index).metadata?.let(::acceptLyricsMetadata)
                 }
             }
-            override fun onMetadata(metadata:androidx.media3.common.Metadata){acceptLyricsMetadata(metadata)}
-            override fun onPlayerError(error:PlaybackException){mutable.update{it.copy(playing=false,loading=false,error="Couldn't play this audio. Tap play to retry.")}}
+            override fun onMetadata(metadata:Metadata){acceptLyricsMetadata(metadata)}
+            override fun onPlayerError(error:PlaybackException){requestedPlay=false;mutable.update{it.copy(playing=false,loading=false,playRequested=false,error="Couldn't play this audio. Retry, or download an offline copy.")}}
         })
         scope.launch {
             state.map{it.file!=null}.distinctUntilChanged().collectLatest { active ->
-                if(active)while(isActive){delay(if(mutable.value.playing&&mutable.value.metadata.lyrics!=null)150 else 500);mutable.update{it.copy(positionMs=player.currentPosition.coerceAtLeast(0),durationMs=player.duration.coerceAtLeast(0))}}
+                if(active)while(isActive){delay(200);mutable.update{it.copy(positionMs=player.currentPosition.coerceAtLeast(0),durationMs=knownDuration())}}
             }
         }
     }
-    private fun acceptLyricsMetadata(metadata:androidx.media3.common.Metadata){
-        val track=mutable.value.file?.id?:return
+    private fun observeCurrentFile() {
+        scope.launch {
+            state.map{it.file?.id}.distinctUntilChanged().collectLatest { id ->
+                if(id!=null)files.observeFile(id).collect { latest ->
+                    if(latest==null||latest.isTrashed)stop()
+                    else mutable.update{if(it.file?.id==id)it.copy(file=latest)else it}
+                }
+            }
+        }
+    }
+    private fun knownDuration()=player.duration.takeIf{it>0}?:mutable.value.metadata.durationMs?:mutable.value.file?.durationMs?:0L
+    private fun metadataKey(file:DriveFile)="${file.id}:${file.modifiedAt}:${file.localPath}"
+    private fun acceptLyricsMetadata(metadata:Metadata){
+        val track=mutable.value.file?:return
         scope.launch {
             val lyrics=withContext(Dispatchers.Default){streamedLyrics(metadata)}?:return@launch
-            mutable.update{if(it.file?.id==track)it.copy(metadata=it.metadata.copy(lyrics=lyrics))else it}
+            if(mutable.value.file?.id==track.id){
+                mutable.update{it.copy(metadata=it.metadata.copy(lyrics=lyrics))}
+                synchronized(metadataCache){metadataCache[metadataKey(track)]=mutable.value.metadata}
+            }
         }
     }
-    override fun updateLibraryContext(chatId:Long?,signedIn:Boolean){
-        // Preference observers can resume off the UI thread; Media3 owns the main looper.
-        scope.launch {
-            val next=chatId to signedIn
-            if(libraryContext!=null&&libraryContext!=next)stop()
-            libraryContext=next
+    override fun updateLibraryContext(chatId:Long?,signedIn:Boolean){scope.launch {
+        val next=chatId to signedIn
+        if(libraryContext!=null&&libraryContext!=next){stop();synchronized(metadataCache){metadataCache.clear()}}
+        libraryContext=next
+    }}
+    override fun play(file:DriveFile){queueJob?.cancel();start(file,true)}
+    private fun start(file:DriveFile,autoplay:Boolean){
+        resolveJob?.cancel();metadataJob?.cancel()
+        if(file.id !in queue)queue=listOf(file.id)
+        desiredIndex=queue.indexOf(file.id)
+        // Listener callbacks from stop belong to the old item; install the new intent afterwards.
+        player.stop();player.clearMediaItems();requestedPlay=autoplay
+        val previous=mutable.value
+        val cached=synchronized(metadataCache){metadataCache[metadataKey(file)]}
+        mutable.value=AudioPlaybackState(file=file,loading=true,playRequested=autoplay,metadata=cached?:AudioMetadata(durationMs=file.durationMs),durationMs=cached?.durationMs?:file.durationMs?:0,
+            repeatMode=previous.repeatMode,sleepTimerMinutes=previous.sleepTimerMinutes,queueRevision=previous.queueRevision)
+        refreshQueueState()
+        runCatching { appContext.startService(android.content.Intent(appContext,TeleDriveAudioService::class.java)) }
+        metadataJob=scope.launch {
+            val info=metadata(file)
+            if(mutable.value.file?.id==file.id)mutable.update{it.copy(metadata=mergeMetadata(it.metadata,info),durationMs=knownDuration())}
         }
-    }
-    override fun play(file:DriveFile){
-        resolveJob?.cancel();queueJob?.cancel()
-        if(file.id !in queue)queue=emptyList()
-        player.stop();player.clearMediaItems()
-        requestedPlay=true
-        mutable.value=AudioPlaybackState(file=file,loading=true,playRequested=true,repeatMode=mutable.value.repeatMode,sleepTimerMinutes=mutable.value.sleepTimerMinutes)
-        setQueue(queue)
         resolveJob=scope.launch {
             try {
-                mutable.update{it.copy(metadata=metadata(file))}
+                // Decoder preparation is independent of optional artwork/lyrics extraction.
                 val content=resolver.resolve(file).first { it is PreviewContent.LocalMedia || it is PreviewContent.StreamedMedia || it is PreviewContent.Failed || it is PreviewContent.Unsupported || it is PreviewContent.RequiresDownload }
                 ensureActive()
+                val item=MediaItem.Builder().setMediaId(file.id).setMediaMetadata(MediaMetadata.Builder().setDisplayTitle(file.name.substringBeforeLast('.')).build())
                 when(content){
-                    is PreviewContent.LocalMedia->player.setMediaItem(MediaItem.fromUri(Uri.fromFile(File(content.path))))
+                    is PreviewContent.LocalMedia->player.setMediaItem(item.setUri(Uri.fromFile(File(content.path))).build())
                     is PreviewContent.StreamedMedia->{
                         val factory=if(content.parts.isNotEmpty())sources.createParted(content.parts,content.encrypted)else sources.create(content.remoteFileId)
-                        player.setMediaSource(ProgressiveMediaSource.Factory(factory).createMediaSource(MediaItem.fromUri("telegram://audio/${file.id}")))
+                        player.setMediaSource(ProgressiveMediaSource.Factory(factory).createMediaSource(item.setUri("telegram://audio/${file.id}").build()))
                     }
-                    else->{mutable.update{it.copy(loading=false,error="Audio is unavailable. Open file options to download or retry.")};return@launch}
+                    else->{mutable.update{it.copy(loading=false,error="Audio is unavailable. Retry, or download an offline copy.")};return@launch}
                 }
-                player.prepare();player.playWhenReady=requestedPlay
+                val intent=requestedPlay
+                player.prepare();player.playWhenReady=intent
             } catch(cancel:CancellationException){throw cancel}
             catch(_:Exception){mutable.update{it.copy(loading=false,playing=false,error="Couldn't load this audio. Tap play to retry.")}}
         }
     }
+    private fun mergeMetadata(current:AudioMetadata,next:AudioMetadata)=AudioMetadata(
+        next.title?.takeIf(String::isNotBlank)?:current.title,next.artist?.takeIf(String::isNotBlank)?:current.artist,
+        next.durationMs?:current.durationMs,next.artworkColors.ifEmpty{current.artworkColors},next.lyrics?:current.lyrics,next.artworkPath?:current.artworkPath)
+    override fun containsQueuedFile(id:String)=id in queue
     override fun setQueue(ids:List<String>){
-        queue=ids
-        val index=queue.indexOf(mutable.value.file?.id)
-        mutable.update{it.copy(canSkipPrevious=index>0,canSkipNext=index>=0&&(index<queue.lastIndex||it.repeatMode==AudioRepeatMode.ALL))}
+        val next=ids.distinct()
+        if(next==queue)return
+        queue=next;desiredIndex=queue.indexOf(mutable.value.file?.id)
+        mutable.update{it.copy(queueRevision=it.queueRevision+1)};refreshQueueState()
+    }
+    private fun refreshQueueState(){
+        val i=queue.indexOf(mutable.value.file?.id)
+        val wrap=mutable.value.repeatMode==AudioRepeatMode.ALL&&queue.size>1
+        mutable.update{it.copy(canSkipPrevious=i>0||wrap,canSkipNext=i>=0&&(i<queue.lastIndex||wrap))}
     }
     override fun toggle(){
         val current=mutable.value
         if(current.error!=null){current.file?.let(::play);return}
         if(current.loading&&player.mediaItemCount==0){requestedPlay=!requestedPlay;mutable.update{it.copy(playRequested=requestedPlay)};return}
-        if(player.isPlaying||player.playWhenReady)pause()
+        if(requestedPlay||player.playWhenReady)pause()
         else {requestedPlay=true;if(player.playbackState==Player.STATE_ENDED)player.seekTo(0);player.play()}
     }
     override fun pause(){requestedPlay=false;player.pause();mutable.update{it.copy(playRequested=false)}}
     override fun previous(){if(player.currentPosition>3000){seek(0);return};skip(-1)}
     override fun next()=skip(1)
-    private fun skip(direction:Int){
+    private fun skip(direction:Int,autoplay:Boolean=requestedPlay){
+        if(queue.isEmpty()||desiredIndex<0)return
+        val next=audioQueueStep(desiredIndex,direction,queue.size,mutable.value.repeatMode==AudioRepeatMode.ALL)?:return
+        // Reserve the destination synchronously: a second tap advances from this target.
+        desiredIndex=next
         queueJob?.cancel()
-        val index=queue.indexOf(mutable.value.file?.id)
-        if(index<0)return
-        val following=if(direction>0)queue.drop(index+1)+(if(mutable.value.repeatMode==AudioRepeatMode.ALL)queue.take(index+1)else emptyList())else queue.take(index).asReversed()
-        queueJob=scope.launch{
-            for(id in following){val file=files.getFile(id);if(file!=null&&!file.isTrashed){queueJob=null;play(file);return@launch}}
+        mutable.update{it.copy(queueError=null)}
+        queueJob=scope.launch {
+            try {
+                val visited=mutableSetOf<String>()
+                while(desiredIndex in queue.indices){
+                    val id=queue[desiredIndex]
+                    if(!visited.add(id))break
+                    val file=withContext(ioDispatcher){files.getFile(id)}
+                    ensureActive()
+                    if(file!=null&&!file.isTrashed){start(file,autoplay);return@launch}
+                    val oldIndex=desiredIndex
+                    queue=queue.filterNot{it==id}
+                    mutable.update{it.copy(queueRevision=it.queueRevision+1)}
+                    desiredIndex=if(direction>0)oldIndex else oldIndex-1
+                    if(desiredIndex !in queue.indices&&mutable.value.repeatMode==AudioRepeatMode.ALL&&queue.isNotEmpty())desiredIndex=if(direction>0)0 else queue.lastIndex
+                }
+                refreshQueueState()
+            } catch(cancel:CancellationException){throw cancel}
+            catch(_:Exception){mutable.update{it.copy(queueError="Couldn't load the next track. Try Next again.")}}
         }
     }
-    override fun stop(){sleepJob?.cancel();sleepJob=null;requestedPlay=false;resolveJob?.cancel();queueJob?.cancel();player.stop();player.clearMediaItems();queue=emptyList();mutable.value=AudioPlaybackState()}
-    override fun seek(positionMs:Long){val target=positionMs.coerceIn(0,player.duration.coerceAtLeast(0));player.seekTo(target);mutable.update{it.copy(positionMs=target)}}
-    override fun cycleRepeat(){
-        mutable.update{it.copy(repeatMode=AudioRepeatMode.entries[(it.repeatMode.ordinal+1)%AudioRepeatMode.entries.size])}
-        setQueue(queue)
-    }
+    override fun stop(){sleepJob?.cancel();sleepJob=null;resolveJob?.cancel();metadataJob?.cancel();queueJob?.cancel();requestedPlay=false;player.stop();player.clearMediaItems();queue=emptyList();desiredIndex=-1;mutable.value=AudioPlaybackState()}
+    override fun seek(positionMs:Long){val target=positionMs.coerceIn(0,knownDuration());player.seekTo(target);mutable.update{it.copy(positionMs=target)}}
+    override fun cycleRepeat(){mutable.update{it.copy(repeatMode=AudioRepeatMode.entries[(it.repeatMode.ordinal+1)%AudioRepeatMode.entries.size])};refreshQueueState()}
     override fun setSleepTimer(minutes:Int?){
         sleepJob?.cancel();sleepJob=null
-        val duration=minutes?.coerceIn(1,180)
-        mutable.update{it.copy(sleepTimerMinutes=duration)}
+        val duration=minutes?.coerceIn(1,180);mutable.update{it.copy(sleepTimerMinutes=duration)}
         if(duration!=null)sleepJob=scope.launch{delay(duration*60_000L);pause();mutable.update{it.copy(sleepTimerMinutes=null)}}
     }
-    override suspend fun queuedFiles():List<DriveFile> = queue.drop(queue.indexOf(mutable.value.file?.id).coerceAtLeast(0)).take(100).mapNotNull{files.getFile(it)}.filterNot{it.isTrashed}
-    override suspend fun metadata(file:DriveFile):AudioMetadata {
-        val path=file.localPath?:return AudioMetadata(durationMs=file.durationMs)
-        val key="${file.id}:${file.modifiedAt}:$path"
-        synchronized(metadataCache){metadataCache[key]}?.let{return it}
-        val metadata=metadataSlots.withPermit { withContext(Dispatchers.IO){
-            val retriever=MediaMetadataRetriever()
-            try {
-                retriever.setDataSource(path)
-                run {
-                    val picture=retriever.embeddedPicture?.takeIf{it.size<=5*1024*1024}
-                    val colors=picture?.let(::artworkColors).orEmpty()
-                    AudioMetadata(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE),retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST),retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?:file.durationMs,colors,readEmbeddedLyrics(File(path)))
-                }
-            } catch(_:Exception){AudioMetadata(durationMs=file.durationMs,lyrics=readEmbeddedLyrics(File(path)))}
-            finally{runCatching{retriever.release()}}
-        }}
-        synchronized(metadataCache){metadataCache[key]=metadata}
-        return metadata
+    override suspend fun queuedFiles():List<DriveFile> {
+        val ids=queue.toList()
+        return withContext(ioDispatcher){ids.chunked(400).flatMap{batch->val found=files.getFiles(batch).associateBy{it.id};batch.mapNotNull(found::get)}.filterNot{it.isTrashed}}
     }
-    fun release(){resolveJob?.cancel();scope.cancel();player.release()}
+    override suspend fun metadata(file:DriveFile):AudioMetadata {
+        val key=metadataKey(file)
+        synchronized(metadataCache){metadataCache[key]}?.let{return it}
+        val path=file.localPath?:return AudioMetadata(durationMs=file.durationMs)
+        // Coalesce requests from list rows and Now Playing; callers do not own the task.
+        val task=withContext(Dispatchers.Main.immediate){metadataInFlight.getOrPut(key){scope.async(ioDispatcher){
+            metadataSlots.withPermit {
+                val retriever=MediaMetadataRetriever()
+                try {
+                    retriever.setDataSource(path)
+                    val picture=retriever.embeddedPicture?.takeIf{it.size<=5*1024*1024}
+                    AudioMetadata(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)?.takeIf(String::isNotBlank),
+                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)?.takeIf(String::isNotBlank),
+                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?:file.durationMs,
+                        picture?.let(::artworkColors).orEmpty(),readEmbeddedLyrics(File(path)),picture?.let{saveArtwork(file,it)})
+                } finally {runCatching{retriever.release()}}
+            }
+        }.also{job->job.invokeOnCompletion{scope.launch{if(metadataInFlight[key]===job)metadataInFlight.remove(key)}}}}}
+        return try { task.await().also{synchronized(metadataCache){metadataCache[key]=it}} }
+        catch(cancel:CancellationException){throw cancel}
+        catch(_:Exception){AudioMetadata(durationMs=file.durationMs)}
+    }
+    private fun saveArtwork(file:DriveFile,bytes:ByteArray):String?=runCatching {
+        val dir=File(appContext.cacheDir,"audio-artwork").apply{mkdirs()}
+        val key=java.security.MessageDigest.getInstance("SHA-256").digest(metadataKey(file).toByteArray()).joinToString(""){"%02x".format(it)}
+        val target=File(dir,"$key.img")
+        if(!target.exists()){
+            val tmp=File.createTempFile("artwork-",".tmp",dir)
+            try{tmp.writeBytes(bytes);if(!tmp.renameTo(target))tmp.delete()}finally{tmp.delete()}
+        }
+        target.setLastModified(System.currentTimeMillis())
+        // Bound disk artwork separately from the existing thumbnail cache.
+        var total=0L
+        dir.listFiles()?.sortedByDescending{it.lastModified()}?.forEach{entry->total+=entry.length();if(total>24L*1024*1024&&entry!=target)entry.delete()}
+        target.absolutePath
+    }.getOrNull()
+    fun release(){stop();scope.cancel();player.release()}
+}
+
+internal fun audioQueueStep(index:Int,direction:Int,size:Int,repeatAll:Boolean):Int? {
+    if(size<=0||index !in 0 until size)return null
+    val next=index+direction
+    return if(next in 0 until size)next else if(repeatAll&&size>1)(next+size)%size else null
 }
 
 /** Millisecond SYLT takes priority over plain USLT; MPEG-frame timestamps cannot be guessed. */

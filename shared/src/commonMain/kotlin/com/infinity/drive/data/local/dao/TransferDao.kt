@@ -13,6 +13,37 @@ import com.infinity.drive.domain.model.TransferStage
 @Dao
 interface TransferDao {
 
+    @Query("""SELECT * FROM transfers WHERE state = 'QUEUED'
+        AND ((:lane = 0 AND type IN ('UPLOAD','BACKUP') AND remoteFileId IS NULL) OR (:lane = 1 AND type IN ('UPLOAD','BACKUP') AND remoteFileId IS NOT NULL) OR (:lane = 2 AND type IN ('DOWNLOAD','RESTORE')))
+        ORDER BY priority DESC, createdAt ASC LIMIT 128""")
+    suspend fun queuedLane(lane: Int): List<TransferEntity>
+
+    @Query("UPDATE transfers SET state = 'RUNNING', errorMessage = NULL, updatedAt = :now WHERE id = :id AND state = 'QUEUED'")
+    suspend fun claim(id: String, now: Long): Int
+
+    @Query("""UPDATE transfers SET state = 'QUEUED', nextAttemptAt = :deadline,
+        retryCount = :attempt, errorMessage = :reason, speedBytesPerSecond = 0, updatedAt = :now
+        WHERE id = :id AND state = 'RUNNING'""")
+    suspend fun defer(id: String, deadline: Long, attempt: Int, reason: String, now: Long)
+
+    @Query("SELECT id FROM transfers WHERE fileId = :fileId AND type = :type AND state IN ('QUEUED','RUNNING','PAUSED') LIMIT 1")
+    suspend fun unfinishedOfType(fileId:String,type:com.infinity.drive.domain.model.TransferType):String?
+    @Query("UPDATE transfers SET state = 'QUEUED', retryCount = 0, nextAttemptAt = 0, errorMessage = NULL, updatedAt = :now WHERE id = :id AND state IN ('FAILED','PAUSED','CANCELLED')")
+    suspend fun resetForRetry(id:String,now:Long)
+
+    @Query("UPDATE transfers SET chatId = :chatId, messageId = :messageId WHERE id = :id AND state = 'RUNNING'")
+    suspend fun recordPending(id:String,chatId:Long,messageId:Long)
+
+    @Query("UPDATE transfers SET sizeBytes = :size WHERE id = :id")
+    suspend fun updateSize(id:String,size:Long)
+
+    @Query("UPDATE transfers SET state = 'QUEUED', telegramFileId = NULL, stage = NULL, speedBytesPerSecond = 0, updatedAt = :now WHERE state = 'RUNNING' AND id NOT IN (:liveIds)")
+    suspend fun requeueRunningExcept(now:Long,liveIds:List<String>)
+    @Query("UPDATE transfers SET state = :state, updatedAt = :now WHERE id = :id AND state = 'RUNNING'")
+    suspend fun setRunningState(id:String,state:TransferState,now:Long)
+    @Query("UPDATE transfers SET state = 'FAILED', errorMessage = :error, updatedAt = :now WHERE id = :id AND state = 'RUNNING'")
+    suspend fun failRunning(id:String,error:String,now:Long):Int
+
     @Query("SELECT COUNT(*) FROM transfers WHERE state = 'COMPLETED' AND completedAt >= :startedAt")
     suspend fun completedSince(startedAt:Long):Int
 
@@ -133,7 +164,7 @@ interface TransferDao {
     suspend fun pauseAll(now: Long): Int
 
     @Query(
-        """UPDATE transfers SET state = 'QUEUED', updatedAt = :now
+        """UPDATE transfers SET state = 'QUEUED', retryCount = 0, nextAttemptAt = 0, errorMessage = NULL, updatedAt = :now
            WHERE state = 'PAUSED'"""
     )
     suspend fun resumeAll(now: Long): Int

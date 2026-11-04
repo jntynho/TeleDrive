@@ -696,7 +696,7 @@
     <string name="settings_debug_logging">Registro de depuração</string>
     <string name="settings_link_previews">Pré-visualização de links</string>
     <string name="settings_link_previews_subtitle">O Telegram busca o título e a imagem dos links salvos</string>
-    <string name="settings_parallel_transfers">Transferências simultâneas</string>
+    <string name="settings_parallel_transfers">Envios simultâneos</string>
     <string name="settings_proxy">Proxy</string>
     <string name="settings_proxy_subtitle">Acesse o Telegram onde ele estiver bloqueado</string>
     <string name="settings_retry_attempts">Tentativas</string>

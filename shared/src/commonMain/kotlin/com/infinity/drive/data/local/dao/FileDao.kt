@@ -19,6 +19,24 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface FileDao {
 
+    @Query("SELECT * FROM files WHERE chatId IS :chatId AND folderId IS :folderId AND name = :name COLLATE NOCASE AND trashedAt IS NULL LIMIT 1")
+    suspend fun nameClash(name:String,folderId:String?,chatId:Long?):FileEntity?
+    @Query("UPDATE files SET offlinePinned = :pinned WHERE id = :id")
+    suspend fun setOfflinePinned(id:String,pinned:Boolean)
+
+    @Query("UPDATE files SET localPath = NULL WHERE id = :id AND localPath = :expected AND (:evenPinned = 1 OR offlinePinned = 0)")
+    suspend fun clearLocalPathIfMatches(id:String,expected:String,evenPinned:Boolean=false):Int
+
+    @Query("UPDATE files SET uploadRequested = :requested WHERE id IN (:ids)")
+    suspend fun setUploadRequested(ids:List<String>,requested:Boolean)
+    @Query("UPDATE files SET uploadRequested = 0 WHERE messageId IS NULL AND id IN (SELECT fileId FROM transfers WHERE id IN (:ids) AND type IN ('UPLOAD','BACKUP'))")
+    suspend fun suppressUploadsForTransfers(ids:List<String>)
+    @Query("UPDATE files SET uploadRequested = 0 WHERE messageId IS NULL AND id IN (SELECT fileId FROM transfers WHERE type IN ('UPLOAD','BACKUP') AND state IN ('QUEUED','RUNNING','PAUSED','FAILED'))")
+    suspend fun suppressPendingUploads()
+
+    @Query("UPDATE files SET contentHash = :hash WHERE id = :id")
+    suspend fun setContentHash(id:String,hash:String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(file: FileEntity)
 
@@ -28,8 +46,8 @@ interface FileDao {
     @Query(
         """SELECT * FROM files
             WHERE sizeBytes = :sizeBytes AND chatId IS :chatId
-              AND trashedAt IS NULL AND contentHash IS NOT NULL
-              AND messageId IS NOT NULL"""
+              AND trashedAt IS NULL
+              """
     )
     suspend fun liveMatchesBySize(sizeBytes: Long, chatId: Long?): List<FileEntity>
 
@@ -320,7 +338,7 @@ interface FileDao {
         """SELECT COALESCE(SUM(sizeBytes), 0) FROM files
            WHERE localPath IS NOT NULL
              AND messageId IS NOT NULL
-             AND backupState = 'BACKED_UP'
+             AND backupState = 'BACKED_UP' AND offlinePinned = 0
              AND chatId IS :chatId"""
     )
     fun observeReclaimableBytes(chatId: Long?): Flow<Long>
@@ -329,7 +347,7 @@ interface FileDao {
         """SELECT id FROM files
            WHERE localPath IS NOT NULL
              AND messageId IS NOT NULL
-             AND backupState = 'BACKED_UP'
+             AND backupState = 'BACKED_UP' AND offlinePinned = 0
              AND chatId IS :chatId"""
     )
     suspend fun reclaimableFileIds(chatId: Long?): List<String>
@@ -338,7 +356,7 @@ interface FileDao {
         """SELECT id, localPath FROM files
            WHERE localPath IS NOT NULL
              AND messageId IS NOT NULL
-             AND backupState = 'BACKED_UP'"""
+             AND backupState = 'BACKED_UP' AND offlinePinned = 0"""
     )
     suspend fun reclaimableLocalCopies(): List<LocalCopyRef>
 
@@ -350,7 +368,8 @@ interface FileDao {
     @Query(
         """SELECT id FROM files
            WHERE trashedAt IS NULL
-             AND localPath IS NOT NULL
+             AND (localPath IS NOT NULL OR importReference IS NOT NULL OR sourceMessageId IS NOT NULL)
+             AND uploadRequested = 1
              AND messageId IS NULL
              AND backupState IN ('NONE', 'FAILED')
              AND chatId IS :chatId"""

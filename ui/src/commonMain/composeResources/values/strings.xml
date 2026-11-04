@@ -696,7 +696,7 @@
     <string name="settings_debug_logging">Debug logging</string>
     <string name="settings_link_previews">Link previews</string>
     <string name="settings_link_previews_subtitle">Telegram fetches the title and image for saved links</string>
-    <string name="settings_parallel_transfers">Parallel transfers</string>
+    <string name="settings_parallel_transfers">Parallel uploads</string>
     <string name="settings_proxy">Proxy</string>
     <string name="settings_proxy_subtitle">Reach Telegram where it is blocked</string>
     <string name="settings_retry_attempts">Retry attempts</string>

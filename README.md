@@ -78,7 +78,11 @@ No separate storage server is required. Telegram still controls account limits, 
 
 ## How uploading works
 
-TDLib sends the document and its manifest caption in the same message directly to the chosen private channel. The caption records the file/folder identity and allows the index to be rebuilt. Large/encrypted files retain the reference multipart, streaming and key-recovery paths. One account-wide pacer controls message writes and respects Telegram's cooldowns; changing the destination does not remove those limits.
+TDLib sends the document and its manifest caption in the same message directly to the chosen private channel. The caption records the file/folder identity and allows the index to be rebuilt. Large/encrypted files retain the reference multipart, streaming and key-recovery paths. Two upload slots start originals without an artificial per-file delay. A separate server-copy lane and independent downloads share a persisted Telegram cooldown; changing the destination does not remove server limits. Selected provider URIs and queued work survive process recreation.
+
+The **Add** sheet includes original photos/videos, document scanning, private camera capture, folders, local Google Takeout ZIP import, and server-side copies from Telegram chats. Name conflicts offer Replace / Keep both / Skip. A shared file sheet supports downloads, offline protection, sharing, stars, rename, move, Telegram links and Trash. Scanning needs supported Google Play services; Google Photos import uses downloaded Takeout exports, without a Google login inside TeleDrive.
+
+Read the [transfer and playback notes](docs/TRANSFER-AND-PLAYBACK.md) for the scheduling policy, recovery behavior, feature requirements and verification limits.
 
 ## Moving from the original app
 

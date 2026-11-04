@@ -10,6 +10,7 @@ import app.tgdrive.BuildConfig
 import com.infinity.drive.core.common.SafeLog
 import com.infinity.drive.domain.model.Country
 import com.infinity.drive.domain.model.LinkMetadata
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -32,6 +33,8 @@ import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onSubscription
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
@@ -858,7 +861,7 @@ internal class TdLibTelegramClient(
         mimeType: String,
         caption: String,
         thumbnailPath: String?
-    ): Flow<TelegramUploadEvent> = callbackFlow<TelegramUploadEvent> {
+    ): Flow<TelegramUploadEvent> = kotlinx.coroutines.flow.flow {
         val thumbnail = thumbnailPath?.let {
             val bounds=android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds=true }
             android.graphics.BitmapFactory.decodeFile(it,bounds)
@@ -870,6 +873,10 @@ internal class TdLibTelegramClient(
             TdApi.InputDocument(TdApi.InputFileLocal(localPath),thumbnail,true),
             TdApi.FormattedText(caption, emptyArray())
         )
+        sendUploadContent(chatId,content).collect { emit(it) }
+    }.buffer(capacity = 64)
+
+    private fun sendUploadContent(chatId:Long,content:TdApi.InputMessageContent?,resumeId:Long?=null):Flow<TelegramUploadEvent> = callbackFlow<TelegramUploadEvent> {
         var finished = false
         var sentMessageId: Long
         val subscribed = CompletableDeferred<Unit>()
@@ -905,7 +912,7 @@ internal class TdLibTelegramClient(
                             } else {
                                 finished = true
                                 close(
-                                    TelegramException(500, "Sent message is not a document")
+                                    TelegramException(500, "Sent message has no supported file")
                                 )
                             }
                         }
@@ -914,9 +921,10 @@ internal class TdLibTelegramClient(
                     is TdApi.UpdateMessageSendFailed -> {
                         if (update.oldMessageId == pendingId && update.message.chatId == chatId) {
                             finished = true
-                            close(
-                                TelegramException.from(update.error.code, update.error.message)
-                            )
+                            val failure = TelegramException.from(update.error.code, update.error.message)
+                            if (failure.isRateLimit) pacer.recordFloodWait(failure.retryAfterSeconds ?: 5)
+                            client?.send(TdApi.DeleteMessages(chatId, longArrayOf(update.message.id), true)) { }
+                            close(failure)
                         }
                     }
                 }
@@ -924,10 +932,26 @@ internal class TdLibTelegramClient(
         }
 
         subscribed.await()
-        val pending: TdApi.Message =
-            paced { send(TdApi.SendMessage(chatId, null, null, null, null, content)) }
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+        // TDLib accepts SendMessage locally. Await that short acceptance even on cancellation,
+        // so a late reply cannot leave a sent message whose id the caller never received.
+        val pending: TdApi.Message = kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+            if(resumeId!=null) send(TdApi.GetMessage(chatId,resumeId)) else pacer.upload { send(TdApi.SendMessage(chatId, null, null, null, null, content)) }
+        }
         sentMessageId = pending.id
-        pendingFile.complete((pending.content as? TdApi.MessageDocument)?.document?.document?.id)
+        if(!kotlinx.coroutines.currentCoroutineContext().isActive){
+            job.cancel()
+            client?.send(TdApi.DeleteMessages(chatId,longArrayOf(pending.id),true)) { }
+            close()
+            return@callbackFlow
+        }
+        pendingFile.complete(when(val body=pending.content){
+            is TdApi.MessageDocument->body.document.document.id
+            is TdApi.MessageVideo->body.video.video.id
+            is TdApi.MessageAudio->body.audio.audio.id
+            is TdApi.MessagePhoto->body.photo.sizes.maxByOrNull{it.width.toLong()*it.height}?.photo?.id
+            else->null
+        })
         pendingMessageId.complete(pending.id)
         trySend(TelegramUploadEvent.Started(pending.id))
         when(val sending=pending.sendingState) {
@@ -935,7 +959,7 @@ internal class TdLibTelegramClient(
                 finished=true
                 val document=pending.toRemoteDocument()
                 if(document!=null)trySend(TelegramUploadEvent.Completed(document))
-                close(if(document==null)TelegramException(500,"Sent message is not a document") else null)
+                close(if(document==null)TelegramException(500,"Sent message has no supported file") else null)
             }
             is TdApi.MessageSendingStateFailed -> {
                 finished=true
@@ -952,6 +976,20 @@ internal class TdLibTelegramClient(
             }
         }
     }.buffer(capacity = 64)
+
+    override suspend fun recoverUpload(chatId:Long,temporaryMessageId:Long):Flow<TelegramUploadEvent>? {
+        val pending=try { send<TdApi.Message>(TdApi.GetMessage(chatId,temporaryMessageId)) }
+        catch(error:TelegramException){if(error.code==404)return null else throw error}
+        val failed=pending.sendingState as? TdApi.MessageSendingStateFailed
+        if(failed!=null){
+            send<TdApi.Ok>(TdApi.DeleteMessages(chatId,longArrayOf(pending.id),true))
+            val error=TelegramException.from(failed.error.code,failed.error.message)
+            if(error.isRateLimit){pacer.recordFloodWait(error.retryAfterSeconds?:5);throw error}
+            return null
+        }
+        // Subscribe before reading the current state again, so a concurrent completion cannot be lost.
+        return sendUploadContent(chatId,null,temporaryMessageId)
+    }
 
     override suspend fun copyDocument(
         chatId: Long,
@@ -1169,6 +1207,43 @@ internal class TdLibTelegramClient(
     override suspend fun getDocument(chatId: Long, messageId: Long): RemoteDocument? =
         runCatching { send(TdApi.GetMessage(chatId, messageId)).toRemoteDocument() }
             .getOrNull()
+
+    override suspend fun listChats(query:String):List<TelegramChat> {
+        val ids=if(query.isNotBlank()) send<TdApi.Chats>(TdApi.SearchChats(query,null,100)).chatIds else {
+            runCatching { send<TdApi.Ok>(TdApi.LoadChats(TdApi.ChatListMain(),100)) }
+            send<TdApi.Chats>(TdApi.GetChats(TdApi.ChatListMain(),100)).chatIds
+        }
+        return ids.toList().mapNotNull { id ->
+            try { val chat=send<TdApi.Chat>(TdApi.GetChat(id));TelegramChat(chat.id,chat.title) }
+            catch(cancel:CancellationException){throw cancel}
+            catch(_:TelegramException){null}
+        }
+    }
+
+    override suspend fun copyMessage(chatId:Long,fromChatId:Long,messageId:Long,caption:String):RemoteDocument =
+        copyMessageEvents(chatId,fromChatId,messageId,caption).filterIsInstance<TelegramUploadEvent.Completed>().first().document
+
+    override fun copyMessageEvents(chatId:Long,fromChatId:Long,messageId:Long,caption:String):Flow<TelegramUploadEvent> {
+        val content=TdApi.InputMessageForwarded().apply {
+            this.fromChatId=fromChatId;this.messageId=messageId
+            copyOptions=TdApi.MessageCopyOptions().apply {
+                sendCopy=true;replaceCaption=true;newCaption=TdApi.FormattedText(caption,emptyArray())
+            }
+        }
+        return sendUploadContent(chatId,content)
+    }
+
+    override suspend fun sendToChat(chatId:Long,fromChatId:Long,messageIds:List<Long>) {
+        for(batch in messageIds.chunked(100))paced {
+            send<TdApi.Messages>(TdApi.ForwardMessages().apply {
+                this.chatId=chatId;this.fromChatId=fromChatId;this.messageIds=batch.toLongArray()
+                sendCopy=true;removeCaption=true
+            })
+        }
+    }
+
+    override suspend fun messageLink(chatId:Long,messageId:Long):String =
+        send<TdApi.MessageLink>(TdApi.GetMessageLink().apply {this.chatId=chatId;this.messageId=messageId}).link
 
     override suspend fun editCaption(chatId: Long, messageId: Long, caption: String) {
         paced {

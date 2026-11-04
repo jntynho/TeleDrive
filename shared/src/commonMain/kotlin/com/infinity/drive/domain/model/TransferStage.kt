@@ -5,6 +5,7 @@ package com.infinity.drive.domain.model
  * these, so a speed reading would be a stale number rather than an idle one.
  */
 enum class TransferStage {
+    PREPARING,
     SEALING,
     JOINING
 }

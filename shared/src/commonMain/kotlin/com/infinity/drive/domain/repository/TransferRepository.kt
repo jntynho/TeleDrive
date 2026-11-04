@@ -23,6 +23,8 @@ interface TransferRepository {
     /** Queues an upload of [fileId]'s local copy to the storage chat. */
     suspend fun enqueueUpload(fileId: String, priority: Int = 0): AppResult<String>
 
+    suspend fun enqueueUploads(fileIds: List<String>): AppResult<Int> = AppResult.Success(fileIds.count { enqueueUpload(it) is AppResult.Success })
+
     /** Queues every file held only on this device. Returns how many were added. */
     suspend fun enqueuePendingUploads(): AppResult<Int>
 
@@ -36,6 +38,7 @@ interface TransferRepository {
 
     /** Queues a download of [fileId]'s remote copy into local storage. */
     suspend fun enqueueDownload(fileId: String, priority: Int = 0): AppResult<String>
+    suspend fun enqueueSaveToPhone(fileId:String):AppResult<String> = enqueueDownload(fileId)
 
     suspend fun pause(id: String)
 

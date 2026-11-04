@@ -52,6 +52,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.infinity.drive.resources.files_import_preparing
 import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.common_actions
 import com.infinity.drive.resources.common_back
@@ -339,6 +340,7 @@ private fun transferRate(transfer: TransferTask): String {
     if (stage != null) {
         return stringResource(
             when (stage) {
+                TransferStage.PREPARING -> Res.string.files_import_preparing
                 TransferStage.SEALING -> Res.string.transfer_stage_sealing
                 TransferStage.JOINING -> Res.string.transfer_stage_joining
             }

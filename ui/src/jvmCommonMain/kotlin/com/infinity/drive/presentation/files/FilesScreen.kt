@@ -205,6 +205,7 @@ fun FilesScreen(
     var uploadRequestHandled by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     var audioQuery by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     var showAddMenu by remember { mutableStateOf(false) }
+    com.infinity.drive.presentation.upload.AddFilesSheet(showAddMenu,state.folderId){showAddMenu=false}
     var showMovePicker by remember { mutableStateOf(false) }
     var showCopyPicker by remember { mutableStateOf(false) }
     var showSelectionOverflow by remember { mutableStateOf(false) }
@@ -215,7 +216,7 @@ fun FilesScreen(
             if (references.isNotEmpty()) viewModel.importAndUpload(references)
         }
     }
-    LaunchedEffect(requestUpload){if(requestUpload&&!uploadRequestHandled){uploadRequestHandled=true;onPickUploads()}}
+    LaunchedEffect(requestUpload){if(requestUpload&&!uploadRequestHandled){uploadRequestHandled=true;showAddMenu=true}}
     val folderUploadPicker = LocalFolderPicker.current
     val onPickUploadFolder = {
         folderUploadPicker.pick { result ->

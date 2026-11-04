@@ -37,7 +37,9 @@ class MediaStoreLocalCopyDeleter(
         return LocalCleanup(deleted)
     }
 
-    override fun isGone(path: String): Boolean = !File(path).exists()
+    override fun isGone(path:String):Boolean = if(path.startsWith("content://")) {
+        runCatching{context.contentResolver.openAssetFileDescriptor(Uri.parse(path),"r")?.use{false}?:true}.getOrDefault(true)
+    }else !File(path).exists()
 
     private fun deleteOne(path: String): Boolean {
         val uri = mediaUriFor(path)
@@ -47,6 +49,7 @@ class MediaStoreLocalCopyDeleter(
             }.getOrDefault(false)
             if (removed) return true
         }
+        if(path.startsWith("content://"))return isGone(path)
         val file = File(path)
         if (!file.exists()) return true
         return runCatching { file.delete() }.getOrDefault(false).also { success ->
@@ -54,7 +57,7 @@ class MediaStoreLocalCopyDeleter(
         }
     }
 
-    private fun mediaUriFor(path: String): Uri? = runCatching {
+    private fun mediaUriFor(path: String): Uri? = if(path.startsWith("content://"))Uri.parse(path)else runCatching {
         val collection = MediaStore.Files.getContentUri(externalVolume())
         context.contentResolver.query(
             collection,

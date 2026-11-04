@@ -12,6 +12,7 @@ import com.infinity.drive.domain.model.MediaAlbum
 import com.infinity.drive.domain.model.SortDirection
 import com.infinity.drive.domain.model.StorageSlice
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 
 interface FileRepository {
 
@@ -88,8 +89,11 @@ interface FileRepository {
     suspend fun importLocalFile(
         localPath: String,
         folderId: String?,
-        displayName: String? = null
+        displayName: String? = null,
+        allowDuplicate: Boolean = false
     ): AppResult<DriveFile>
+
+    suspend fun registerImport(source:com.infinity.drive.core.files.ImportedFile,folderId:String?,displayName:String,allowDuplicate:Boolean=false):AppResult<DriveFile> = importLocalFile(source.path,folderId,displayName,allowDuplicate)
 
     /**
      * Brings a trashed file back when [localPath] holds the very same bytes,
@@ -124,7 +128,11 @@ interface FileRepository {
     /** Link metadata for a saved URL, or null when previews are off. */
     suspend fun linkPreview(url: String): LinkMetadata?
 
-    suspend fun findDuplicate(localPath: String): DriveFile?
+    suspend fun findDuplicate(localPath: String,knownHash:String?=null): DriveFile?
+    suspend fun rememberContentHash(id:String,hash:String) {}
+    suspend fun findNameClash(name:String,folderId:String?):DriveFile? = observeFiles(FileQuerySpec(folderId=folderId,filterByFolder=true,showHidden=true,showArchived=true)).first().firstOrNull{it.name.equals(name,true)}
+    suspend fun setOfflinePinned(id:String,pinned:Boolean) {}
+    suspend fun importTelegramFile(document:com.infinity.drive.core.telegram.RemoteDocument,folderId:String?,name:String=document.fileName):AppResult<DriveFile> = AppResult.Failure(com.infinity.drive.core.common.AppError.NotFound)
 
     /** Deletes import staging copies that no file references anymore. */
     suspend fun sweepImportOrphans()

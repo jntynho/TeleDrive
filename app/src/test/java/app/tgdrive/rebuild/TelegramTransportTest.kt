@@ -38,9 +38,9 @@ class TelegramTransportTest {
         }
         fun emit(value:TdApi.Object)=callbacks.last()(value)
     }
-    private fun TestScope.client(wire:Wire):TdLibTelegramClient {
+    private fun TestScope.client(wire:Wire,pacer:TelegramPacer=TelegramPacer()):TdLibTelegramClient {
         val context=RuntimeEnvironment.getApplication()
-        return TdLibTelegramClient(context,object:TdlibDatabaseKeyProvider { override fun databaseKey()=ByteArray(32) },TelegramPacer(),AndroidStoragePaths(context),wire,backgroundScope)
+        return TdLibTelegramClient(context,object:TdlibDatabaseKeyProvider { override fun databaseKey()=ByteArray(32) },pacer,AndroidStoragePaths(context),wire,backgroundScope)
     }
     private fun message(id:Long,pending:Boolean=false):TdApi.Message = TdApi.Message().apply {
         this.id=id;chatId=-1001;date=123
@@ -107,4 +107,51 @@ class TelegramTransportTest {
         client.start(TelegramCredentials(12345,"a".repeat(32)))
         assertTrue(client.authState.value is TelegramAuthState.Failed)
     }
+    @Test fun `an asynchronous send failure records the global deadline and removes only its failed placeholder`()=runTest {
+        val wire=Wire();val pacer=TelegramPacer{testScheduler.currentTime};val client=client(wire,pacer)
+        client.start(TelegramCredentials(12345,"a".repeat(32)))
+        var failure:Throwable?=null
+        val job=backgroundScope.launch{try{client.uploadDocument(-1001,"/photo.jpg","photo.jpg","image/jpeg","manifest").collect{}}catch(error:Throwable){failure=error}}
+        runCurrent();wire.reply(TdApi.SendMessage::class.java,message(-5,true));runCurrent()
+        wire.emit(TdApi.UpdateMessageSendFailed().apply{message=message(-8);oldMessageId=-5;error=TdApi.Error(429,"FLOOD_WAIT_160")});runCurrent()
+        assertTrue(job.isCompleted);assertTrue(failure is TelegramException);assertEquals(161,pacer.floodWaitSeconds)
+        val deleted=wire.sent.filterIsInstance<TdApi.DeleteMessages>().single();assertArrayEquals(longArrayOf(-8),deleted.messageIds)
+    }
+    @Test fun `an interrupted pending upload resumes delivery without another SendMessage`()=runTest {
+        val wire=Wire();val client=client(wire);client.start(TelegramCredentials(12345,"a".repeat(32)))
+        var events:kotlinx.coroutines.flow.Flow<TelegramUploadEvent>?=null
+        val lookup=backgroundScope.launch{events=client.recoverUpload(-1001,-5)}
+        runCurrent();wire.reply(TdApi.GetMessage::class.java,message(-5,true));runCurrent();assertTrue(lookup.isCompleted)
+        val received=mutableListOf<TelegramUploadEvent>()
+        val resume=backgroundScope.launch{events!!.toList(received)}
+        runCurrent();wire.emit(TdApi.UpdateMessageSendSucceeded(message(23),-5));runCurrent()
+        wire.reply(TdApi.GetMessage::class.java,message(-5,true));runCurrent()
+        assertTrue(resume.isCompleted);assertEquals(23L,(received.last() as TelegramUploadEvent.Completed).document.messageId)
+        assertFalse(wire.sent.any{it is TdApi.SendMessage||it is TdApi.PreliminaryUploadFile})
+    }
+    @Test fun `copying from a chat replaces its caption in the same request without a local upload`()=runTest {
+        val wire=Wire();val client=client(wire);client.start(TelegramCredentials(12345,"a".repeat(32)))
+        val events=mutableListOf<TelegramUploadEvent>()
+        val job=backgroundScope.launch{client.copyMessageEvents(-1001,-2002,31,"new manifest").toList(events)}
+        runCurrent()
+        val send=wire.sent.single() as TdApi.SendMessage
+        val forwarded=send.inputMessageContent as TdApi.InputMessageForwarded
+        assertEquals(-2002L,forwarded.fromChatId);assertEquals(31L,forwarded.messageId)
+        assertTrue(forwarded.copyOptions.sendCopy);assertTrue(forwarded.copyOptions.replaceCaption)
+        assertEquals("new manifest",forwarded.copyOptions.newCaption.text)
+        wire.reply(TdApi.SendMessage::class.java,message(41));runCurrent()
+        assertTrue(job.isCompleted);assertEquals(41L,(events.last() as TelegramUploadEvent.Completed).document.messageId)
+    }
+
+    @Test fun `canceling before send acceptance cleans up a late final reply instead of leaking a message`()=runTest {
+        val wire=Wire();val client=client(wire);client.start(TelegramCredentials(12345,"a".repeat(32)))
+        val events=mutableListOf<TelegramUploadEvent>()
+        val job=backgroundScope.launch{client.uploadDocument(-1001,"/photo.jpg","photo.jpg","image/jpeg","manifest").toList(events)}
+        runCurrent();job.cancel();runCurrent()
+        wire.reply(TdApi.SendMessage::class.java,message(99));runCurrent()
+        assertTrue(job.isCompleted)
+        assertArrayEquals(longArrayOf(99),wire.sent.filterIsInstance<TdApi.DeleteMessages>().single().messageIds)
+        assertFalse(events.any{it is TelegramUploadEvent.Completed})
+    }
+
 }

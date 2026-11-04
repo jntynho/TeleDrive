@@ -28,14 +28,18 @@ class TransferQueueWorker(
     private val transferDao: TransferDao,
     private val drainer: TransferQueueDrainer,
     private val settingsRepository: SettingsRepository,
-    private val appNotifications: AppNotifications
+    private val appNotifications: AppNotifications,
+    private val scheduler:TransferScheduler,
+    private val auth:com.infinity.drive.domain.repository.TelegramAuthRepository
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
+        TransferActivityRegistry.recover(transferDao,System.currentTimeMillis())
         if (transferDao.nextQueued(1).isEmpty()) return Result.success()
         appNotifications.createChannels()
         runCatching { setForeground(getForegroundInfo()) }
 
+        if(!awaitTransferSession(auth))return Result.retry()
         val startedAt=System.currentTimeMillis()
         val monitor=CoroutineScope(currentCoroutineContext()).launch {
             combine(transferDao.observeActive(100),transferDao.observeActiveCount()){active,count->active to count}.sample(1000).collectLatest { (active,count) ->
@@ -62,7 +66,12 @@ class TransferQueueWorker(
                 }
             }
         )
-        } finally { monitor.cancelAndJoin() }
+        } catch(cancel:CancellationException){
+            withContext(NonCancellable){
+                if(transferDao.nextQueued(1).isNotEmpty())scheduler.kick(settingsRepository.preferences.first().allowMeteredTransfers)
+            }
+            throw cancel
+        } finally { withContext(NonCancellable){monitor.cancelAndJoin()} }
         val completed=transferDao.observeCompleted(100).first().filter{(it.completedAt?:0)>=startedAt}
         val completedCount=transferDao.completedSince(startedAt)
         if(completedCount>0&&settingsRepository.preferences.first().backupNotifications){

@@ -189,6 +189,7 @@ fun DriveInfinityApp(
             }
             androidx.compose.animation.AnimatedVisibility(visibleState=warmup,enter=fadeIn(tween(200)),exit=fadeOut(tween(360))){com.infinity.drive.presentation.components.StartupSurface()}
             }
+            if(state.onboardingComplete&&!state.loading&&!state.locked&&!preparing)com.infinity.drive.presentation.upload.UploadConflictHost()
             if(upgradeNotice!=null&&!state.loading&&!state.locked&&!preparing)androidx.compose.material3.AlertDialog(onDismissRequest=viewModel::dismissUpgradeNotice,title={Text("Previous library preserved")},text={Text(upgradeNotice.orEmpty())},confirmButton={androidx.compose.material3.TextButton(viewModel::dismissUpgradeNotice){Text("Continue")}})
             if (sessionBroken&&!state.locked&&!preparing) {
                 SessionBrokenDialog(onSignInAgain = viewModel::resetSession)
@@ -296,14 +297,13 @@ private fun MainScaffold(
     var bottomChromeHeight by remember { mutableStateOf(BottomBarHeight) }
     val chromeDensity=androidx.compose.ui.platform.LocalDensity.current
     val systemBottom=WindowInsets.navigationBars.getBottom(chromeDensity)
-    LaunchedEffect(currentDestination){
-        if(!showChrome&&currentDestination?.hasRoute(Route.Preview::class)!=true)audioPlayer.pause()
-    }
+
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val railWidth=if(useRail&&onboardingComplete)80.dp else 0.dp
         CompositionLocalProvider(
             LocalBottomBarHeight provides if(onboardingComplete)bottomChromeHeight else 0.dp,
+            com.infinity.drive.presentation.components.LocalFileFolderNavigation provides { id:String? -> navController.navigateOnce(Route.Files(id)) },
             com.infinity.drive.presentation.navigation.LocalNavigationRailWidth provides railWidth
         ) {
             AppNavHost(navController=navController,startDestination=startDestination,modifier=Modifier.fillMaxSize().testTag("navigation-host"))
@@ -322,13 +322,13 @@ private fun MainScaffold(
         val topLevelIndex=TopLevelDestination.entries.indexOfFirst { currentDestination?.hasRoute(it.route::class)==true }
         var selectedNavIndex by remember { mutableIntStateOf(0) }
         LaunchedEffect(topLevelIndex){if(topLevelIndex>=0)selectedNavIndex=topLevelIndex}
-        AnimatedVisibility(visible=showChrome&&!keyboardVisible,enter=fadeIn(tween(180)),exit=fadeOut(tween(180)),
+        AnimatedVisibility(visible=showChrome,enter=fadeIn(tween(180)),exit=fadeOut(tween(180)),
             modifier=Modifier.align(Alignment.BottomCenter).padding(start=railWidth)) {
             androidx.compose.foundation.layout.Column(Modifier.onSizeChanged {
                 bottomChromeHeight=with(chromeDensity){(it.height-if(useRail)0 else systemBottom).coerceAtLeast(0).toDp()}
             }) {
                 com.infinity.drive.presentation.audio.LibraryAudioMiniPlayer()
-                if(!useRail)FloatingNavigationBar(selectedIndex=selectedNavIndex,onNavigate={requestedTab=it})
+                if(!useRail&&!keyboardVisible)FloatingNavigationBar(selectedIndex=selectedNavIndex,onNavigate={requestedTab=it})
             }
         }
     }

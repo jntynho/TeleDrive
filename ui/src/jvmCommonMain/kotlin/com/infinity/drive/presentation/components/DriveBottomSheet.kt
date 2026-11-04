@@ -48,12 +48,15 @@ fun DriveBottomSheet(
 }
 
 @Composable
-fun SheetActionRow(label: String, icon: ImageVector, enabled: Boolean = true, onClick: () -> Unit) {
+fun SheetActionRow(label: String, icon: ImageVector, enabled: Boolean = true, detail:String? = null, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick)
         .heightIn(min = 56.dp).padding(horizontal = 24.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
         val color = MaterialTheme.colorScheme.onSurface.copy(alpha = if(enabled)1f else .38f)
         Icon(icon, null, Modifier.size(24.dp), tint = color)
-        Text(label, style = MaterialTheme.typography.bodyLarge, color = color)
+        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge, color = color)
+            if(detail!=null)Text(detail,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }

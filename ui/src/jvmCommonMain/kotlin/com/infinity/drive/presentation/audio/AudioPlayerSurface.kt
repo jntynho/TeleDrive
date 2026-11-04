@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,14 +46,14 @@ fun LibraryAudioMiniPlayer(){
         val current=if(state.file!=null)state else last
         val file=current.file
         if(file!=null){
-            val pause=current.playing||(current.loading&&current.playRequested)
+            val pause=(current.playing||current.playRequested)&&current.error==null
             Surface(modifier=Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=8.dp),shape=RoundedCornerShape(20.dp),color=MaterialTheme.colorScheme.surface){
                 Column {
                     Row(Modifier.fillMaxWidth().clickable(onClickLabel="Open now playing"){expanded=true}.padding(start=12.dp,end=4.dp,top=10.dp,bottom=8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)){
-                        FileThumbnail(file,Modifier.size(44.dp).clip(RoundedCornerShape(11.dp)))
+                        AudioArtwork(file,current.metadata,Modifier.size(44.dp).clip(RoundedCornerShape(11.dp)))
                         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)){
-                            Text(current.metadata.title?:file.name.substringBeforeLast('.'),style=MaterialTheme.typography.titleSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
-                            Text(current.error?:if(current.loading)"Loading audio…"else current.metadata.artist?:"Unknown artist",style=MaterialTheme.typography.bodySmall,color=if(current.error!=null)MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
+                            Text(current.metadata.title?.takeIf(String::isNotBlank)?:file.name.substringBeforeLast('.'),style=MaterialTheme.typography.titleSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
+                            Text(current.error?:if(current.loading)"Loading audio…"else current.metadata.artist?.takeIf(String::isNotBlank)?:"Unknown artist",style=MaterialTheme.typography.bodySmall,color=if(current.error!=null)MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
                         }
                         FilledIconButton(player::toggle,shape=CircleShape,colors=IconButtonDefaults.filledIconButtonColors(containerColor=MaterialTheme.colorScheme.primary,contentColor=MaterialTheme.colorScheme.onPrimary)){
                             Icon(if(pause)DriveIcons.Pause else DriveIcons.PlayArrow,if(current.error!=null)"Retry audio"else if(pause)"Pause audio"else"Play audio")
@@ -83,18 +84,9 @@ fun LibraryAudioMiniPlayer(){
 fun FullscreenAudioPlayer(file:DriveFile,isActivePage:Boolean,modifier:Modifier=Modifier,onTrackChanged:(String)->Unit={}){
     val player=LocalAudioPlayback.current
     val state by player.state.collectAsStateWithLifecycle()
-    var connected by remember(file.id){mutableStateOf(false)}
-    val notifyTrack by rememberUpdatedState(onTrackChanged)
-    LaunchedEffect(file.id,isActivePage){
-        if(isActivePage){if(player.state.value.file?.id!=file.id)player.play(file);connected=true}
-        else {connected=false;if(player.state.value.file?.id==file.id)player.pause()}
-    }
-    LaunchedEffect(state.file?.id,connected,isActivePage){
-        val id=state.file?.id
-        if(connected&&isActivePage&&id!=null&&id!=file.id)notifyTrack(id)
-    }
+
     Box(modifier.fillMaxSize().ambientArtwork(state).systemBarsPadding().padding(top=audioHeaderHeight())){
-        NowPlayingContent(file,player::stop,Modifier.fillMaxSize())
+        NowPlayingContent(if(isActivePage)state.file?:file else file,player::stop,Modifier.fillMaxSize())
     }
 }
 
@@ -122,9 +114,9 @@ internal fun AudioSeekBar(state:AudioPlaybackState){
     val position=scrub?.toLong()?:state.positionMs.coerceIn(0,duration)
     Column(Modifier.fillMaxWidth()){
         SlimSlider(value=position.toFloat(),onValueChange={scrub=it},
-            onValueChangeFinished={scrub?.let{player.seek(it.toLong())};scrub=null},
+            onValueChangeFinished={if(player.state.value.file?.id==state.file?.id)scrub?.let{player.seek(it.toLong())};scrub=null},
             enabled=state.file?.id==player.state.value.file?.id&&duration>0,
-            valueRange=0f..duration.coerceAtLeast(1).toFloat(),trackHeight=2.dp,thumbSize=0.dp,
+            valueRange=0f..duration.coerceAtLeast(1).toFloat(),trackHeight=2.dp,thumbSize=if(scrub!=null)8.dp else 0.dp,
             activeColor=Color.White,inactiveColor=Color.White.copy(alpha=.25f),
             modifier=Modifier.fillMaxWidth().semantics{contentDescription="Seek audio"})
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){
@@ -138,7 +130,7 @@ internal fun AudioSeekBar(state:AudioPlaybackState){
 internal fun AudioTransport(state:AudioPlaybackState){
     val player=LocalAudioPlayback.current
     val active=state.file?.id==player.state.value.file?.id
-    val pause=active&&(state.playing||(state.loading&&state.playRequested))
+    val pause=active&&((state.playing||state.playRequested)&&state.error==null)
     Row(Modifier.fillMaxWidth().height(72.dp),verticalAlignment=Alignment.CenterVertically,
         horizontalArrangement=Arrangement.spacedBy(32.dp,Alignment.CenterHorizontally)){
         IconButton(player::previous,enabled=active&&(state.canSkipPrevious||state.positionMs>3000)){
@@ -161,10 +153,14 @@ private fun NowPlayingContent(file:DriveFile,onStop:()->Unit,modifier:Modifier=M
     val state=if(active)playback else AudioPlaybackState(file=file,durationMs=file.durationMs?:0L)
     var showLyrics by rememberSaveable(file.id){mutableStateOf(false)}
     var showInfo by rememberSaveable(file.id){mutableStateOf(false)}
+    var recoveryMessage by remember(file.id){mutableStateOf<String?>(null)}
+    val transferRepository=org.koin.compose.koinInject<com.infinity.drive.domain.repository.TransferRepository>()
+    val recoveryScope=rememberCoroutineScope()
     var showQueue by rememberSaveable(file.id){mutableStateOf(false)}
     var options by remember(file.id){mutableStateOf(false)}
     var timer by remember(file.id){mutableStateOf(false)}
     val lyrics=remember(state.metadata.lyrics){AudioLyricsParser.parse(state.metadata.lyrics)}
+    val lyricPosition=if(lyrics.cues.isNotEmpty())interpolatedAudioPosition(state)else state.positionMs
     CompositionLocalProvider(LocalContentColor provides Color.White){
         BoxWithConstraints(modifier.padding(horizontal=24.dp)){
             val fontScale=androidx.compose.ui.platform.LocalDensity.current.fontScale.coerceAtLeast(1f)
@@ -172,15 +168,27 @@ private fun NowPlayingContent(file:DriveFile,onStop:()->Unit,modifier:Modifier=M
             val cover=if(wide)minOf(maxHeight-24.dp,maxWidth*.43f).coerceAtLeast(80.dp)
                 else minOf(maxWidth,(maxHeight-(360*fontScale).dp).coerceAtLeast(96.dp),420.dp)
             val artwork:@Composable ()->Unit={
-                Crossfade(file,animationSpec=tween(320),label="audioCover"){shown->
-                    FileThumbnail(shown,Modifier.size(cover).clip(RoundedCornerShape(12.dp)))
+                Crossfade(file to state.metadata.artworkPath,animationSpec=tween(320),label="audioCover"){(shown,artwork)->
+                    AudioArtwork(shown,state.metadata.copy(artworkPath=artwork),Modifier.size(cover).clip(RoundedCornerShape(12.dp)))
                 }
             }
             val controls:@Composable ()->Unit={
                 Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(8.dp)){
-                    LyricsSnippet(lyrics,state.positionMs,{showLyrics=true},Modifier.fillMaxWidth())
-                    if(state.error!=null)Text(state.error,color=Color(0xFFFFC7C2),style=MaterialTheme.typography.bodySmall)
+                    LyricsSnippet(lyrics,lyricPosition,{showLyrics=true},Modifier.fillMaxWidth())
+                    if(state.error!=null)Column{
+                        Text(state.error,color=Color(0xFFFFC7C2),style=MaterialTheme.typography.bodySmall)
+                        Row{
+                            TextButton(player::toggle){Text("Retry",color=Color.White)}
+                            TextButton({recoveryScope.launch{
+                                try {recoveryMessage=if(transferRepository.enqueueDownload(file.id).isSuccess)"Download queued in Activity. Retry after it finishes."else"Couldn't queue a download."}
+                                catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}
+                                catch(_:Exception){recoveryMessage="Couldn't queue a download."}
+                            }}){Text("Download",color=Color.White)}
+                        }
+                    }
                     else if(state.loading)Text("Loading audio…",color=Color.White.copy(alpha=.7f),style=MaterialTheme.typography.bodySmall)
+                    state.queueError?.let{Text(it,color=Color.White.copy(alpha=.7f),style=MaterialTheme.typography.bodySmall)}
+                    recoveryMessage?.let{Text(it,color=Color.White.copy(alpha=.7f),style=MaterialTheme.typography.bodySmall)}
                     AudioSeekBar(state)
                     AudioTransport(state)
                     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){
@@ -204,7 +212,7 @@ private fun NowPlayingContent(file:DriveFile,onStop:()->Unit,modifier:Modifier=M
                         Box {
                             IconButton({options=true}){Icon(DriveIcons.MoreHoriz,"Playback options",Modifier.size(23.dp))}
                             DropdownMenu(options,{options=false}){
-                                DropdownMenuItem(text={Text("File details")},onClick={options=false;showInfo=true})
+                                DropdownMenuItem(text={Text("File options")},onClick={options=false;showInfo=true})
                                 DropdownMenuItem(text={Text("Stop playback")},onClick={options=false;onStop()},enabled=active)
                             }
                         }
@@ -224,19 +232,19 @@ private fun NowPlayingContent(file:DriveFile,onStop:()->Unit,modifier:Modifier=M
         }
     }
     if(showLyrics&&active)SynchronizedLyrics(lyrics,{showLyrics=false})
-    if(showInfo)com.infinity.drive.presentation.components.FileInfoSheet(file,{showInfo=false})
+    if(showInfo)com.infinity.drive.presentation.components.FileActionsSheet(file,onDismiss={showInfo=false},onOpen={showInfo=false})
     if(showQueue){
         var queue by remember{mutableStateOf<List<DriveFile>?>(null)}
         var queueError by remember{mutableStateOf<String?>(null)}
         var queueRevision by remember{mutableIntStateOf(0)}
-        LaunchedEffect(playback.file?.id,queueRevision){
+        LaunchedEffect(playback.file?.id,playback.queueRevision,queueRevision){
             queue=null;queueError=null
             try{queue=player.queuedFiles()}
             catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}
             catch(_:Exception){queueError="Couldn't load the play queue."}
         }
         com.infinity.drive.presentation.components.DriveBottomSheet(onDismissRequest={showQueue=false}){
-            Text("Play queue",Modifier.padding(24.dp),style=MaterialTheme.typography.titleLarge)
+            Text("Play queue${queue?.let{" · ${it.size} tracks"}.orEmpty()}",Modifier.padding(24.dp),style=MaterialTheme.typography.titleLarge)
             if(queueError!=null)Column(Modifier.padding(24.dp)){Text(queueError!!);TextButton({queueRevision++}){Text("Retry")}}
             else if(queue==null)LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal=24.dp))
             else if(queue!!.isEmpty())Text("No other tracks in this queue",Modifier.padding(24.dp))
@@ -283,4 +291,11 @@ internal fun Modifier.ambientArtwork(state:AudioPlaybackState):Modifier {
         drawRect(Brush.radialGradient(listOf(bottom.copy(alpha=.2f),Color.Transparent),
             center=androidx.compose.ui.geometry.Offset(size.width*(1-(motion?.value?:frozen.floatValue)),size.height*.8f),radius=size.maxDimension*.7f))
     }
+}
+
+@Composable
+private fun AudioArtwork(file:DriveFile,metadata:AudioMetadata,modifier:Modifier){
+    if(metadata.artworkPath!=null)coil3.compose.AsyncImage(model=metadata.artworkPath,contentDescription=file.name,
+        modifier=modifier,contentScale=androidx.compose.ui.layout.ContentScale.Crop)
+    else FileThumbnail(file,modifier)
 }

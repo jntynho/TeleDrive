@@ -68,10 +68,11 @@ class PartUploader(
         val totalSize = source.length()
         val partCount = FileParts.countFor(totalSize)
         val done = filePartDao.partsOf(entity.id)
-            .filter { it.messageId != null }
+            .filter { it.messageId != null && it.remoteFileId != null }
             .associateBy { it.partIndex }
             .toMutableMap()
 
+        val pendingParts=filePartDao.partsOf(entity.id).filter{it.messageId!=null&&it.remoteFileId==null}.associateBy{it.partIndex}
         var uploadedBefore = done.values.sumOf { it.plainSize }
         emit(Event.Progress(uploadedBefore))
 
@@ -84,7 +85,15 @@ class PartUploader(
 
             try {
                 if (encrypt) emit(Event.Sealing(index))
-                withContext(dispatchers.io) {
+                val pending=pendingParts[index]
+                val recovered=if(pending?.messageId!=null){
+                    val landed=telegramClient.fetchDocuments(chatId,0,100).documents.firstOrNull{document->
+                        manifestCodec.decode(document.caption)?.let{it.fileId==entity.id&&it.partIndex==index&&it.modifiedAt==entity.modifiedAt}==true
+                    }
+                    if(landed!=null)kotlinx.coroutines.flow.flowOf(TelegramUploadEvent.Completed(landed))
+                    else telegramClient.recoverUpload(chatId,pending.messageId)
+                }else null
+                if(recovered==null)withContext(dispatchers.io) {
                     writePart(source, plainOffset, plainSize, scratch, encrypt)
                 }
                 if (encrypt) emit(Event.PartDone(index, partCount))
@@ -109,16 +118,19 @@ class PartUploader(
 
                 var stored: FilePartEntity? = null
                 val alreadySent = uploadedBefore
-                telegramClient.uploadDocument(
+                (recovered ?: telegramClient.uploadDocument(
                     chatId = chatId,
                     localPath = scratch.absolutePath,
                     fileName = partName,
                     mimeType = if (encrypt) OCTET_STREAM else entity.mimeType,
                     caption = manifestCodec.encode(partManifest, encrypt),
                     thumbnailPath = null
-                ).failWhenIdle("Part upload stalled").collect { event ->
+                )).failWhenIdle("Part upload stalled").collect { event ->
                     when (event) {
-                        is TelegramUploadEvent.Started -> Unit
+                        is TelegramUploadEvent.Started -> filePartDao.upsert(FilePartEntity(
+                            fileId=entity.id,partIndex=index,chatId=chatId,messageId=event.temporaryMessageId,
+                            remoteFileId=null,remoteUniqueId=null,plainOffset=plainOffset,plainSize=plainSize,
+                            storedSize=scratch.length(),uploadedAt=0))
                         is TelegramUploadEvent.Progress -> {
                             val within = event.transferredBytes
                                 .coerceAtMost(plainSize)
@@ -136,7 +148,7 @@ class PartUploader(
                                 remoteUniqueId = document.uniqueFileId,
                                 plainOffset = plainOffset,
                                 plainSize = plainSize,
-                                storedSize = scratch.length(),
+                                storedSize = if(scratch.exists())scratch.length() else pending?.storedSize?:plainSize,
                                 uploadedAt = System.currentTimeMillis()
                             )
                         }

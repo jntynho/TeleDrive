@@ -85,7 +85,8 @@ fun AudioLibraryRow(file:DriveFile?,playing:Boolean=false,currentMetadata:AudioM
     val player=LocalAudioPlayback.current
     val storedMetadata by produceState(AudioMetadata(),file?.id,file?.modifiedAt,file?.localPath){if(file!=null)value=player.metadata(file)}
     val meta=if(currentMetadata!=null)AudioMetadata(currentMetadata.title?:storedMetadata.title,currentMetadata.artist?:storedMetadata.artist,currentMetadata.durationMs?:storedMetadata.durationMs)else storedMetadata
-    var menu by remember{mutableStateOf(false)}
+    var menu by remember(file?.id){mutableStateOf(false)}
+    if(menu&&file!=null)com.infinity.drive.presentation.components.FileActionsSheet(file,onDismiss={menu=false},onOpen=onPlay)
     Column {
     Row(modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(enabled=!loading,onClick=onPlay).padding(vertical=LibraryLayout.AudioRowPadding),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(LibraryLayout.AudioRowGap)){
         if(file!=null)FileThumbnail(file,Modifier.size(LibraryLayout.AudioCover).clip(RoundedCornerShape(LibraryLayout.CoverCorner)))
@@ -99,10 +100,7 @@ fun AudioLibraryRow(file:DriveFile?,playing:Boolean=false,currentMetadata:AudioM
         if(playing)Icon(DriveIcons.Audiotrack,"Playing",Modifier.size(20.dp),tint=MaterialTheme.colorScheme.primary)
         Box {
             IconButton({menu=true},enabled=!loading){Icon(DriveIcons.MoreVert,"Audio options for ${file?.name.orEmpty()}",Modifier.skeleton(loading))}
-            DropdownMenu(menu,{menu=false}){
-                DropdownMenuItem(text={Text(if(file?.isFavorite==true)"Remove from favorites"else"Add to favorites")},onClick={menu=false;onFavorite()})
-                DropdownMenuItem(text={Text("Open player & file options")},onClick={menu=false;onDetails()})
-            }
+
         }
     }
     HorizontalDivider(Modifier.padding(start=LibraryLayout.AudioCover+LibraryLayout.AudioRowGap),color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.4f))

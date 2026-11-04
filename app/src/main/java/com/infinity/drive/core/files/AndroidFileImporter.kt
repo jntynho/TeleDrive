@@ -23,6 +23,7 @@ class AndroidFileImporter(
     private val context: Context,
     private val storagePaths: AppStoragePaths
 ) : FileImporter {
+    private val preparingPaths=java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     override fun import(reference: String): ImportedFile? {
         val direct = runCatching { File(reference) }.getOrNull()?.takeIf { it.isFile }
@@ -30,6 +31,38 @@ class AndroidFileImporter(
             return ImportedFile(direct.absolutePath, direct.name, direct.length())
         }
         return import(reference.toUri())
+    }
+
+    override fun describe(reference:String):ImportedFile? {
+        val direct=File(reference).takeIf{it.isFile}?:runCatching{readablePath(Uri.parse(reference))}.getOrNull()
+        if(direct!=null)return ImportedFile(direct.absolutePath,direct.name,direct.length())
+        return runCatching {
+            val uri=Uri.parse(reference)
+            val metadata=queryMetadata(uri)?:return null
+            ImportedFile(reference,FileNameUtils.sanitize(metadata.first),metadata.second,context.contentResolver.getType(uri))
+        }.getOrNull()
+    }
+
+    override suspend fun prepare(reference:String,onProgress:suspend()->Unit):ImportedFile? {
+        onProgress()
+        val direct=File(reference).takeIf{it.isFile}?:runCatching{readablePath(Uri.parse(reference))}.getOrNull()
+        if(direct!=null)return ImportedFile(direct.absolutePath,direct.name,direct.length())
+        val metadata=describe(reference)?:return null
+        val root=File(storagePaths.filesDir,IMPORT_DIR)
+        if(metadata.sizeBytes>0&&root.parentFile!!.usableSpace<metadata.sizeBytes+4L*1024*1024)error("Not enough free space to prepare this original")
+        val directory=File(root,java.util.UUID.randomUUID().toString()).apply{mkdirs()}
+        val target=File(directory,FileNameUtils.sanitize(metadata.name))
+        reserve(target.absolutePath)
+        try {
+            val input=context.contentResolver.openInputStream(Uri.parse(reference))?:error("The file provider refused to open this original")
+            input.use{source->target.outputStream().buffered().use{output->
+                val buffer=ByteArray(256*1024)
+                while(true){onProgress();val read=source.read(buffer);if(read<0)break;output.write(buffer,0,read)}
+            }}
+            onProgress()
+            if(metadata.sizeBytes>0)check(target.length()==metadata.sizeBytes){"The selected file is incomplete or changed while being prepared"}
+            return ImportedFile(target.absolutePath,metadata.name,target.length(),metadata.mimeType)
+        }catch(error:Throwable){target.delete();preparingPaths.remove(target.absolutePath);directory.delete();throw error}
     }
 
     private fun import(uri: Uri): ImportedFile? {
@@ -52,18 +85,22 @@ class AndroidFileImporter(
         // while simultaneous selections can never overwrite each other.
         val targetDir = File(File(storagePaths.filesDir, IMPORT_DIR),java.util.UUID.randomUUID().toString()).apply { mkdirs() }
         val target = File(targetDir, displayName)
+        reserve(target.absolutePath)
 
         return runCatching {
             context.contentResolver.openInputStream(uri)?.use { input ->
                 target.outputStream().buffered().use { output -> input.copyTo(output) }
             } ?: run {
                 SafeLog.w(TAG, "Import failed: the provider refused to open the document")
+                preparingPaths.remove(target.absolutePath);targetDir.delete()
                 return null
             }
             ImportedFile(target.absolutePath, displayName, target.length())
         }.getOrElse {
             SafeLog.w(TAG, "Import failed", it)
             target.delete()
+            preparingPaths.remove(target.absolutePath)
+            targetDir.delete()
             null
         }
     }
@@ -73,6 +110,7 @@ class AndroidFileImporter(
         if (isStaged(imported.path)) {
             val file=File(imported.path)
             file.delete()
+            preparingPaths.remove(file.absolutePath)
             if(file.parentFile!=File(storagePaths.filesDir,IMPORT_DIR))file.parentFile?.delete()
         }
     }
@@ -82,6 +120,23 @@ class AndroidFileImporter(
             ?: expandSafTree(reference)
             ?: listOf(ImportSource(reference, ""))
 
+    override fun retainOffline(reference:String,fileId:String):String? {
+        val directory=File(storagePaths.filesDir,"offline/${java.util.UUID.nameUUIDFromBytes(fileId.toByteArray())}").apply{mkdirs()}
+        val local=File(reference)
+        if(local.isFile&&local.canonicalPath.startsWith(File(storagePaths.filesDir,"offline").canonicalPath+File.separator))return reference
+        val name=if(local.isFile)local.name else queryMetadata(Uri.parse(reference))?.first?:"offline-file"
+        val target=File(directory,FileNameUtils.sanitize(name))
+        val temporary=File.createTempFile("offline-",".tmp",directory)
+        return try {
+            val input=if(local.isFile)local.inputStream() else context.contentResolver.openInputStream(Uri.parse(reference))?:return null
+            input.use{source->temporary.outputStream().buffered().use{source.copyTo(it)}}
+            check(temporary.renameTo(target));target.absolutePath
+        }catch(_:Exception){null}finally{temporary.delete()}
+    }
+
+    override fun reserve(path:String) {preparingPaths.add(path)}
+    override fun registered(path:String) {preparingPaths.remove(path)}
+
     override fun isStaged(path: String): Boolean =
         runCatching { File(path).canonicalFile.toPath().startsWith(File(storagePaths.filesDir,IMPORT_DIR).canonicalFile.toPath()) }.getOrDefault(false)
 
@@ -89,7 +144,8 @@ class AndroidFileImporter(
         val root=File(storagePaths.filesDir,IMPORT_DIR)
         if(!root.isDirectory)return
         root.walkBottomUp().forEach { file ->
-            if(file.isFile && file.absolutePath !in referencedPaths)file.delete()
+            val active=file.absolutePath in preparingPaths
+            if(file.isFile && file.absolutePath !in referencedPaths&&!active)file.delete()
             else if(file.isDirectory && file!=root && file.list()?.isEmpty()==true)file.delete()
         }
     }

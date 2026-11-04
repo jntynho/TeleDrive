@@ -18,7 +18,7 @@ fun shareLocalFiles(
     if (paths.isEmpty()) return
     val uris = ArrayList(
         paths.map { path ->
-            FileProvider.getUriForFile(
+            if(path.startsWith("content://"))android.net.Uri.parse(path) else FileProvider.getUriForFile(
                 context,
                 "${context.packageName}.fileprovider",
                 File(path)

@@ -50,8 +50,8 @@ internal fun LyricsSnippet(lyrics: AudioLyrics, positionMs: Long, onOpen: () -> 
             (fadeIn(tween(200)) togetherWith fadeOut(tween(200))).using(SizeTransform(clip = true) { _, _ -> snap() })
         }, label = "lyricLine") { index ->
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                val first = (index - 1).coerceAtLeast(0)
-                for (line in first..(first + 2).coerceAtMost(lyrics.cues.lastIndex)) {
+                for (line in index-1..index+1) {
+                    if(line !in lyrics.cues.indices){Text(" ",style=MaterialTheme.typography.bodyLarge);continue}
                     val selected = line == index
                     val color = Color.White.copy(alpha = if (selected) 1f else .7f)
                     Text(cueText(lyrics.cues[line], positionMs, selected, color), maxLines = 1,
@@ -67,6 +67,7 @@ internal fun LyricsSnippet(lyrics: AudioLyrics, positionMs: Long, onOpen: () -> 
 internal fun SynchronizedLyrics(lyrics: AudioLyrics, onDismiss: () -> Unit) {
     val player = LocalAudioPlayback.current
     val state by player.state.collectAsStateWithLifecycle()
+    val position=if(lyrics.cues.isNotEmpty())interpolatedAudioPosition(state)else state.positionMs
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         CompositionLocalProvider(LocalContentColor provides Color.White) {
             Column(Modifier.fillMaxSize().ambientArtwork(state).systemBarsPadding()) {
@@ -74,7 +75,7 @@ internal fun SynchronizedLyrics(lyrics: AudioLyrics, onDismiss: () -> Unit) {
                     IconButton(onDismiss) { Icon(DriveIcons.ArrowBack, "Back to player") }
                     state.file?.let { AudioNowPlayingTitle(it, Modifier.weight(1f)) }
                 }
-                LyricsTimeline(lyrics, state.positionMs, player::seek, Modifier.weight(1f).fillMaxWidth())
+                LyricsTimeline(lyrics, position, player::seek, Modifier.weight(1f).fillMaxWidth())
                 Column(Modifier.padding(horizontal = 24.dp)) {
                     AudioSeekBar(state)
                     AudioTransport(state)
@@ -92,7 +93,7 @@ internal fun LyricsTimeline(lyrics: AudioLyrics, positionMs: Long, onSeek: (Long
     var follow by remember(lyrics) { mutableStateOf(true) }
     val active = lyrics.activeIndex(positionMs)
     LaunchedEffect(dragging) { if (dragging) follow = false }
-    LaunchedEffect(active, follow) {
+    LaunchedEffect(lyrics, active, follow) {
         if (follow && lyrics.cues.isNotEmpty()) list.animateScrollToItem(active.coerceAtLeast(0))
     }
     val cues = remember(lyrics) { lyrics.cues.ifEmpty { lyrics.plainText.lines().filter(String::isNotBlank).map { LyricCue(0, it) } } }
@@ -116,4 +117,20 @@ internal fun LyricsTimeline(lyrics: AudioLyrics, positionMs: Long, onSeek: (Long
                 color = Color.White.copy(alpha = .65f), style = MaterialTheme.typography.labelMedium)
         }
     }
+}
+
+/** Interpolation is local to visible lyrics. Pauses, seeks and new tracks re-anchor immediately. */
+@Composable
+internal fun interpolatedAudioPosition(state:com.infinity.drive.presentation.platform.AudioPlaybackState):Long {
+    val position by produceState(state.positionMs,state.file?.id,state.positionMs,state.playing,state.loading){
+        value=state.positionMs
+        if(state.playing&&!state.loading){
+            val start=androidx.compose.animation.core.withInfiniteAnimationFrameNanos{it}
+            while(true)androidx.compose.animation.core.withInfiniteAnimationFrameNanos{frame->
+                val elapsed=((frame-start)/1_000_000).coerceIn(0,350)
+                value=(state.positionMs+elapsed).coerceAtMost(state.durationMs.takeIf{it>0}?:Long.MAX_VALUE)
+            }
+        }
+    }
+    return position
 }

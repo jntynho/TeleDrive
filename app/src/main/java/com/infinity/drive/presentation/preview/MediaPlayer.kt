@@ -108,6 +108,8 @@ fun MediaPlayer(
         val renderers = DefaultRenderersFactory(context)
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
         holder.value = ExoPlayer.Builder(context, renderers).build().apply {
+            setAudioAttributes(androidx.media3.common.AudioAttributes.Builder().setUsage(androidx.media3.common.C.USAGE_MEDIA).setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE).build(),true)
+            setHandleAudioBecomingNoisy(true)
             trackSelectionParameters = trackSelectionParameters.buildUpon()
                 .setPreferredAudioLanguage(audioLanguage.ifEmpty { null })
                 .setPreferredTextLanguage(subtitleLanguage.ifEmpty { null })
@@ -154,7 +156,9 @@ fun MediaPlayer(
         }
     }
     DisposableEffect(player, isActivePage) {
-        if (!isActivePage) player?.pause()
+        if (!isActivePage) {
+            player?.let { resumePosition=it.currentPosition.coerceAtLeast(0);resumePlaying=it.playWhenReady;it.pause() }
+        } else if(player!=null) player.playWhenReady=resumePlaying
         onDispose { }
     }
 
@@ -293,9 +297,10 @@ fun MediaPlayer(
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurface
                 )
+                if(!decoderFailed)androidx.compose.material3.TextButton(onClick={playbackFailed=false;decoderFailed=false;player?.prepare();player?.play()}){Text("Retry")}
             }
         }
-        Box(
+        if(!decoderFailed&&!playbackFailed)Box(
             modifier = Modifier
                 .matchParentSize()
                 .pointerInput(Unit) {

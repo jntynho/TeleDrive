@@ -69,7 +69,7 @@ class TransferExecutor(
     private val partDownloader: PartDownloader,
     private val apkIconUploader: ApkIconUploader,
     private val backupSessionTracker: BackupSessionTracker
-) {
+) : TransferRunner {
 
     /**
      * Telegram reports transfers through updates, so a connection that dies
@@ -100,20 +100,25 @@ class TransferExecutor(
         data object Completed : Outcome
         data object Paused : Outcome
         data object Canceled : Outcome
-        data class Failed(val message: String, val retryAfterSeconds: Int? = null) : Outcome
+        data class Failed(val message: String, val retryAfterSeconds: Int? = null,val retryable:Boolean=false) : Outcome
     }
 
-    suspend fun execute(transfer: TransferEntity): Outcome = try {
+    override suspend fun execute(transfer: TransferEntity): Outcome = try {
+        checkControl(transfer.id)
         when (transfer.type) {
             TransferType.UPLOAD, TransferType.BACKUP -> executeUpload(transfer)
             TransferType.DOWNLOAD, TransferType.RESTORE -> executeDownload(transfer)
         }
+    } catch (control: TransferControlException) {
+        if(control.paused) Outcome.Paused else Outcome.Canceled
     } catch (_: KeyUnavailableException) {
         Outcome.Failed(messages.keyMissing)
     } catch (_: CancellationException) {
         throw CancellationException("Transfer ${transfer.id} was cancelled")
+    } catch (error: TelegramException) {
+        Outcome.Failed(error.message, if(error.isRateLimit) error.retryAfterSeconds ?: 5 else null,retryable=error.code>=500||error.code==408)
     } catch (error: Throwable) {
-        Outcome.Failed(error.message ?: messages.uploadEnded)
+        Outcome.Failed(error.message ?: messages.uploadEnded,retryable=error is java.io.IOException)
     }
 
     private suspend fun recordProgress(
@@ -129,16 +134,69 @@ class TransferExecutor(
     private suspend fun executeUpload(transfer: TransferEntity): Outcome {
         val fileId = transfer.fileId
             ?: return Outcome.Failed(messages.noFileReference)
-        val entity = fileDao.byId(fileId)
+        var entity = fileDao.byId(fileId)
             ?: return Outcome.Failed(messages.fileRecordMissing)
+        val currentPrefs=settingsRepository.preferences.first()
+        if(!currentPrefs.onboardingComplete||(currentPrefs.storageChatId!=null&&entity.chatId!=null&&entity.chatId!=currentPrefs.storageChatId))return Outcome.Paused
+        if(entity.localPath==null&&entity.importReference!=null){
+            transferDao.setStage(transfer.id,TransferStage.PREPARING,System.currentTimeMillis())
+            var lastControlCheck=0L
+            val prepared=fileImporter.prepare(entity.importReference!!){
+                currentCoroutineContext().ensureActive()
+                val now=System.currentTimeMillis()
+                if(now-lastControlCheck>=250){checkControl(transfer.id);lastControlCheck=now}
+            }
+                ?:return Outcome.Failed("The original is no longer accessible. Select this file again.")
+            fileDao.setLocalPath(entity.id,prepared.path)
+            entity=entity.copy(localPath=prepared.path,sizeBytes=prepared.sizeBytes)
+            fileDao.upsert(entity)
+            fileImporter.registered(prepared.path)
+            transferDao.updateSize(transfer.id,prepared.sizeBytes)
+            transferDao.setStage(transfer.id,null,System.currentTimeMillis())
+            if(prepared.sizeBytes<=0)return Outcome.Failed("Telegram cannot store an empty file")
+        }
+        if(entity.trashedAt!=null)return Outcome.Canceled
+        if(transfer.remoteFileId!=null&&entity.messageId!=null){
+            transferDao.setCompleted(transfer.id,System.currentTimeMillis());return Outcome.Completed
+        }
+        if(transfer.remoteFileId!=null&&entity.localPath==null&&entity.messageId==null) {
+            val prefs=settingsRepository.preferences.first()
+            if(prefs.encryptFiles)return Outcome.Failed("Turn off file encryption to copy directly from Telegram, or upload the original file instead.")
+            val target=entity.chatId?:prefs.storageChatId?:telegramClient.ensureStorageChat(null)
+            val manifest=RemoteFileManifest(fileId=entity.id,name=entity.name,folderPath=folderPathResolver.pathOf(entity.folderId),folderId=entity.folderId,
+                mimeType=entity.mimeType,sizeBytes=entity.sizeBytes,contentHash=null,hidden=false,archived=false,encrypted=false,createdAt=entity.createdAt,modifiedAt=entity.modifiedAt)
+            val caption=manifestCodec.encode(manifest,false)
+            val recovered=if(transfer.messageId!=null){
+                val landed=telegramClient.fetchDocuments(target,0,100).documents.firstOrNull { manifestCodec.decode(it.caption)?.fileId==entity.id }
+                if(landed!=null)kotlinx.coroutines.flow.flowOf(TelegramUploadEvent.Completed(landed))
+                else telegramClient.recoverUpload(target,transfer.messageId)
+            }else null
+            var copied:com.infinity.drive.core.telegram.RemoteDocument?=null
+            val copyEvents=recovered ?: if(entity.sourceChatId!=null&&entity.sourceMessageId!=null)
+                telegramClient.copyMessageEvents(target,entity.sourceChatId,entity.sourceMessageId,caption)
+            else kotlinx.coroutines.flow.flowOf(TelegramUploadEvent.Completed(telegramClient.copyDocument(target,transfer.remoteFileId,entity.name,entity.mimeType,caption)))
+            copyEvents.failWhenIdle(messages.uploadStalled).collect { event ->
+                when(event){
+                    is TelegramUploadEvent.Started->{transferDao.recordPending(transfer.id,target,event.temporaryMessageId);checkControl(transfer.id)}
+                    is TelegramUploadEvent.Progress->checkControl(transfer.id)
+                    is TelegramUploadEvent.Completed->copied=event.document
+                }
+            }
+            val document=copied?:return Outcome.Failed(messages.uploadEnded)
+            // Delivery is complete: index it before responding to a concurrent pause/cancel.
+            fileDao.setRemoteMapping(id=entity.id,chatId=document.chatId,messageId=document.messageId,remoteFileId=document.remoteFileId,remoteUniqueId=document.uniqueFileId,state=BackupState.BACKED_UP,iconFileId=null)
+            checkControl(transfer.id)
+            transferDao.setCompleted(transfer.id,System.currentTimeMillis())
+            return Outcome.Completed
+        }
         val localPath = entity.localPath
             ?: return Outcome.Failed(messages.noLocalCopy)
         val sourceFile = File(localPath)
         if (!sourceFile.exists()) return Outcome.Failed(messages.localFileGone)
 
         val prefs = settingsRepository.preferences.first()
-        val chatId = transfer.chatId
-            ?: telegramClient.ensureStorageChat(prefs.storageChatId).also { resolved ->
+        val chatId = transfer.chatId ?: prefs.storageChatId
+            ?: telegramClient.ensureStorageChat(null).also { resolved ->
                 if (resolved != prefs.storageChatId) {
                     settingsRepository.update { it.copy(storageChatId = resolved) }
                 }
@@ -147,20 +205,14 @@ class TransferExecutor(
         val encrypt = prefs.encryptFiles && prefs.keyBackupCreated
         val uploadSize = sourceFile.length()
         val sizeChanged = entity.sizeBytes != uploadSize
-        val contentHash = if (sizeChanged) {
-            Hashing.sha256(sourceFile)
-        } else {
-            entity.contentHash ?: Hashing.sha256(sourceFile)
-        }
-        if (sizeChanged || (contentHash != null && contentHash != entity.contentHash)) {
-            fileDao.upsert(entity.copy(sizeBytes = uploadSize, contentHash = contentHash))
-        }
+        val contentHash = entity.contentHash.takeUnless { sizeChanged }
+        if(sizeChanged) fileDao.upsert(entity.copy(sizeBytes=uploadSize,contentHash=null))
         val supersededMessageId = entity.messageId
             ?.takeIf { entity.chatId == chatId && filePartDao.countOf(entity.id) == 0 }
 
-        val rawIconPath = thumbnailStore.uploadThumbnailFile(entity.id)?.absolutePath
+        val rawIconPath = if(encrypt||entity.category==com.infinity.drive.domain.model.FileCategory.IMAGE)null else thumbnailStore.uploadThumbnailFile(entity.id)?.absolutePath
         val iconFileId = apkIconUploader.uploadIconIfApk(entity, chatId, encrypt)
-        val previewPath = if (encrypt) null else rawIconPath
+        val previewPath = if (encrypt || entity.category == com.infinity.drive.domain.model.FileCategory.IMAGE) null else rawIconPath
 
         val manifest = RemoteFileManifest(
             fileId = entity.id,
@@ -198,8 +250,15 @@ class TransferExecutor(
             )
         }
 
+        val recovered:Flow<TelegramUploadEvent>? = if(transfer.messageId!=null||transfer.retryCount>0) {
+            val landed=telegramClient.fetchDocuments(chatId,0,100).documents.firstOrNull { document ->
+                manifestCodec.decode(document.caption)?.let{it.fileId==entity.id&&it.modifiedAt==entity.modifiedAt&&it.sizeBytes==uploadSize&&it.partCount<=1}==true
+            }
+            if(landed!=null)kotlinx.coroutines.flow.flowOf(TelegramUploadEvent.Completed(landed))
+            else transfer.messageId?.let{telegramClient.recoverUpload(chatId,it)}
+        }else null
         var stagingFile: File? = null
-        val (uploadPath, uploadName) = if (encrypt) {
+        val (uploadPath, uploadName) = if (encrypt&&recovered==null) {
             val staging = File(stagingDir(), "${entity.id}.tde")
             val key = wrappedKeyRepository.getOrCreate(CryptoKeys.CONTENT)
             sourceFile.inputStream().use { input ->
@@ -219,17 +278,17 @@ class TransferExecutor(
         return try {
             var outcome: Outcome =
                 Outcome.Failed(messages.uploadEnded)
-            telegramClient.uploadDocument(
+            (recovered ?: telegramClient.uploadDocument(
                 chatId = chatId,
                 localPath = uploadPath,
                 fileName = uploadName,
                 mimeType = if (encrypt) "application/octet-stream" else entity.mimeType,
                 caption = caption,
                 thumbnailPath = previewPath
-            ).failWhenIdle(messages.uploadStalled).collect { event ->
+            )).failWhenIdle(messages.uploadStalled).collect { event ->
                 currentCoroutineContext().ensureActive()
                 when (event) {
-                    is TelegramUploadEvent.Started -> Unit
+                    is TelegramUploadEvent.Started -> {transferDao.recordPending(transfer.id,chatId,event.temporaryMessageId);checkControl(transfer.id)}
                     is TelegramUploadEvent.Progress -> {
                         val now = System.currentTimeMillis()
                         ticker.tick(event.transferredBytes, now)?.let { speed ->
@@ -284,7 +343,7 @@ class TransferExecutor(
             if (e.paused) Outcome.Paused else Outcome.Canceled
         } catch (e: TelegramException) {
             fileDao.setBackupStateIfLocalOnly(entity.id, BackupState.FAILED)
-            Outcome.Failed(e.message, e.retryAfterSeconds)
+            Outcome.Failed(e.message, if(e.isRateLimit) e.retryAfterSeconds ?: 5 else null,retryable=e.code>=500||e.code==408)
         } finally {
             stagingFile?.delete()
         }
@@ -403,7 +462,7 @@ class TransferExecutor(
             if (e.paused) Outcome.Paused else Outcome.Canceled
         } catch (e: TelegramException) {
             fileDao.setBackupStateIfLocalOnly(entity.id, BackupState.FAILED)
-            Outcome.Failed(e.message, e.retryAfterSeconds)
+            Outcome.Failed(e.message, if(e.isRateLimit) e.retryAfterSeconds ?: 5 else null,retryable=e.code>=500||e.code==408)
         }
     }
 
@@ -413,6 +472,10 @@ class TransferExecutor(
         val entity = fileDao.byId(fileId)
             ?: return Outcome.Failed(messages.fileRecordMissing)
 
+        if(transfer.type==TransferType.RESTORE){
+            val original=entity.localPath?.let(::File)?.takeIf{it.isFile}
+            if(original!=null)return finalizeDownload(transfer,entity.id,original.absolutePath,alreadyPlain=true)
+        }
         if (filePartDao.countOf(entity.id) > 1) return downloadInParts(transfer, entity)
 
         val remoteFileId = entity.remoteFileId
@@ -446,7 +509,7 @@ class TransferExecutor(
         } catch (e: TransferControlException) {
             if (e.paused) Outcome.Paused else Outcome.Canceled
         } catch (e: TelegramException) {
-            Outcome.Failed(e.message, e.retryAfterSeconds)
+            Outcome.Failed(e.message, if(e.isRateLimit) e.retryAfterSeconds ?: 5 else null,retryable=e.code>=500||e.code==408)
         }
     }
 
@@ -499,7 +562,7 @@ class TransferExecutor(
             if (!e.paused) partDownloader.discardAssembly(entity.id)
             if (e.paused) Outcome.Paused else Outcome.Canceled
         } catch (e: TelegramException) {
-            Outcome.Failed(e.message, e.retryAfterSeconds)
+            Outcome.Failed(e.message, if(e.isRateLimit) e.retryAfterSeconds ?: 5 else null,retryable=e.code>=500||e.code==408)
         }
     }
 
@@ -522,7 +585,7 @@ class TransferExecutor(
         }
 
         val folderPath = folderPathResolver.pathOf(entity.folderId)
-        val savedPath = downloadWriter.write(
+        val savedPath = (if(entity.offlinePinned&&transfer.type!=TransferType.RESTORE) offlineWriter(entity.id) else downloadWriter).write(
             fileName = entity.name,
             mimeType = entity.mimeType,
             folderPath = folderPath
@@ -542,15 +605,17 @@ class TransferExecutor(
             }
         )
 
-        fileDao.setLocalPath(fileId, savedPath)
+        if(!(transfer.type==TransferType.RESTORE&&entity.offlinePinned&&entity.localPath!=null))fileDao.setLocalPath(fileId, savedPath)
         transferDao.setCompleted(transfer.id, System.currentTimeMillis())
         return Outcome.Completed
     }
 
     private suspend fun dropStagedSource(fileId: String, localPath: String) {
         if (!fileImporter.isStaged(localPath)) return
-        File(localPath).delete()
-        fileDao.setLocalPath(fileId, null)
+        val latest=fileDao.byId(fileId)?:return
+        if(latest.offlinePinned)return
+        // A pin or another operation can have replaced the registered local path during upload.
+        if(latest.localPath==localPath){File(localPath).delete();fileDao.clearLocalPathIfMatches(fileId,localPath)}
     }
 
     private suspend fun checkControl(transferId: String) {
@@ -558,6 +623,16 @@ class TransferExecutor(
             TransferState.PAUSED -> throw TransferControlException(paused = true)
             TransferState.CANCELLED -> throw TransferControlException(paused = false)
             else -> Unit
+        }
+    }
+
+    private fun offlineWriter(id:String)=object:DownloadWriter {
+        override fun write(fileName:String,mimeType:String,folderPath:String?,body:(java.io.OutputStream)->Unit):String? {
+            val directory=File(storagePaths.filesDir,"offline/$id").apply{mkdirs()}
+            val target=File(directory,com.infinity.drive.core.files.FileNameUtils.sanitize(fileName))
+            val temporary=File(directory,".download")
+            return try { temporary.outputStream().buffered().use(body);check(temporary.renameTo(target));target.absolutePath }
+            catch(e:Exception){temporary.delete();throw e}
         }
     }
 
@@ -570,4 +645,8 @@ class TransferExecutor(
         private const val STALL_TIMEOUT_MS = 180_000L
         private const val STALL_CODE = 408
     }
+}
+
+fun interface TransferRunner {
+    suspend fun execute(transfer:TransferEntity):TransferExecutor.Outcome
 }

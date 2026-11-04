@@ -10,3 +10,7 @@ dist/
 *.hprof
 .idea/
 .DS_Store
+
+# Generated Python bytecode
+__pycache__/
+*.py[cod]

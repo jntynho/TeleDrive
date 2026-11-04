@@ -22,6 +22,7 @@ import com.infinity.drive.domain.model.TransferType
 import com.infinity.drive.domain.repository.SettingsRepository
 import com.infinity.drive.domain.repository.TransferRepository
 import com.infinity.drive.domain.usecase.ValidateUploadUseCase
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -64,6 +65,9 @@ class TransferRepositoryImpl(
     override suspend fun enqueueUpload(fileId: String, priority: Int): AppResult<String> =
         enqueue(fileId, TransferType.UPLOAD, priority)
 
+    override suspend fun enqueueUploads(fileIds: List<String>): AppResult<Int> =
+        AppResult.Success(enqueueBatch(fileIds, TransferType.UPLOAD, sessionId = null))
+
     /**
      * A file can be left marked queued with no transfer behind it when the
      * process dies between the two writes, or when its staged copy is deleted
@@ -79,7 +83,7 @@ class TransferRepositoryImpl(
         if (orphaned.isNotEmpty()) {
             val phantoms = mutableListOf<String>()
             fileDao.byIds(orphaned).forEach { entity ->
-                val exists = entity.localPath?.let { File(it).exists() } == true
+                val exists = entity.importReference!=null || entity.localPath?.let { File(it).exists() } == true || entity.sourceMessageId!=null
                 when {
                     exists -> requeue.add(entity.id)
                     entity.remoteFileId == null -> phantoms.add(entity.id)
@@ -99,28 +103,17 @@ class TransferRepositoryImpl(
         )
     }
 
-    override suspend fun enqueueDownload(fileId: String, priority: Int): AppResult<String> {
-        val entity = fileDao.byId(fileId) ?: return AppResult.Failure(AppError.NotFound)
-        transferDao.unfinishedIdsForFiles(listOf(fileId)).firstOrNull()
-            ?.let { return AppResult.Success(it) }
-
-        if (entity.remoteFileId == null) {
-            return AppResult.Failure(AppError.NoRemoteCopy)
-        }
-        val available = storageInspector.availableBytes()
-        if (available < entity.sizeBytes + STORAGE_MARGIN) {
-            return AppResult.Failure(
-                AppError.InsufficientStorage(entity.sizeBytes + STORAGE_MARGIN, available)
-            )
-        }
-        return insertTransfer(
-            entity.id,
-            entity.name,
-            entity.sizeBytes,
-            TransferType.DOWNLOAD,
-            priority,
-            null
-        )
+    private val outgoingLock=kotlinx.coroutines.sync.Mutex()
+    private val incomingLock=kotlinx.coroutines.sync.Mutex()
+    override suspend fun enqueueDownload(fileId:String,priority:Int):AppResult<String> = enqueueIncoming(fileId,TransferType.DOWNLOAD,priority)
+    override suspend fun enqueueSaveToPhone(fileId:String):AppResult<String> = enqueueIncoming(fileId,TransferType.RESTORE,0)
+    private suspend fun enqueueIncoming(fileId:String,type:TransferType,priority:Int):AppResult<String> = incomingLock.withLock {
+        val entity=fileDao.byId(fileId)?:return@withLock AppResult.Failure(AppError.NotFound)
+        transferDao.unfinishedOfType(fileId,type)?.let{return@withLock AppResult.Success(it)}
+        if(entity.remoteFileId==null&&!(type==TransferType.RESTORE&&entity.localPath!=null))return@withLock AppResult.Failure(AppError.NoRemoteCopy)
+        val available=storageInspector.availableBytes()
+        if(available<entity.sizeBytes+STORAGE_MARGIN)return@withLock AppResult.Failure(AppError.InsufficientStorage(entity.sizeBytes+STORAGE_MARGIN,available))
+        insertTransfer(entity.id,entity.name,entity.sizeBytes,type,priority,null)
     }
 
     suspend fun enqueueBackup(
@@ -140,7 +133,7 @@ class TransferRepositoryImpl(
         fileIds: List<String>,
         type: TransferType,
         sessionId: String?
-    ): Int {
+    ): Int = outgoingLock.withLock {
         if (fileIds.isEmpty()) return 0
 
         val limits = currentLimits()
@@ -155,21 +148,22 @@ class TransferRepositoryImpl(
             for (fileId in chunk) {
                 if (fileId in alreadyQueued) continue
                 val entity = fileDao.byId(fileId) ?: continue
-                if (entity.localPath == null) continue
+                if (entity.localPath == null && entity.remoteFileId == null && entity.importReference == null) continue
                 val scratch = if (prefs.encryptFiles) {
                     minOf(entity.sizeBytes, FileParts.PART_SIZE)
                 } else {
                     0
                 }
                 val rejected = validateUpload(
-                    fileSizeBytes = entity.sizeBytes,
+                    fileSizeBytes = if(entity.importReference!=null)entity.sizeBytes.coerceAtLeast(1)else entity.sizeBytes,
                     limits = limits,
                     availableLocalBytes = availableBytes,
                     requiredScratchBytes = scratch,
                     splitsIfTooLarge = true
                 )
                 if (rejected != null) continue
-                fileDao.setBackupStateIfLocalOnly(entity.id, BackupState.QUEUED)
+                fileDao.setUploadRequested(listOf(entity.id),true)
+        fileDao.setBackupStateIfLocalOnly(entity.id, BackupState.QUEUED)
                 transfers += TransferEntity(
                     id = UUID.randomUUID().toString(),
                     type = type,
@@ -178,7 +172,7 @@ class TransferRepositoryImpl(
                     localPath = null,
                     chatId = null,
                     messageId = null,
-                    remoteFileId = null,
+                    remoteFileId = entity.remoteFileId.takeIf { entity.messageId == null && entity.localPath == null },
                     sizeBytes = entity.sizeBytes,
                     state = TransferState.QUEUED,
                     priority = 0,
@@ -201,7 +195,7 @@ class TransferRepositoryImpl(
         type: TransferType,
         priority: Int,
         sessionId: String? = null
-    ): AppResult<String> {
+    ): AppResult<String> = outgoingLock.withLock {
         val entity = fileDao.byId(fileId) ?: return AppResult.Failure(AppError.NotFound)
         if (entity.localPath == null) {
             return AppResult.Failure(AppError.NoLocalCopy)
@@ -218,13 +212,14 @@ class TransferRepositoryImpl(
             0
         }
         validateUpload(
-            fileSizeBytes = entity.sizeBytes,
+            fileSizeBytes = if(entity.importReference!=null)entity.sizeBytes.coerceAtLeast(1)else entity.sizeBytes,
             limits = limits,
             availableLocalBytes = storageInspector.availableBytes(),
             requiredScratchBytes = scratch,
             splitsIfTooLarge = true
         )?.let { return AppResult.Failure(it) }
 
+        fileDao.setUploadRequested(listOf(entity.id),true)
         fileDao.setBackupStateIfLocalOnly(entity.id, BackupState.QUEUED)
         return insertTransfer(entity.id, entity.name, entity.sizeBytes, type, priority, sessionId)
     }
@@ -270,7 +265,8 @@ class TransferRepositoryImpl(
     override suspend fun resume(id: String) {
         val transfer = transferDao.byId(id) ?: return
         if (transfer.state == TransferState.PAUSED || transfer.state == TransferState.FAILED) {
-            transferDao.setState(id, TransferState.QUEUED, System.currentTimeMillis())
+            if(!transfer.type.isIncoming)transfer.fileId?.let{fileDao.setUploadRequested(listOf(it),true)}
+            transferDao.resetForRetry(id,System.currentTimeMillis())
             backupSessionTracker.refresh(transfer.backupSessionId)
             kickWorker()
         }
@@ -278,6 +274,7 @@ class TransferRepositoryImpl(
 
     override suspend fun cancel(id: String) {
         val transfer = transferDao.byId(id) ?: return
+        fileDao.suppressUploadsForTransfers(listOf(id))
         if (transfer.state.isTerminal) {
             transferDao.deleteByIds(listOf(id))
         } else {
@@ -307,6 +304,7 @@ class TransferRepositoryImpl(
     }
 
     override suspend fun cancelAll() {
+        fileDao.suppressPendingUploads()
         transferDao.cancelAll(System.currentTimeMillis())
         syncFileStates()
         backupSessionTracker.refreshActive()
@@ -315,11 +313,13 @@ class TransferRepositoryImpl(
     override suspend fun retry(id: String) {
         val transfer = transferDao.byId(id) ?: return
         if (transfer.state == TransferState.FAILED || transfer.state == TransferState.CANCELLED) {
+            if(!transfer.type.isIncoming)transfer.fileId?.let{fileDao.setUploadRequested(listOf(it),true)}
             transferDao.upsert(
                 transfer.copy(
                     state = TransferState.QUEUED,
                     transferredBytes = 0,
                     errorMessage = null,
+                    retryCount = 0, nextAttemptAt = 0,
                     updatedAt = System.currentTimeMillis()
                 )
             )
@@ -333,7 +333,7 @@ class TransferRepositoryImpl(
     }
 
     override suspend fun recoverOrphanedTransfers() {
-        transferDao.requeueRunning(System.currentTimeMillis())
+        com.infinity.drive.core.transfer.TransferActivityRegistry.recover(transferDao,System.currentTimeMillis())
         syncFileStates()
         kickWorker()
     }

@@ -146,5 +146,6 @@
   "Warning": "danger-triangle-linear",
   "ZoomOutMap": "full-screen-linear",
   "SkipPrevious": "skip-previous-linear",
-  "SkipNext": "skip-next-linear"
+  "SkipNext": "skip-next-linear",
+  "PhotoCamera": "camera-linear"
 }

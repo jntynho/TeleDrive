@@ -25,13 +25,13 @@ class WorkTransferScheduler(
         val pending = workManager.getWorkInfosForUniqueWork(TransferQueueWorker.UNIQUE_NAME)
         pending.addListener(
             {
-                val running = runCatching { pending.get() }
-                    .getOrNull()
-                    .orEmpty()
-                    .any { it.state == WorkInfo.State.RUNNING }
+                val infos=runCatching { pending.get() }.getOrNull().orEmpty()
+                val running=infos.any { it.state==WorkInfo.State.RUNNING }
+                // One queued successor closes the enqueue-vs-worker-exit race, without appending one worker per file.
+                if(running&&infos.any{it.state==WorkInfo.State.ENQUEUED||it.state==WorkInfo.State.BLOCKED})return@addListener
                 enqueue(
                     allowMetered = allowMetered,
-                    policy = if (running) ExistingWorkPolicy.KEEP else ExistingWorkPolicy.REPLACE,
+                    policy = if (running) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.REPLACE,
                     expedited = true
                 )
             },

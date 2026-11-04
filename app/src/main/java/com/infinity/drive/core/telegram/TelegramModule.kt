@@ -14,5 +14,9 @@ val telegramModule = module {
         }
     }
     single<TelegramClient> { TdLibTelegramClient(androidContext(),get(),get(),get()) }
-    single { TelegramPacer() }
+    single {
+        val store = androidContext().getSharedPreferences("telegram-transfer-policy", android.content.Context.MODE_PRIVATE)
+        TelegramPacer(initialDeadline = store.getLong("flood-until", 0L),
+            persistDeadline = { store.edit().putLong("flood-until", it).commit() })
+    }
 }

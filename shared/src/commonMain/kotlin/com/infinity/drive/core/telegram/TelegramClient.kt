@@ -116,6 +116,9 @@ interface TelegramClient {
      * the upload; cancelling the collection aborts it and deletes the pending
      * message.
      */
+    /** Observes an interrupted TDLib send without creating a second message. Null only when it is gone. */
+    suspend fun recoverUpload(chatId:Long,temporaryMessageId:Long):Flow<TelegramUploadEvent>? = null
+
     fun uploadDocument(
         chatId: Long,
         localPath: String,
@@ -169,6 +172,12 @@ interface TelegramClient {
     suspend fun fetchDocuments(chatId: Long, fromMessageId: Long, limit: Int): RemoteDocumentPage
 
     suspend fun getDocument(chatId: Long, messageId: Long): RemoteDocument?
+
+    suspend fun listChats(query:String=""):List<TelegramChat> = emptyList()
+    fun copyMessageEvents(chatId:Long,fromChatId:Long,messageId:Long,caption:String):Flow<TelegramUploadEvent> = kotlinx.coroutines.flow.flow { emit(TelegramUploadEvent.Completed(copyMessage(chatId,fromChatId,messageId,caption))) }
+    suspend fun copyMessage(chatId:Long,fromChatId:Long,messageId:Long,caption:String):RemoteDocument = error("Copying chat messages is unavailable")
+    suspend fun sendToChat(chatId:Long,fromChatId:Long,messageIds:List<Long>) { error("Sending to chats is unavailable") }
+    suspend fun messageLink(chatId:Long,messageId:Long):String = error("Message link unavailable")
 
     suspend fun editCaption(chatId: Long, messageId: Long, caption: String)
 

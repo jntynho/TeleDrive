@@ -103,17 +103,7 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     CollectSnackbarMessages(viewModel.messages, snackbarHostState)
     CollectSnackbarMessages(uploads.messages, snackbarHostState)
-    if(showUploadSheet)com.infinity.drive.presentation.components.DriveBottomSheet(onDismissRequest={showUploadSheet=false},sheetState=uploadSheetState){
-        Column(Modifier.fillMaxWidth().padding(horizontal=16.dp).padding(bottom=24.dp)){
-            Text("Upload",style=MaterialTheme.typography.titleLarge,modifier=Modifier.padding(8.dp))
-            androidx.compose.material3.ListItem(colors=androidx.compose.material3.ListItemDefaults.colors(containerColor=androidx.compose.ui.graphics.Color.Transparent),headlineContent={Text("Upload files")},leadingContent={Icon(DriveIcons.Description,null)},modifier=Modifier.clickable{
-                sheetScope.launch{uploadSheetState.hide();showUploadSheet=false;uploadPicker.pick{references->if(references.isNotEmpty())uploads.importAndUpload(references)}}
-            })
-            androidx.compose.material3.ListItem(colors=androidx.compose.material3.ListItemDefaults.colors(containerColor=androidx.compose.ui.graphics.Color.Transparent),headlineContent={Text("Upload folder")},leadingContent={Icon(DriveIcons.Folder,null)},modifier=Modifier.clickable{
-                sheetScope.launch{uploadSheetState.hide();showUploadSheet=false;folderPicker.pick{result->if(result is com.infinity.drive.presentation.platform.PickResult.Picked)uploads.importAndUpload(listOf(result.path))}}
-            })
-        }
-    }
+    com.infinity.drive.presentation.upload.AddFilesSheet(showUploadSheet,onDismiss={showUploadSheet=false})
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),

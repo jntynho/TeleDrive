@@ -149,3 +149,16 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         )
     }
 }
+
+/** Retry deadlines survive process death; a server wait is never a failed upload. */
+val MIGRATION_11_12 = object : Migration(11, 12) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE files ADD COLUMN uploadRequested INTEGER NOT NULL DEFAULT 1")
+        connection.execSQL("ALTER TABLE files ADD COLUMN importReference TEXT")
+        connection.execSQL("ALTER TABLE files ADD COLUMN sourceChatId INTEGER")
+        connection.execSQL("ALTER TABLE files ADD COLUMN sourceMessageId INTEGER")
+        connection.execSQL("ALTER TABLE files ADD COLUMN offlinePinned INTEGER NOT NULL DEFAULT 0")
+        connection.execSQL("ALTER TABLE transfers ADD COLUMN nextAttemptAt INTEGER NOT NULL DEFAULT 0")
+        connection.execSQL("ALTER TABLE transfers ADD COLUMN retryCount INTEGER NOT NULL DEFAULT 0")
+    }
+}

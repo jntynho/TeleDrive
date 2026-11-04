@@ -25,7 +25,7 @@ def main(paths):
             seen.add(abi)
             if f"lib/{abi}/libtdjni.so" not in names:
                 raise SystemExit(f"Telegram native library is missing: {path.name}")
-            forbidden = [name for name in names if "mlkit" in name.lower() or "ocr-models" in name.lower() or name.endswith("libsqliteJni.so")]
+            forbidden = [name for name in names if ("mlkit" in name.lower() and name != "play-services-mlkit-document-scanner.properties") or "ocr-models" in name.lower() or name.endswith("libsqliteJni.so")]
             if forbidden:
                 raise SystemExit(f"Retired bundled libraries reappeared: {forbidden}")
             if any(entry.compress_type != zipfile.ZIP_DEFLATED for entry in native):
