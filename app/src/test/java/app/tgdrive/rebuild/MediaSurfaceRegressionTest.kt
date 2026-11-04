@@ -16,6 +16,8 @@ import com.infinity.drive.core.telegram.TelegramChat
 import com.infinity.drive.domain.model.*
 import com.infinity.drive.domain.repository.FileRepository
 import com.infinity.drive.presentation.audio.FullscreenAudioPlayer
+import com.infinity.drive.presentation.audio.AudioLibraryRow
+import com.infinity.drive.presentation.audio.LibraryAudioMiniPlayer
 import com.infinity.drive.presentation.platform.*
 import com.infinity.drive.presentation.theme.DriveInfinityTheme
 import com.infinity.drive.presentation.upload.TelegramChatAvatar
@@ -110,6 +112,25 @@ class MediaSurfaceRegressionTest {
         val controls=compose.onNodeWithTag("audio-controls").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         assertTrue(lyrics.bottom<=controls.top)
         compose.onNodeWithContentDescription("Next audio").assertIsDisplayed()
+    }
+    @Test fun audioRowShowsArtistOrFormatAlongsideTheActualLibraryDate(){
+        val row=file("voice").copy(addedAt=1_700_000_000_000)
+        activity.get().setContent{DriveInfinityTheme{CompositionLocalProvider(LocalAudioPlayback provides player){
+            AudioLibraryRow(row,currentMetadata=AudioMetadata(artist=" "))
+        }}}
+        compose.onNodeWithText("MP3").assertIsDisplayed()
+        compose.onNodeWithText(java.text.SimpleDateFormat("MMM d",java.util.Locale.getDefault()).format(java.util.Date(row.addedAt))).assertIsDisplayed()
+        activity.get().setContent{DriveInfinityTheme{CompositionLocalProvider(LocalAudioPlayback provides player){
+            AudioLibraryRow(row,currentMetadata=AudioMetadata(artist="M83"))
+        }}}
+        compose.onNodeWithText("M83").assertIsDisplayed()
+        compose.onNodeWithText("Unknown artist").assertDoesNotExist()
+    }
+    @Test fun miniPlayerDismissStopsPlaybackAndRemovesTheCard(){
+        activity.get().setContent{DriveInfinityTheme{CompositionLocalProvider(LocalAudioPlayback provides player){LibraryAudioMiniPlayer()}}}
+        compose.onNodeWithContentDescription("Dismiss audio player").assertIsDisplayed().performClick()
+        compose.waitUntil(3000){compose.onAllNodesWithTag("audio-mini-player").fetchSemanticsNodes().isEmpty()}
+        assertNull(playback.value.file)
     }
     @Test fun pendingAvatarIsCancelledWhenTheChatChangesAndNeverReusesAnotherIdentity(){
         var chat by mutableStateOf(TelegramChat(1,"Alice North",7))

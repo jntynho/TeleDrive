@@ -30,13 +30,13 @@ enum class CollectionType(
     ARCHIVED(
         titleRes = Res.string.collection_archived_title,
         subtitleRes = Res.string.collection_archived_subtitle,
-        icon = DriveIcons.Archive,
+        icon = app.tgdrive.ui.LibraryIcons.Archive,
         emptyMessageRes = Res.string.collection_archived_empty
     ),
     HIDDEN(
         titleRes = Res.string.collection_hidden_title,
         subtitleRes = Res.string.collection_hidden_subtitle,
-        icon = DriveIcons.VisibilityOff,
+        icon = app.tgdrive.ui.LibraryIcons.Hidden,
         emptyMessageRes = Res.string.collection_hidden_empty
     )
 }

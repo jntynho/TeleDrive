@@ -20,7 +20,7 @@ class TakeoutImporter(private val importer:FileImporter,private val paths:AppSto
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
     private var job:Job?=null
     fun cancel(){job?.cancel()}
-    fun start(references:List<String>){
+    fun start(references:List<String>,parentFolder:String?=null){
         if(job?.isActive==true||references.isEmpty())return
         mutable.value=State(running=true)
         job=scope.launch {
@@ -76,7 +76,7 @@ class TakeoutImporter(private val importer:FileImporter,private val paths:AppSto
                                 if(settings.preferences.first().let{it.storageChatId to it.onboardingComplete}!=context)throw CancellationException("Drive changed")
                                 val parent=entry.name.substringBeforeLast('/',"")
                                 val relative=albumNames[parent]?:parent.substringAfter("Google Photos/",parent.substringAfterLast('/'))
-                                val destination=files.resolveImportFolder("Google Photos/${FileNameUtils.relativeFolderPath(relative).orEmpty()}",null)
+                                val destination=files.resolveImportFolder("Google Photos/${FileNameUtils.relativeFolderPath(relative).orEmpty()}",parentFolder)
                                 val existing=files.findDuplicate(target.absolutePath,hash)
                                 if(existing!=null){
                                     if(existing.folderId!=destination&&files.findNameClash(name,destination)?.contentHash!=existing.contentHash){

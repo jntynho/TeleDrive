@@ -1045,6 +1045,7 @@ private fun CountryPickerSheet(
     }
 
     com.infinity.drive.presentation.components.DriveBottomSheet(onDismissRequest = onDismiss) {
+        val closeThen=com.infinity.drive.presentation.components.LocalSheetCloseThen.current
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
             Text(
                 text = stringResource(Res.string.onboarding_choose_country),
@@ -1071,7 +1072,7 @@ private fun CountryPickerSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(MaterialTheme.shapes.large)
-                            .clickable { onSelect(country) }
+                            .clickable { closeThen{onSelect(country)} }
                             .padding(horizontal = 8.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {

@@ -47,6 +47,7 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit) {
     val live by repository.observeFile(file.id).collectAsStateWithLifecycle(file)
     val current=live?:file
     var page by remember{mutableStateOf("actions")}
+    var closeSheet by remember{mutableStateOf(onDismiss)}
     var working by remember{mutableStateOf(false)}
     var message by remember{mutableStateOf<String?>(null)}
     var failure by remember{mutableStateOf(false)}
@@ -55,7 +56,7 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit) {
         if(working)return
         working=true;message=null;failure=false
         scope.launch {
-            try{action();if(close)onDismiss()}
+            try{action();if(close)closeSheet()}
             catch(cancel:CancellationException){throw cancel}
             catch(error:Exception){failure=true;message=error.message?:"Couldn't complete this action. Try again.";page="actions"}
             finally{working=false}
@@ -70,19 +71,6 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit) {
             repository.observeFile(latest.id).filterNotNull().first{it.localPath!=null||it.isTrashed}.localPath
         }?:error("The download is still waiting or unavailable. Check Activity, then try Share again.")
     }
-    if(page=="details"){FileInfoSheet(current,onDismiss);return}
-    if(page=="send"){
-        TelegramChatPicker("Send in Telegram",onDismiss={if(!working)page="actions"}){chat->
-            page="actions"
-            run {
-                check(!current.isEncrypted){"Download and use Share for encrypted files."}
-                val chatId=current.chatId?:error("Upload this file to Telegram first")
-                val chunkIds=parts.partsOf(current.id).sortedBy{it.partIndex}.mapNotNull{it.messageId}
-                val ids=chunkIds.ifEmpty{listOf(current.messageId?:error("Upload this file first"))}
-                telegram.sendToChat(chat.id,chatId,ids)
-            }
-        };return
-    }
     var folder by remember{mutableStateOf<String?>(null)}
     var folders by remember{mutableStateOf<List<DriveFolder>?>(null)}
     var folderError by remember{mutableStateOf<String?>(null)}
@@ -94,10 +82,28 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit) {
         catch(cancel:CancellationException){throw cancel}
         catch(_:Exception){folderError="Couldn't load folders."}
     }
-    DriveBottomSheet(onDismissRequest=onDismiss) {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom=16.dp)) {
-            Row(Modifier.fillMaxWidth().padding(start=if(page=="actions")24.dp else 8.dp,end=24.dp,bottom=16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)){
-                if(page!="actions")IconButton({if(!working)page="actions"}){Icon(DriveIcons.ArrowBack,"Back to file actions")}
+    DriveBottomSheet(onDismissRequest=onDismiss) { dismiss ->
+        val closeThen=LocalSheetCloseThen.current
+        SideEffect{closeSheet=dismiss}
+        DriveSheetPage(page){shown ->
+        if(shown=="details")Column{
+            IconButton({page="actions"}){Icon(DriveIcons.ArrowBack,"Back to file actions")}
+            FileInfoSheet(current){page="actions"}
+        }
+        else if(shown=="send"){
+            TelegramChatPicker("Send in Telegram",onDismiss={if(!working)page="actions"}){chat->
+                page="actions"
+                run {
+                    check(!current.isEncrypted){"Download and use Share for encrypted files."}
+                    val chatId=current.chatId?:error("Upload this file to Telegram first")
+                    val ids=parts.partsOf(current.id).sortedBy{it.partIndex}.mapNotNull{it.messageId}
+                        .ifEmpty{listOf(current.messageId?:error("Upload this file first"))}
+                    telegram.sendToChat(chat.id,chatId,ids)
+                }
+            }
+        }else Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom=16.dp)) {
+            Row(Modifier.fillMaxWidth().padding(start=if(shown=="actions")24.dp else 8.dp,end=24.dp,bottom=16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)){
+                if(shown!="actions")IconButton({if(!working)page="actions"}){Icon(DriveIcons.ArrowBack,"Back to file actions")}
                 FileThumbnail(current,Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)))
                 Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)){
                     Text(current.name,style=MaterialTheme.typography.titleMedium,maxLines=2,overflow=TextOverflow.Ellipsis)
@@ -107,7 +113,7 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit) {
             }
             message?.let{Text(it,Modifier.padding(horizontal=24.dp,vertical=8.dp),color=if(failure)MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)}
             HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.5f))
-            when(page){
+            when(shown){
                 "rename"->{
                     var name by remember(current.id){mutableStateOf(current.name)}
                     OutlinedTextField(name,{name=it},singleLine=true,enabled=!working,label={Text("File name")},isError=!FileNameUtils.isValidName(name),modifier=Modifier.fillMaxWidth().padding(24.dp))
@@ -132,7 +138,7 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit) {
                     Button({run{requireSuccess(trash.moveFilesToTrash(listOf(current.id)))}},enabled=!working,modifier=Modifier.fillMaxWidth().padding(horizontal=24.dp)){Text("Move to Trash")}
                 }
                 else->{
-                    SheetActionRow("Open",DriveIcons.FileOpen,enabled=!working){onDismiss();onOpen()}
+                    SheetActionRow("Open",DriveIcons.FileOpen,enabled=!working){closeThen(onOpen)}
                     SheetActionRow("Download to this phone",DriveIcons.Download,enabled=!working&&(current.hasRemoteCopy||current.hasLocalCopy)){
                         run(false){requireSuccess(transfers.enqueueSaveToPhone(current.id));message="Saving to Downloads. You can follow its progress in Activity."}
                     }
@@ -144,7 +150,7 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit) {
                     SheetActionRow(if(current.isFavorite)"Remove from Starred"else"Add to Starred",DriveIcons.Star,enabled=!working){run{repository.setFilesFavorite(listOf(current.id),!current.isFavorite)}}
                     SheetActionRow("Rename",DriveIcons.Edit,enabled=!working){page="rename"}
                     SheetActionRow("Move",DriveIcons.DriveFileMove,enabled=!working){page="move"}
-                    SheetActionRow("Show in folder",DriveIcons.FolderOpen,enabled=!working){onDismiss();navigateFolder(current.folderId)}
+                    SheetActionRow("Show in folder",DriveIcons.FolderOpen,enabled=!working){closeThen{navigateFolder(current.folderId)}}
                     SheetActionRow("Details",DriveIcons.Info,enabled=!working){page="details"}
                     SheetActionRow("Show in Telegram",DriveIcons.OpenInNew,enabled=!working&&current.hasRemoteCopy){
                         run{check(linkOpener.open(telegram.messageLink(current.chatId!!,current.messageId!!))){"No app could open this Telegram link."}}
@@ -154,5 +160,6 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit) {
                 }
             }
         }
+    }
     }
 }

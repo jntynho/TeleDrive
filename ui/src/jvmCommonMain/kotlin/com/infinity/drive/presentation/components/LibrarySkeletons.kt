@@ -21,9 +21,9 @@ fun HomeSkeleton(modifier:Modifier=Modifier,bottomPadding:androidx.compose.ui.un
             LibraryDashboard(LibraryOverview(0,0,emptyList()),{},showAddAction=false,loading=true)
             Spacer(Modifier.height(20.dp))
             LibraryBrowse(listOf(
-                LibraryShortcut("All files",DriveIcons.Folder){}, LibraryShortcut("Activity",DriveIcons.SwapVert){},
-                LibraryShortcut("Favorites",DriveIcons.Star){}, LibraryShortcut("Archived",DriveIcons.Archive){},
-                LibraryShortcut("Hidden",DriveIcons.VisibilityOff){}, LibraryShortcut("Trash",DriveIcons.Delete){}
+                LibraryShortcut("All files",DriveIcons.Folder){}, LibraryShortcut("Activity",app.tgdrive.ui.LibraryIcons.Activity){},
+                LibraryShortcut("Favorites",DriveIcons.Star){}, LibraryShortcut("Archived",app.tgdrive.ui.LibraryIcons.Archive){},
+                LibraryShortcut("Hidden",app.tgdrive.ui.LibraryIcons.Hidden){}, LibraryShortcut("Trash",DriveIcons.Delete){}
             ),loading=true)
         }}
         item{RecentSectionHeader(loading=true)}

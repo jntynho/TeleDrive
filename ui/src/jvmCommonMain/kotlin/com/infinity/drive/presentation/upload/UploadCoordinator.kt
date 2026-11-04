@@ -74,8 +74,8 @@ class UploadCoordinator(private val fileRepository:FileRepository,
             for((index,source) in sources.withIndex()){
                 var staged:ImportedFile?=null
                 try {
-                    val destination=fileRepository.resolveImportFolder(source.relativeFolder,target)
                     check(settings.preferences.first().let{it.storageChatId to it.onboardingComplete}==context){"Drive changed. Select the remaining files again."}
+                    val destination=fileRepository.resolveImportFolder(source.relativeFolder,target)
                     staged=(if(copyImmediately)fileImporter.import(source.reference)else fileImporter.describe(source.reference))?:error("The file provider could not read this file")
                     if(settings.preferences.first().let{it.storageChatId to it.onboardingComplete}!=context)throw CancellationException("Drive changed")
                     val (answer,name)=choice(staged.name,staged.sizeBytes,destination,sources.size-index,apply)

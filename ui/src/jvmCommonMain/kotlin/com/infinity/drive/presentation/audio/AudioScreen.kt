@@ -84,7 +84,7 @@ fun AudioLibraryRow(file:DriveFile?,playing:Boolean=false,currentMetadata:AudioM
     val loading=file==null
     val player=LocalAudioPlayback.current
     val storedMetadata by produceState(AudioMetadata(),file?.id,file?.modifiedAt,file?.localPath){if(file!=null)value=player.metadata(file)}
-    val meta=if(currentMetadata!=null)AudioMetadata(currentMetadata.title?:storedMetadata.title,currentMetadata.artist?:storedMetadata.artist,currentMetadata.durationMs?:storedMetadata.durationMs)else storedMetadata
+    val meta=if(currentMetadata!=null)AudioMetadata(currentMetadata.title?.takeIf(String::isNotBlank)?:storedMetadata.title,currentMetadata.artist?.takeIf(String::isNotBlank)?:storedMetadata.artist,currentMetadata.durationMs?:storedMetadata.durationMs)else storedMetadata
     var menu by remember(file?.id){mutableStateOf(false)}
     if(menu&&file!=null)com.infinity.drive.presentation.components.FileActionsSheet(file,onDismiss={menu=false},onOpen=onPlay)
     Column {
@@ -93,10 +93,14 @@ fun AudioLibraryRow(file:DriveFile?,playing:Boolean=false,currentMetadata:AudioM
         else SkeletonBlock(Modifier.size(LibraryLayout.AudioCover),LibraryLayout.CoverCorner)
         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)){
             Text(meta.title?.takeIf{it.isNotBlank()}?:file?.name?.substringBeforeLast('.')?:"Midnight City",Modifier.skeleton(loading),style=MaterialTheme.typography.titleSmall,color=if(playing)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,maxLines=1,overflow=TextOverflow.Ellipsis)
-            Text(meta.artist?.takeIf{it.isNotBlank()}?:if(loading)"Artist name"else "Unknown artist",Modifier.skeleton(loading),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
+            Text(meta.artist?.takeIf{it.isNotBlank()}?:if(loading)"Artist name"else file?.extension?.uppercase()?.ifBlank{"Audio"}?:"Audio",Modifier.skeleton(loading),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
         }
         val duration=meta.durationMs?:file?.durationMs
-        Text(if(loading)"3:42"else if(duration!=null)Formatters.duration(duration)else "—",Modifier.skeleton(loading),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(horizontalAlignment=Alignment.End,verticalArrangement=Arrangement.spacedBy(4.dp)){
+            Text(if(loading)"3:42"else if(duration!=null)Formatters.duration(duration)else "—",Modifier.skeleton(loading),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(if(loading)"Jan 20"else file?.addedAt?.takeIf{it>0}?.let{java.text.SimpleDateFormat("MMM d",java.util.Locale.getDefault()).format(java.util.Date(it))}.orEmpty(),
+                Modifier.skeleton(loading),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.75f),maxLines=1)
+        }
         if(playing)Icon(DriveIcons.Audiotrack,"Playing",Modifier.size(20.dp),tint=MaterialTheme.colorScheme.primary)
         Box {
             IconButton({menu=true},enabled=!loading){Icon(DriveIcons.MoreVert,"Audio options for ${file?.name.orEmpty()}",Modifier.skeleton(loading))}

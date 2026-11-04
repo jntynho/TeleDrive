@@ -42,10 +42,10 @@ fun TelegramChatPicker(title:String,onDismiss:()->Unit,onSelected:(TelegramChat)
         try{rows=client.listChats(query)}catch(cancel:CancellationException){throw cancel}
         catch(_:Exception){error="Couldn't load your chats. Check your connection and retry."}
     }
-    DriveBottomSheet(onDismissRequest=onDismiss) {
+    DriveBottomSheet(onDismissRequest=onDismiss) { dismiss ->
         Row(Modifier.fillMaxWidth().padding(start=24.dp,end=12.dp,top=4.dp,bottom=8.dp),verticalAlignment=Alignment.CenterVertically){
             Text(title,Modifier.weight(1f),style=MaterialTheme.typography.titleLarge)
-            IconButton(onDismiss){Icon(DriveIcons.Close,"Close chat picker")}
+            IconButton(dismiss){Icon(DriveIcons.Close,"Close chat picker")}
         }
         TextField(query,{query=it},singleLine=true,placeholder={Text("Search your chats")},
             leadingIcon={Icon(DriveIcons.Search,null)},shape=RoundedCornerShape(14.dp),
@@ -101,8 +101,9 @@ fun TelegramImportSheet(target:String?=null,onDismiss:()->Unit) {
     var error by remember{mutableStateOf<String?>(null)}
     var encrypted by remember{mutableStateOf(false)}
     LaunchedEffect(Unit){encrypted=settings.preferences.first().encryptFiles}
-    if(chat==null){TelegramChatPicker("Save from a Telegram chat",onDismiss){chat=it};return}
+
     LaunchedEffect(chat?.id,page){
+        if(chat==null)return@LaunchedEffect
         loading=true;error=null
         try{
             val result=client.fetchDocuments(chat!!.id,cursor,100)
@@ -113,10 +114,14 @@ fun TelegramImportSheet(target:String?=null,onDismiss:()->Unit) {
         catch(_:Exception){error="Couldn't load this chat. It may be protected or unavailable."}
         finally{loading=false}
     }
-    DriveBottomSheet(onDismissRequest=onDismiss) {
+    DriveBottomSheet(onDismissRequest=onDismiss) { dismiss ->
+        val closeThen=LocalSheetCloseThen.current
+        DriveSheetPage(chat){shown ->
+        if(shown==null)TelegramChatPicker("Save from a Telegram chat",dismiss){chat=it}
+        else Column {
         Row(Modifier.fillMaxWidth().padding(end=24.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
             IconButton({chat=null;documents=emptyList();selected=emptySet();cursor=0;end=false;page=0}){Icon(DriveIcons.ArrowBack,"Choose another chat")}
-            Text(chat!!.title,Modifier.weight(1f),style=MaterialTheme.typography.titleLarge)
+            Text(shown.title,Modifier.weight(1f),style=MaterialTheme.typography.titleLarge)
             TextButton({selected=if(selected.size==documents.size)emptySet()else documents.map{it.messageId}.toSet()},enabled=documents.isNotEmpty()){Text(if(selected.size==documents.size)"Clear"else"Select loaded")}
         }
         Text("Original messages stay in this chat. Copies go into your private drive.",Modifier.padding(horizontal=24.dp,vertical=8.dp),style=MaterialTheme.typography.bodySmall)
@@ -132,8 +137,10 @@ fun TelegramImportSheet(target:String?=null,onDismiss:()->Unit) {
             else if(!end)item{TextButton({page++},Modifier.fillMaxWidth()){Text("Load more messages")}}
             else if(documents.isEmpty())item{Text("No supported files in this chat",Modifier.padding(24.dp))}
         }
-        Button({uploads.importFromTelegram(documents.filter{it.messageId in selected},target);onDismiss()},enabled=selected.isNotEmpty()&&!encrypted,modifier=Modifier.fillMaxWidth().padding(24.dp)){
+        Button({val chosen=documents.filter{it.messageId in selected};closeThen{uploads.importFromTelegram(chosen,target)}},enabled=selected.isNotEmpty()&&!encrypted,modifier=Modifier.fillMaxWidth().padding(24.dp)){
             Text("Save ${selected.size} ${if(selected.size==1)"file"else"files"}")
         }
+    }
+    }
     }
 }

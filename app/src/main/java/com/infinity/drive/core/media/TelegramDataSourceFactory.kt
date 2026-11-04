@@ -14,6 +14,9 @@ class TelegramDataSourceFactory(
     private val wrappedKeyRepository: WrappedKeyRepository
 ) {
 
+    internal fun metadataSource(remoteFileId:String,playbackActive:()->Boolean):android.media.MediaDataSource =
+        TelegramMetadataSource(telegramClient,remoteFileId,playbackActive)
+
     fun create(remoteFileId: String): DataSource.Factory =
         DataSource.Factory { TelegramDataSource(telegramClient, remoteFileId) }
 

@@ -68,7 +68,7 @@ fun SettingsScreen(onBack:(()->Unit)?,onOpenSection:(SettingsSectionType)->Unit,
                 groups.forEachIndexed { index,(title,items) ->
                     SettingsSectionTitle(title.uppercase())
                     SettingsGroup {
-                        if(index==0)add{SettingsClickRow("Activity",onOpenActivity,icon=DriveIcons.SwapVert,trailing={Icon(DriveIcons.KeyboardArrowRight,null)})}
+                        if(index==0)add{SettingsClickRow("Activity",onOpenActivity,icon=app.tgdrive.ui.LibraryIcons.Activity,trailing={Icon(DriveIcons.KeyboardArrowRight,null)})}
                         items.filterNot{it in hidden}.forEach { section->add{SectionRow(section){onOpenSection(section)}} }
                     }
                 }

@@ -15,7 +15,7 @@ import org.koin.compose.koinInject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TakeoutSheet(onDismiss:()->Unit) {
+fun TakeoutSheet(target:String?=null,onDismiss:()->Unit) {
     val importer=koinInject<TakeoutImporter>()
     val state by importer.state.collectAsStateWithLifecycle()
     val picker=LocalMultiFilePicker.current
@@ -34,7 +34,7 @@ fun TakeoutSheet(onDismiss:()->Unit) {
                 OutlinedButton(importer::cancel,Modifier.fillMaxWidth()){Text("Stop preparing")}
             }else{
                 if(state.processed>0)Text("${state.imported} queued · ${state.skipped} existing · ${state.failed} couldn't import")
-                Button({picker.pick{importer.start(it)}},Modifier.fillMaxWidth()){Text(if(state.processed>0)"Choose more ZIP parts"else"Choose downloaded ZIP parts")}
+                Button({picker.pick{importer.start(it,target)}},Modifier.fillMaxWidth()){Text(if(state.processed>0)"Choose more ZIP parts"else"Choose downloaded ZIP parts")}
                 Text("If preparation was interrupted, select the same parts again. Already indexed originals are checked before importing.",style=MaterialTheme.typography.bodySmall)
             }
             state.error?.let{Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}

@@ -20,8 +20,9 @@ fun UploadConflictHost() {
     val request by uploads.conflict.collectAsStateWithLifecycle()
     request?.let { conflict ->
         var all by remember(conflict){mutableStateOf(false)}
-        fun choose(choice:UploadCoordinator.Choice)=uploads.answer(UploadCoordinator.Answer(choice,all))
-        DriveBottomSheet(onDismissRequest={choose(UploadCoordinator.Choice.SKIP)}) {
+        var choice by remember(conflict){mutableStateOf<UploadCoordinator.Choice?>(null)}
+        DriveBottomSheet(onDismissRequest={uploads.answer(UploadCoordinator.Answer(choice?:UploadCoordinator.Choice.SKIP,all))}) {dismiss->
+            fun choose(value:UploadCoordinator.Choice){if(choice==null){choice=value;dismiss()}}
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom=16.dp)) {
                 Text("“${conflict.name}” is already in ${conflict.folderName}",Modifier.padding(horizontal=24.dp,vertical=12.dp),style=MaterialTheme.typography.titleLarge)
                 ListItem(headlineContent={Text(conflict.existing.name)},supportingContent={Text("In the drive · ${Formatters.bytes(conflict.existing.sizeBytes)}")},leadingContent={FileThumbnail(conflict.existing,Modifier.size(48.dp))})

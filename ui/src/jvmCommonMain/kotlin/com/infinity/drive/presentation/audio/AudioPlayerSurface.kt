@@ -3,6 +3,9 @@ package com.infinity.drive.presentation.audio
 import app.tgdrive.ui.*
 import coil3.request.crossfade
 import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -53,16 +56,17 @@ fun LibraryAudioMiniPlayer(){
                 Column(Modifier.background(Brush.linearGradient(listOf(first,second)))
                     .border(1.dp,Color.White.copy(alpha=.08f),RoundedCornerShape(18.dp)).testTag("audio-mini-player")){
                     Row(Modifier.fillMaxWidth().height(66.dp).clickable(onClickLabel="Open now playing"){expanded=true}
-                        .padding(start=10.dp,end=4.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)){
+                        .padding(start=10.dp,end=4.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(2.dp)){
                         TrackArtwork(file,current.metadata,Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)))
                         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(2.dp)){
                             Text(current.metadata.title?.takeIf(String::isNotBlank)?:file.name.substringBeforeLast('.'),style=MaterialTheme.typography.titleSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
-                            Text(current.error?:current.metadata.artist?.takeIf(String::isNotBlank)?:"Unknown artist",style=MaterialTheme.typography.bodySmall,
+                            Text(current.error?:current.metadata.artist?.takeIf(String::isNotBlank)?:file.extension.uppercase().ifBlank{"Audio"},style=MaterialTheme.typography.bodySmall,
                                 color=Color.White.copy(alpha=.7f),maxLines=1,overflow=TextOverflow.Ellipsis)
                         }
                         IconButton(player::toggle){Icon(if(pause)DriveIcons.Pause else DriveIcons.PlayArrow,
                             if(current.error!=null)"Retry audio"else if(pause)"Pause audio"else"Play audio",Modifier.size(24.dp))}
-                        IconButton(player::next,enabled=current.canSkipNext){Icon(DriveIcons.SkipNext,"Next audio",Modifier.size(24.dp),tint=Color.White.copy(alpha=if(current.canSkipNext)1f else .35f))}
+                        IconButton(player::next,enabled=current.canSkipNext){Icon(DriveIcons.SkipNext,"Next audio",Modifier.size(22.dp))}
+                        IconButton(player::stop){Icon(DriveIcons.Close,"Dismiss audio player",Modifier.size(21.dp))}
                     }
                     LinearProgressIndicator(progress={if(current.durationMs>0)(current.positionMs.toFloat()/current.durationMs).coerceIn(0f,1f)else 0f},
                         modifier=Modifier.fillMaxWidth().padding(horizontal=12.dp).height(2.dp),color=Color.White.copy(alpha=.85f),trackColor=Color.White.copy(alpha=.2f),gapSize=0.dp,drawStopIndicator={})
@@ -102,7 +106,7 @@ fun AudioNowPlayingTitle(file:DriveFile,modifier:Modifier=Modifier){
     val state by LocalAudioPlayback.current.state.collectAsStateWithLifecycle()
     val metadata=state.metadata.takeIf{state.file?.id==file.id}
     val labels=(metadata?.title?.takeIf(String::isNotBlank)?:file.name.substringBeforeLast('.')) to
-        (metadata?.artist?.takeIf(String::isNotBlank)?:"Unknown artist")
+        (metadata?.artist?.takeIf(String::isNotBlank)?:file.extension.uppercase().ifBlank{"Audio"})
     Crossfade(labels,modifier=modifier,animationSpec=tween(200),label="audioTitle"){(title,artist)->
         Column(verticalArrangement=Arrangement.spacedBy(2.dp)){
             Text(title,color=Color.White,style=MaterialTheme.typography.titleLarge,maxLines=1,overflow=TextOverflow.Ellipsis)
@@ -150,9 +154,14 @@ internal fun AudioTransport(state:AudioPlaybackState,isFavorite:Boolean?=null,fa
                 if(pause)"Pause audio"else if(active&&state.error!=null)"Retry audio"else"Play audio",Modifier.size(36.dp))
         }
         IconButton(player::next,enabled=active&&state.canSkipNext){Icon(DriveIcons.SkipNext,"Next audio",Modifier.size(26.dp))}
-        if(isFavorite!=null)IconButton(onFavorite,enabled=active&&favoriteEnabled){
-            Icon(DriveIcons.Favorite,if(isFavorite)"Remove from favorites"else"Add to favorites",Modifier.size(23.dp),
-                tint=if(isFavorite)Color(0xFFFFADBC)else Color.White)
+        if(isFavorite!=null){
+            val fill by animateFloatAsState(if(isFavorite)1f else 0f,tween(220, easing=FastOutSlowInEasing),label="favoriteFill")
+            IconButton(onFavorite,enabled=active&&favoriteEnabled){
+                Box(Modifier.size(23.dp).graphicsLayer{scaleX=1f+.08f*kotlin.math.sin(fill*Math.PI).toFloat();scaleY=scaleX}){
+                    Icon(DriveIcons.Favorite,if(isFavorite)"Remove from favorites"else"Add to favorites",Modifier.fillMaxSize(),tint=Color.White)
+                    Icon(MediaIcons.HeartFilled,null,Modifier.fillMaxSize().graphicsLayer{alpha=fill},tint=Color.White)
+                }
+            }
         }
     }
 }
@@ -176,10 +185,11 @@ internal fun NowPlayingContent(file:DriveFile,modifier:Modifier=Modifier){
         BoxWithConstraints(modifier.padding(horizontal=24.dp)){
             val fontScale=androidx.compose.ui.platform.LocalDensity.current.fontScale.coerceAtLeast(1f)
             val wide=maxWidth>maxHeight
-            val lyricHeight=minOf((120*fontScale).dp,maxHeight*.24f).coerceAtLeast(56.dp)
+            val lyricHeight=minOf((90*fontScale).dp,maxHeight*.18f).coerceAtLeast(56.dp)
+            val bottomInset=if(wide)12.dp else minOf(56.dp,maxHeight*.08f)
             val transportHeight=(132+18*fontScale).dp
             val cover=if(wide)minOf(maxHeight-24.dp,maxWidth*.43f).coerceAtLeast(48.dp)
-                else minOf(maxWidth,(maxHeight-transportHeight-lyricHeight-40.dp).coerceAtLeast(48.dp),420.dp)
+                else minOf(maxWidth,(maxHeight-transportHeight-lyricHeight-bottomInset-40.dp).coerceAtLeast(48.dp),420.dp)
             val artwork:@Composable ()->Unit={TrackArtwork(file,state.metadata,Modifier.size(cover).clip(RoundedCornerShape(14.dp)).testTag("audio-cover"))}
             val favorite= favoriteOverride?:file.isFavorite
             val controls:@Composable ()->Unit={
@@ -212,13 +222,14 @@ internal fun NowPlayingContent(file:DriveFile,modifier:Modifier=Modifier){
                     artwork()
                     Box(Modifier.weight(1f).fillMaxHeight()){
                         Box(Modifier.fillMaxWidth().padding(bottom=transportHeight).align(Alignment.Center)){lyricPanel()}
-                        Box(Modifier.align(Alignment.BottomCenter)){controls()}
+                        Box(Modifier.align(Alignment.BottomCenter).padding(bottom=bottomInset)){controls()}
                     }
                 }
             }else{
-                Box(Modifier.align(Alignment.TopCenter).padding(top=12.dp)){artwork()}
-                Box(Modifier.align(Alignment.BottomCenter).padding(bottom=transportHeight+12.dp)){lyricPanel()}
-                Box(Modifier.align(Alignment.BottomCenter)){controls()}
+                val artworkTop=maxOf(12.dp,(maxHeight-transportHeight-lyricHeight-bottomInset-cover-24.dp)/2)
+                Box(Modifier.align(Alignment.TopCenter).padding(top=artworkTop)){artwork()}
+                Box(Modifier.align(Alignment.BottomCenter).padding(bottom=transportHeight+bottomInset+12.dp)){lyricPanel()}
+                Box(Modifier.align(Alignment.BottomCenter).padding(bottom=bottomInset)){controls()}
             }
         }
     }
@@ -230,7 +241,7 @@ private data class ArtworkFrame(val file:DriveFile,val metadata:AudioMetadata)
 @Composable
 private fun TrackArtwork(file:DriveFile,metadata:AudioMetadata,modifier:Modifier){
     val frame=remember(file.id,metadata.artworkPath){ArtworkFrame(file,metadata)}
-    Crossfade(frame,modifier=modifier,animationSpec=tween(280),label="trackArtwork"){
+    Crossfade(frame,modifier=modifier,animationSpec=tween(320, easing=FastOutSlowInEasing),label="trackArtwork"){
         AudioArtwork(it.file,it.metadata,Modifier.fillMaxSize())
     }
 }

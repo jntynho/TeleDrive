@@ -204,12 +204,20 @@ class RebuiltUiTest {
     @Test fun homeUploadOpensOnlyTheRequestedPickerWithoutChangingDestination() {
         var filePicks=0
         var folderPicks=0
+        var mediaPicks=0
+        var scans=0
+        var photos=0
         val pending=GlobalContext.get().get<PendingShare>()
         compose.runOnUiThread {
             activity.get().setContent { ProvidePlatformActions {
                 androidx.compose.runtime.CompositionLocalProvider(
                     com.infinity.drive.presentation.platform.LocalMultiFilePicker provides com.infinity.drive.presentation.platform.MultiFilePicker { callback->filePicks++;callback(emptyList()) },
-                    com.infinity.drive.presentation.platform.LocalFolderPicker provides com.infinity.drive.presentation.platform.FolderPicker { callback->folderPicks++;callback(com.infinity.drive.presentation.platform.PickResult.Canceled) }
+                    com.infinity.drive.presentation.platform.LocalFolderPicker provides com.infinity.drive.presentation.platform.FolderPicker { callback->folderPicks++;callback(com.infinity.drive.presentation.platform.PickResult.Canceled) },
+                    com.infinity.drive.presentation.platform.LocalDeviceImportActions provides object:com.infinity.drive.presentation.platform.DeviceImportActions{
+                        override fun pickMedia(onPicked:(List<String>)->Unit){mediaPicks++;onPicked(emptyList())}
+                        override fun scanDocument(onResult:(com.infinity.drive.presentation.platform.CaptureResult)->Unit){scans++;onResult(com.infinity.drive.presentation.platform.CaptureResult.Cancelled)}
+                        override fun takePhoto(onResult:(com.infinity.drive.presentation.platform.CaptureResult)->Unit){photos++;onResult(com.infinity.drive.presentation.platform.CaptureResult.Failed("Test camera unavailable"))}
+                    }
                 ){ DriveInfinityApp(pending) }
             } }
         }
@@ -226,6 +234,27 @@ class RebuiltUiTest {
         compose.onNodeWithContentDescription("Upload").performClick()
         compose.onNodeWithText("Upload folder",substring=false).performClick()
         compose.waitUntil(5_000){folderPicks==1}
+        compose.onNodeWithTag("navigation-home").assertIsSelected()
+        fun pick(label:String){compose.onNodeWithContentDescription("Upload").performClick();compose.onNodeWithText(label,substring=false).performScrollTo().performClick()}
+        pick("Upload photos and videos")
+        compose.waitUntil(5_000){mediaPicks==1}
+        pick("Scan a document")
+        compose.waitUntil(5_000){scans==1}
+        pick("Take a photo")
+        compose.waitUntil(5_000){photos==1}
+        compose.onNodeWithText("Test camera unavailable").assertIsDisplayed()
+        compose.onNodeWithText("OK",substring=false).performClick()
+        pick("Import from Google Photos")
+        compose.onNodeWithText("Choose downloaded ZIP parts").performScrollTo().performClick()
+        compose.waitUntil(5_000){filePicks==2}
+        compose.onNodeWithContentDescription("Back to add options").performClick()
+        compose.onNodeWithText("Save from a Telegram chat",substring=false).performScrollTo().performClick()
+        compose.onNodeWithText("Search your chats").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Close chat picker").performClick()
+        compose.onNodeWithText("New folder",substring=false).performScrollTo().performClick()
+        compose.onNode(hasSetTextAction()).performTextInput("Test folder")
+        compose.onNodeWithText("Create",substring=false).performClick()
+        compose.waitUntil(5_000){compose.onAllNodesWithText("Folder name",substring=false).fetchSemanticsNodes().isEmpty()}
         compose.onNodeWithTag("navigation-home").assertIsSelected()
         compose.onNodeWithTag("navigation-gallery").performClick()
         compose.onNodeWithContentDescription("Upload").assertDoesNotExist()

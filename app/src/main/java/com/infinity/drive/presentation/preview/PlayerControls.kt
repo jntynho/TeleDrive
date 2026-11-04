@@ -111,7 +111,7 @@ fun PlayerControls(
                 SlimSlider(scrub?:position.coerceIn(0,duration).toFloat(),onValueChange={scrub=it;scrubbing(true);onInteraction()},
                     onValueChangeFinished={scrub?.let{player.seekTo(videoSeekTarget(it.toLong(),0,duration))};scrub=null;scrubbing(false);onInteraction()},
                     valueRange=0f..duration.coerceAtLeast(1).toFloat(),enabled=canSeek,
-                    trackHeight=2.dp,thumbSize=if(compact)8.dp else 10.dp,
+                    trackHeight=2.dp,thumbSize=8.dp,
                     activeColor=Color.White,inactiveColor=Color.White.copy(alpha=.3f),
                     modifier=trackModifier.semantics{contentDescription="Seek video"})
             }
@@ -119,20 +119,12 @@ fun PlayerControls(
                 .background(Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.75f))))
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal+WindowInsetsSides.Bottom))
                 .padding(horizontal=if(compact)16.dp else 24.dp,vertical=8.dp)){
-                if(compact){
-                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)){
-                        Text(Formatters.duration(scrub?.toLong()?:position),color=Color.White,style=MaterialTheme.typography.labelSmall)
-                        timeline(Modifier.weight(1f))
-                        Text(Formatters.duration(duration),color=Color.White.copy(alpha=.75f),style=MaterialTheme.typography.labelSmall)
-                        speed();fit();rotate()
-                    }
-                }else{
-                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){speed();fit();rotate()}
-                    timeline(Modifier.fillMaxWidth())
-                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){
-                        Text(Formatters.duration(scrub?.toLong()?:position),color=Color.White,style=MaterialTheme.typography.labelSmall)
-                        Text(Formatters.duration(duration),color=Color.White.copy(alpha=.75f),style=MaterialTheme.typography.labelSmall)
-                    }
+                timeline(Modifier.fillMaxWidth())
+                Row(Modifier.fillMaxWidth().heightIn(min=48.dp),verticalAlignment=Alignment.CenterVertically){
+                    Text("${Formatters.duration(scrub?.toLong()?:position)} / ${Formatters.duration(duration)}",
+                        color=Color.White.copy(alpha=.85f),style=MaterialTheme.typography.labelSmall,
+                        modifier=Modifier.weight(1f),maxLines=1)
+                    speed();fit();rotate()
                 }
             }
         }

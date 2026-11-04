@@ -42,7 +42,7 @@ class TakeoutImportTest {
         val rows=linkedMapOf<String,DriveFile>()
         var uploads=0;var copies=0
         val repository=fake<FileRepository>{name,args->when(name){
-            "resolveImportFolder"->args[0] as String
+            "resolveImportFolder"->{assertEquals("selected-folder",args[1]);args[0] as String}
             "findDuplicate"->rows.values.firstOrNull{it.contentHash==args[1]}
             "findNameClash"->rows.values.firstOrNull{it.name==args[0]&&it.folderId==args[1]}
             "importLocalFile"->{
@@ -72,11 +72,11 @@ class TakeoutImportTest {
         val settings=fake<SettingsRepository>{name,_->when(name){"getPreferences"->flowOf(UserPreferences(onboardingComplete=true,storageChatId=-1001));else->error(name)}}
         val service=TakeoutImporter(importer,paths,repository,queue,StorageInspector(paths),settings)
         try {
-            service.start(listOf(zip.absolutePath));val first=withTimeout(5000){service.state.first{!it.running}}
+            service.start(listOf(zip.absolutePath),"selected-folder");val first=withTimeout(5000){service.state.first{!it.running}}
             assertNull(first.error);assertEquals("state=$first",0,first.failed);assertEquals("state=$first",1,uploads);assertEquals("state=$first",1,copies);assertEquals(2,rows.size)
             assertTrue(rows.values.all{it.createdAt==1_700_000_000_000&&it.isFavorite})
             assertEquals(setOf("Google Photos/First album","Google Photos/Second album"),rows.values.map{it.folderId}.toSet())
-            service.start(listOf(zip.absolutePath));val second=withTimeout(5000){service.state.first{!it.running}}
+            service.start(listOf(zip.absolutePath),"selected-folder");val second=withTimeout(5000){service.state.first{!it.running}}
             assertEquals(0,second.failed);assertEquals(2,second.skipped);assertEquals(1,uploads);assertEquals(1,copies)
             assertTrue(zip.exists())
         }finally{service.cancel();root.deleteRecursively()}

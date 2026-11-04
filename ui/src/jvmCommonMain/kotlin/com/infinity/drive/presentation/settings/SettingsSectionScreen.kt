@@ -772,7 +772,7 @@ private fun SecuritySection(state: SettingsUiState, viewModel: SettingsViewModel
 
     val capabilities = LocalPlatformCapabilities.current
     SettingsGroup {
-        add{SettingsClickRow(title=stringResource(com.infinity.drive.resources.Res.string.collection_hidden_title),onClick=onOpenHidden,icon=DriveIcons.VisibilityOff)}
+        add{SettingsClickRow(title=stringResource(com.infinity.drive.resources.Res.string.collection_hidden_title),onClick=onOpenHidden,icon=app.tgdrive.ui.LibraryIcons.Hidden)}
         add(visible = capabilities.supportsAppLock) {
             SettingsSwitchRow(
                 title = stringResource(Res.string.settings_app_lock),

@@ -230,25 +230,40 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
     override suspend fun metadata(file:DriveFile):AudioMetadata {
         val key=metadataKey(file)
         synchronized(metadataCache){metadataCache[key]}?.let{return it}
-        val path=file.localPath?:return AudioMetadata(durationMs=file.durationMs)
-        // Coalesce requests from list rows and Now Playing; callers do not own the task.
-        val task=withContext(Dispatchers.Main.immediate){metadataInFlight.getOrPut(key){scope.async(ioDispatcher){
-            metadataSlots.withPermit {
-                val retriever=MediaMetadataRetriever()
-                try {
-                    retriever.setDataSource(path)
-                    val picture=retriever.embeddedPicture?.takeIf{it.size<=5*1024*1024}
-                    AudioMetadata(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)?.takeIf(String::isNotBlank),
-                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)?.takeIf(String::isNotBlank),
-                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?:file.durationMs,
-                        picture?.let(::artworkColors).orEmpty(),readEmbeddedLyrics(File(path)),picture?.let{saveArtwork(file,it)})
-                } finally {runCatching{retriever.release()}}
+        val path=file.localPath?.takeIf{File(it).exists()}
+        val remote=file.remoteFileId?.takeIf{path==null&&!file.isEncrypted&&file.hasRemoteCopy}
+        if(path==null&&(remote==null||mutable.value.file?.id==file.id))return AudioMetadata(durationMs=file.durationMs)
+        suspend fun inspect():AudioMetadata=metadataSlots.withPermit {
+            val retriever=MediaMetadataRetriever()
+            var source:android.media.MediaDataSource?=null
+            try {
+                if(path!=null)retriever.setDataSource(path)
+                else {
+                    val owner=currentCoroutineContext()[Job]
+                    source=sources.metadataSource(remote!!){owner?.isActive==false||mutable.value.file?.id==file.id}
+                    retriever.setDataSource(source!!)
+                }
+                val picture=if(path==null)null else retriever.embeddedPicture?.takeIf{it.size<=5*1024*1024}
+                AudioMetadata(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)?.takeIf(String::isNotBlank),
+                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)?.takeIf(String::isNotBlank)
+                        ?:retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST)?.takeIf(String::isNotBlank),
+                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?:file.durationMs,
+                    picture?.let(::artworkColors).orEmpty(),path?.let{readEmbeddedLyrics(File(it))},picture?.let{saveArtwork(file,it)})
+            } finally {runCatching{retriever.release()};runCatching{source?.close()}}
+        }
+        return try {
+            // Optional remote inspection belongs to the visible row: leaving it cancels queued work.
+            val result=if(path==null)withContext(ioDispatcher){inspect()}
+            else {
+                val task=withContext(Dispatchers.Main.immediate){metadataInFlight.getOrPut(key){scope.async(ioDispatcher){inspect()}
+                    .also{job->job.invokeOnCompletion{scope.launch{if(metadataInFlight[key]===job)metadataInFlight.remove(key)}}}}}
+                task.await()
             }
-        }.also{job->job.invokeOnCompletion{scope.launch{if(metadataInFlight[key]===job)metadataInFlight.remove(key)}}}}}
-        return try { task.await().also{synchronized(metadataCache){metadataCache[key]=it}} }
-        catch(cancel:CancellationException){throw cancel}
+            result.also{synchronized(metadataCache){metadataCache[key]=it}}
+        }catch(cancel:CancellationException){throw cancel}
         catch(_:Exception){AudioMetadata(durationMs=file.durationMs)}
     }
+
     private fun saveArtwork(file:DriveFile,bytes:ByteArray):String?=runCatching {
         val dir=File(appContext.cacheDir,"audio-artwork").apply{mkdirs()}
         val key=java.security.MessageDigest.getInstance("SHA-256").digest(metadataKey(file).toByteArray()).joinToString(""){"%02x".format(it)}

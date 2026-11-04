@@ -536,7 +536,8 @@ private fun ProxyEditorSheet(
         onDismissRequest = onDismiss,
         sheetState = formSheetState(),
         contentWindowInsets = { SheetTopInset }
-    ) {
+    ) { dismiss ->
+        val closeThen=com.infinity.drive.presentation.components.LocalSheetCloseThen.current
         Column(
             modifier = Modifier
                 .verticalScroll(rememberScrollState())
@@ -644,19 +645,20 @@ private fun ProxyEditorSheet(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedButton(
-                    onClick = onDismiss,
+                    onClick = dismiss,
                     shapes = ButtonDefaults.shapes(),
                     modifier = Modifier.weight(1f)
                 ) { Text(stringResource(Res.string.common_cancel)) }
                 Button(
                     onClick = {
-                        onSave(
+                        val selectedPort=portNumber?:return@Button
+                        closeThen{onSave(
                             ProxyServer(
                                 id = original?.id ?: UUID.randomUUID().toString(),
                                 label = label.trim().ifBlank { host.trim() },
                                 type = type,
                                 host = host.trim(),
-                                port = portNumber ?: return@Button,
+                                port = selectedPort,
                                 username = username.takeIf {
                                     type != TelegramProxyType.MTPROTO && it.isNotBlank()
                                 },
@@ -668,7 +670,7 @@ private fun ProxyEditorSheet(
                                 },
                                 isActive = original?.isActive == true
                             )
-                        )
+                        )}
                     },
                     shapes = ButtonDefaults.shapes(),
                     enabled = valid,
@@ -688,7 +690,8 @@ private fun ImportLinkSheet(onImport: (String) -> Unit, onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         sheetState = formSheetState(),
         contentWindowInsets = { SheetTopInset }
-    ) {
+    ) { dismiss ->
+        val closeThen=com.infinity.drive.presentation.components.LocalSheetCloseThen.current
         Column(
             modifier = Modifier
                 .verticalScroll(rememberScrollState())
@@ -719,12 +722,12 @@ private fun ImportLinkSheet(onImport: (String) -> Unit, onDismiss: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedButton(
-                    onClick = onDismiss,
+                    onClick = dismiss,
                     shapes = ButtonDefaults.shapes(),
                     modifier = Modifier.weight(1f)
                 ) { Text(stringResource(Res.string.common_cancel)) }
                 Button(
-                    onClick = { onImport(link) },
+                    onClick = { closeThen{onImport(link)} },
                     shapes = ButtonDefaults.shapes(),
                     enabled = link.isNotBlank(),
                     modifier = Modifier.weight(1f)
