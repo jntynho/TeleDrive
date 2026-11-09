@@ -85,6 +85,7 @@ android {
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 
 dependencies {
+    implementation("top.yukonga.miuix.kmp:miuix-blur-android:0.9.4")
     implementation(project(":shared"))
     implementation(project(":ui"))
     implementation(project(":skin"))

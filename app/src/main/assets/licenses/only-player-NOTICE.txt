@@ -1,0 +1,11 @@
+Liquid floating navigation imported and adapted on 2026-11-09 from only_player:
+https://github.com/Kindness-Kismet/only_player
+Commit d2b5dd9bcf8978bc0e7524363a902a81da4bcb02
+
+Original contributors retain their copyright. Repository GPL-3.0 and individual Apache-2.0 adaptation notices are retained in corresponding source. GPL text and Apache text accompany this notice.
+
+Modified packages, theme bridge, responsive sizing and navigation selection synchronization. Original shader and physics constants retained. Uses miuix-blur-android 0.9.4 (compose-miuix-ui contributors, Apache-2.0).
+
+Corresponding TeleDrive source including build scripts:
+https://github.com/jntynho/TeleDrive
+See third_party/only_player/SOURCE.md and THIRD_PARTY_NOTICES.md in source.

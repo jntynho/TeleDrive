@@ -224,7 +224,9 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
         Environment.getExternalStorageDirectory().absolutePath
     }
 
+    val liquidNavigation=if(android.os.Build.VERSION.SDK_INT>=33)com.infinity.drive.presentation.navigation.liquid.rememberLiquidNavigation()else null
     CompositionLocalProvider(
+        LocalLiquidNavigation provides liquidNavigation,
         LocalProfilePalette provides {path->withContext(Dispatchers.IO){runCatching{val file=File(path);if(file.length() in 1..5_000_000)com.infinity.drive.presentation.audio.artworkColors(file.readBytes())else emptyList()}.getOrDefault(emptyList())}},
         LocalAudioPlayback provides audio,
         LocalAppIcon provides appIcon,

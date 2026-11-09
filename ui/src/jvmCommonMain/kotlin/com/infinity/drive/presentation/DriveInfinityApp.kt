@@ -230,6 +230,8 @@ private fun MainScaffold(
     val navigationSettings=org.koin.compose.koinInject<com.infinity.drive.domain.repository.SettingsRepository>()
     val navigationPreferences by navigationSettings.preferences.collectAsStateWithLifecycle(com.infinity.drive.domain.model.UserPreferences())
     val navigationScene=rememberGraphicsLayer()
+    val liquidNavigation=com.infinity.drive.presentation.platform.LocalLiquidNavigation.current
+    val liquidStyle=navigationPreferences.floatingNavigationBar&&navigationPreferences.navigationBarStyle==com.infinity.drive.domain.model.NavigationBarStyle.FLOATING&&liquidNavigation!=null
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
@@ -321,7 +323,7 @@ private fun MainScaffold(
             com.infinity.drive.presentation.components.LocalFileFolderNavigation provides { id:String? -> navController.navigateOnce(Route.Files(id)) },
             com.infinity.drive.presentation.navigation.LocalNavigationRailWidth provides railWidth
         ) {
-            AppNavHost(navController=navController,startDestination=startDestination,modifier=Modifier.fillMaxSize().recordNavigationScene(navigationScene,navigationPreferences.floatingNavigationBar&&navigationPreferences.navigationBarBlur&&navigationPreferences.navigationBarStyle.supportsBlur&&com.infinity.drive.presentation.platform.LocalPlatformCapabilities.current.supportsDynamicColor&&showChrome&&!useRail&&!keyboardVisible).testTag("navigation-host"))
+            AppNavHost(navController=navController,startDestination=startDestination,modifier=(liquidNavigation?.capture(Modifier.fillMaxSize(),liquidStyle&&navigationPreferences.navigationBarBlur&&liquidNavigation.supportsGlass&&showChrome&&!useRail&&!keyboardVisible)?:Modifier.fillMaxSize()).recordNavigationScene(navigationScene,!liquidStyle&&navigationPreferences.navigationBarStyle!=com.infinity.drive.domain.model.NavigationBarStyle.FLOATING&&navigationPreferences.floatingNavigationBar&&navigationPreferences.navigationBarBlur&&navigationPreferences.navigationBarStyle.supportsBlur&&com.infinity.drive.presentation.platform.LocalPlatformCapabilities.current.supportsDynamicColor&&showChrome&&!useRail&&!keyboardVisible).testTag("navigation-host"))
         }
         if(useRail) AnimatedVisibility(visible=showChrome&&!keyboardVisible,
             enter=fadeIn(tween(180)),exit=fadeOut(tween(180)),modifier=Modifier.align(Alignment.CenterStart)) {
@@ -351,9 +353,15 @@ private fun MainScaffold(
 /** TG Drive's four native destinations, with stable icons and labels. */
 @Composable
 private fun FloatingNavigationBar(preferences:com.infinity.drive.domain.model.UserPreferences,selectedIndex:Int,onNavigate:(TopLevelDestination)->Unit) {
+    val liquid=com.infinity.drive.presentation.platform.LocalLiquidNavigation.current
+    if(preferences.floatingNavigationBar&&preferences.navigationBarStyle==com.infinity.drive.domain.model.NavigationBarStyle.FLOATING&&liquid!=null){
+        val items=TopLevelDestination.entries.map{com.infinity.drive.presentation.platform.LiquidNavigationItem(it.icon,stringResource(it.labelRes),"navigation-${it.name.lowercase()}")}
+        liquid.Bar(items,selectedIndex,preferences.navigationBarLabels,preferences.navigationBarBlur){i->TopLevelDestination.entries.getOrNull(i)?.let(onNavigate)}
+        return
+    }
     val style=if(preferences.floatingNavigationBar)preferences.navigationBarStyle else com.infinity.drive.domain.model.NavigationBarStyle.STANDARD
     val floating=style!=com.infinity.drive.domain.model.NavigationBarStyle.STANDARD
-    val blur=preferences.floatingNavigationBar&&style.supportsBlur&&preferences.navigationBarBlur&&com.infinity.drive.presentation.platform.LocalPlatformCapabilities.current.supportsDynamicColor
+    val blur=style!=com.infinity.drive.domain.model.NavigationBarStyle.FLOATING&&preferences.floatingNavigationBar&&style.supportsBlur&&preferences.navigationBarBlur&&com.infinity.drive.presentation.platform.LocalPlatformCapabilities.current.supportsDynamicColor
     androidx.compose.material3.Surface(modifier=Modifier.fillMaxWidth().padding(horizontal=if(floating)20.dp else 0.dp,vertical=if(floating)10.dp else 0.dp).then(if(floating)Modifier.navigationBarsPadding()else Modifier).navigationBackdrop(blur,if(floating)28.dp else 0.dp),
         shape=androidx.compose.foundation.shape.RoundedCornerShape(if(floating)28.dp else 0.dp),color=if(blur)MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha=.86f)else MaterialTheme.colorScheme.surfaceContainerHigh,
         shadowElevation=if(floating)8.dp else 0.dp){

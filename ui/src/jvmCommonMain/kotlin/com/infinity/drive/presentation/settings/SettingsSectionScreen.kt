@@ -1214,13 +1214,17 @@ private fun NavigationBarSection(state:SettingsUiState,viewModel:SettingsViewMod
     if(chooseStyle)ChoiceDialog(title="Navigation bar style",
         options=com.infinity.drive.domain.model.NavigationBarStyle.entries.map{it to it.label},selected=prefs.navigationBarStyle,
         onSelect={style->chooseStyle=false;viewModel.update{it.copy(navigationBarStyle=style)}},onDismiss={chooseStyle=false})
-    val blurSupported=LocalPlatformCapabilities.current.supportsDynamicColor&&prefs.navigationBarStyle.supportsBlur
+    val floatingGlass=prefs.navigationBarStyle==com.infinity.drive.domain.model.NavigationBarStyle.FLOATING
+    val glassRenderer=com.infinity.drive.presentation.platform.LocalLiquidNavigation.current
+    val blurSupported=prefs.navigationBarStyle.supportsBlur&&if(floatingGlass)glassRenderer?.supportsGlass==true else LocalPlatformCapabilities.current.supportsDynamicColor
     SettingsGroup {
         add{SettingsSwitchRow("Enable custom navigation",checked=prefs.floatingNavigationBar,onChange={value->viewModel.update{it.copy(floatingNavigationBar=value)}},subtitle="Apply your preferred navigation style")}
         add{SettingsClickRow("Navigation bar style",onClick={chooseStyle=true},subtitle=prefs.navigationBarStyle.label)}
         add{SettingsSwitchRow("Blur background",checked=prefs.navigationBarBlur,enabled=blurSupported,onChange={value->viewModel.update{it.copy(navigationBarBlur=value)}},subtitle=when{
+            floatingGlass&&glassRenderer?.supportsGlass!=true->"Liquid glass is available on Android 13 and later"
             !LocalPlatformCapabilities.current.supportsDynamicColor->"Available on Android 12 and later"
             !prefs.navigationBarStyle.supportsBlur->"Miuix uses a solid background"
+            floatingGlass->"Refracts content with a moving glass lens and highlights"
             else->"Softens content behind the navigation bar"
         })}
         add{SettingsSwitchRow("Show labels",checked=prefs.navigationBarLabels,onChange={value->viewModel.update{it.copy(navigationBarLabels=value)}},subtitle="Show destination names alongside their icons")}

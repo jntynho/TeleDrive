@@ -149,3 +149,5 @@ Based on [DriveInfinity](https://github.com/ZHINFINITY/DriveInfinity), originall
 Built with [TDLib](https://github.com/tdlib/td), [Jetpack Compose](https://developer.android.com/compose), [Media3](https://developer.android.com/media/media3) and [Tink](https://github.com/tink-crypto/tink). Interface icons use **Solar Linear by [480 Design](https://www.figma.com/community/file/1166831539721848736)**, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Selected SVG sources, attribution and the native-vector conversion details are in [third_party/solar](third_party/solar/SOURCE.md).
 
 TG Drive is an independent project and is not affiliated with Telegram.
+
+The optional liquid floating navigation imports the original [only_player](https://github.com/Kindness-Kismet/only_player) component. Its GPL-3.0 source and retained Apache-2.0 notices are documented in [third_party/only_player](third_party/only_player/SOURCE.md); these notices apply to their respective imported portions.

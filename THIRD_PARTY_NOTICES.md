@@ -5,6 +5,8 @@ This project uses third-party software, including:
 | Component | Project / license information |
 | --- | --- |
 | DriveInfinity Android/shared/UI source | https://github.com/ZHINFINITY/DriveInfinity — Apache 2.0; [pinned source, authors and modifications](third_party/driveinfinity/SOURCE.md), [license](third_party/driveinfinity/LICENSE) |
+| only_player liquid floating navigation | GPL-3.0 with retained Apache-2.0 file notices; [source and modifications](third_party/only_player/SOURCE.md), [GPL text](third_party/only_player/LICENSE) |
+| Miuix blur 0.9.4 | https://github.com/compose-miuix-ui/miuix — Apache-2.0 |
 | Solar Linear by 480 Design | CC BY 4.0; [SVG sources and attribution](third_party/solar/SOURCE.md) |
 | Coil | https://github.com/coil-kt/coil — Apache 2.0 |
 | Koin | https://github.com/InsertKoinIO/koin — Apache 2.0 |
