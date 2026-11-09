@@ -918,4 +918,5 @@
         <item>Português (Brasil)</item>
     </string-array>
     <string name="nav_audio">Audio</string>
+    <string name="settings_floating_navigation_bar">Floating navigation bar</string>
 </resources>

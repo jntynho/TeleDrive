@@ -225,6 +225,7 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
     }
 
     CompositionLocalProvider(
+        LocalProfilePalette provides {path->withContext(Dispatchers.IO){runCatching{val file=File(path);if(file.length() in 1..5_000_000)com.infinity.drive.presentation.audio.artworkColors(file.readBytes())else emptyList()}.getOrDefault(emptyList())}},
         LocalAudioPlayback provides audio,
         LocalAppIcon provides appIcon,
         LocalStandardFolders provides standardFolders,

@@ -94,6 +94,7 @@ class SettingsViewModel(
 ) : ViewModel() {
 
     val authorization = telegramAuthRepository.authState
+    val storageChannels = channelRepository.observeChannels().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5_000),emptyList())
     private val user = MutableStateFlow<TelegramUser?>(null)
 
     private val _updateState = MutableStateFlow<UpdateState>(UpdateState.Idle)
@@ -178,8 +179,9 @@ class SettingsViewModel(
             if (current.updateCheckEnabled != previous.updateCheckEnabled) {
                 maintenanceScheduler.scheduleUpdateCheck(current.updateCheckEnabled)
             }
-            backupRepository.syncActiveSessionWithSelection()
-            rescheduleWork()
+            if(current.storageChatId!=previous.storageChatId)backupRepository.syncActiveSessionWithSelection()
+            fun scheduleKey(p:UserPreferences)=listOf(p.autoBackupEnabled,p.backupIntervalHours,p.backupWifiOnly,p.backupChargingOnly,p.instantBackupEnabled,p.updateCheckEnabled)
+            if(scheduleKey(current)!=scheduleKey(previous))rescheduleWork()
     }
 
     private suspend fun scanForNewBackupWork() {

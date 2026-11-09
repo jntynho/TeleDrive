@@ -200,6 +200,8 @@ fun SettingsSectionScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    var navigationOptions by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    com.infinity.drive.presentation.common.AppBackHandler(navigationOptions){navigationOptions=false}
     var confirmLogout by remember { mutableStateOf(false) }
     var confirmClearCache by remember { mutableStateOf(false) }
 
@@ -221,9 +223,9 @@ fun SettingsSectionScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             app.tgdrive.ui.LibraryHeader(
-                title = stringResource(section.titleRes),
+                title = if(navigationOptions)"Floating navigation bar"else stringResource(section.titleRes),
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = {if(navigationOptions)navigationOptions=false else onBack()}) {
                         Icon(
                             DriveIcons.ArrowBack,
                             contentDescription = stringResource(Res.string.common_back)
@@ -269,7 +271,9 @@ fun SettingsSectionScreen(
                     PermissionsSection(viewModel.permissionChecker)
 
                 SettingsSectionType.SECURITY -> SecuritySection(state, viewModel,onOpenHidden)
-                SettingsSectionType.APPEARANCE -> AppearanceSection(state, viewModel)
+                SettingsSectionType.APPEARANCE -> androidx.compose.animation.Crossfade(navigationOptions,animationSpec=androidx.compose.animation.core.tween(240),label="navigationPreferencesPage"){open->
+                    if(open)NavigationBarSection(state,viewModel)else AppearanceSection(state,viewModel){navigationOptions=true}
+                }
                 SettingsSectionType.PLAYBACK -> PlaybackSection(state, viewModel)
                 SettingsSectionType.NOTIFICATIONS -> NotificationsSection(state, viewModel)
                 SettingsSectionType.ADVANCED -> AdvancedSection(
@@ -772,7 +776,6 @@ private fun SecuritySection(state: SettingsUiState, viewModel: SettingsViewModel
 
     val capabilities = LocalPlatformCapabilities.current
     SettingsGroup {
-        add{SettingsClickRow(title=stringResource(com.infinity.drive.resources.Res.string.collection_hidden_title),onClick=onOpenHidden,icon=app.tgdrive.ui.LibraryIcons.Hidden)}
         add(visible = capabilities.supportsAppLock) {
             SettingsSwitchRow(
                 title = stringResource(Res.string.settings_app_lock),
@@ -912,7 +915,7 @@ private fun KeyBackupWarning(onSetPassphrase: () -> Unit) {
 }
 
 @Composable
-private fun AppearanceSection(state: SettingsUiState, viewModel: SettingsViewModel) {
+private fun AppearanceSection(state: SettingsUiState, viewModel: SettingsViewModel,onNavigation:()->Unit) {
     val prefs = state.preferences
     val capabilities = LocalPlatformCapabilities.current
     var showThemeDialog by remember { mutableStateOf(false) }
@@ -945,6 +948,7 @@ private fun AppearanceSection(state: SettingsUiState, viewModel: SettingsViewMod
     }
 
     SettingsGroup {
+        add{SettingsClickRow("Floating navigation bar",onNavigation,subtitle="Style and appearance of your bottom navigation")}
         add {
             SettingsClickRow(
                 title = stringResource(Res.string.settings_theme),
@@ -1201,4 +1205,24 @@ private fun ChannelCriteria() {
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
+}
+
+@Composable
+private fun NavigationBarSection(state:SettingsUiState,viewModel:SettingsViewModel){
+    val prefs=state.preferences
+    var chooseStyle by remember{mutableStateOf(false)}
+    if(chooseStyle)ChoiceDialog(title="Navigation bar style",
+        options=com.infinity.drive.domain.model.NavigationBarStyle.entries.map{it to it.label},selected=prefs.navigationBarStyle,
+        onSelect={style->chooseStyle=false;viewModel.update{it.copy(navigationBarStyle=style)}},onDismiss={chooseStyle=false})
+    val blurSupported=LocalPlatformCapabilities.current.supportsDynamicColor&&prefs.navigationBarStyle.supportsBlur
+    SettingsGroup {
+        add{SettingsSwitchRow("Enable custom navigation",checked=prefs.floatingNavigationBar,onChange={value->viewModel.update{it.copy(floatingNavigationBar=value)}},subtitle="Apply your preferred navigation style")}
+        add{SettingsClickRow("Navigation bar style",onClick={chooseStyle=true},subtitle=prefs.navigationBarStyle.label)}
+        add{SettingsSwitchRow("Blur background",checked=prefs.navigationBarBlur,enabled=blurSupported,onChange={value->viewModel.update{it.copy(navigationBarBlur=value)}},subtitle=when{
+            !LocalPlatformCapabilities.current.supportsDynamicColor->"Available on Android 12 and later"
+            !prefs.navigationBarStyle.supportsBlur->"Miuix uses a solid background"
+            else->"Softens content behind the navigation bar"
+        })}
+        add{SettingsSwitchRow("Show labels",checked=prefs.navigationBarLabels,onChange={value->viewModel.update{it.copy(navigationBarLabels=value)}},subtitle="Show destination names alongside their icons")}
+    }
 }

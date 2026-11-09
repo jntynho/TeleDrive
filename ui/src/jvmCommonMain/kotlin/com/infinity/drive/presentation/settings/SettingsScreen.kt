@@ -5,6 +5,11 @@ import app.tgdrive.ui.elasticVerticalScroll as verticalScroll
 import com.infinity.drive.presentation.components.resultReveal
 import app.tgdrive.ui.*
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
@@ -33,6 +38,13 @@ fun SettingsScreen(onBack:(()->Unit)?,onOpenSection:(SettingsSectionType)->Unit,
     com.infinity.drive.presentation.common.AppBackHandler(searching){searching=false;query=""}
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val authorization by viewModel.authorization.collectAsStateWithLifecycle()
+    val channels by viewModel.storageChannels.collectAsStateWithLifecycle()
+    val paletteLoader=com.infinity.drive.presentation.platform.LocalProfilePalette.current
+    val photo=state.user?.photoPath
+    val palette by produceState<List<Long>>(emptyList(),photo){value=emptyList();if(photo!=null)value=paletteLoader(photo)}
+    val base=MaterialTheme.colorScheme.surfaceContainer
+    val first by animateColorAsState(palette.firstOrNull()?.let{androidx.compose.ui.graphics.lerp(base,Color(it.toInt()),.28f)}?:base,tween(500),label="profileFirst")
+    val second by animateColorAsState(palette.getOrNull(1)?.let{androidx.compose.ui.graphics.lerp(base,Color(it.toInt()),.16f)}?:base,tween(500),label="profileSecond")
     val capabilities=LocalPlatformCapabilities.current
     val hidden=buildSet {
         if(!capabilities.supportsAutoBackup)add(SettingsSectionType.BACKUP)
@@ -54,13 +66,13 @@ fun SettingsScreen(onBack:(()->Unit)?,onOpenSection:(SettingsSectionType)->Unit,
             EmptyState(DriveIcons.Search,"No settings found","Try a setting name, such as cache, backup or playback.",Modifier.padding(padding),"Clear search",{query=""})
         } else Column(Modifier.fillMaxSize().padding(top=padding.calculateTopPadding()).verticalScroll(rememberScrollState()).resultReveal(query)) {
             if(query.isBlank()) {
-                Card(onClick={onOpenSection(SettingsSectionType.ACCOUNT)},modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp),shape=DriveStyle.CardShape,colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)) {
-                    Row(Modifier.padding(18.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
+                androidx.compose.material3.Card(onClick={onOpenSection(SettingsSectionType.ACCOUNT)},modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp),shape=DriveStyle.CardShape,colors=CardDefaults.cardColors(containerColor=Color.Transparent)) {
+                    Row(Modifier.background(Brush.linearGradient(listOf(first,second))).padding(18.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
                         com.infinity.drive.presentation.components.TelegramProfileAvatar(state.user?.photoPath,Modifier.size(44.dp))
                         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
                             Text(state.user?.let{listOf(it.firstName,it.lastName).filter(String::isNotBlank).joinToString(" ")}?.takeIf(String::isNotBlank)?:"Telegram account",style=MaterialTheme.typography.titleMedium)
                             val connection=accountConnectionLabel(authorization,state.connection)
-                            Text(connection+if(state.preferences.storageChatId!=null)" · Private drive"else" · Set up your drive",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(connection+if(state.preferences.storageChatId!=null)" · "+(channels.firstOrNull{it.chatId==state.preferences.storageChatId}?.label?.takeIf{it.isNotBlank()}?:"Storage channels")else" · Set up your drive",maxLines=1,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Icon(DriveIcons.KeyboardArrowRight,null,tint=MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -68,7 +80,6 @@ fun SettingsScreen(onBack:(()->Unit)?,onOpenSection:(SettingsSectionType)->Unit,
                 groups.forEachIndexed { index,(title,items) ->
                     SettingsSectionTitle(title.uppercase())
                     SettingsGroup {
-                        if(index==0)add{SettingsClickRow("Activity",onOpenActivity,icon=app.tgdrive.ui.LibraryIcons.Activity,trailing={Icon(DriveIcons.KeyboardArrowRight,null)})}
                         items.filterNot{it in hidden}.forEach { section->add{SectionRow(section){onOpenSection(section)}} }
                     }
                 }

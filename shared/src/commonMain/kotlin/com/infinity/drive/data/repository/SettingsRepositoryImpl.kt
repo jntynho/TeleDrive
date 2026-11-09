@@ -100,6 +100,10 @@ class SettingsRepositoryImpl(
                 ?: defaults.keyBackupCreated,
             theme = enumOrDefault(this[PreferenceKeys.THEME], defaults.theme),
             language = AppLanguage.fromCode(this[PreferenceKeys.LANGUAGE]),
+            floatingNavigationBar = this[PreferenceKeys.FLOATING_NAVIGATION] ?: defaults.floatingNavigationBar,
+            navigationBarStyle = enumOrDefault(this[PreferenceKeys.NAVIGATION_STYLE],defaults.navigationBarStyle),
+            navigationBarBlur = this[PreferenceKeys.NAVIGATION_BLUR] ?: defaults.navigationBarBlur,
+            navigationBarLabels = this[PreferenceKeys.NAVIGATION_LABELS] ?: defaults.navigationBarLabels,
             dynamicColor = this[PreferenceKeys.DYNAMIC_COLOR] ?: defaults.dynamicColor,
             viewMode = if(this[PreferenceKeys.FILE_LIST_DEFAULT_APPLIED]==true)enumOrDefault(this[PreferenceKeys.VIEW_MODE], defaults.viewMode)else com.infinity.drive.domain.model.ViewMode.LIST,
             galleryViewMode = enumOrDefault(
@@ -185,6 +189,10 @@ class SettingsRepositoryImpl(
         this[PreferenceKeys.FOLDER_OWNERSHIP_REPAIRED] = prefs.folderOwnershipRepaired
         this[PreferenceKeys.THEME] = prefs.theme.name
         this[PreferenceKeys.LANGUAGE] = prefs.language.code
+        this[PreferenceKeys.FLOATING_NAVIGATION] = prefs.floatingNavigationBar
+        this[PreferenceKeys.NAVIGATION_STYLE] = prefs.navigationBarStyle.name
+        this[PreferenceKeys.NAVIGATION_BLUR] = prefs.navigationBarBlur
+        this[PreferenceKeys.NAVIGATION_LABELS] = prefs.navigationBarLabels
         this[PreferenceKeys.DYNAMIC_COLOR] = prefs.dynamicColor
         this[PreferenceKeys.FILE_LIST_DEFAULT_APPLIED] = true
         this[PreferenceKeys.VIEW_MODE] = prefs.viewMode.name

@@ -372,7 +372,7 @@ fun PreviewScreen(
     }
     }
 
-    if(showOverflow)com.infinity.drive.presentation.components.FileActionsSheet(currentFile,onDismiss={showOverflow=false},onOpen={showOverflow=false})
+    if(showOverflow)com.infinity.drive.presentation.components.FileActionsSheet(currentFile,onDismiss={showOverflow=false},onOpen={showOverflow=false},isOpen=true)
 
     renameTarget?.let { file ->
         RenameDialog(
@@ -446,47 +446,18 @@ private fun PreviewPage(
     }
     if(file.category==FileCategory.AUDIO){com.infinity.drive.presentation.audio.FullscreenAudioPlayer(file,isActivePage,Modifier.fillMaxSize(),onAudioTrackChanged);return}
     when (content) {
-        is PreviewContent.Loading -> LoadingState()
-        is PreviewContent.DownloadProgress -> Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 48.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = stringResource(Res.string.preview_preparing, file.name),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(bottom = 20.dp)
-            )
-            if (content.total > 0) {
-                LinearWavyProgressIndicator(
-                    progress = {
-                        (content.transferred.toFloat() / content.total).coerceIn(0f, 1f)
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            } else {
-                LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
+        is PreviewContent.Loading,is PreviewContent.DownloadProgress -> {
+            Box(Modifier.fillMaxSize().background(Color.Black),contentAlignment=Alignment.Center){
+                coil3.compose.AsyncImage(com.infinity.drive.core.media.ThumbnailModel(file.id),file.name,Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Fit)
+                val progress=content as? PreviewContent.DownloadProgress
+                Text(if(progress!=null&&progress.total>0)"${(progress.transferred*100/progress.total).coerceIn(0,100)}%"else"Preparing preview…",
+                    color=Color.White.copy(alpha=.75f),style=MaterialTheme.typography.labelSmall,
+                    modifier=Modifier.align(Alignment.BottomCenter).padding(bottom=40.dp))
             }
-            Text(
-                text = stringResource(
-                    Res.string.preview_progress_bytes,
-                    Formatters.bytes(content.transferred),
-                    Formatters.bytes(content.total)
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 12.dp)
-            )
         }
 
         is PreviewContent.Image -> Box(Modifier.fillMaxSize().background(Color.Black)) {
+            coil3.compose.AsyncImage(com.infinity.drive.core.media.ThumbnailModel(file.id),null,Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Fit)
             ZoomableImage(model=content.model,contentDescription=file.name,onTap=onToggleChrome,onZoomChanged=onImageZoomChanged)
         }
 

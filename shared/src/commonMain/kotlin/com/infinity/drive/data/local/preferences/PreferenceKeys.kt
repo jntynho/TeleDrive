@@ -35,6 +35,10 @@ object PreferenceKeys {
 
     val THEME = stringPreferencesKey("theme")
     val LANGUAGE = stringPreferencesKey("language")
+    val FLOATING_NAVIGATION = booleanPreferencesKey("floating_navigation")
+    val NAVIGATION_STYLE = stringPreferencesKey("navigation_style")
+    val NAVIGATION_BLUR = booleanPreferencesKey("navigation_blur")
+    val NAVIGATION_LABELS = booleanPreferencesKey("navigation_labels")
     val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
     val FILE_LIST_DEFAULT_APPLIED = booleanPreferencesKey("files_list_default_applied")
     val VIEW_MODE = stringPreferencesKey("view_mode")

@@ -2,6 +2,7 @@
 package com.infinity.drive.presentation.files
 
 import app.tgdrive.ui.ElasticLazyVerticalGrid as LazyVerticalGrid
+import com.infinity.drive.presentation.components.resultReveal
 import app.tgdrive.ui.DriveIcons
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -466,19 +467,12 @@ fun FilesScreen(
                                 }
                             },
                             actions = {
+                                Box {
                                 IconButton(onClick = { showSortMenu = true }) {
                                     Icon(
                                         DriveIcons.Sort,
                                         contentDescription = stringResource(Res.string.files_sort)
                                     )
-                                }
-                                Box {
-                                    IconButton({fileActions=true}){Icon(DriveIcons.MoreVert,"More file actions")}
-                                    DropdownMenu(fileActions,{fileActions=false}){
-                                        DropdownMenuItem(text={Text("Refresh")},enabled=!refreshing,onClick={fileActions=false;viewModel.refresh()})
-                                        if(!audioOnly)DropdownMenuItem(text={Text("New folder")},onClick={fileActions=false;showCreateFolder=true})
-                                        DropdownMenuItem(text={Text("New note")},onClick={fileActions=false;onNewNote(state.folderId)})
-                                    }
                                 }
                                 SortMenu(
                                     expanded = showSortMenu,
@@ -490,6 +484,16 @@ fun FilesScreen(
                                         viewModel.setSort(field, direction)
                                     }
                                 )
+                                }
+                                Box {
+                                    IconButton({fileActions=true}){Icon(DriveIcons.MoreVert,"More file actions")}
+                                    DropdownMenu(fileActions,{fileActions=false}){
+                                        DropdownMenuItem(text={Text("Refresh")},enabled=!refreshing,onClick={fileActions=false;viewModel.refresh()})
+                                        if(!audioOnly)DropdownMenuItem(text={Text("New folder")},onClick={fileActions=false;showCreateFolder=true})
+                                        DropdownMenuItem(text={Text("New note")},onClick={fileActions=false;onNewNote(state.folderId)})
+                                    }
+                                }
+
                             }
                         )
                     }
@@ -516,16 +520,7 @@ fun FilesScreen(
                         .padding(top = padding.calculateTopPadding())
                         .nestedScroll(fabScrollConnection)
                 ) {
-                    Breadcrumbs(crumbs = state.breadcrumbs, onOpen = onOpenCrumb)
-                    HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.35f))
-                    Row(Modifier.fillMaxWidth().heightIn(min=40.dp).padding(horizontal=20.dp),
-                        verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
-                        Text("${state.folders.size} folders · ${files.itemCount} loaded files",Modifier.weight(1f),maxLines=1,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(state.sortField.name.lowercase().replace('_',' ').replaceFirstChar(Char::uppercase)+
-                            if(state.sortDirection==SortDirection.ASCENDING)" ↑"else" ↓",
-                            modifier=Modifier.padding(start=12.dp).widthIn(max=120.dp),maxLines=1,overflow=TextOverflow.Ellipsis,
-                            style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    if(state.folderId!=null&&state.breadcrumbs.any{it.id!=null})Breadcrumbs(crumbs=state.breadcrumbs.filter{it.id!=null},onOpen=onOpenCrumb)
                     RefreshableContent(
                         isRefreshing = refreshing,
                         onRefresh = viewModel::refresh,
@@ -702,8 +697,6 @@ private fun Breadcrumbs(
             .heightIn(min=48.dp).padding(horizontal = 16.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(DriveIcons.CloudQueue,null,Modifier.size(20.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)
-        if(crumbs.isEmpty())Text("My drive",Modifier.padding(start=8.dp),style=MaterialTheme.typography.labelLarge)
         if (collapsed.isNotEmpty()) {
             Box {
                 CrumbLabel(
@@ -809,7 +802,7 @@ private fun FilesContent(
         state = gridState,
         columns = GridCells.Fixed(columns),
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxSize().resultReveal(gridState)
 
             .then(dragSelect),
         contentPadding = padding.add(horizontal = 12.dp, top = 12.dp, bottom = 100.dp),

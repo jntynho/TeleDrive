@@ -27,6 +27,10 @@ data class UserPreferences(
 
     val theme: AppTheme = AppTheme.DARK,
     val language: AppLanguage = AppLanguage.ENGLISH,
+    val floatingNavigationBar:Boolean=false,
+    val navigationBarStyle:NavigationBarStyle=NavigationBarStyle.FLOATING,
+    val navigationBarBlur:Boolean=true,
+    val navigationBarLabels:Boolean=true,
     val dynamicColor: Boolean = false,
     val viewMode: ViewMode = ViewMode.LIST,
     val gridSize: Int = 3,

@@ -12,6 +12,12 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import com.infinity.drive.presentation.components.recordNavigationScene
+import com.infinity.drive.presentation.components.navigationBackdrop
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -20,11 +26,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
@@ -219,17 +227,23 @@ private fun MainScaffold(
     onUpdateRequested: () -> Unit,
     driveMissing: Flow<Unit>
 ) {
+    val navigationSettings=org.koin.compose.koinInject<com.infinity.drive.domain.repository.SettingsRepository>()
+    val navigationPreferences by navigationSettings.preferences.collectAsStateWithLifecycle(com.infinity.drive.domain.model.UserPreferences())
+    val navigationScene=rememberGraphicsLayer()
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     val navigationFocus=androidx.compose.ui.platform.LocalFocusManager.current
     val navigationKeyboard=androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     LaunchedEffect(backStackEntry?.id){navigationFocus.clearFocus();navigationKeyboard?.hide()}
+    var selectedNavIndex by androidx.compose.runtime.saveable.rememberSaveable { mutableIntStateOf(0) }
     var requestedTab by remember { mutableStateOf<TopLevelDestination?>(null) }
     LaunchedEffect(requestedTab,backStackEntry) {
         val target=requestedTab ?: return@LaunchedEffect
         val entry=backStackEntry ?: return@LaunchedEffect
         entry.lifecycle.currentStateFlow.first { it.isAtLeast(Lifecycle.State.RESUMED) }
+        if(navController.currentBackStackEntry!==entry)return@LaunchedEffect
+        selectedNavIndex=TopLevelDestination.entries.indexOf(target)
         if(navController.currentDestination?.hasRoute(target.route::class)!=true)navigateTopLevel(navController,target)
         requestedTab=null
     }
@@ -302,11 +316,12 @@ private fun MainScaffold(
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val railWidth=if(useRail&&onboardingComplete)80.dp else 0.dp
         CompositionLocalProvider(
+            com.infinity.drive.presentation.components.LocalNavigationScene provides navigationScene,
             LocalBottomBarHeight provides if(onboardingComplete)bottomChromeHeight else 0.dp,
             com.infinity.drive.presentation.components.LocalFileFolderNavigation provides { id:String? -> navController.navigateOnce(Route.Files(id)) },
             com.infinity.drive.presentation.navigation.LocalNavigationRailWidth provides railWidth
         ) {
-            AppNavHost(navController=navController,startDestination=startDestination,modifier=Modifier.fillMaxSize().testTag("navigation-host"))
+            AppNavHost(navController=navController,startDestination=startDestination,modifier=Modifier.fillMaxSize().recordNavigationScene(navigationScene,navigationPreferences.floatingNavigationBar&&navigationPreferences.navigationBarBlur&&navigationPreferences.navigationBarStyle.supportsBlur&&com.infinity.drive.presentation.platform.LocalPlatformCapabilities.current.supportsDynamicColor&&showChrome&&!useRail&&!keyboardVisible).testTag("navigation-host"))
         }
         if(useRail) AnimatedVisibility(visible=showChrome&&!keyboardVisible,
             enter=fadeIn(tween(180)),exit=fadeOut(tween(180)),modifier=Modifier.align(Alignment.CenterStart)) {
@@ -320,7 +335,6 @@ private fun MainScaffold(
             }
         }
         val topLevelIndex=TopLevelDestination.entries.indexOfFirst { currentDestination?.hasRoute(it.route::class)==true }
-        var selectedNavIndex by remember { mutableIntStateOf(0) }
         LaunchedEffect(topLevelIndex){if(topLevelIndex>=0)selectedNavIndex=topLevelIndex}
         AnimatedVisibility(visible=showChrome,enter=fadeIn(tween(180)),exit=fadeOut(tween(180)),
             modifier=Modifier.align(Alignment.BottomCenter).padding(start=railWidth)) {
@@ -328,7 +342,7 @@ private fun MainScaffold(
                 bottomChromeHeight=with(chromeDensity){(it.height-if(useRail)0 else systemBottom).coerceAtLeast(0).toDp()}
             }) {
                 com.infinity.drive.presentation.audio.LibraryAudioMiniPlayer()
-                if(!useRail&&!keyboardVisible)FloatingNavigationBar(selectedIndex=selectedNavIndex,onNavigate={requestedTab=it})
+                if(!useRail&&!keyboardVisible)CompositionLocalProvider(com.infinity.drive.presentation.components.LocalNavigationScene provides navigationScene){FloatingNavigationBar(preferences=navigationPreferences,selectedIndex=topLevelIndex.takeIf{it>=0}?:selectedNavIndex,onNavigate={requestedTab=it})}
             }
         }
     }
@@ -336,13 +350,22 @@ private fun MainScaffold(
 
 /** TG Drive's four native destinations, with stable icons and labels. */
 @Composable
-private fun FloatingNavigationBar(selectedIndex:Int,onNavigate:(TopLevelDestination)->Unit) {
-    androidx.compose.material3.NavigationBar(containerColor=MaterialTheme.colorScheme.background,tonalElevation=0.dp){
+private fun FloatingNavigationBar(preferences:com.infinity.drive.domain.model.UserPreferences,selectedIndex:Int,onNavigate:(TopLevelDestination)->Unit) {
+    val style=if(preferences.floatingNavigationBar)preferences.navigationBarStyle else com.infinity.drive.domain.model.NavigationBarStyle.STANDARD
+    val floating=style!=com.infinity.drive.domain.model.NavigationBarStyle.STANDARD
+    val blur=preferences.floatingNavigationBar&&style.supportsBlur&&preferences.navigationBarBlur&&com.infinity.drive.presentation.platform.LocalPlatformCapabilities.current.supportsDynamicColor
+    androidx.compose.material3.Surface(modifier=Modifier.fillMaxWidth().padding(horizontal=if(floating)20.dp else 0.dp,vertical=if(floating)10.dp else 0.dp).then(if(floating)Modifier.navigationBarsPadding()else Modifier).navigationBackdrop(blur,if(floating)28.dp else 0.dp),
+        shape=androidx.compose.foundation.shape.RoundedCornerShape(if(floating)28.dp else 0.dp),color=if(blur)MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha=.86f)else MaterialTheme.colorScheme.surfaceContainerHigh,
+        shadowElevation=if(floating)8.dp else 0.dp){
+    androidx.compose.material3.NavigationBar(modifier=if(floating)Modifier.height(maxOf(64.dp,(32+32*androidx.compose.ui.platform.LocalDensity.current.fontScale).dp))else Modifier,containerColor=if(floating||blur)androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.background,tonalElevation=0.dp,
+        windowInsets=if(floating)WindowInsets(0,0,0,0)else androidx.compose.material3.NavigationBarDefaults.windowInsets){
         TopLevelDestination.entries.forEachIndexed{index,destination->
-            NavigationBarItem(modifier=Modifier.testTag("navigation-${destination.name.lowercase()}"),selected=index==selectedIndex,onClick={onNavigate(destination)},icon={Icon(destination.icon,null)},label={Text(stringResource(destination.labelRes),style=MaterialTheme.typography.labelSmall)},
-                colors=androidx.compose.material3.NavigationBarItemDefaults.colors(selectedIconColor=MaterialTheme.colorScheme.primary,selectedTextColor=MaterialTheme.colorScheme.primary,indicatorColor=androidx.compose.ui.graphics.Color.Transparent,unselectedIconColor=MaterialTheme.colorScheme.onSurfaceVariant,unselectedTextColor=MaterialTheme.colorScheme.onSurfaceVariant))
+            val destinationLabel=stringResource(destination.labelRes)
+            NavigationBarItem(modifier=Modifier.testTag("navigation-${destination.name.lowercase()}").semantics{contentDescription=destinationLabel},selected=index==selectedIndex,onClick={onNavigate(destination)},icon={Icon(destination.icon,null)},label=if(preferences.navigationBarLabels){{Text(stringResource(destination.labelRes),style=MaterialTheme.typography.labelSmall)}}else null,
+                colors=androidx.compose.material3.NavigationBarItemDefaults.colors(selectedIconColor=MaterialTheme.colorScheme.primary,selectedTextColor=MaterialTheme.colorScheme.primary,indicatorColor=when(style){com.infinity.drive.domain.model.NavigationBarStyle.MIUIX->MaterialTheme.colorScheme.primaryContainer;com.infinity.drive.domain.model.NavigationBarStyle.FLOATING->MaterialTheme.colorScheme.primary.copy(alpha=.12f);else->androidx.compose.ui.graphics.Color.Transparent},unselectedIconColor=MaterialTheme.colorScheme.onSurfaceVariant,unselectedTextColor=MaterialTheme.colorScheme.onSurfaceVariant))
         }
     }
+}
 }
 
 private fun navigateTopLevel(

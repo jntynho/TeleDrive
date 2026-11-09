@@ -2,6 +2,11 @@
 package com.infinity.drive.presentation.settings
 
 import app.tgdrive.ui.DriveIcons
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -55,23 +60,21 @@ fun AboutSection(state: SettingsUiState, viewModel: SettingsViewModel) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primaryContainer,MaterialTheme.colorScheme.surfaceContainer)))
+            .padding(28.dp)
     ) {
-        LocalAppIcon.current(
-            Modifier
-                .size(88.dp)
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = stringResource(Res.string.app_name),
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Text(
-            text = stringResource(Res.string.about_version, LocalAppVersion.current),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
+        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(18.dp)){
+            LocalAppIcon.current(Modifier.size(72.dp))
+            Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
+                Text(stringResource(Res.string.app_name),style=MaterialTheme.typography.headlineMedium)
+                Text(stringResource(Res.string.about_version,LocalAppVersion.current),
+                    Modifier.clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surface.copy(alpha=.65f)).padding(horizontal=12.dp,vertical=6.dp),
+                    style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary)
+            }
+        }
+        Spacer(Modifier.height(12.dp))
         Text(
             text = stringResource(Res.string.about_tagline),
             style = MaterialTheme.typography.bodyMedium,

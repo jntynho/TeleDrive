@@ -27,6 +27,7 @@ fun settingsSearchEntries():List<SettingsSearchEntry> = listOf(
     SettingsSearchEntry(SettingsSectionType.SECURITY,Res.string.settings_encrypt_uploads),
     SettingsSearchEntry(SettingsSectionType.SECURITY,Res.string.settings_restore_encryption_key),
     SettingsSearchEntry(SettingsSectionType.SECURITY,Res.string.settings_encrypt_thumbnails),
+    SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_floating_navigation_bar),
     SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_theme),
     SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_language),
     SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_dynamic_color),

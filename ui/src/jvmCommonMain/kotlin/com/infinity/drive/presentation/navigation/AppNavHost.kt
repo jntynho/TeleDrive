@@ -1,6 +1,8 @@
 // Modified for TG Drive: Android integration, safety fixes and visual adaptation; see third_party/driveinfinity/SOURCE.md.
 package com.infinity.drive.presentation.navigation
 
+import androidx.navigation.NavDestination.Companion.hasRoute
+
 import com.infinity.drive.presentation.navigation.NavigationTransitions.forward
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -89,7 +91,10 @@ fun AppNavHost(
                 )
             }
         }
-        stableComposable<Route.Files>(navController) { entry ->
+        stableComposable<Route.Files>(navController,
+            enterTransition={if(initialState.destination.hasRoute<Route.Files>())androidx.compose.animation.EnterTransition.None else null},
+            exitTransition={if(targetState.destination.hasRoute<Route.Files>())androidx.compose.animation.ExitTransition.None else null}
+        ) { entry ->
             UnderBottomBar {
                 val isRoot = entry.toRoute<Route.Files>().folderId == null
                 FilesScreen(

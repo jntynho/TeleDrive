@@ -72,7 +72,7 @@ fun AddFilesSheet(visible:Boolean,target:String?=null,onDismiss:()->Unit) {
                     Text("Add to ${if(target==null)"My Drive"else"this folder"}",Modifier.padding(horizontal=24.dp,vertical=12.dp),style=MaterialTheme.typography.titleLarge)
                     SheetActionRow("Upload files",DriveIcons.FileUpload,enabled=!busy,detail="Anything on this phone, any size"){launchPicker{picker.pick{uploads.importAndUpload(it,target)}}}
                     SheetActionRow("Upload photos and videos",DriveIcons.PhotoLibrary,enabled=!busy,detail="Originals, uncompressed"){launchPicker{device.pickMedia{uploads.importAndUpload(it,target)}}}
-                    SheetActionRow("Scan a document",DriveIcons.DocumentScanner,enabled=!busy,detail="Straightened and cropped into a PDF"){launchPicker{device.scanDocument(::capture)}}
+                    SheetActionRow("Scan a document",DriveIcons.DocumentScanner,enabled=!busy,detail="Capture a document as a PDF"){launchPicker{device.scanDocument(::capture)}}
                     SheetActionRow("Take a photo",DriveIcons.PhotoCamera,enabled=!busy,detail="Goes straight here, not to your gallery"){launchPicker{device.takePhoto(::capture)}}
                     SheetActionRow("New folder",DriveIcons.CreateNewFolder,enabled=!busy){page="folder"}
                     SheetActionRow("Import from Google Photos",DriveIcons.Image,enabled=!busy,detail="Bring your library and albums from Google Takeout"){page="takeout"}

@@ -11,6 +11,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.FileProvider
 import com.google.mlkit.vision.documentscanner.*
 import java.io.File
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.*
 
 /** System camera and on-demand Play Services scanner: no camera/OCR engine bundled in the APK. */
 @Composable
@@ -26,6 +28,29 @@ internal fun rememberDeviceImportActions():DeviceImportActions {
         if(success&&photo!=null&&photo.length()>0)deliverPhoto(CaptureResult.Ready(photo.absolutePath))
         else {photo?.delete();deliverPhoto(CaptureResult.Cancelled)}
     }
+    var fallbackPath by androidx.compose.runtime.saveable.rememberSaveable{mutableStateOf<String?>(null)}
+    val scanCamera=rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()){success->
+        val photo=fallbackPath?.let(::File);fallbackPath=null
+        if(!success||photo==null){photo?.delete();deliverScan(CaptureResult.Cancelled)}
+        else callbacks.viewModelScope.launch{
+            val result=try{withContext(Dispatchers.IO){
+                val pdf=File(photo.parentFile,"Scan_${System.currentTimeMillis()}.pdf")
+                CaptureResult.Ready(photoToScanPdf(photo,pdf).absolutePath)
+            }}catch(cancel:CancellationException){throw cancel}
+            catch(_:Exception){CaptureResult.Failed("Couldn't create the PDF. Please try another photo.")}
+            finally{photo.delete()}
+            deliverScan(result)
+        }
+    }
+    fun scanFallback(){
+        if(callbacks.scan==null||fallbackPath!=null)return
+        try{
+            val directory=File(context.filesDir,"captures").apply{mkdirs()}
+            val photo=File(directory,"Scan_${System.currentTimeMillis()}.jpg")
+            fallbackPath=photo.absolutePath
+            scanCamera.launch(FileProvider.getUriForFile(context,"${context.packageName}.files",photo))
+        }catch(_:Exception){fallbackPath?.let(::File)?.delete();fallbackPath=null;deliverScan(CaptureResult.Failed("Neither document scanning nor a camera app is available on this phone."))}
+    }
     val scanner=rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()){result ->
         if(result.resultCode!=Activity.RESULT_OK)deliverScan(CaptureResult.Cancelled)
         else {
@@ -39,7 +64,7 @@ internal fun rememberDeviceImportActions():DeviceImportActions {
         uris.forEach{uri->runCatching{context.contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION)}}
         picked.fire(uris.map{it.toString()})
     }
-    return remember(context,activity,camera,scanner,media) { object:DeviceImportActions {
+    return remember(context,activity,camera,scanner,scanCamera,media) { object:DeviceImportActions {
         override fun pickMedia(onPicked:(List<String>)->Unit){
             picked.arm(onPicked)
             runCatching{media.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))}
@@ -59,12 +84,14 @@ internal fun rememberDeviceImportActions():DeviceImportActions {
             if(callbacks.scan!=null){onResult(CaptureResult.Failed("The scanner is already open."));return}
             if(activity==null){onResult(CaptureResult.Failed("Open TeleDrive to start scanning."));return}
             callbacks.scan=onResult
+            try {
             val options=GmsDocumentScannerOptions.Builder().setGalleryImportAllowed(true).setPageLimit(30)
                 .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_PDF)
                 .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL).build()
             GmsDocumentScanning.getClient(options).getStartScanIntent(activity)
-                .addOnSuccessListener{sender->runCatching{scanner.launch(IntentSenderRequest.Builder(sender).build())}.onFailure{deliverScan(CaptureResult.Failed("Couldn't open the document scanner."))}}
-                .addOnFailureListener{deliverScan(CaptureResult.Failed("Document scanning requires supported Google Play services. Connect to the internet for its first setup, then try again."))}
+                .addOnSuccessListener{sender->runCatching{scanner.launch(IntentSenderRequest.Builder(sender).build())}.onFailure{scanFallback()}}
+                .addOnFailureListener{scanFallback()}
+            }catch(_:Exception){scanFallback()}
         }
     }}
 }

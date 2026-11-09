@@ -26,6 +26,7 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Assert.assertTrue
 import org.junit.runner.RunWith
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.workmanager.koin.workManagerFactory
@@ -109,6 +110,67 @@ class RebuiltUiTest {
         capture("api-setup")
         compose.onNodeWithText("Continue").assertIsNotEnabled()
     }
+    @Test fun floatingNavigationPreferencesPersistAndTabsRemainUsable(){
+        compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("navigation-settings").performClick()
+        compose.onNodeWithText("Appearance",substring=false).performScrollTo().performClick()
+        compose.onNodeWithText("Floating navigation bar",substring=false).performScrollTo().performClick()
+        compose.onAllNodesWithText("Floating navigation bar",substring=false).onFirst().assertIsDisplayed()
+        compose.onNodeWithText("Apply your preferred navigation style").assertIsDisplayed()
+        capture("floating-before-tap")
+        compose.onNodeWithText("Apply your preferred navigation style").performClick()
+        capture("floating-after-tap")
+        val repository=GlobalContext.get().get<SettingsRepository>()
+        compose.waitUntil(5000){compose.waitForIdle();runBlocking{repository.preferences.first().floatingNavigationBar}}
+        compose.onNodeWithText("Show labels",substring=false).performClick()
+        capture("floating-label-after")
+        compose.waitUntil(5000){compose.waitForIdle();!runBlocking{repository.preferences.first().navigationBarLabels}}
+        for(style in listOf(com.infinity.drive.domain.model.NavigationBarStyle.MIUIX,com.infinity.drive.domain.model.NavigationBarStyle.STANDARD,com.infinity.drive.domain.model.NavigationBarStyle.FLOATING)){
+            compose.onNodeWithText("Navigation bar style",substring=false).performClick()
+            compose.onNodeWithText(style.label,substring=false).performClick()
+            compose.waitUntil(5000){compose.waitForIdle();runBlocking{repository.preferences.first().navigationBarStyle==style}}
+            compose.onNodeWithTag("navigation-settings").assertIsSelected()
+        }
+        capture("floating-navigation-settings")
+        for(tab in listOf("home","gallery","audio","settings","audio","home")){
+            compose.onNodeWithTag("navigation-$tab").performClick()
+            compose.onNodeWithTag("navigation-$tab").assertIsSelected()
+        }
+        assertTrue(runBlocking{repository.preferences.first().floatingNavigationBar})
+    }
+
+    @Test fun fileActionsUseHeaderDetailsAndHideActionsForAnOpenFile(){
+        val file=runBlocking{GlobalContext.get().get<com.infinity.drive.domain.repository.FileRepository>().getFile("Report.pdf")}!!
+        compose.runOnUiThread{activity.get().setContent{ProvidePlatformActions{
+            com.infinity.drive.presentation.theme.DriveInfinityTheme{
+                com.infinity.drive.presentation.components.FileActionsSheet(file,onDismiss={},onOpen={},isOpen=true)
+            }
+        }}}
+        compose.onNodeWithText("Open",substring=false).assertDoesNotExist()
+        compose.onNodeWithText("Make available offline",substring=false).assertDoesNotExist()
+        compose.onNodeWithText("Download",substring=false).assertIsDisplayed()
+        compose.onNodeWithContentDescription("File details").assertIsDisplayed().performClick()
+        compose.onNodeWithContentDescription("Back to file actions").assertIsDisplayed()
+    }
+
+    @Test fun allFilesKeepsACleanHeaderAndAnchorsSortingToItsButton(){
+        compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("All files",substring=false).performScrollTo().performClick()
+        compose.onNodeWithText("My drive",substring=false).assertDoesNotExist()
+        compose.onNodeWithText("loaded files",substring=true).assertDoesNotExist()
+        fun screenBounds(node:androidx.compose.ui.semantics.SemanticsNode):androidx.compose.ui.geometry.Rect{
+            val c=node.layoutInfo.coordinates
+            return androidx.compose.ui.geometry.Rect(c.localToScreen(androidx.compose.ui.geometry.Offset.Zero),androidx.compose.ui.geometry.Size(c.size.width.toFloat(),c.size.height.toFloat()))
+        }
+        val button=screenBounds(compose.onNodeWithContentDescription("Sort").fetchSemanticsNode())
+        compose.onNodeWithContentDescription("Sort").performClick()
+        val menu=screenBounds(compose.onNodeWithText("Name",substring=false).assertIsDisplayed().fetchSemanticsNode())
+        capture("all-files-sort-anchor")
+        assertTrue("Sort menu should align with Sort rather than the adjacent More button",menu.right<=button.right+20)
+        assertTrue("Sort options should appear below the top bar",menu.top>=button.bottom)
+        capture("all-files-sort-anchor")
+    }
+
     @Test fun settingsSearchFindsControlsAndExplainsNoResults() {
         compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithTag("navigation-settings").performClick()
@@ -414,8 +476,8 @@ class RebuiltUiTest {
         val bounds=compose.onNodeWithTag("navigation-host").fetchSemanticsNode().boundsInRoot
         compose.onNodeWithTag("navigation-settings").performClick()
         org.junit.Assert.assertEquals(bounds,compose.onNodeWithTag("navigation-host").fetchSemanticsNode().boundsInRoot)
-        compose.onNodeWithText("Activity",substring=false).performClick()
-        compose.onNodeWithText("Activity",substring=false).assertIsDisplayed()
+        compose.onNodeWithText("Appearance",substring=false).performScrollTo().performClick()
+        compose.onNodeWithText("Appearance",substring=false).assertIsDisplayed()
         org.junit.Assert.assertEquals(bounds,compose.onNodeWithTag("navigation-host").fetchSemanticsNode().boundsInRoot)
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithTag("navigation-gallery").performClick()

@@ -48,17 +48,18 @@ fun FolderRow(
                 else Color.Transparent
             )
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .heightIn(min=64.dp).padding(horizontal = 4.dp, vertical = 10.dp),
+            .heightIn(min=if(LocalCompactLayout.current)56.dp else 72.dp).padding(horizontal = 4.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainer),contentAlignment=Alignment.Center) {
+        Box(Modifier.size(if(LocalCompactLayout.current)38.dp else 48.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),contentAlignment=Alignment.Center) {
         Icon(
             imageVector = DriveIcons.Folder,
+            modifier = Modifier.size(28.dp),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary
         )
         }
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(if(LocalCompactLayout.current)10.dp else 14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = folder.name,
@@ -82,8 +83,8 @@ fun FolderRow(
                 tint = MaterialTheme.colorScheme.tertiary
             )
         }
-        Icon(DriveIcons.ChevronRight,null,Modifier.padding(start=8.dp).size(20.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)
+        androidx.compose.material3.IconButton(onClick){Icon(DriveIcons.ChevronRight,"Open ${folder.name}",Modifier.size(20.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)}
     }
-    HorizontalDivider(Modifier.padding(start=62.dp),color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.35f))
+    HorizontalDivider(Modifier.padding(start=if(LocalCompactLayout.current)52.dp else 66.dp),color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.35f))
     }
 }

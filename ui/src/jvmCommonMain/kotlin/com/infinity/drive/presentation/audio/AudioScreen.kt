@@ -8,6 +8,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -95,18 +98,30 @@ fun AudioLibraryRow(file:DriveFile?,playing:Boolean=false,currentMetadata:AudioM
             Text(meta.title?.takeIf{it.isNotBlank()}?:file?.name?.substringBeforeLast('.')?:"Midnight City",Modifier.skeleton(loading),style=MaterialTheme.typography.titleSmall,color=if(playing)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,maxLines=1,overflow=TextOverflow.Ellipsis)
             Text(meta.artist?.takeIf{it.isNotBlank()}?:if(loading)"Artist name"else file?.extension?.uppercase()?.ifBlank{"Audio"}?:"Audio",Modifier.skeleton(loading),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
         }
-        val duration=meta.durationMs?:file?.durationMs
-        Column(horizontalAlignment=Alignment.End,verticalArrangement=Arrangement.spacedBy(4.dp)){
-            Text(if(loading)"3:42"else if(duration!=null)Formatters.duration(duration)else "—",Modifier.skeleton(loading),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(if(loading)"Jan 20"else file?.addedAt?.takeIf{it>0}?.let{java.text.SimpleDateFormat("MMM d",java.util.Locale.getDefault()).format(java.util.Date(it))}.orEmpty(),
-                Modifier.skeleton(loading),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.75f),maxLines=1)
+        Box(Modifier.width(56.dp),contentAlignment=Alignment.CenterEnd){
+            androidx.compose.animation.Crossfade(playing,animationSpec=androidx.compose.animation.core.tween(220),label="audioDateOrPlayback"){active->
+                if(active)PlayingEqualizer()
+                else Text(if(loading)"Jan 20"else file?.addedAt?.takeIf{it>0}?.let{java.text.SimpleDateFormat("MMM d",java.util.Locale.getDefault()).format(java.util.Date(it))}.orEmpty(),
+                    Modifier.skeleton(loading),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1)
+            }
         }
-        if(playing)Icon(DriveIcons.Audiotrack,"Playing",Modifier.size(20.dp),tint=MaterialTheme.colorScheme.primary)
         Box {
-            IconButton({menu=true},enabled=!loading){Icon(DriveIcons.MoreVert,"Audio options for ${file?.name.orEmpty()}",Modifier.skeleton(loading))}
+            IconButton({menu=true},enabled=!loading){Icon(DriveIcons.MoreVert,"Audio options for ${file?.name.orEmpty()}",Modifier.size(20.dp).skeleton(loading))}
 
         }
     }
     HorizontalDivider(Modifier.padding(start=LibraryLayout.AudioCover+LibraryLayout.AudioRowGap),color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.4f))
+    }
+}
+
+@Composable
+private fun PlayingEqualizer(){
+    val color=MaterialTheme.colorScheme.primary
+    val transition=androidx.compose.animation.core.rememberInfiniteTransition(label="playingBars")
+    val phase by transition.animateFloat(initialValue=0f,targetValue=6.283185f,
+        animationSpec=androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1100,easing=androidx.compose.animation.core.LinearEasing)),label="barPhase")
+    androidx.compose.foundation.Canvas(Modifier.size(20.dp).semantics{contentDescription="Playing"}){
+        repeat(3){i->val h=size.height*(.3f+.65f*((kotlin.math.sin(phase+i*1.8f)+1f)/2f))
+            drawLine(color,androidx.compose.ui.geometry.Offset(size.width*(i+1)/4f,(size.height-h)/2),androidx.compose.ui.geometry.Offset(size.width*(i+1)/4f,(size.height+h)/2),2.dp.toPx(),androidx.compose.ui.graphics.StrokeCap.Round)}
     }
 }

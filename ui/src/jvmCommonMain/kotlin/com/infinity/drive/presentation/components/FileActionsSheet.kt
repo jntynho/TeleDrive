@@ -34,7 +34,7 @@ val LocalFileFolderNavigation=staticCompositionLocalOf<(String?)->Unit>{{}}
 /** A single action surface used in lists, search, Recent, audio and the full-screen viewer. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit) {
+fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Boolean=false) {
     val repository=koinInject<FileRepository>()
     val transfers=koinInject<TransferRepository>()
     val telegram=koinInject<TelegramClient>()
@@ -109,6 +109,7 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit) {
                     Text(current.name,style=MaterialTheme.typography.titleMedium,maxLines=2,overflow=TextOverflow.Ellipsis)
                     Text("${current.category.name.lowercase().replaceFirstChar(Char::uppercase)} · ${Formatters.bytes(current.sizeBytes)}",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                IconButton({page="details"},enabled=!working){Icon(DriveIcons.Info,"File details")}
                 if(working)CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp)
             }
             message?.let{Text(it,Modifier.padding(horizontal=24.dp,vertical=8.dp),color=if(failure)MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)}
@@ -138,24 +139,20 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit) {
                     Button({run{requireSuccess(trash.moveFilesToTrash(listOf(current.id)))}},enabled=!working,modifier=Modifier.fillMaxWidth().padding(horizontal=24.dp)){Text("Move to Trash")}
                 }
                 else->{
-                    SheetActionRow("Open",DriveIcons.FileOpen,enabled=!working){closeThen(onOpen)}
-                    SheetActionRow("Download to this phone",DriveIcons.Download,enabled=!working&&(current.hasRemoteCopy||current.hasLocalCopy)){
+                    if(!isOpen)SheetActionRow("Open",DriveIcons.FileOpen,enabled=!working){closeThen(onOpen)}
+                    SheetActionRow("Download",DriveIcons.Download,enabled=!working&&(current.hasRemoteCopy||current.hasLocalCopy)){
                         run(false){requireSuccess(transfers.enqueueSaveToPhone(current.id));message="Saving to Downloads. You can follow its progress in Activity."}
                     }
                     SheetActionRow("Send in Telegram",DriveIcons.Share,enabled=!working&&current.hasRemoteCopy&&!current.isEncrypted){page="send"}
-                    SheetActionRow(if(current.offlinePinned)"Stop keeping offline"else"Make available offline",DriveIcons.OfflinePin,enabled=!working){
-                        run(false){repository.setOfflinePinned(current.id,!current.offlinePinned);if(!current.offlinePinned&&!current.hasLocalCopy&&current.hasRemoteCopy)requireSuccess(transfers.enqueueDownload(current.id));message=if(current.offlinePinned)"This copy is no longer protected from cleanup."else"Offline protection enabled. Follow any pending transfer in Activity."}
-                    }
                     SheetActionRow("Share",DriveIcons.Share,enabled=!working){run{val path=obtain();sharer.share(listOf(path),current.mimeType,"Share ${current.name}")}}
                     SheetActionRow(if(current.isFavorite)"Remove from Starred"else"Add to Starred",DriveIcons.Star,enabled=!working){run{repository.setFilesFavorite(listOf(current.id),!current.isFavorite)}}
                     SheetActionRow("Rename",DriveIcons.Edit,enabled=!working){page="rename"}
                     SheetActionRow("Move",DriveIcons.DriveFileMove,enabled=!working){page="move"}
                     SheetActionRow("Show in folder",DriveIcons.FolderOpen,enabled=!working){closeThen{navigateFolder(current.folderId)}}
-                    SheetActionRow("Details",DriveIcons.Info,enabled=!working){page="details"}
                     SheetActionRow("Show in Telegram",DriveIcons.OpenInNew,enabled=!working&&current.hasRemoteCopy){
                         run{check(linkOpener.open(telegram.messageLink(current.chatId!!,current.messageId!!))){"No app could open this Telegram link."}}
                     }
-                    SheetActionRow(if(current.isArchived)"Unarchive"else"Archive",DriveIcons.Archive,enabled=!working){run{repository.setFilesArchived(listOf(current.id),!current.isArchived)}}
+                    SheetActionRow(if(current.isArchived)"Unarchive"else"Archive",app.tgdrive.ui.LibraryIcons.Archive,enabled=!working){run{repository.setFilesArchived(listOf(current.id),!current.isArchived)}}
                     SheetActionRow("Move to Trash",DriveIcons.DeleteOutline,enabled=!working){page="trash"}
                 }
             }

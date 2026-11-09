@@ -17,6 +17,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import coil3.compose.AsyncImage
+import coil3.request.crossfade
 import coil3.compose.AsyncImagePainter
 import com.infinity.drive.presentation.components.EmptyState
 import com.infinity.drive.resources.Res
@@ -82,7 +83,9 @@ fun ZoomableImage(model:Any,contentDescription:String?,modifier:Modifier=Modifie
             }while(event.changes.any{it.pressed})
         }}
     ) {
-        AsyncImage(model,contentDescription,contentScale=ContentScale.Fit,onState={state->
+        val context=coil3.compose.LocalPlatformContext.current
+        val imageRequest=remember(model,context){coil3.request.ImageRequest.Builder(context).data(model).crossfade(220).build()}
+        AsyncImage(imageRequest,contentDescription,contentScale=ContentScale.Fit,onState={state->
             when(state){
                 is AsyncImagePainter.State.Error->failed=true
                 is AsyncImagePainter.State.Success->{imageSize=IntSize(state.result.image.width,state.result.image.height);offset=clamp(offset,scale)}
