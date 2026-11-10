@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/brand/tg-drive-icon.png" width="112" height="112" alt="TeleDrive cloud and folder app icon">
+  <img src="docs/brand/tg-drive-icon.svg" width="112" height="112" alt="TeleDrive Aero Fold app icon">
 </p>
 
 <h1 align="center">TeleDrive</h1>
@@ -104,8 +104,9 @@ Ordinary channels are not end-to-end encrypted. Keep encryption recovery materia
 | [UI/UX corrections · Arabic](docs/UI-UX-0.9.ar.md) | The 0.9 audit corrections and practical limits |
 | [UI review and fixes · Arabic](docs/UI-UX-SKILL-REVIEW.ar.md) | The full interface review, applied corrections and validation |
 | [Solar and approved layouts · Arabic](docs/SOLAR-0.11.ar.md) | Icon sources, semicircle dashboard and grouped Activity |
+| [Telegram and Gallery follow-up · Arabic](docs/reviews/TELEGRAM-GALLERY-STARTUP-FOLLOWUP.ar.md) | Telegram actions, pinch stability, startup and the restored icon |
 | [Saved audit corrections · Arabic](docs/reviews/AUDIT-IMPLEMENTATION.ar.md) | Navigation, Audio, Gallery, video, Telegram actions and validation limits |
-| [App icon artwork](docs/brand/README.md) | Approved artwork, separate adaptive layers and system-themed icons |
+| [App icon artwork](docs/brand/README.md) | Editable SVG layers, adaptive sizing and system-themed icons |
 
 ## Build from source
 

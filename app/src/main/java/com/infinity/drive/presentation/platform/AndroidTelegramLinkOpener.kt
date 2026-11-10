@@ -33,5 +33,17 @@ class AndroidTelegramLinkOpener(
         return launch(link)
     }
 
+    override fun shareFile(path:String,mimeType:String,title:String):Boolean = runCatching {
+        val probe=Intent(Intent.ACTION_VIEW,"tg://resolve?domain=telegram".toUri())
+        @Suppress("DEPRECATION") val packages=context.packageManager.queryIntentActivities(probe,0).map{it.activityInfo.packageName}.distinct()
+        if(packages.isEmpty())return false
+        val intent=com.infinity.drive.presentation.common.localFilesShareIntent(context,listOf(path),mimeType)
+        val targets=packages.map{Intent(intent).setPackage(it)}.filter{it.resolveActivity(context.packageManager)!=null}
+        if(targets.isEmpty())return false
+        val chosen=if(targets.size==1)targets.first()else Intent.createChooser(targets.first(),title)
+            .putExtra(Intent.EXTRA_INITIAL_INTENTS,targets.drop(1).toTypedArray())
+        context.startActivity(chosen.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));true
+    }.getOrDefault(false)
+
     private fun probe() = Intent(Intent.ACTION_VIEW, "tg://login".toUri())
 }

@@ -234,6 +234,24 @@ fun GalleryScreen(
     val mediaGridState = rememberSaveable(state.tab,contextRevision,query,state.sortField,state.sortDirection, saver = LazyGridState.Saver) {
         LazyGridState()
     }
+    var pinchAnchor by remember{mutableStateOf<Pair<String,Int>?>(null)}
+    val capturePinchAnchor:(androidx.compose.ui.geometry.Offset)->Unit={point->
+        val item=mediaGridState.layoutInfo.visibleItemsInfo.filter{info->
+            info.index in 0 until media.itemCount&&media.peek(info.index) is GalleryListItem.Media
+        }.minByOrNull{info->
+            val dx=info.offset.x+info.size.width/2f-point.x;val dy=info.offset.y+info.size.height/2f-point.y;dx*dx+dy*dy
+        }
+        val file=item?.index?.let{if(it in 0 until media.itemCount)(media.peek(it) as? GalleryListItem.Media)?.file else null}
+        pinchAnchor=if(file!=null&&item!=null)file.id to item.offset.y else null
+    }
+    LaunchedEffect(state.gridSize,state.viewMode){
+        val anchor=pinchAnchor
+        if(anchor!=null&&state.viewMode==ViewMode.GRID){
+            val index=media.itemSnapshotList.items.indexOfFirst{it is GalleryListItem.Media&&it.file.id==anchor.first}
+            if(index>=0)mediaGridState.scrollToItem(index,-anchor.second)
+            pinchAnchor=null
+        }
+    }
     val scrolled = if (state.viewMode == ViewMode.LIST) mediaListState else mediaGridState
     val position=remember(viewModel,state.tab,query,state.sortField,state.sortDirection,state.viewMode,contextRevision){viewModel.positionFor(state.viewMode)}
     var anchorRestored by remember(position){mutableStateOf(false)}
@@ -460,7 +478,9 @@ fun GalleryScreen(
                             .fillMaxSize()
                             .pinchZoom(
                                 onZoomIn = viewModel::zoomIn,
-                                onZoomOut = viewModel::zoomOut
+                                onZoomOut = viewModel::zoomOut,
+                                onGestureStarted=capturePinchAnchor,
+                                onGestureFinished={committed->if(!committed||!viewModel.flushZoom())pinchAnchor=null}
                             )
                             .then(listDragSelect).resultReveal(query to media.itemSnapshotList.items.take(8).map{it.key}),
                         contentPadding = PaddingValues(
@@ -511,7 +531,9 @@ fun GalleryScreen(
                             .fillMaxSize()
                             .pinchZoom(
                                 onZoomIn = viewModel::zoomIn,
-                                onZoomOut = viewModel::zoomOut
+                                onZoomOut = viewModel::zoomOut,
+                                onGestureStarted=capturePinchAnchor,
+                                onGestureFinished={committed->if(!committed||!viewModel.flushZoom())pinchAnchor=null}
                             )
                             .then(gridDragSelect).resultReveal(query to media.itemSnapshotList.items.take(8).map{it.key}),
                         contentPadding = PaddingValues(

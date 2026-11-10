@@ -159,7 +159,7 @@ private suspend fun AwaitPointerEventScope.awaitLongPress(down: PointerInputChan
             while (held) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
                 val change = event.changes.fastFirstOrNull { it.id == down.id }
-                held = change != null && change.pressed &&
+                held = event.changes.count{it.pressed}==1 && change != null && change.pressed &&
                         (change.position - down.position).getDistance() <= viewConfiguration.touchSlop
             }
             false

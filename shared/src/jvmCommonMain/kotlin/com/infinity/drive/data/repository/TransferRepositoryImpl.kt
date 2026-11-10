@@ -59,6 +59,8 @@ class TransferRepositoryImpl(
 
     override fun observeActiveCount(): Flow<Int> = transferDao.observeActiveCount()
 
+    override fun observeLatestForFile(fileId:String):Flow<TransferTask?> = transferDao.observeLatestForFile(fileId).map{it?.toDomain()}
+
     override fun observeActiveForFile(fileId: String): Flow<TransferTask?> =
         transferDao.observeActiveForFile(fileId).map { it?.toDomain() }
 

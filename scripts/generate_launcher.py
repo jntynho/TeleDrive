@@ -1,109 +1,132 @@
 #!/usr/bin/env python3
-"""Package the approved cloud/folder/plane artwork as Android adaptive layers (stdlib only)."""
+"""Generate native Aero Fold launcher vectors from docs/brand SVGs (stdlib only)."""
 from pathlib import Path
 import argparse
+import copy
+import math
 import xml.etree.ElementTree as E
 
 ROOT = Path(__file__).resolve().parents[1]
-BRAND = ROOT / 'docs/brand'
-RES = ROOT / 'app/src/main/res'
+SVG = '{http://www.w3.org/2000/svg}'
 ANDROID = 'http://schemas.android.com/apk/res/android'
 AAPT = 'http://schemas.android.com/aapt'
-SVG = '{http://www.w3.org/2000/svg}'
 E.register_namespace('android', ANDROID)
 E.register_namespace('aapt', AAPT)
-
-# Android draws 108dp adaptive layers through a nominal central 72dp mask.
-# The opaque emblem spans 52dp and fits within the 66dp safe circle.
-ARTBOARD = 1254
-MARK_BOUNDS = (155, 209, 1087, 1032)
-MARK_CENTER = (621.0, 620.5)
-MARK_WIDTH_DP = 52.0
-DP_PER_PIXEL = MARK_WIDTH_DP / (MARK_BOUNDS[2] - MARK_BOUNDS[0])
+# Adaptive layers are 108dp; the usual visible mask is 72dp. Keep the cloud
+# about 72% of that visible width, rather than filling 72% of the whole layer.
+ADAPTIVE_WIDTH_DP = 52.0
+CLOUD_WIDTH = 283.0
+CLOUD_CENTER = (257.5, 242.5)
+ARTBOARD = 512.0
 
 
 def a(name):
     return '{' + ANDROID + '}' + name
 
 
-def xml(root):
-    E.indent(root)
-    return E.tostring(root, encoding='utf-8', xml_declaration=True) + b'\n'
+def vector():
+    return E.Element('vector', {a('width'): '108dp', a('height'): '108dp',
+                               a('viewportWidth'): '512', a('viewportHeight'): '512'})
 
 
-def background():
-    source = E.parse(BRAND / 'tg-drive-background.svg').getroot()
-    gradient = source.find(SVG + 'defs').find(SVG + 'linearGradient')
-    vector = E.Element('vector', {a('width'): '108dp', a('height'): '108dp',
-                                a('viewportWidth'): '108', a('viewportHeight'): '108'})
-    path = E.SubElement(vector, 'path', {a('pathData'): 'M0 0H108V108H0Z'})
-    attr = E.SubElement(path, '{' + AAPT + '}attr', {'name': 'android:fillColor'})
-    native = E.SubElement(attr, 'gradient', {a('type'): 'linear', a('startX'): gradient.get('x1'),
-        a('startY'): gradient.get('y1'), a('endX'): gradient.get('x2'), a('endY'): gradient.get('y2')})
-    for stop in gradient:
-        E.SubElement(native, 'item', {a('offset'): stop.get('offset'), a('color'): stop.get('stop-color')})
-    return xml(vector)
-
-
-def foreground():
-    # Fractions, rather than fixed dp insets, also scale correctly in About and
-    # launcher zoom animations. There is no baked-in circle, square or backdrop.
-    size = ARTBOARD * DP_PER_PIXEL
-    left = (54 - MARK_CENTER[0] * DP_PER_PIXEL) / 108
-    top = (54 - MARK_CENTER[1] * DP_PER_PIXEL) / 108
-    insets = (left, top, 1 - left - size / 108, 1 - top - size / 108)
-    node = E.Element('inset', {a('inset' + side): f'{value * 100:.8f}%'
-        for side, value in zip(('Left', 'Top', 'Right', 'Bottom'), insets)})
-    E.SubElement(node, 'bitmap', {a('src'): '@drawable/launcher_mark', a('gravity'): 'fill', a('filter'): 'true'})
-    return xml(node)
-
-
-def monochrome():
-    vector = E.Element('vector', {a('width'): '108dp', a('height'): '108dp',
-        a('viewportWidth'): str(ARTBOARD), a('viewportHeight'): str(ARTBOARD)})
-    scale = DP_PER_PIXEL * ARTBOARD / 108
-    group = E.SubElement(vector, 'group', {a('scaleX'): f'{scale:.9f}', a('scaleY'): f'{scale:.9f}',
-        a('translateX'): f'{ARTBOARD / 2 - scale * MARK_CENTER[0]:.9f}',
-        a('translateY'): f'{ARTBOARD / 2 - scale * MARK_CENTER[1]:.9f}'})
-    for path in E.parse(BRAND / 'tg-drive-monochrome.svg').getroot().findall(SVG + 'path'):
-        E.SubElement(group, 'path', {a('pathData'): path.get('d'), a('fillColor'): '#FFFFFF',
-            a('fillType'): 'evenOdd' if path.get('fill-rule') == 'evenodd' else 'nonZero'})
-    return xml(vector)
-
-
-def adaptive(themed=False):
-    root = E.Element('adaptive-icon')
-    for kind in ('background', 'foreground') + (('monochrome',) if themed else ()):
-        E.SubElement(root, kind, {a('drawable'): '@drawable/ic_launcher_' + kind})
-    return xml(root)
+def convert(node, parent, definitions):
+    kind = node.tag.removeprefix(SVG)
+    if kind == 'g':
+        assert 'transform' not in node.attrib, 'Sizing is applied explicitly below'
+        out = E.SubElement(parent, 'group')
+        if 'clip-path' in node.attrib:
+            clip = definitions[node.attrib['clip-path'][5:-1]]
+            for child in clip:
+                E.SubElement(out, 'clip-path', {a('pathData'): child.attrib['d']})
+        for child in node:
+            convert(child, out, definitions)
+        return
+    if kind == 'path':
+        data = node.attrib['d']
+    elif kind == 'rect':
+        width, height = node.attrib['width'], node.attrib['height']
+        radius = float(node.get('rx', '0'))
+        if radius:
+            w, h = float(width), float(height)
+            data = (f'M{radius} 0H{w-radius}Q{w} 0 {w} {radius}V{h-radius}'
+                    f'Q{w} {h} {w-radius} {h}H{radius}Q0 {h} 0 {h-radius}'
+                    f'V{radius}Q0 0 {radius} 0Z')
+        else:
+            data = f'M0 0H{width}V{height}H0Z'
+    else:
+        raise ValueError(f'Unsupported SVG geometry: {kind}')
+    out = E.SubElement(parent, 'path', {a('pathData'): data})
+    for svg_name, android_name in [('stroke', 'strokeColor'), ('stroke-width', 'strokeWidth'),
+                                   ('stroke-opacity', 'strokeAlpha')]:
+        if svg_name in node.attrib:
+            out.set(a(android_name), node.attrib[svg_name])
+    fill = node.get('fill', 'black')
+    if fill == 'none':
+        out.set(a('fillColor'), '#00000000')
+    elif fill.startswith('url(#'):
+        gradient = definitions[fill[5:-1]]
+        assert gradient.tag == SVG+'linearGradient'
+        assert gradient.get('gradientUnits') == 'userSpaceOnUse'
+        attr = E.SubElement(out, '{'+AAPT+'}attr', {'name': 'android:fillColor'})
+        attrs = {a('type'): 'linear'}
+        for coord, target in [('x1', 'startX'), ('y1', 'startY'), ('x2', 'endX'), ('y2', 'endY')]:
+            attrs[a(target)] = gradient.attrib[coord]
+        native = E.SubElement(attr, 'gradient', attrs)
+        for stop in gradient:
+            E.SubElement(native, 'item', {a('offset'): stop.get('offset', '0'),
+                                         a('color'): stop.attrib['stop-color']})
+    else:
+        out.set(a('fillColor'), fill)
 
 
 def generate():
-    mono = monochrome()
-    return {
-        RES / 'drawable/ic_launcher_background.xml': background(),
-        RES / 'drawable/ic_launcher_foreground.xml': foreground(),
-        RES / 'drawable/ic_launcher_monochrome.xml': mono,
-        RES / 'drawable-nodpi/launcher_mark.webp': (BRAND / 'tg-drive-mark.webp').read_bytes(),
-        RES / 'mipmap-anydpi/ic_launcher.xml': adaptive(),
-        RES / 'mipmap-anydpi-v26/ic_launcher.xml': adaptive(),
-        RES / 'mipmap-anydpi-v33/ic_launcher.xml': adaptive(themed=True),
-        ROOT / 'ui/src/commonMain/composeResources/drawable/ic_launcher_monochrome.xml': mono,
-    }
+    svg = E.parse(ROOT/'docs/brand/tg-drive-icon.svg').getroot()
+    definitions = {node.attrib['id']: node for node in svg.find(SVG+'defs')}
+    logo = copy.deepcopy(next(node for node in svg if node.get('id') == 'logo'))
+    assert logo.attrib.pop('transform') == 'translate(256 256) scale(1.3) translate(-257.5 -242.5)'
+    background = next(node for node in svg if node.get('id') == 'background')
+    scale = ADAPTIVE_WIDTH_DP / 108 * ARTBOARD / CLOUD_WIDTH
+    # Even the cloud's enclosing rectangle fits inside the 66dp safe circle.
+    assert math.hypot(ADAPTIVE_WIDTH_DP, 189/CLOUD_WIDTH*ADAPTIVE_WIDTH_DP) < 66
+    result = {}
+    for name in ['foreground', 'background', 'monochrome', 'legacy']:
+        v = vector()
+        if name in ['background', 'legacy']:
+            bg = copy.deepcopy(background)
+            if name == 'background':
+                for rect in bg.iter(SVG+'rect'):
+                    rect.attrib.pop('rx', None)
+            convert(bg, v, definitions)
+        if name != 'background':
+            s = 1.3 if name == 'legacy' else scale
+            group = E.SubElement(v, 'group', {
+                a('scaleX'): f'{s:.9f}', a('scaleY'): f'{s:.9f}',
+                a('translateX'): f'{256-s*CLOUD_CENTER[0]:.9f}',
+                a('translateY'): f'{256-s*CLOUD_CENTER[1]:.9f}'})
+            if name == 'monochrome':
+                # A single cloud silhouette: no colored fold/shading to obscure system tint.
+                E.SubElement(group, 'path', {a('fillColor'): '#FFFFFF',
+                                           a('pathData'): next(logo.iter(SVG+'path')).attrib['d']})
+            else:
+                convert(logo, group, definitions)
+        E.indent(v)
+        path = ('mipmap-anydpi/ic_launcher.xml' if name == 'legacy'
+                else f'drawable/ic_launcher_{name}.xml')
+        result[ROOT/'app/src/main/res'/path] = E.tostring(v, encoding='utf-8', xml_declaration=True)+b'\n'
+    return result
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--check', action='store_true', help='Fail if packaged resources differ')
+    parser.add_argument('--check', action='store_true', help='Fail if generated resources differ')
     args = parser.parse_args()
     for path, content in generate().items():
         if args.check:
-            if not path.exists() or path.read_bytes() != content:
+            if path.read_bytes() != content:
                 raise SystemExit(f'Out of date: {path.relative_to(ROOT)}')
         else:
-            path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(content)
-    print('TeleDrive adaptive launcher resources verified.' if args.check else 'Generated TeleDrive adaptive launcher resources.')
+    print('Aero Fold launcher resources verified.' if args.check else 'Generated Aero Fold launcher resources.')
 
 
 if __name__ == '__main__':

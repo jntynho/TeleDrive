@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import com.infinity.drive.presentation.components.pinchZoom
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -111,4 +113,20 @@ class UiComponentRegressionTest {
         compose.waitForIdle()
         assertEquals(original,controller.get().requestedOrientation)
     }
+    @Test fun pinchCommitsOnlyOnReleaseAndSurvivesCallbackRecomposition(){
+        var revision by mutableIntStateOf(0)
+        var steps=0
+        controller.get().setContent {
+            val currentRevision=revision
+            Box(Modifier.size(360.dp,500.dp).testTag("pinch-grid").pinchZoom({steps+=1+currentRevision*0},{steps-=1}))
+        }
+        compose.onNodeWithTag("pinch-grid").performTouchInput{
+            down(0,center.copy(x=center.x-50));down(1,center.copy(x=center.x+50))
+            moveTo(0,center.copy(x=center.x-100));moveTo(1,center.copy(x=center.x+100))
+        }
+        compose.runOnIdle{assertEquals(0,steps);revision++}
+        compose.onNodeWithTag("pinch-grid").performTouchInput{up(0);up(1)}
+        compose.waitForIdle();assertEquals(2,steps)
+    }
+
 }

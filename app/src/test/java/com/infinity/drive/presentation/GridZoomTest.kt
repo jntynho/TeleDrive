@@ -63,4 +63,16 @@ class GridZoomTest {
         }
         assertEquals(GridZoomLevel(ViewMode.GRID, MIN_GRID_COLUMNS), inward.last())
     }
+    @Test fun `a pinch accumulates density changes without reacting to jitter or invalid factors`(){
+        val gesture=com.infinity.drive.presentation.components.GridPinchSession()
+        repeat(20){gesture.add(1.001f)}
+        assertEquals(0,gesture.steps)
+        gesture.add(Float.NaN);gesture.add(0f)
+        assertEquals(0,gesture.steps)
+        gesture.add(2f)
+        assertEquals(2,gesture.steps)
+        gesture.add(.25f)
+        assertEquals(-2,gesture.steps)
+    }
+
 }

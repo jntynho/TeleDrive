@@ -103,6 +103,9 @@ interface TransferDao {
     )
     fun observeActiveForFile(fileId: String): Flow<TransferEntity?>
 
+    @Query("SELECT * FROM transfers WHERE fileId = :fileId ORDER BY createdAt DESC, id DESC LIMIT 1")
+    fun observeLatestForFile(fileId:String):Flow<TransferEntity?>
+
     @Query(
         """SELECT id FROM transfers
             WHERE fileId IN (:fileIds) AND state IN ('QUEUED', 'RUNNING', 'PAUSED')"""

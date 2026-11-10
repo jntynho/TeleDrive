@@ -11,6 +11,9 @@ interface TelegramLinkOpener {
     val canOpenTelegram: Boolean
 
     fun open(link: String): Boolean
+
+    /** Hands an original to an installed Telegram client, where the user chooses its destination. */
+    fun shareFile(path:String,mimeType:String,title:String):Boolean = false
 }
 
 val LocalTelegramLinkOpener = staticCompositionLocalOf<TelegramLinkOpener> {

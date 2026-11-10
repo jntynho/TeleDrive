@@ -1257,26 +1257,42 @@ internal class TdLibTelegramClient(
         return sendUploadContent(chatId,content)
     }
 
+    private suspend fun actionMessage(chatId:Long,messageId:Long):TdApi.Message {
+        try{return send(TdApi.GetMessage(chatId,messageId))}
+        catch(error:TelegramException){
+            val missing=error.code==404||error.code==400&&(error.message.contains("MESSAGE",true)||error.message.contains("identifier",true))
+            // Some older imports stored server ids rather than TDLib's shifted message ids.
+            if(!missing||messageId<=0||messageId and ((1L shl 20)-1)==0L||messageId>Long.MAX_VALUE.shr(20))throw error
+            return send(TdApi.GetMessage(chatId,messageId shl 20))
+        }
+    }
+
     override suspend fun sendToChat(chatId:Long,fromChatId:Long,messageIds:List<Long>) {
         require(messageIds.isNotEmpty()) { "No Telegram message is attached to this file." }
         val destination=send<TdApi.Chat>(TdApi.GetChat(chatId))
         check(canSendDocuments(destination)) { "This chat doesn't allow sending documents." }
         for(id in messageIds.distinct()) {
-            send<TdApi.Message>(TdApi.GetMessage(fromChatId,id))
-            val properties=send<TdApi.MessageProperties>(TdApi.GetMessageProperties(fromChatId,id))
+            val source=actionMessage(fromChatId,id)
+            check(source.sendingState==null){"This file is still being sent to Telegram. Wait for the upload to finish."}
+            val properties=send<TdApi.MessageProperties>(TdApi.GetMessageProperties(fromChatId,source.id))
             check(properties.canBeCopied) { "Telegram doesn't allow copying this message. The source may have protected content." }
             // This flow subscribes before sending and waits for Telegram's final acknowledgement.
-            copyMessageEvents(chatId,fromChatId,id,"").filterIsInstance<TelegramUploadEvent.Completed>().first()
+            copyMessageEvents(chatId,fromChatId,source.id,"").filterIsInstance<TelegramUploadEvent.Completed>().first()
         }
     }
 
     override suspend fun messageLink(chatId:Long,messageId:Long):String {
-        val message=send<TdApi.Message>(TdApi.GetMessage(chatId,messageId))
+        val message=actionMessage(chatId,messageId)
+        check(message.sendingState==null){"This message is still uploading. Wait for Telegram to confirm it."}
         val chat=send<TdApi.Chat>(TdApi.GetChat(chatId))
-        val properties=send<TdApi.MessageProperties>(TdApi.GetMessageProperties(chatId,messageId))
-        if(properties.canGetLink)return send<TdApi.MessageLink>(TdApi.GetMessageLink().apply {
-            this.chatId=chatId;this.messageId=message.id;pollOptionId=""
-        }).link
+        try {
+            val properties=send<TdApi.MessageProperties>(TdApi.GetMessageProperties(chatId,message.id))
+            if(properties.canGetLink)return send<TdApi.MessageLink>(TdApi.GetMessageLink().apply {
+                this.chatId=chatId;this.messageId=message.id;pollOptionId=""
+            }).link
+        }catch(cancel:CancellationException){throw cancel}
+        catch(error:TelegramException){if(error.code !in listOf(400,403))throw error}
+        // Private channels/direct chats may not export HTTPS links; the confirmed message still opens natively.
         val serverId=message.id shr 20
         check(serverId>0) { "This message hasn't been confirmed by Telegram yet." }
         return when(val type=chat.type) {

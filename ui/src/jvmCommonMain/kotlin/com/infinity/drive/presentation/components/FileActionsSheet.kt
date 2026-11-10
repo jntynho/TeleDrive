@@ -40,6 +40,7 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Bo
     val telegram=koinInject<TelegramClient>()
     val trash=koinInject<TrashRepository>()
     val parts=koinInject<FilePartDao>()
+    val telegramActions=remember(telegram,parts){com.infinity.drive.presentation.files.TelegramFileActions(telegram,parts)}
     val sharer=LocalFileSharer.current
     val linkOpener=LocalTelegramLinkOpener.current
     val navigateFolder=LocalFileFolderNavigation.current
@@ -64,14 +65,25 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Bo
             finally{working=false}
         }
     }
+    suspend fun waitForFile(id:String,transferId:String,ready:(DriveFile)->Boolean):DriveFile =
+        withTimeoutOrNull(30*60_000L){
+            combine(repository.observeFile(id),transfers.observeLatestForFile(id)){latest,transfer->
+                check(latest!=null&&!latest.isTrashed){"This file is no longer available."}
+                if(transfer?.id==transferId&&transfer.state in listOf(TransferState.FAILED,TransferState.CANCELLED))
+                    error(transfer.errorMessage?:"The transfer stopped. Retry it in Activity.")
+                latest
+            }.first(ready)
+        }?:error("The transfer is still waiting. Check Activity, then try again.")
     suspend fun obtain():String {
         val latest=repository.getFile(current.id)?:error("This file is no longer available")
-        latest.localPath?.let{return it}
-        requireSuccess(transfers.enqueueDownload(latest.id))
-        message="Downloading a copy to share… You can close this sheet to leave the download in Activity."
-        return withTimeoutOrNull(30*60_000L){
-            repository.observeFile(latest.id).filterNotNull().first{it.localPath!=null||it.isTrashed}.localPath
-        }?:error("The download is still waiting or unavailable. Check Activity, then try Share again.")
+        latest.localPath?.let { path ->
+            if(path.startsWith("content://")||withContext(Dispatchers.IO){java.io.File(path).isFile})return path
+            requireSuccess(repository.deleteLocalCopy(listOf(latest.id)))
+        }
+        val queued=transfers.enqueueDownload(latest.id)
+        requireSuccess(queued)
+        message="Preparing the original… You can close this sheet and follow its download in Activity."
+        return waitForFile(latest.id,(queued as AppResult.Success<String>).value){it.localPath!=null}.localPath!!
     }
     var folder by remember{mutableStateOf<String?>(null)}
     var folders by remember{mutableStateOf<List<DriveFolder>?>(null)}
@@ -96,13 +108,8 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Bo
             TelegramChatPicker("Send in Telegram",onDismiss={if(!working)page="actions"},forSending=true){chat->
                 page="actions"
                 run {
-                    check(!current.isEncrypted){"Download and use Share for encrypted files."}
-                    val chatId=current.chatId?:error("Upload this file to Telegram first")
-                    val storedParts=parts.partsOf(current.id)
-                    check(storedParts.size<=1){"This file is stored in multiple parts. Use Download, then Share to send the complete file."}
-                    val ids=storedParts.sortedBy{it.partIndex}.mapNotNull{it.messageId}
-                        .ifEmpty{listOf(current.messageId?:error("Upload this file first"))}
-                    telegram.sendToChat(chat.id,chatId,ids)
+                    val latest=repository.getFile(current.id)?:error("This file is no longer available")
+                    telegramActions.send(latest,chat.id)
                 }
             }
         }else Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom=16.dp)) {
@@ -120,6 +127,22 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Bo
             HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.5f))
             telegramLink?.let{link->TextButton({clipboard.setText(androidx.compose.ui.text.AnnotatedString(link));message="Telegram link copied"},Modifier.padding(horizontal=16.dp)){Text("Copy Telegram link")}}
             when(shown){
+                "send-original"->{
+                    Text(if(current.isEncrypted)"Your file will be decrypted on this device before sharing. Telegram will open so you can choose a chat."
+                        else "Telegram will open with the complete original so you can choose a chat. A cloud-only file is downloaded first; split storage parts are never sent as the original.",Modifier.padding(24.dp),style=MaterialTheme.typography.bodyMedium)
+                    Button({run{val path=obtain();check(linkOpener.shareFile(path,current.mimeType,"Send in Telegram")){"No installed Telegram client could receive this file. Install Telegram, or use Share instead."}}},enabled=!working,modifier=Modifier.fillMaxWidth().padding(horizontal=24.dp)){Text("Open Telegram with original")}
+                }
+                "upload-show"->{
+                    Text("This file has no Telegram message yet. Upload it to your private drive, then open its confirmed message.",Modifier.padding(24.dp))
+                    Button({run(false){
+                        val queued=transfers.enqueueUpload(current.id);requireSuccess(queued)
+                        message="Uploading to your drive… You can follow it in Activity."
+                        val uploaded=waitForFile(current.id,(queued as AppResult.Success<String>).value){it.hasRemoteCopy&&it.backupState==BackupState.BACKED_UP}
+                        val link=telegramActions.messageLink(uploaded);telegramLink=link
+                        check(linkOpener.open(link)){"Copy this link and open it in the Telegram account that owns your drive."}
+                        page="actions";message="Telegram was opened. Select the account that owns your drive."
+                    }},enabled=!working&&current.hasLocalCopy,modifier=Modifier.fillMaxWidth().padding(horizontal=24.dp)){Text("Upload and show in Telegram")}
+                }
                 "rename"->{
                     var name by remember(current.id){mutableStateOf(current.name)}
                     OutlinedTextField(name,{name=it},singleLine=true,enabled=!working,label={Text("File name")},isError=!FileNameUtils.isValidName(name),modifier=Modifier.fillMaxWidth().padding(24.dp))
@@ -148,15 +171,19 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Bo
                     SheetActionRow("Download",DriveIcons.Download,enabled=!working&&(current.hasRemoteCopy||current.hasLocalCopy)){
                         run(false){requireSuccess(transfers.enqueueSaveToPhone(current.id));message="Saving to Downloads. You can follow its progress in Activity."}
                     }
-                    SheetActionRow("Send in Telegram",DriveIcons.Share,enabled=!working&&current.hasRemoteCopy&&!current.isEncrypted){page="send"}
+                    SheetActionRow("Send in Telegram",DriveIcons.Share,enabled=!working){
+                        run(false){page=if(telegramActions.needsOriginal(current))"send-original"else"send"}
+                    }
                     SheetActionRow("Share",DriveIcons.Share,enabled=!working){run{val path=obtain();sharer.share(listOf(path),current.mimeType,"Share ${current.name}")}}
                     SheetActionRow(if(current.isFavorite)"Remove from Starred"else"Add to Starred",DriveIcons.Star,enabled=!working){run{repository.setFilesFavorite(listOf(current.id),!current.isFavorite)}}
                     SheetActionRow("Rename",DriveIcons.Edit,enabled=!working){page="rename"}
                     SheetActionRow("Move",DriveIcons.DriveFileMove,enabled=!working){page="move"}
                     SheetActionRow("Show in folder",DriveIcons.FolderOpen,enabled=!working){closeThen{navigateFolder(current.folderId)}}
-                    SheetActionRow("Show in Telegram",DriveIcons.OpenInNew,enabled=!working&&current.hasRemoteCopy){
+                    SheetActionRow("Show in Telegram",DriveIcons.OpenInNew,enabled=!working){
                         run(false){
-                            val link=telegram.messageLink(current.chatId!!,current.messageId!!)
+                            val latest=repository.getFile(current.id)?:error("This file is no longer available")
+                            if(telegramActions.references(latest).isEmpty()){page="upload-show";return@run}
+                            val link=telegramActions.messageLink(latest)
                             telegramLink=link
                             check(linkOpener.open(link)){"No app could open this link. Copy it and open it in Telegram using the account that owns this drive."}
                             message="Opened Telegram. For a private channel, select the account that owns this drive. Split files open at their first part."

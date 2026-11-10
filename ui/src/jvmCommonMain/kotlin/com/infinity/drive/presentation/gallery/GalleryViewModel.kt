@@ -282,7 +282,7 @@ class GalleryViewModel(
 
     fun zoomIn() = applyZoom(GridZoomLevel::zoomedIn)
 
-    fun zoomOut() = applyZoom(GridZoomLevel::zoomedOut)
+    fun zoomOut() = applyZoom { current -> if(current.viewMode==ViewMode.LIST)current else current.copy(gridSize=(current.gridSize+1).coerceAtMost(MAX_GRID_COLUMNS)) }
 
     fun zoomAlbumsIn() = stepAlbumColumns(-1)
 
@@ -301,6 +301,14 @@ class GalleryViewModel(
 
     private var zoomJob:Job?=null
     private var pendingZoom:GridZoomLevel?=null
+    fun flushZoom():Boolean {
+        zoomJob?.cancel()
+        val desired=pendingZoom?:return false
+        pendingZoom=null
+        if(desired==GridZoomLevel(uiState.value.viewMode,uiState.value.gridSize))return false
+        viewModelScope.launch{settingsRepository.update{it.copy(galleryViewMode=desired.viewMode,galleryGridSize=desired.gridSize)}}
+        return true
+    }
     private fun applyZoom(transform: (GridZoomLevel) -> GridZoomLevel) {
         pendingZoom=transform(pendingZoom?:GridZoomLevel(uiState.value.viewMode,uiState.value.gridSize))
         zoomJob?.cancel()

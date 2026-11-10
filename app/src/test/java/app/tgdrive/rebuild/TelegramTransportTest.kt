@@ -6,6 +6,7 @@ import app.tgdrive.data.TdConnectionFactory
 import com.infinity.drive.core.files.AndroidStoragePaths
 import com.infinity.drive.core.telegram.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.*
@@ -152,6 +153,26 @@ class TelegramTransportTest {
         assertTrue(job.isCompleted)
         assertArrayEquals(longArrayOf(99),wire.sent.filterIsInstance<TdApi.DeleteMessages>().single().messageIds)
         assertFalse(events.any{it is TelegramUploadEvent.Completed})
+    }
+
+    @Test fun `private channel link remains available when export is rejected`()=runTest {
+        val wire=Wire();val client=client(wire);client.start(TelegramCredentials(12345,"a".repeat(32)))
+        val result=async { client.messageLink(-1001,123L shl 20) }
+        runCurrent();wire.reply(TdApi.GetMessage::class.java,message(123L shl 20));runCurrent()
+        wire.reply(TdApi.GetChat::class.java,TdApi.Chat().apply{id=-1001;type=TdApi.ChatTypeSupergroup(77,true)});runCurrent()
+        wire.reply(TdApi.GetMessageProperties::class.java,TdApi.MessageProperties().apply{canGetLink=true});runCurrent()
+        wire.reply(TdApi.GetMessageLink::class.java,TdApi.Error(403,"Chat link export is unavailable"));runCurrent()
+        assertEquals("https://t.me/c/77/123",result.await())
+    }
+    @Test fun `legacy server message ids are normalized before creating a direct link`()=runTest {
+        val wire=Wire();val client=client(wire);client.start(TelegramCredentials(12345,"a".repeat(32)))
+        val result=async { client.messageLink(-1001,123) }
+        runCurrent();wire.reply(TdApi.GetMessage::class.java,TdApi.Error(404,"Message not found"));runCurrent()
+        assertEquals(123L shl 20,wire.sent.filterIsInstance<TdApi.GetMessage>().last().messageId)
+        wire.reply(TdApi.GetMessage::class.java,message(123L shl 20));runCurrent()
+        wire.reply(TdApi.GetChat::class.java,TdApi.Chat().apply{id=-1001;type=TdApi.ChatTypePrivate(42)});runCurrent()
+        wire.reply(TdApi.GetMessageProperties::class.java,TdApi.MessageProperties());runCurrent()
+        assertEquals("tg://openmessage?user_id=42&message_id=123",result.await())
     }
 
 }
