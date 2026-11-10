@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -134,7 +135,7 @@ class HomeViewModel(
     @OptIn(FlowPreview::class)
     private val counts: Flow<HomeCounts> = activeChannel.observe().flatMapLatest { chatId ->
         fileDao.observeHomeAggregates(chatId)
-            .debounce(COUNTS_DEBOUNCE_MS.milliseconds)
+            .conflate()
             .distinctUntilChanged()
             .map { aggregates ->
                 HomeCounts(

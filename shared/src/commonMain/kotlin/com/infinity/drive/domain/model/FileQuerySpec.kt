@@ -20,5 +20,7 @@ data class FileQuerySpec(
     val showHidden: Boolean = false,
     val showArchived: Boolean = false,
     val sortField: FileSortField = FileSortField.NAME,
-    val sortDirection: SortDirection = SortDirection.ASCENDING
+    val sortDirection: SortDirection = SortDirection.ASCENDING,
+    val initialLoadIndex:Int?=null,
+    val scopeToChat:Boolean=false
 )

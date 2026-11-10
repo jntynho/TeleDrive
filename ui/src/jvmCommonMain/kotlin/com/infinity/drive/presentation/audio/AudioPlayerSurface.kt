@@ -8,6 +8,8 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,11 +38,14 @@ import com.infinity.drive.presentation.components.FileThumbnail
 import com.infinity.drive.presentation.platform.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 @Composable
 fun LibraryAudioMiniPlayer(){
     val player=LocalAudioPlayback.current
-    val state by player.state.collectAsStateWithLifecycle()
+    val state by remember(player){player.state.map{it.copy(positionMs=0)}.distinctUntilChanged()}.collectAsStateWithLifecycle(remember(player){player.state.value.copy(positionMs=0)})
+    val openPlayer=LocalOpenAudioPlayer.current
     var last by remember{mutableStateOf(AudioPlaybackState())}
     var expanded by rememberSaveable{mutableStateOf(false)}
     SideEffect { if(state.file!=null)last=state }
@@ -55,7 +60,7 @@ fun LibraryAudioMiniPlayer(){
             Surface(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=8.dp),shape=RoundedCornerShape(18.dp),color=Color.Transparent,contentColor=Color.White){
                 Column(Modifier.background(Brush.linearGradient(listOf(first,second)))
                     .border(1.dp,Color.White.copy(alpha=.08f),RoundedCornerShape(18.dp)).testTag("audio-mini-player")){
-                    Row(Modifier.fillMaxWidth().height(66.dp).clickable(onClickLabel="Open now playing"){expanded=true}
+                    Row(Modifier.fillMaxWidth().height(66.dp).clickable(onClickLabel="Open now playing"){if(openPlayer!=null)openPlayer(file.id)else expanded=true}
                         .padding(start=10.dp,end=4.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(2.dp)){
                         TrackArtwork(file,current.metadata,Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)))
                         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(2.dp)){
@@ -68,14 +73,13 @@ fun LibraryAudioMiniPlayer(){
                         IconButton(player::next,enabled=current.canSkipNext){Icon(DriveIcons.SkipNext,"Next audio",Modifier.size(22.dp))}
                         IconButton(player::stop){Icon(DriveIcons.Close,"Dismiss audio player",Modifier.size(21.dp))}
                     }
-                    LinearProgressIndicator(progress={if(current.durationMs>0)(current.positionMs.toFloat()/current.durationMs).coerceIn(0f,1f)else 0f},
-                        modifier=Modifier.fillMaxWidth().padding(horizontal=12.dp).height(2.dp),color=Color.White.copy(alpha=.85f),trackColor=Color.White.copy(alpha=.2f),gapSize=0.dp,drawStopIndicator={})
+                    MiniPlayerProgress(file.id)
                     Spacer(Modifier.height(6.dp))
                 }
             }
         }
     }
-    if(expanded&&state.file!=null){
+    if(expanded&&state.file!=null&&openPlayer==null){
         androidx.compose.ui.window.Dialog(onDismissRequest={expanded=false},properties=androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth=false,decorFitsSystemWindows=false)){
             Surface(Modifier.fillMaxSize(),color=Color.Black){
                 Box(Modifier.fillMaxSize().ambientArtwork(state).systemBarsPadding()){
@@ -91,8 +95,16 @@ fun LibraryAudioMiniPlayer(){
 }
 
 @Composable
-fun FullscreenAudioPlayer(file:DriveFile,isActivePage:Boolean,modifier:Modifier=Modifier,onTrackChanged:(String)->Unit={}){
+private fun MiniPlayerProgress(fileId:String){
     val state by LocalAudioPlayback.current.state.collectAsStateWithLifecycle()
+    LinearProgressIndicator(progress={if(state.file?.id==fileId&&state.durationMs>0)(state.positionMs.toFloat()/state.durationMs).coerceIn(0f,1f)else 0f},
+        modifier=Modifier.fillMaxWidth().padding(horizontal=12.dp).height(2.dp),color=Color.White.copy(alpha=.85f),trackColor=Color.White.copy(alpha=.2f),gapSize=0.dp,drawStopIndicator={})
+}
+
+@Composable
+fun FullscreenAudioPlayer(file:DriveFile,isActivePage:Boolean,modifier:Modifier=Modifier,onTrackChanged:(String)->Unit={}){
+    val audio=LocalAudioPlayback.current
+    val state by remember(audio){audio.state.map{it.copy(positionMs=0)}.distinctUntilChanged()}.collectAsStateWithLifecycle(remember(audio){audio.state.value.copy(positionMs=0)})
     Box(modifier.fillMaxSize().ambientArtwork(state).systemBarsPadding().padding(top=audioHeaderHeight())){
         NowPlayingContent(if(isActivePage)state.file?:file else file,Modifier.fillMaxSize())
     }
@@ -103,7 +115,8 @@ fun audioHeaderHeight()=maxOf(72.dp,(52*androidx.compose.ui.platform.LocalDensit
 
 @Composable
 fun AudioNowPlayingTitle(file:DriveFile,modifier:Modifier=Modifier){
-    val state by LocalAudioPlayback.current.state.collectAsStateWithLifecycle()
+    val audio=LocalAudioPlayback.current
+    val state by remember(audio){audio.state.map{it.copy(positionMs=0)}.distinctUntilChanged()}.collectAsStateWithLifecycle(remember(audio){audio.state.value.copy(positionMs=0)})
     val metadata=state.metadata.takeIf{state.file?.id==file.id}
     val labels=(metadata?.title?.takeIf(String::isNotBlank)?:file.name.substringBeforeLast('.')) to
         (metadata?.artist?.takeIf(String::isNotBlank)?:file.extension.uppercase().ifBlank{"Audio"})
@@ -116,16 +129,18 @@ fun AudioNowPlayingTitle(file:DriveFile,modifier:Modifier=Modifier){
 }
 
 @Composable
-internal fun AudioSeekBar(state:AudioPlaybackState){
+internal fun AudioSeekBar(snapshot:AudioPlaybackState){
+    val live by LocalAudioPlayback.current.state.collectAsStateWithLifecycle()
+    val state=if(live.file?.id==snapshot.file?.id)live else snapshot
     val player=LocalAudioPlayback.current
     var scrub by remember(state.file?.id){mutableStateOf<Float?>(null)}
     val duration=state.durationMs.coerceAtLeast(0)
-    val position=scrub?.toLong()?:state.positionMs.coerceIn(0,duration)
+    val position=(scrub?.toLong()?:state.positionMs).coerceIn(0,duration)
     Column(Modifier.fillMaxWidth()){
         SlimSlider(value=position.toFloat(),onValueChange={scrub=it},
             onValueChangeFinished={if(player.state.value.file?.id==state.file?.id)scrub?.let{player.seek(it.toLong())};scrub=null},
             enabled=state.file?.id==player.state.value.file?.id&&duration>0,
-            valueRange=0f..duration.coerceAtLeast(1).toFloat(),trackHeight=2.dp,thumbSize=if(scrub!=null)8.dp else 0.dp,
+            valueRange=0f..duration.coerceAtLeast(1).toFloat(),trackHeight=2.dp,thumbSize=6.dp,
             activeColor=Color.White,inactiveColor=Color.White.copy(alpha=.25f),
             modifier=Modifier.fillMaxWidth().semantics{contentDescription="Seek audio"})
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){
@@ -170,7 +185,7 @@ internal fun AudioTransport(state:AudioPlaybackState,isFavorite:Boolean?=null,fa
 @Composable
 internal fun NowPlayingContent(file:DriveFile,modifier:Modifier=Modifier){
     val player=LocalAudioPlayback.current
-    val playback by player.state.collectAsStateWithLifecycle()
+    val playback by remember(player){player.state.map{it.copy(positionMs=if(it.positionMs>3000)3001 else 0)}.distinctUntilChanged()}.collectAsStateWithLifecycle(remember(player){player.state.value})
     val active=playback.file?.id==file.id
     val state=if(active)playback else AudioPlaybackState(file=file,durationMs=file.durationMs?:0L)
     val repository=org.koin.compose.koinInject<FileRepository>()
@@ -180,16 +195,17 @@ internal fun NowPlayingContent(file:DriveFile,modifier:Modifier=Modifier){
     var favoriteError by remember(file.id){mutableStateOf<String?>(null)}
     val scope=rememberCoroutineScope()
     val lyrics=remember(state.metadata.lyrics){AudioLyricsParser.parse(state.metadata.lyrics)}
-    val lyricPosition=if(lyrics.cues.isNotEmpty())interpolatedAudioPosition(state)else state.positionMs
+
     CompositionLocalProvider(LocalContentColor provides Color.White){
         BoxWithConstraints(modifier.padding(horizontal=24.dp)){
+            val viewportHeight=maxHeight
             val fontScale=androidx.compose.ui.platform.LocalDensity.current.fontScale.coerceAtLeast(1f)
-            val wide=maxWidth>maxHeight
-            val lyricHeight=minOf((90*fontScale).dp,maxHeight*.18f).coerceAtLeast(56.dp)
-            val bottomInset=if(wide)12.dp else minOf(56.dp,maxHeight*.08f)
+            val wide=maxWidth>viewportHeight
+            val lyricHeight=minOf((80*fontScale).dp,viewportHeight*.16f).coerceAtLeast(32.dp)
+            val bottomInset=if(wide)4.dp else minOf(32.dp,viewportHeight*.05f)
             val transportHeight=(132+18*fontScale).dp
-            val cover=if(wide)minOf(maxHeight-24.dp,maxWidth*.43f).coerceAtLeast(48.dp)
-                else minOf(maxWidth,(maxHeight-transportHeight-lyricHeight-bottomInset-40.dp).coerceAtLeast(48.dp),420.dp)
+            val cover=if(wide)minOf(viewportHeight-24.dp,maxWidth*.43f).coerceAtLeast(48.dp)
+                else minOf(maxWidth,(viewportHeight-transportHeight-lyricHeight-bottomInset-40.dp).coerceAtLeast(48.dp),420.dp)
             val artwork:@Composable ()->Unit={TrackArtwork(file,state.metadata,Modifier.size(cover).clip(RoundedCornerShape(14.dp)).testTag("audio-cover"))}
             val favorite= favoriteOverride?:file.isFavorite
             val controls:@Composable ()->Unit={
@@ -214,19 +230,23 @@ internal fun NowPlayingContent(file:DriveFile,modifier:Modifier=Modifier){
                             Text(state.error?:state.queueError?:favoriteError.orEmpty(),maxLines=2,overflow=TextOverflow.Ellipsis,color=Color.White.copy(alpha=.75f),style=MaterialTheme.typography.bodySmall)
                             if(state.error!=null)TextButton(player::toggle){Text("Retry audio",color=Color.White)}
                         }
-                    }else LyricsSnippet(lyrics,lyricPosition,{showLyrics=true},Modifier.fillMaxSize(),trackKey=file.id)
+                    }else if(state.metadata.failed&&state.metadata.lyrics==null)Text("Audio information unavailable",color=Color.White.copy(alpha=.55f),style=MaterialTheme.typography.bodySmall)
+                    else if(!state.metadata.resolved&&state.metadata.lyrics==null)Text("Reading audio information…",color=Color.White.copy(alpha=.55f),style=MaterialTheme.typography.bodySmall)
+                    else LiveLyricsSnippet(lyrics,file.id,{showLyrics=true},Modifier.fillMaxSize())
                 }
             }
             if(wide){
                 Row(Modifier.fillMaxSize().padding(vertical=12.dp),horizontalArrangement=Arrangement.spacedBy(24.dp),verticalAlignment=Alignment.CenterVertically){
                     artwork()
-                    Box(Modifier.weight(1f).fillMaxHeight()){
+                    if(viewportHeight<transportHeight+lyricHeight+32.dp){
+                        Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())){lyricPanel();controls()}
+                    }else Box(Modifier.weight(1f).fillMaxHeight()){
                         Box(Modifier.fillMaxWidth().padding(bottom=transportHeight).align(Alignment.Center)){lyricPanel()}
                         Box(Modifier.align(Alignment.BottomCenter).padding(bottom=bottomInset)){controls()}
                     }
                 }
             }else{
-                val artworkTop=maxOf(12.dp,(maxHeight-transportHeight-lyricHeight-bottomInset-cover-24.dp)/2)
+                val artworkTop=maxOf(12.dp,(viewportHeight-transportHeight-lyricHeight-bottomInset-cover-24.dp)/2)
                 Box(Modifier.align(Alignment.TopCenter).padding(top=artworkTop)){artwork()}
                 Box(Modifier.align(Alignment.BottomCenter).padding(bottom=transportHeight+bottomInset+12.dp)){lyricPanel()}
                 Box(Modifier.align(Alignment.BottomCenter).padding(bottom=bottomInset)){controls()}
@@ -240,7 +260,7 @@ internal fun NowPlayingContent(file:DriveFile,modifier:Modifier=Modifier){
 private data class ArtworkFrame(val file:DriveFile,val metadata:AudioMetadata)
 @Composable
 private fun TrackArtwork(file:DriveFile,metadata:AudioMetadata,modifier:Modifier){
-    val frame=remember(file.id,metadata.artworkPath){ArtworkFrame(file,metadata)}
+    val frame=remember(file.id,file.modifiedAt,file.localPath,metadata.artworkPath,metadata.artworkColors){ArtworkFrame(file,metadata)}
     Crossfade(frame,modifier=modifier,animationSpec=tween(320, easing=FastOutSlowInEasing),label="trackArtwork"){
         AudioArtwork(it.file,it.metadata,Modifier.fillMaxSize())
     }
@@ -289,7 +309,7 @@ private fun AudioArtwork(file:DriveFile,metadata:AudioMetadata,modifier:Modifier
     val context=coil3.compose.LocalPlatformContext.current
     val model=remember(file.id,file.modifiedAt,file.localPath,metadata.artworkPath){
         metadata.artworkPath?:if(file.hasLocalCopy||file.hasRemoteCopy)
-            coil3.request.ImageRequest.Builder(context).data(com.infinity.drive.core.media.ThumbnailModel(file.id)).crossfade(160).build()else null
+            coil3.request.ImageRequest.Builder(context).data(com.infinity.drive.core.media.ThumbnailModel(file.id,"${file.modifiedAt}:${file.localPath}")).crossfade(160).build()else null
     }
     Box(modifier.background(Brush.linearGradient(listOf(artworkTone(metadata,0),artworkTone(metadata,1)))),contentAlignment=Alignment.Center){
         Icon(DriveIcons.MusicNotes,null,Modifier.size(56.dp),tint=Color.White.copy(alpha=.5f))

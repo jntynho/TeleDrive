@@ -27,9 +27,9 @@ class TelegramDataSourceFactory(
      */
     fun createParted(
         parts: List<MediaPart>,
-        encrypted: Boolean
+        encrypted: Boolean,nominalBytesPerSecond:Long?=null
     ): DataSource.Factory = DataSource.Factory {
         val key = if (encrypted) wrappedKeyRepository.get(CryptoKeys.CONTENT) else null
-        PartedTelegramDataSource(telegramClient, streamCrypto, parts, encrypted, key)
+        PartedTelegramDataSource(telegramClient, streamCrypto, parts, encrypted, key,nominalBytesPerSecond)
     }
 }

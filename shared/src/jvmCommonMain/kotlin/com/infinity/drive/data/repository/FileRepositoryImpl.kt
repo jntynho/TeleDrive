@@ -43,6 +43,8 @@ import com.infinity.drive.domain.repository.FileRepository
 import com.infinity.drive.domain.repository.SettingsRepository
 import com.infinity.drive.domain.usecase.FolderCycleCheck
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -88,20 +90,34 @@ class FileRepositoryImpl(
     override fun pagedFiles(spec: FileQuerySpec): Flow<PagingData<DriveFile>> =
         activeChannel.observe().flatMapLatest { chatId ->
             Pager(
+                initialKey = spec.initialLoadIndex,
                 config = PagingConfig(
-                    pageSize = 60,
-                    prefetchDistance = 120,
+                    pageSize = 40,
+                    initialLoadSize = 40,
+                    prefetchDistance = 20,
                     enablePlaceholders = false
                 ),
                 pagingSourceFactory = {
-                    fileDao.pagingSource(FileQueryBuilder.build(spec.copy(chatId = chatId)))
+                    fileDao.pagingSource(FileQueryBuilder.build(spec.copy(chatId = chatId,scopeToChat=true)))
                 }
             ).flow.map { paging -> paging.map { it.toDomain() } }
         }
 
+    override suspend fun indexOfFile(spec:FileQuerySpec,id:String):Int {
+        val file=getFile(id)?:return 0
+        val chat=activeChannel.id()
+        if(file.chatId!=chat)return 0
+        return fileDao.queryCount(FileQueryBuilder.rank(spec.copy(chatId=chat,scopeToChat=true),file))
+    }
+    override suspend fun previewWindow(spec:FileQuerySpec,id:String,radius:Int):List<DriveFile> {
+        val rank=indexOfFile(spec,id)
+        val chat=activeChannel.id()
+        return fileDao.observeList(FileQueryBuilder.buildWindow(spec.copy(chatId=chat,scopeToChat=true),(rank-radius).coerceAtLeast(0),radius*2+1)).first().map{it.toDomain()}
+    }
+
     override fun observeFiles(spec: FileQuerySpec): Flow<List<DriveFile>> =
         activeChannel.observe().flatMapLatest { chatId ->
-            fileDao.observeList(FileQueryBuilder.build(spec.copy(chatId = chatId)))
+            fileDao.observeList(FileQueryBuilder.build(spec.copy(chatId = chatId,scopeToChat=true)))
                 .map { list -> list.map { it.toDomain() } }
         }
 
@@ -121,15 +137,29 @@ class FileRepositoryImpl(
     }
 
     override suspend fun fileIds(spec: FileQuerySpec): List<String> =
-        fileDao.idList(FileQueryBuilder.buildIds(spec.copy(chatId = activeChannel.id())))
+        fileDao.idList(FileQueryBuilder.buildIds(spec.copy(chatId = activeChannel.id(),scopeToChat=true)))
 
     override fun observeFile(id: String): Flow<DriveFile?> =
         fileDao.observeById(id).map { it?.toDomain() }
 
     override suspend fun getFile(id: String): DriveFile? = fileDao.byId(id)?.toDomain()
 
+    override suspend fun storeAudioTags(file:DriveFile,title:String?,artist:String?) {
+        val current=fileDao.byId(file.id)?:return
+        if(current.modifiedAt!=file.modifiedAt||current.localPath!=file.localPath)return
+        val tag=com.infinity.drive.data.local.entity.AudioTagEntity(file.id,file.modifiedAt,file.localPath,title,artist)
+        if(fileDao.audioTagsById(file.id)!=tag)fileDao.storeAudioTags(tag)
+    }
+
     override suspend fun getFiles(ids: List<String>): List<DriveFile> =
-        fileDao.byIds(ids).map { it.toDomain() }
+        ids.distinct().chunked(400).flatMap { fileDao.byIds(it) }.map { it.toDomain() }
+
+    override suspend fun warmLibrary() {
+        val chat=activeChannel.id()
+        for(category in listOf(FileCategory.IMAGE,FileCategory.AUDIO)) {
+            fileDao.observeList(FileQueryBuilder.buildLimited(FileQuerySpec(chatId=chat,scopeToChat=true,categories=listOf(category),sortField=FileSortField.DATE_MODIFIED,sortDirection=SortDirection.DESCENDING),24)).first()
+        }
+    }
 
     override fun observeRecent(limit: Int): Flow<List<DriveFile>> =
         activeChannel.observe().flatMapLatest { chatId ->
@@ -519,7 +549,9 @@ class FileRepositoryImpl(
     }
 
     override fun observeFilesByIds(ids: List<String>): Flow<List<DriveFile>> =
-        fileDao.observeByIds(ids).map { rows -> rows.map { it.toDomain() } }
+        if (ids.isEmpty()) flowOf(emptyList()) else combine(ids.distinct().chunked(400).map { batch ->
+            fileDao.observeByIds(batch).map { rows -> rows.map { it.toDomain() } }
+        }) { batches -> batches.flatMap { it } }
 
     override suspend fun reconcileLocalCopies(ids: List<String>) {
         fileDao.byIds(ids)

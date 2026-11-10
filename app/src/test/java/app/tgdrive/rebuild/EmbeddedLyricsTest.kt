@@ -30,6 +30,14 @@ class EmbeddedLyricsTest {
         val lyric=atom("©lyr",atom("data",ByteArray(8)+"Local words".toByteArray()))
         assertEquals("Local words",read(atom("moov",atom("udta",atom("meta",ByteArray(4)+atom("ilst",lyric))))))
     }
+    @Test fun flacSynchronizedCommentWinsOverEarlierPlainLyrics(){
+        val values=listOf("LYRICS=Untimed", "SYNCEDLYRICS=[00:01.00]Timed").map{it.toByteArray()}
+        val comments=ByteBuffer.allocate(8+values.sumOf{4+it.size}).order(ByteOrder.LITTLE_ENDIAN).putInt(0).putInt(values.size)
+        values.forEach{comments.putInt(it.size).put(it)}
+        val bytes=comments.array()
+        val header=byteArrayOf(0x84.toByte(),(bytes.size shr 16).toByte(),(bytes.size shr 8).toByte(),bytes.size.toByte())
+        assertEquals("[00:01.00]Timed",read("fLaC".toByteArray()+header+bytes))
+    }
     @Test fun missingOrMalformedMetadataDoesNotPreventPlayback(){
         assertNull(read(byteArrayOf(1,2,3)))
         assertNull(read("fLaC".toByteArray()+byteArrayOf(0x84.toByte(),127,127,127)))

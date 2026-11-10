@@ -128,7 +128,7 @@
   "RestoreFromTrash": "history-linear",
   "ScreenLockLandscape": "lock-keyhole-linear",
   "ScreenLockPortrait": "lock-keyhole-linear",
-  "ScreenRotation": "refresh-square-linear",
+  "ScreenRotation": "smartphone-rotate-orientation-linear",
   "SelectAll": "check-square-linear",
   "SlowMotionVideo": "speedometer-middle-linear",
   "Sms": "chat-round-line-linear",

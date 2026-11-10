@@ -21,7 +21,8 @@ sealed interface PreviewContent {
         val remoteFileId: String,
         val isAudio: Boolean,
         val parts: List<MediaPart> = emptyList(),
-        val encrypted: Boolean = false
+        val encrypted: Boolean = false,
+        val nominalBytesPerSecond:Long?=null
     ) : PreviewContent
 
     data class Pdf(val path: String) : PreviewContent

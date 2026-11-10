@@ -49,7 +49,7 @@ class QueueMigrationTest {
             }
             old.version=11
         }
-        fun open()=Room.databaseBuilder(context,DriveInfinityDatabase::class.java,name).addMigrations(MIGRATION_11_12).allowMainThreadQueries().build()
+        fun open()=Room.databaseBuilder(context,DriveInfinityDatabase::class.java,name).addMigrations(MIGRATION_11_12,MIGRATION_12_13).allowMainThreadQueries().build()
         try {
             val first=open()
             try {

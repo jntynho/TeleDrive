@@ -17,6 +17,11 @@ import kotlinx.coroutines.flow.first
 interface FileRepository {
 
     fun pagedFiles(spec: FileQuerySpec): Flow<PagingData<DriveFile>>
+    suspend fun indexOfFile(spec:FileQuerySpec,id:String):Int = fileIds(spec).indexOf(id).coerceAtLeast(0)
+    suspend fun previewWindow(spec:FileQuerySpec,id:String,radius:Int=40):List<DriveFile> {
+        val rows=observeFiles(spec).first();val index=rows.indexOfFirst{it.id==id}.coerceAtLeast(0)
+        return rows.subList((index-radius).coerceAtLeast(0),(index+radius+1).coerceAtMost(rows.size))
+    }
 
     fun observeFiles(spec: FileQuerySpec): Flow<List<DriveFile>>
 
@@ -31,6 +36,9 @@ interface FileRepository {
     suspend fun getFile(id: String): DriveFile?
 
     suspend fun getFiles(ids: List<String>): List<DriveFile>
+    suspend fun storeAudioTags(file:DriveFile,title:String?,artist:String?) {}
+
+    suspend fun warmLibrary() {}
 
     fun observeRecent(limit: Int): Flow<List<DriveFile>>
 

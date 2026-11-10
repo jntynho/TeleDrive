@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -95,6 +96,8 @@ private fun dragSelect(
     val maxScrollPx = with(density) { scrollPerFrame.toPx() }
     var autoScroll by remember { mutableFloatStateOf(0f) }
     val scrolling = autoScroll != 0f
+    var anchorIndex by remember { mutableStateOf<Int?>(null) }
+    var finger by remember { mutableStateOf<Offset?>(null) }
 
     val currentIndexAt by rememberUpdatedState(indexAt)
     val currentOnStart by rememberUpdatedState(onStart)
@@ -102,9 +105,15 @@ private fun dragSelect(
     val currentOnEnd by rememberUpdatedState(onEnd)
 
     LaunchedEffect(scrolling, scrollable) {
+        var previous=withFrameNanos { it }
         while (scrolling) {
-            withFrameNanos { }
-            scrollable.scrollBy(autoScroll)
+            val frame=withFrameNanos { it }
+            val seconds=((frame-previous)/1_000_000_000f).coerceIn(0f,.05f)
+            previous=frame
+            scrollable.scrollBy(autoScroll * 60f * seconds)
+            val anchor=anchorIndex
+            val index=finger?.let(currentIndexAt)
+            if(anchor!=null&&index!=null)currentOnRange(minOf(anchor,index)..maxOf(anchor,index))
         }
     }
 
@@ -114,21 +123,26 @@ private fun dragSelect(
             if (!awaitLongPress(down)) return@awaitEachGesture
 
             var anchor = currentIndexAt(down.position)
+            anchorIndex=anchor;finger=down.position
             currentOnStart()
-            while (true) {
+            try { while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
                 val change = event.changes.fastFirstOrNull { it.id == down.id } ?: break
                 change.consume()
                 if (!change.pressed) break
+                finger=change.position
                 val current = currentIndexAt(change.position)
                 if (current != null) {
-                    val start = anchor ?: current.also { anchor = it }
+                    val start = anchor ?: current.also { anchor = it;anchorIndex=it }
                     currentOnRange(minOf(start, current)..maxOf(start, current))
                 }
                 autoScroll = edgeScroll(change.position.y, size.height, edgePx, maxScrollPx)
             }
-            autoScroll = 0f
-            currentOnEnd()
+            } finally {
+                autoScroll = 0f
+                anchorIndex=null;finger=null
+                currentOnEnd()
+            }
         }
     }
 }

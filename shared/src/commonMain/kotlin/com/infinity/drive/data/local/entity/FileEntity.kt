@@ -18,6 +18,7 @@ import com.infinity.drive.domain.model.FileCategory
         )
     ],
     indices = [
+        Index(value=["chatId","trashedAt","modifiedAt","id","category"],orders=[Index.Order.ASC,Index.Order.ASC,Index.Order.DESC,Index.Order.ASC,Index.Order.ASC],name="index_files_gallery"),
         Index("folderId"),
         Index("name"),
         Index("category"),

@@ -79,6 +79,9 @@ open class DriveInfinityApplication : Application(), SingletonImageLoader.Factor
                 .onEach { SafeLog.verbose = it || BuildConfig.DEBUG }
                 .launchIn(applicationScope)
             transferRepository.recoverOrphanedTransfers()
+            // Transfer recovery is essential; disk sweeping/repair can yield until local UI is ready.
+            // A service-only process has no AppViewModel, so the wait has a bounded fallback.
+            kotlinx.coroutines.withTimeoutOrNull(3000){com.infinity.drive.core.common.StartupReadiness.ready.first{it}}
             fileRepository.sweepImportOrphans()
             folderOwnershipRepair.runOnce()
             publishScheduler.kick()

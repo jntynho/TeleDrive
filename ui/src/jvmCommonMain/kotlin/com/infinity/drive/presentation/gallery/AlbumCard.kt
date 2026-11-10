@@ -55,9 +55,10 @@ fun AlbumCard(
             contentAlignment = Alignment.Center
         ) {
             val coverFileId = album.coverFileId
+            Icon(DriveIcons.PhotoLibrary,null,Modifier.size(28.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)
             if (coverFileId != null) {
                 AsyncImage(
-                    model = ThumbnailModel(coverFileId),
+                    model = ThumbnailModel(coverFileId,album.latestAt.toString()),
                     contentDescription = albumName,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()

@@ -23,7 +23,8 @@ class PartedMediaByteSource(
     private val streamCrypto: StreamCrypto,
     private val parts: List<MediaPart>,
     private val encrypted: Boolean,
-    private val contentKey: ByteArray?
+    private val contentKey: ByteArray?,
+    private val nominalBytesPerSecond:Long?=null
 ) : MediaByteSource {
 
     private class OpenPart(
@@ -128,9 +129,7 @@ class PartedMediaByteSource(
 
         val remoteFileId = part.remoteFileId
         val info = telegramClient.resolveFile(remoteFileId)
-        if (!info.isDownloadingCompleted) {
-            telegramClient.requestFileRange(info.fileId, 0, 0)
-        }
+
         val salt = if (encrypted) {
             val headerSize = streamCrypto.headerSize().toLong()
             awaitAvailable(info.fileId, 0, headerSize)
@@ -139,9 +138,7 @@ class PartedMediaByteSource(
             null
         }
 
-        open?.let { previous ->
-            runCatching { telegramClient.cancelFileDownload(previous.fileId) }
-        }
+
         frameIndex = -1
         frame = null
         return OpenPart(part, index, info.fileId, info.sizeBytes, salt).also { open = it }
@@ -152,57 +149,23 @@ class PartedMediaByteSource(
         val nextIndex = parts.indexOf(part) + 1
         val next = parts.getOrNull(nextIndex) ?: return
         if (preloaded == nextIndex) return
-        if (part.plainSize - within > PRELOAD_MARGIN) return
+        val margin=((nominalBytesPerSecond?:1024L*1024)*8).coerceIn(1024L*1024,16L*1024*1024)
+        if (part.plainSize - within > margin) return
 
         val remoteFileId = next.remoteFileId
         runCatching {
             val info = telegramClient.resolveFile(remoteFileId)
-            preloadedFileId?.takeIf { it != open?.fileId && it != info.fileId }?.let {
-                telegramClient.cancelFileDownload(it)
-            }
-            telegramClient.requestFileRange(info.fileId, 0, 0)
+            if(!info.isDownloadingCompleted)telegramClient.requestFileRange(info.fileId, 0, STREAM_RANGE_BYTES)
             preloadedFileId = info.fileId
             preloaded = nextIndex
         }
     }
 
-    private suspend fun awaitAvailable(fileId: Int, readPosition: Long, count: Long) {
-        val info = telegramClient.getFileInfo(fileId)
-        if (covers(info, readPosition, count)) return
-
-        val downloading = info.isDownloadingCompleted || info.downloadedPrefixSize > 0
-        if (!downloading ||
-            readPosition < info.downloadOffset ||
-            readPosition > info.downloadOffset + info.downloadedPrefixSize
-        ) {
-            telegramClient.requestFileRange(fileId, readPosition, 0)
-        }
-        withTimeout(BUFFER_TIMEOUT_MS.milliseconds) {
-            // File updates are a hot stream. Completion can arrive before a collector
-            // subscribes; bounded local TDLib queries also recover that missed update.
-            while (!covers(telegramClient.getFileInfo(fileId), readPosition, count)) delay(100)
-        }
-    }
-
-    private fun covers(info: TelegramFileInfo, readPosition: Long, count: Long): Boolean {
-        if (info.isDownloadingCompleted) return true
-        val start = info.downloadOffset
-        val end = start + info.downloadedPrefixSize
-        return readPosition >= start && readPosition + count <= end
-    }
+    private suspend fun awaitAvailable(fileId:Int,readPosition:Long,count:Long)=awaitTelegramRange(telegramClient,fileId,readPosition,count)
 
     override fun close() {
-        open?.let { active ->
-            runCatching { runBlocking { telegramClient.cancelFileDownload(active.fileId) } }
-        }
-        preloadedFileId?.takeIf { it != open?.fileId }?.let { fileId ->
-            runCatching { runBlocking { telegramClient.cancelFileDownload(fileId) } }
-        }
-        preloadedFileId = null
-        open = null
-        frame = null
-        frameIndex = -1
-        preloaded = -1
+        // Finite prefetched ranges may finish into TDLib's cache; another reader owns its own lifetime.
+        preloadedFileId=null;open=null;frame=null;frameIndex=-1;preloaded=-1
     }
 
     private companion object {

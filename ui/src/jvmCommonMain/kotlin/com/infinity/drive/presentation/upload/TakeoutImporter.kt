@@ -21,11 +21,11 @@ class TakeoutImporter(private val importer:FileImporter,private val paths:AppSto
     private var job:Job?=null
     fun cancel(){job?.cancel()}
     fun start(references:List<String>,parentFolder:String?=null){
-        if(job?.isActive==true||references.isEmpty())return
+        if(mutable.value.running||references.isEmpty())return
         mutable.value=State(running=true)
         job=scope.launch {
-            val context=settings.preferences.first().let{it.storageChatId to it.onboardingComplete}
             try {
+                val context=settings.preferences.first().let{it.storageChatId to it.onboardingComplete}
                 for(reference in references){
                     ensureActive()
                     val source=importer.import(reference)?:error("Couldn't read an export part. Download the ZIP to this phone first.")

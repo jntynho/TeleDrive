@@ -59,6 +59,9 @@ import com.infinity.drive.resources.player_codec_unsupported
 import com.infinity.drive.resources.player_playback_failed
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -81,13 +84,33 @@ fun MediaPlayer(
     onControlsVisibilityChanged: (Boolean) -> Unit = {},
     interactionBlocked: Boolean = false,
     onGestureInProgress: (Boolean) -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    contentRevision:String=""
 ) {
     val context = LocalContext.current
+    val activity=androidx.activity.compose.LocalActivity.current
     val activePage by rememberUpdatedState(isActivePage)
     val notifyControls by rememberUpdatedState(onControlsVisibilityChanged)
 
-    val checkpoint = rememberSaveable(fileId, saver = VideoPlaybackCheckpoint.Saver) { VideoPlaybackCheckpoint() }
+    val checkpointKey=remember(fileId,contentRevision){"$fileId:$contentRevision"}
+    val checkpoint = rememberSaveable(checkpointKey, saver = VideoPlaybackCheckpoint.Saver) { VideoPlaybackCheckpoint() }
+    val checkpointPrefs=remember(context){context.applicationContext.getSharedPreferences("video-checkpoints",android.content.Context.MODE_PRIVATE)}
+    var checkpointReady by remember(checkpointKey){mutableStateOf(false)}
+    LaunchedEffect(checkpointKey){
+        val saved=withContext(Dispatchers.IO){runCatching{checkpointPrefs.getString(checkpointKey,null)?.let{org.json.JSONObject(it)}}.getOrNull()}
+        if(saved!=null&&checkpoint.position==0L&&checkpoint.wantsPlay){
+            checkpoint.position=saved.optLong("position").coerceAtLeast(0);checkpoint.wantsPlay=saved.optBoolean("play",true)
+            checkpoint.speed=saved.optDouble("speed",1.0).toFloat().coerceIn(.5f,2f)
+        }
+        checkpointReady=true
+    }
+    fun saveCheckpoint(){
+        val value=org.json.JSONObject().put("position",checkpoint.position).put("play",checkpoint.wantsPlay).put("speed",checkpoint.speed).toString()
+        val edit=checkpointPrefs.edit().putString(checkpointKey,value)
+        // Keep at most 128 progress records; no unbounded preferences growth.
+        if(checkpointPrefs.all.size>128)checkpointPrefs.all.keys.filter{it!=checkpointKey}.take(checkpointPrefs.all.size-128).forEach{edit.remove(it)}
+        edit.apply()
+    }
     val holder = remember(fileId) { mutableStateOf<ExoPlayer?>(null) }
     val player = holder.value
     val audioPlayback = com.infinity.drive.presentation.platform.LocalAudioPlayback.current
@@ -97,18 +120,17 @@ fun MediaPlayer(
     val touchExploration = app.tgdrive.ui.rememberTouchExploration()
     var initializationFailed by remember(content, isActivePage, retryInitialization) { mutableStateOf(false) }
 
-    DisposableEffect(content, isActivePage, retryInitialization) {
+    DisposableEffect(fileId,content, isActivePage, retryInitialization,checkpointReady) {
         var owned: ExoPlayer? = null
-        if (isActivePage) {
+        if (isActivePage && checkpointReady) {
             try {
                 // Pause the application-owned music queue before video claims audio focus.
                 audioPlayback.pause()
                 val renderers = DefaultRenderersFactory(context.applicationContext)
                     .setEnableDecoderFallback(true)
                     .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
-                val created = ExoPlayer.Builder(context.applicationContext, renderers).build()
-                owned = created
-                created.apply {
+                val created = VideoSessionPool.acquire(fileId,content) {
+                    ExoPlayer.Builder(context.applicationContext, renderers).build().apply {
                     setAudioAttributes(androidx.media3.common.AudioAttributes.Builder()
                         .setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
                     setHandleAudioBecomingNoisy(true)
@@ -116,13 +138,13 @@ fun MediaPlayer(
                         .setPreferredTextLanguage(null)
                         .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build()
                     when (content) {
-                        is PreviewContent.LocalMedia -> setMediaItem(MediaItem.fromUri(android.net.Uri.fromFile(java.io.File(content.path))))
+                        is PreviewContent.LocalMedia -> setMediaItem(MediaItem.Builder().setUri(android.net.Uri.fromFile(java.io.File(content.path))).setMediaId(fileId).setMediaMetadata(MediaMetadata.Builder().setTitle(title).build()).build())
                         is PreviewContent.StreamedMedia -> {
                             val factory = if (content.parts.isNotEmpty()) {
-                                dataSourceFactory.createParted(content.parts, content.encrypted)
+                                dataSourceFactory.createParted(content.parts, content.encrypted,content.nominalBytesPerSecond)
                             } else dataSourceFactory.create(content.remoteFileId)
                             setMediaSource(ProgressiveMediaSource.Factory(factory)
-                                .createMediaSource(MediaItem.fromUri("telegram://stream")))
+                                .createMediaSource(MediaItem.Builder().setUri("telegram://stream/$fileId").setMediaId(fileId).setMediaMetadata(MediaMetadata.Builder().setTitle(title).build()).build()))
                         }
                         else -> Unit
                     }
@@ -132,9 +154,13 @@ fun MediaPlayer(
                         checkpoint.suspend(this)
                     }
                 }
+                }
+                owned=created
+                if(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))created.playWhenReady=checkpoint.wantsPlay
                 holder.value = created
+                runCatching{context.applicationContext.startService(android.content.Intent(context,com.infinity.drive.presentation.audio.TeleDriveAudioService::class.java))}
             } catch (_: Exception) {
-                owned?.release()
+                owned?.let{VideoSessionPool.release(it)}
                 owned = null
                 initializationFailed = true
                 notifyControls(true)
@@ -143,9 +169,11 @@ fun MediaPlayer(
         onDispose {
             owned?.let {
                 checkpoint.capture(it)
+                saveCheckpoint()
+                if(activity?.isChangingConfigurations!=true&&lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))it.pause()
                 // Do not leave offscreen decoders and Telegram range loaders alive.
                 holder.value = null
-                it.release()
+                VideoSessionPool.release(it)
             }
         }
     }
@@ -153,13 +181,17 @@ fun MediaPlayer(
     LaunchedEffect(player) {
         if (player != null) while (isActive) {
             checkpoint.capture(player)
-            delay(500)
+            saveCheckpoint()
+            delay(2000)
         }
     }
     DisposableEffect(lifecycleOwner, player) {
         val observer = LifecycleEventObserver { _, event ->
             if (player != null) when (event) {
-                Lifecycle.Event.ON_STOP -> if (!backgroundAllowed) checkpoint.suspend(player)
+                Lifecycle.Event.ON_STOP -> {
+                    VideoSessionPool.background(player,backgroundAllowed)
+                    if(!backgroundAllowed||!VideoSessionPool.serviceAvailable)checkpoint.suspend(player)
+                }
                 Lifecycle.Event.ON_START -> if (activePage) checkpoint.resume(player)
                 else -> Unit
             }
@@ -263,9 +295,9 @@ fun MediaPlayer(
                     .background(androidx.compose.ui.graphics.Color.Black)
             ) {
                 AsyncImage(
-                    model = ThumbnailModel(fileId),
+                    model = ThumbnailModel(fileId,contentRevision),
                     contentDescription = null,
-                    contentScale = ContentScale.Fit,
+                    contentScale = if(resizeMode==PlayerResizeMode.ZOOM)ContentScale.Crop else ContentScale.Fit,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -304,14 +336,35 @@ fun MediaPlayer(
                     textAlign = TextAlign.Center,
                     color = androidx.compose.ui.graphics.Color.White
                 )
-                if (!decoderFailed) androidx.compose.material3.TextButton(onClick = {
-                    if (player == null) retryInitialization++ else {
+                androidx.compose.material3.TextButton(onClick = {
+                    val needsRebuild=decoderFailed
+                    decoderFailed=false
+                    if (player == null || needsRebuild) retryInitialization++ else {
                         playbackFailed = false
                         player.seekTo(player.currentPosition.coerceAtLeast(0))
                         player.prepare()
                         player.play()
                     }
                 }) { Text("Retry", color = androidx.compose.ui.graphics.Color.White) }
+                val repository=org.koin.compose.koinInject<com.infinity.drive.domain.repository.FileRepository>()
+                val transfers=org.koin.compose.koinInject<com.infinity.drive.domain.repository.TransferRepository>()
+                val actions=androidx.compose.runtime.rememberCoroutineScope()
+                var fallbackError by remember(fileId){mutableStateOf<String?>(null)}
+                androidx.compose.material3.TextButton(onClick={actions.launch {
+                    try {
+                        val file=repository.getFile(fileId)?:error("File unavailable")
+                        val path=file.localPath
+                        if(path!=null){
+                            val uri=androidx.core.content.FileProvider.getUriForFile(context,context.packageName+".fileprovider",java.io.File(path))
+                            context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW).setDataAndType(uri,file.mimeType).addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION))
+                        }else{
+                            check(transfers.enqueueDownload(fileId).isSuccess){"Couldn't queue the download"}
+                            fallbackError="Download queued. Follow its progress in Activity."
+                        }
+                    }catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}
+                    catch(_:Exception){fallbackError="Couldn't open another player. Download the file and try again."}
+                }}){Text("Download / Open in another player",color=androidx.compose.ui.graphics.Color.White)}
+                fallbackError?.let{Text(it,color=androidx.compose.ui.graphics.Color.White)}
             }
         }
         if (!initializationFailed && !decoderFailed && !playbackFailed) Box(

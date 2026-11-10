@@ -59,6 +59,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -203,17 +205,32 @@ fun PreviewScreen(
         initialPage = state.initialIndex.coerceAtMost(state.files.lastIndex),
         pageCount = { state.files.size }
     )
-    val pagedFile = state.files[pagerState.settledPage.coerceAtMost(state.files.lastIndex)]
+    val windowRevision=state.files.first().id to state.files.last().id
+    var appliedWindow by remember{mutableStateOf(windowRevision)}
+    val pendingAnchor=state.windowAnchor?.takeIf{windowRevision!=appliedWindow}
+    LaunchedEffect(windowRevision){
+        pendingAnchor?.let{anchor->val index=state.files.indexOfFirst{it.id==anchor};if(index>=0)pagerState.scrollToPage(index)}
+        appliedWindow=windowRevision
+    }
+    val pagedFile = pendingAnchor?.let{anchor->state.files.firstOrNull{it.id==anchor}}?:state.files[pagerState.settledPage.coerceAtMost(state.files.lastIndex)]
     /* The pager holds a snapshot, so the open row is read live: a rename or an
        edit made elsewhere shows without reopening. */
-    val liveFile by viewModel.observeFile(pagedFile.id)
-        .collectAsStateWithLifecycle(initialValue = pagedFile)
+    LaunchedEffect(pagedFile.id){viewModel.ensureWindow(pagedFile.id)}
+    val observedFile by remember(pagedFile.id){viewModel.observeFile(pagedFile.id).map{pagedFile.id to it}}
+        .collectAsStateWithLifecycle(initialValue = pagedFile.id to pagedFile)
+    val liveFile=if(observedFile.first==pagedFile.id)observedFile.second else pagedFile
+    LaunchedEffect(pagedFile.id,observedFile){if(observedFile.first==pagedFile.id&&(liveFile==null||liveFile?.isTrashed==true))viewModel.removeUnavailable(pagedFile.id)}
     val backgroundAudio=com.infinity.drive.presentation.platform.LocalAudioPlayback.current
-    val audioState by backgroundAudio.state.collectAsStateWithLifecycle()
+    val audioState by remember(backgroundAudio){backgroundAudio.state.map{it.copy(positionMs=0)}.distinctUntilChanged()}.collectAsStateWithLifecycle(remember(backgroundAudio){backgroundAudio.state.value.copy(positionMs=0)})
+    var audioSessionOpened by remember{mutableStateOf(false)}
+    LaunchedEffect(audioState.file?.id){
+        if(audioState.file!=null)audioSessionOpened=true
+        else if(audioSessionOpened&&pagedFile.category==FileCategory.AUDIO)onBack()
+    }
     val currentFile = if(pagedFile.category==FileCategory.AUDIO) audioState.file?.takeIf{it.category==FileCategory.AUDIO} ?: liveFile ?: pagedFile else liveFile ?: pagedFile
     val mediaScope=rememberCoroutineScope()
     LaunchedEffect(pagerState.settledPage){
-        val settled=state.files[pagerState.settledPage]
+        val settled=state.files.getOrNull(pagerState.settledPage)?:return@LaunchedEffect
         if(settled.category==FileCategory.AUDIO){
             if(!backgroundAudio.containsQueuedFile(settled.id)) backgroundAudio.setQueue(state.files.filter{it.category==FileCategory.AUDIO}.map{it.id})
             if(backgroundAudio.state.value.file?.id!=settled.id)backgroundAudio.play(settled)
@@ -307,8 +324,8 @@ fun PreviewScreen(
 
             AnimatedVisibility(
                 visible = chromeShown,
-                enter = fadeIn(tween(160)),
-                exit = fadeOut(tween(120)),
+                enter = fadeIn(tween(200)),
+                exit = fadeOut(tween(160)),
                 modifier = Modifier.align(Alignment.TopCenter).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(if(immersive)androidx.compose.ui.graphics.Color.Black.copy(alpha=.65f)else androidx.compose.ui.graphics.Color.Transparent,androidx.compose.ui.graphics.Color.Transparent)))
             ) {
                 TopAppBar(
@@ -448,7 +465,7 @@ private fun PreviewPage(
     when (content) {
         is PreviewContent.Loading,is PreviewContent.DownloadProgress -> {
             Box(Modifier.fillMaxSize().background(Color.Black),contentAlignment=Alignment.Center){
-                coil3.compose.AsyncImage(com.infinity.drive.core.media.ThumbnailModel(file.id),file.name,Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Fit)
+                coil3.compose.AsyncImage(com.infinity.drive.core.media.ThumbnailModel(file.id,"${file.modifiedAt}:${file.localPath}:${file.remoteFileId}"),file.name,Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Fit)
                 val progress=content as? PreviewContent.DownloadProgress
                 Text(if(progress!=null&&progress.total>0)"${(progress.transferred*100/progress.total).coerceIn(0,100)}%"else"Preparing preview…",
                     color=Color.White.copy(alpha=.75f),style=MaterialTheme.typography.labelSmall,
@@ -457,7 +474,7 @@ private fun PreviewPage(
         }
 
         is PreviewContent.Image -> Box(Modifier.fillMaxSize().background(Color.Black)) {
-            coil3.compose.AsyncImage(com.infinity.drive.core.media.ThumbnailModel(file.id),null,Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Fit)
+            coil3.compose.AsyncImage(com.infinity.drive.core.media.ThumbnailModel(file.id,"${file.modifiedAt}:${file.localPath}:${file.remoteFileId}"),null,Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Fit)
             ZoomableImage(model=content.model,contentDescription=file.name,onTap=onToggleChrome,onZoomChanged=onImageZoomChanged)
         }
 
@@ -467,6 +484,7 @@ private fun PreviewPage(
                 content = content,
                 title = file.name,
                 fileId = file.id,
+                contentRevision="${file.modifiedAt}:${file.sizeBytes}:${file.remoteFileId}",
                 dataSourceFactory = dataSourceFactory,
                 isActivePage = isActivePage,
                 controlsVisible = chromeVisible,

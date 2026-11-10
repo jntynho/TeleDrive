@@ -53,7 +53,8 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
 import kotlin.time.Duration.Companion.milliseconds
 
 enum class GalleryTab(val labelRes: StringResource) {
@@ -80,7 +81,7 @@ data class GalleryUiState(
     val selectionMode: Boolean get() = selection.isNotEmpty()
 }
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class GalleryViewModel(
     private val savedStateHandle: SavedStateHandle,
     private val fileRepository: FileRepository,
@@ -99,13 +100,41 @@ class GalleryViewModel(
 
     private val tab = MutableStateFlow(runCatching{GalleryTab.valueOf(savedStateHandle.get<String>("gallery-tab")?:savedStateHandle.get<String>("initialTab")?:"ALL")}.getOrDefault(GalleryTab.ALL))
     val query = MutableStateFlow(savedStateHandle.get<String>("gallery-query").orEmpty())
-    fun setQuery(value:String) { if(query.value==value)return;query.value=value;savedStateHandle["gallery-query"]=value;listPosition.remember(0,0);clearSelection() }
+    fun setQuery(value:String) { if(query.value==value)return;invalidateSelection();query.value=value;savedStateHandle["gallery-query"]=value;listPosition.remember(0,0);clearSelection() }
 
+    val albumQuery = savedStateHandle.getStateFlow("album-query", "")
+    fun searchAlbums(value:String) { savedStateHandle["album-query"] = value }
+    private val _message = MutableSharedFlow<String>(extraBufferCapacity=8)
+    val messages = _message.asSharedFlow()
+    val working = MutableStateFlow(false)
+    private var generation = 0L
+    private var selectJob:Job? = null
+    private var operationJob:Job?=null
+    private var operationSerial=0L
+    private fun invalidateSelection() { generation++; selectJob?.cancel(); clearSelection(); rangeBase=null }
+    init { viewModelScope.launch {
+        settingsRepository.preferences.map { it.storageChatId }.distinctUntilChanged().drop(1).collect {
+            invalidateSelection(); listPosition.remember(0,0)
+        }
+    } }
     private val sort = MutableStateFlow(
         runCatching{FileSortField.valueOf(savedStateHandle.get<String>("gallery-sort")?:"DATE_MODIFIED")}.getOrDefault(FileSortField.DATE_MODIFIED) to
         runCatching{SortDirection.valueOf(savedStateHandle.get<String>("gallery-direction")?:"DESCENDING")}.getOrDefault(SortDirection.DESCENDING))
 
-    val listPosition = ListPosition(savedStateHandle)
+    private val positions=linkedMapOf<String,ListPosition>()
+    private var channelKey="initial"
+    fun positionFor(mode:ViewMode):ListPosition {
+        val key="$channelKey:${tab.value}:${query.value}:${sort.value}:$mode"
+        positions[key]?.let{return it}
+        if(positions.size>=24)positions.remove(positions.keys.first())?.discard()
+        return ListPosition(savedStateHandle,"gallery:$key").also{positions[key]=it}
+    }
+    val listPosition:ListPosition get()=positionFor(ViewMode.GRID)
+    val contextRevision=MutableStateFlow(0L)
+    init {
+        viewModelScope.launch {settingsRepository.preferences.map{it.storageChatId}.distinctUntilChanged().collect{channelKey=it.toString();contextRevision.value++}}
+        viewModelScope.launch {val prefs=settingsRepository.preferences.first();if(savedStateHandle.get<String>("gallery-sort")==null)sort.value=prefs.gallerySortField to prefs.gallerySortDirection}
+    }
 
     private val selection = MutableStateFlow<Set<String>>(emptySet())
     private var rangeBase: Set<String>? = null
@@ -115,7 +144,7 @@ class GalleryViewModel(
     private val spec: Flow<FileQuerySpec> = combine(
         tab,
         sort,
-        settingsRepository.preferences, query
+        settingsRepository.preferences, query.debounce { if(it.isBlank())0L else 180L }
     ) { currentTab, (field, direction), _, nameQuery ->
         FileQuerySpec(
             folderId = albumFolderId,
@@ -133,40 +162,38 @@ class GalleryViewModel(
         )
     }.distinctUntilChanged()
 
-    private val albums: Flow<List<MediaAlbum>> = settingsRepository.preferences
-        .map { it.showHiddenFiles to it.showArchivedFiles }
-        .distinctUntilChanged()
-        .flatMapLatest {
-            if (isAlbumView) flowOf(emptyList())
-            else fileRepository.observeAlbums(showHidden = false, showArchived = false)
+    private val albums: Flow<List<MediaAlbum>> = combine(tab,albumQuery,sort) { t,q,s -> Triple(t,q,s) }
+        .flatMapLatest { (t,q,s) ->
+            if (isAlbumView || t!=GalleryTab.ALBUMS) flowOf(emptyList())
+            else fileRepository.observeAlbums(false,false).map { rows ->
+                val filtered=rows.filter { q.isBlank() || (it.name?:"Not in a folder").contains(q.trim(),true) }
+                val ordered=when(s.first){
+                    FileSortField.NAME->filtered.sortedWith(compareBy<MediaAlbum>{it.name?.lowercase().orEmpty()}.thenBy{it.folderId.orEmpty()})
+                    else->filtered.sortedWith(compareBy<MediaAlbum>{it.latestAt}.thenBy{it.folderId.orEmpty()})
+                }
+                if(s.second==SortDirection.DESCENDING)ordered.asReversed()else ordered
+            }.flowOn(Dispatchers.Default)
         }
 
-    val previewSequence: StateFlow<PreviewSequence> = combine(tab, sort,query) { current, (field, dir), nameQuery ->
-        PreviewSequence(
-            nameQuery = nameQuery.trim().takeIf { it.isNotBlank() },
-            folderId = albumFolderId,
-            filterByFolder = isAlbumView,
-            categories = when (current) {
-                GalleryTab.PHOTOS -> listOf(FileCategory.IMAGE)
-                GalleryTab.VIDEOS -> listOf(FileCategory.VIDEO)
-                else -> listOf(FileCategory.IMAGE, FileCategory.VIDEO)
-            },
-            sortField = field,
-            sortDirection = dir
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PreviewSequence())
+    val previewSequence: StateFlow<PreviewSequence> = spec.map { current ->
+        PreviewSequence(nameQuery=current.nameQuery,folderId=current.folderId,filterByFolder=current.filterByFolder,
+            categories=current.categories,sortField=current.sortField,sortDirection=current.sortDirection)
+    }.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5_000),PreviewSequence())
 
     val pagedMedia: Flow<PagingData<GalleryListItem>> = spec
         .flatMapLatest { current ->
-            fileRepository.pagedFiles(current).map { data -> withDayHeaders(data, current) }
+            if(tab.value==GalleryTab.ALBUMS) flowOf(PagingData.empty()) else flow {
+                val anchor=positionFor(uiState.value.viewMode).anchorId
+                val rank=anchor?.let{fileRepository.indexOfFile(current,it)}
+                emitAll(fileRepository.pagedFiles(current.copy(initialLoadIndex=rank)).map{data->withDayHeaders(data,current)})
+            }
         }
         .cachedIn(viewModelScope)
 
     private val selectionCapabilities: Flow<Pair<Set<String>, SelectionCapabilities>> = selection
         .flatMapLatest { ids ->
-            flow {
-                emit(ids to SelectionCapabilities.of(fileRepository.getFiles(ids.toList())))
-            }
+            if(ids.isEmpty())flowOf(ids to SelectionCapabilities()) else
+                fileRepository.observeFilesByIds(ids.toList()).map { rows -> ids to SelectionCapabilities.of(rows.filterNot{it.isTrashed}) }
         }
 
     val uiState: StateFlow<GalleryUiState> = combine(
@@ -231,24 +258,25 @@ class GalleryViewModel(
         if (_refreshing.value) return
         _refreshing.update { true }
         viewModelScope.launch {
-            val startedAt = System.currentTimeMillis()
-            syncRepository.fullResync()
-            val elapsed = System.currentTimeMillis() - startedAt
-            if (elapsed < MIN_REFRESH_VISIBLE_MS) delay((MIN_REFRESH_VISIBLE_MS - elapsed).milliseconds)
-            _refreshing.update { false }
+            try { check(syncRepository.fullResync().isSuccess){"Refresh failed"} }
+            catch(cancel:CancellationException){throw cancel}
+            catch(_:Exception){_message.tryEmit("Couldn't refresh the gallery. Your current files are still available.")}
+            finally { _refreshing.value=false }
         }
     }
 
 
     fun setTab(value: GalleryTab) {
         if(tab.value==value)return
-        clearSelection();listPosition.remember(0,0)
+        invalidateSelection();listPosition.remember(0,0)
         savedStateHandle["gallery-tab"]=value.name
         tab.update { value }
     }
     fun setSort(field: FileSortField, direction: SortDirection) {
         if(sort.value==field to direction)return
+        invalidateSelection()
         savedStateHandle["gallery-sort"]=field.name;savedStateHandle["gallery-direction"]=direction.name
+        viewModelScope.launch{settingsRepository.update{it.copy(gallerySortField=field,gallerySortDirection=direction)}}
         listPosition.remember(0,0);sort.value=field to direction
     }
 
@@ -271,30 +299,50 @@ class GalleryViewModel(
         }
     }
 
+    private var zoomJob:Job?=null
+    private var pendingZoom:GridZoomLevel?=null
     private fun applyZoom(transform: (GridZoomLevel) -> GridZoomLevel) {
-        viewModelScope.launch {
+        pendingZoom=transform(pendingZoom?:GridZoomLevel(uiState.value.viewMode,uiState.value.gridSize))
+        zoomJob?.cancel()
+        zoomJob=viewModelScope.launch {
+            delay(160)
+            val desired=pendingZoom?:return@launch
+            pendingZoom=null
             settingsRepository.update { prefs ->
-                val next = transform(GridZoomLevel(prefs.galleryViewMode, prefs.galleryGridSize))
+                val next = desired
                 prefs.copy(galleryViewMode = next.viewMode, galleryGridSize = next.gridSize)
             }
         }
     }
 
     fun toggleSelection(id: String) {
+        if(working.value)return
         _allSelected.update { false }
         selection.update { if (id in it) it - id else it + id }
     }
 
     fun clearSelection() {
+        if(working.value){operationSerial++;operationJob?.cancel();working.value=false}
         _allSelected.update { false }
         selection.update { emptySet() }
     }
 
     /** Selects every media file the current tab shows, loaded or not. */
     fun selectAll() {
-        viewModelScope.launch {
-            selection.update { fileRepository.fileIds(spec.first()).toSet() }
-            _allSelected.update { true }
+        if(working.value)return
+        selectJob?.cancel()
+        val token=generation
+        selectJob=viewModelScope.launch {
+            try {
+                val request=spec.first()
+                val ids=fileRepository.fileIds(request).toSet()
+                ensureActive()
+                if(token==generation && request==spec.first()) {
+                    selection.value=ids; _allSelected.value=true
+                    _message.tryEmit("Selected ${ids.size} matching files. New arrivals are not included.")
+                }
+            } catch(cancel:CancellationException){throw cancel}
+            catch(_:Exception){_message.tryEmit("Couldn't select all files. Try again.")}
         }
     }
 
@@ -312,24 +360,37 @@ class GalleryViewModel(
         rangeBase = null
     }
 
-    fun trashSelected() {
-        val ids = selection.value.toList()
-        clearSelection()
-        viewModelScope.launch { trashRepository.moveFilesToTrash(ids) }
+    private fun operate(label:String,eligible:(DriveFile)->Boolean={true},action:suspend(DriveFile)->Boolean){
+        if(working.value)return
+        val ids=selection.value.toList();val token=generation
+        if(ids.isEmpty())return
+        working.value=true
+        val serial=++operationSerial
+        operationJob=viewModelScope.launch {
+            val failed=mutableSetOf<String>();var completed=0;var skipped=0
+            try {
+                for(batch in ids.chunked(200)) {
+                    ensureActive(); if(token!=generation)break
+                    val found=fileRepository.getFiles(batch).associateBy{it.id}
+                    for(id in batch){
+                        ensureActive(); if(token!=generation)break
+                        val file=found[id]
+                        if(file==null||file.isTrashed||!eligible(file)){skipped++;continue}
+                        try { if(action(file))completed++ else failed+=id }
+                        catch(cancel:CancellationException){throw cancel}
+                        catch(_:Exception){failed+=id}
+                    }
+                }
+                if(token==generation){selection.value=failed;_allSelected.value=false}
+                _message.tryEmit("$label: $completed completed, ${failed.size} failed, $skipped skipped.")
+            } catch(cancel:CancellationException){throw cancel}
+            catch(_:Exception){_message.tryEmit("Couldn't complete $label. Try again.")}
+            finally{if(serial==operationSerial)working.value=false}
+        }
     }
-
-    fun downloadSelected() {
-        val ids = selection.value.toList()
-        clearSelection()
-        viewModelScope.launch { ids.forEach { transferRepository.enqueueDownload(it) } }
-    }
-
-    fun uploadSelected() {
-        val ids = selection.value.toList()
-        clearSelection()
-        viewModelScope.launch { ids.forEach { transferRepository.enqueueUpload(it) } }
-    }
-
+    fun trashSelected()=operate("Move to Trash"){trashRepository.moveFilesToTrash(listOf(it.id)).isSuccess}
+    fun downloadSelected()=operate("Download",{it.hasRemoteCopy&&!it.hasLocalCopy}){transferRepository.enqueueDownload(it.id).isSuccess}
+    fun uploadSelected()=operate("Upload",{!it.hasRemoteCopy}){transferRepository.enqueueUpload(it.id).isSuccess}
     private val _renameTarget = MutableStateFlow<DriveFile?>(null)
     val renameTarget: StateFlow<DriveFile?> = _renameTarget.asStateFlow()
 
@@ -345,17 +406,9 @@ class GalleryViewModel(
     fun confirmRename(newName: String) {
         val target = _renameTarget.value ?: return
         _renameTarget.value = null
-        clearSelection()
-        viewModelScope.launch { fileRepository.renameFile(target.id, newName) }
+        operate("Rename",{it.id==target.id}){fileRepository.renameFile(it.id,newName).isSuccess}
     }
 
-    fun favoriteSelected() {
-        val ids = selection.value.toList()
-        clearSelection()
-        viewModelScope.launch { fileRepository.setFilesFavorite(ids, true) }
-    }
+    fun favoriteSelected()=operate("Add to favorites"){fileRepository.setFilesFavorite(listOf(it.id),true);true}
 
-    companion object {
-        private const val MIN_REFRESH_VISIBLE_MS = 700L
-    }
 }

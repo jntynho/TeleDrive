@@ -30,6 +30,7 @@ import com.infinity.drive.data.local.entity.TransferEntity
 @Database(
     entities = [
         FileEntity::class,
+        com.infinity.drive.data.local.entity.AudioTagEntity::class,
         FolderEntity::class,
         TransferEntity::class,
         BackupSessionEntity::class,
@@ -42,7 +43,7 @@ import com.infinity.drive.data.local.entity.TransferEntity
         FilePartEntity::class,
         ProxyEntity::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = true
 )
 @ConstructedBy(DriveInfinityDatabaseConstructor::class)

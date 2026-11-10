@@ -15,7 +15,8 @@ internal class VideoPlaybackCheckpoint(
 
     fun capture(player: Player) {
         position = if (player.playbackState == Player.STATE_ENDED) 0 else player.currentPosition.coerceAtLeast(0)
-        if (!suspended) wantsPlay = player.playWhenReady
+        if (player.playbackState == Player.STATE_ENDED) wantsPlay=false
+        else if (!suspended) wantsPlay = player.playWhenReady
         speed = player.playbackParameters.speed
         volume = player.volume
         repeat = player.repeatMode

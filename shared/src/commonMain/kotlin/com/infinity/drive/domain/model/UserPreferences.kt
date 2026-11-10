@@ -36,6 +36,8 @@ data class UserPreferences(
     val gridSize: Int = 3,
     val galleryViewMode: ViewMode = ViewMode.GRID,
     val galleryGridSize: Int = 3,
+    val gallerySortField:FileSortField=FileSortField.DATE_MODIFIED,
+    val gallerySortDirection:SortDirection=SortDirection.DESCENDING,
     val albumGridSize: Int = 3,
     val layoutDensity: LayoutDensity = LayoutDensity.COMFORTABLE,
     val showHiddenFiles: Boolean = false,

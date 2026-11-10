@@ -44,6 +44,8 @@ object PreferenceKeys {
     val VIEW_MODE = stringPreferencesKey("view_mode")
     val GRID_SIZE = intPreferencesKey("grid_size")
     val GALLERY_VIEW_MODE = stringPreferencesKey("gallery_view_mode")
+    val GALLERY_SORT_FIELD=stringPreferencesKey("gallery_sort_field")
+    val GALLERY_SORT_DIRECTION=stringPreferencesKey("gallery_sort_direction")
     val GALLERY_GRID_SIZE = intPreferencesKey("gallery_grid_size")
     val ALBUM_GRID_SIZE = intPreferencesKey("album_grid_size")
     val LAYOUT_DENSITY = stringPreferencesKey("layout_density")

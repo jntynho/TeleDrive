@@ -1058,6 +1058,9 @@ internal class TdLibTelegramClient(
                     .collect { update ->
                         val local = update.file.local
                         val readyPath = update.file.readyPath()
+                        if(readyPath==null&&local?.isDownloadingActive==false&&local.isDownloadingCompleted==false){
+                            send<TdApi.File>(TdApi.DownloadFile(update.file.id,DOWNLOAD_PRIORITY,0,0,false))
+                        }
                         if (readyPath != null) {
                             trySend(
                                 TelegramDownloadEvent.Completed(readyPath, update.file.size)
@@ -1218,10 +1221,26 @@ internal class TdLibTelegramClient(
                 val chat=send<TdApi.Chat>(TdApi.GetChat(id))
                 val photo=chat.photo?.small
                 TelegramChat(chat.id,chat.title,photo?.id,
-                    photo?.local?.path?.takeIf { it.isNotEmpty() && File(it).isFile })
+                    photo?.local?.path?.takeIf { it.isNotEmpty() && File(it).isFile },canSendDocuments(chat))
             }
             catch(cancel:CancellationException){throw cancel}
             catch(_:TelegramException){null}
+        }
+    }
+
+    private suspend fun canSendDocuments(chat:TdApi.Chat):Boolean {
+        if(chat.permissions.canSendDocuments)return true
+        return when(val type=chat.type){
+            is TdApi.ChatTypeSupergroup -> when(val status=send<TdApi.Supergroup>(TdApi.GetSupergroup(type.supergroupId)).status){
+                is TdApi.ChatMemberStatusCreator -> status.isMember
+                is TdApi.ChatMemberStatusAdministrator -> !type.isChannel||status.rights.canPostMessages
+                else -> false
+            }
+            is TdApi.ChatTypeBasicGroup -> when(send<TdApi.BasicGroup>(TdApi.GetBasicGroup(type.basicGroupId)).status){
+                is TdApi.ChatMemberStatusCreator,is TdApi.ChatMemberStatusAdministrator -> true
+                else -> false
+            }
+            else -> false
         }
     }
 
@@ -1239,16 +1258,33 @@ internal class TdLibTelegramClient(
     }
 
     override suspend fun sendToChat(chatId:Long,fromChatId:Long,messageIds:List<Long>) {
-        for(batch in messageIds.chunked(100))paced {
-            send<TdApi.Messages>(TdApi.ForwardMessages().apply {
-                this.chatId=chatId;this.fromChatId=fromChatId;this.messageIds=batch.toLongArray()
-                sendCopy=true;removeCaption=true
-            })
+        require(messageIds.isNotEmpty()) { "No Telegram message is attached to this file." }
+        val destination=send<TdApi.Chat>(TdApi.GetChat(chatId))
+        check(canSendDocuments(destination)) { "This chat doesn't allow sending documents." }
+        for(id in messageIds.distinct()) {
+            send<TdApi.Message>(TdApi.GetMessage(fromChatId,id))
+            val properties=send<TdApi.MessageProperties>(TdApi.GetMessageProperties(fromChatId,id))
+            check(properties.canBeCopied) { "Telegram doesn't allow copying this message. The source may have protected content." }
+            // This flow subscribes before sending and waits for Telegram's final acknowledgement.
+            copyMessageEvents(chatId,fromChatId,id,"").filterIsInstance<TelegramUploadEvent.Completed>().first()
         }
     }
 
-    override suspend fun messageLink(chatId:Long,messageId:Long):String =
-        send<TdApi.MessageLink>(TdApi.GetMessageLink().apply {this.chatId=chatId;this.messageId=messageId}).link
+    override suspend fun messageLink(chatId:Long,messageId:Long):String {
+        val message=send<TdApi.Message>(TdApi.GetMessage(chatId,messageId))
+        val chat=send<TdApi.Chat>(TdApi.GetChat(chatId))
+        val properties=send<TdApi.MessageProperties>(TdApi.GetMessageProperties(chatId,messageId))
+        if(properties.canGetLink)return send<TdApi.MessageLink>(TdApi.GetMessageLink().apply {
+            this.chatId=chatId;this.messageId=message.id;pollOptionId=""
+        }).link
+        val serverId=message.id shr 20
+        check(serverId>0) { "This message hasn't been confirmed by Telegram yet." }
+        return when(val type=chat.type) {
+            is TdApi.ChatTypeSupergroup -> "https://t.me/c/${type.supergroupId}/$serverId"
+            is TdApi.ChatTypePrivate -> "tg://openmessage?user_id=${type.userId}&message_id=$serverId"
+            else -> error("Telegram doesn't provide a direct link for this conversation.")
+        }
+    }
 
     override suspend fun editCaption(chatId: Long, messageId: Long, caption: String) {
         paced {

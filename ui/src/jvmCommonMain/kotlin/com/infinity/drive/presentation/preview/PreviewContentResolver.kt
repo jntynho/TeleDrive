@@ -79,7 +79,7 @@ class PreviewContentResolver(
                         remoteFileId = remoteFileId,
                         isAudio = file.category == FileCategory.AUDIO,
                         parts = mediaParts,
-                        encrypted = file.isEncrypted
+                        encrypted = file.isEncrypted,nominalBytesPerSecond=file.durationMs?.takeIf{it>0}?.let{file.sizeBytes*1000/it}
                     )
                 )
                 return@flow
@@ -103,7 +103,7 @@ class PreviewContentResolver(
                         remoteFileId = remoteFileId,
                         isAudio = file.category == FileCategory.AUDIO,
                         parts = listOf(MediaPart(remoteFileId, 0, file.sizeBytes)),
-                        encrypted = true
+                        encrypted = true,nominalBytesPerSecond=file.durationMs?.takeIf{it>0}?.let{file.sizeBytes*1000/it}
                     )
                 )
                 return@flow

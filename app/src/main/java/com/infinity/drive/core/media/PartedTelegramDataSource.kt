@@ -20,7 +20,7 @@ class PartedTelegramDataSource(
     streamCrypto: StreamCrypto,
     parts: List<MediaPart>,
     encrypted: Boolean,
-    contentKey: ByteArray?
+    contentKey: ByteArray?,nominalBytesPerSecond:Long?=null
 ) : BaseDataSource(true) {
 
     private val source = PartedMediaByteSource(
@@ -28,7 +28,7 @@ class PartedTelegramDataSource(
         streamCrypto = streamCrypto,
         parts = parts,
         encrypted = encrypted,
-        contentKey = contentKey
+        contentKey = contentKey,nominalBytesPerSecond=nominalBytesPerSecond
     )
 
     private var uri: Uri? = null

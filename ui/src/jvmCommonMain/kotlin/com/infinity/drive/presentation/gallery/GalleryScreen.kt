@@ -183,12 +183,15 @@ fun GalleryScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
-    var albumQuery by rememberSaveable { mutableStateOf("") }
+    val albumQuery by viewModel.albumQuery.collectAsStateWithLifecycle()
     var searching by rememberSaveable { mutableStateOf(false) }
-    AppBackHandler(searching){searching=false;viewModel.setQuery("");albumQuery=""}
+    AppBackHandler(searching){searching=false;viewModel.setQuery("");viewModel.searchAlbums("")}
     var sorting by remember { mutableStateOf(false) }
     val media = viewModel.pagedMedia.collectAsLazyPagingItems()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
+    val busy by viewModel.working.collectAsStateWithLifecycle()
+    val snack=remember { androidx.compose.material3.SnackbarHostState() }
+    LaunchedEffect(viewModel){viewModel.messages.collect{snack.showSnackbar(it)}}
     var confirmTrash by remember { mutableStateOf(false) }
     var showSelectionOverflow by remember { mutableStateOf(false) }
     val renameTarget by viewModel.renameTarget.collectAsStateWithLifecycle()
@@ -222,19 +225,35 @@ fun GalleryScreen(
 
     AppBackHandler(enabled = state.selectionMode) { viewModel.clearSelection() }
 
-    val mediaListState = rememberSaveable(state.tab, saver = LazyListState.Saver) {
+    val contextRevision by viewModel.contextRevision.collectAsStateWithLifecycle()
+    val mediaListState = rememberSaveable(state.tab,contextRevision,query,state.sortField,state.sortDirection, saver = LazyListState.Saver) {
         LazyListState()
     }
     val allSelected by viewModel.allSelected.collectAsStateWithLifecycle()
     val previewSequence by viewModel.previewSequence.collectAsStateWithLifecycle()
-    val mediaGridState = rememberSaveable(state.tab, saver = LazyGridState.Saver) {
+    val mediaGridState = rememberSaveable(state.tab,contextRevision,query,state.sortField,state.sortDirection, saver = LazyGridState.Saver) {
         LazyGridState()
     }
     val scrolled = if (state.viewMode == ViewMode.LIST) mediaListState else mediaGridState
-    if (state.viewMode == ViewMode.LIST) {
-        mediaListState.rememberPosition(viewModel.listPosition, media.itemCount)
-    } else {
-        mediaGridState.rememberPosition(viewModel.listPosition, media.itemCount)
+    val position=remember(viewModel,state.tab,query,state.sortField,state.sortDirection,state.viewMode,contextRevision){viewModel.positionFor(state.viewMode)}
+    var anchorRestored by remember(position){mutableStateOf(false)}
+    LaunchedEffect(position,media.itemCount){
+        if(!anchorRestored&&media.itemCount>0){
+            val wanted=position.anchorId
+            val index=if(wanted==null)0 else media.itemSnapshotList.items.indexOfFirst{(it as? GalleryListItem.Media)?.file?.id==wanted}
+            if(index>=0){
+                if(state.viewMode==ViewMode.LIST)mediaListState.scrollToItem(index,position.offset)else mediaGridState.scrollToItem(index,position.offset)
+                anchorRestored=true
+            }else if(media.loadState.refresh !is androidx.paging.LoadState.Loading)anchorRestored=true
+        }
+    }
+    LaunchedEffect(position,scrolled,anchorRestored){
+        if(anchorRestored)androidx.compose.runtime.snapshotFlow {
+            if(state.viewMode==ViewMode.LIST)mediaListState.firstVisibleItemIndex to mediaListState.firstVisibleItemScrollOffset
+            else mediaGridState.firstVisibleItemIndex to mediaGridState.firstVisibleItemScrollOffset
+        }.collect{(index,offset)->
+            (if(index in 0 until media.itemCount)media.peek(index) as? GalleryListItem.Media else null)?.file?.id?.let{position.anchorId=it;position.remember(index,offset)}
+        }
     }
     val lifted by rememberToolbarLift(scrolled)
     val scopeKey=listOf(query,state.tab.name,state.sortField.name,state.sortDirection.name).joinToString("\u0000")
@@ -243,6 +262,7 @@ fun GalleryScreen(
 
     val filters=com.infinity.drive.presentation.components.rememberCollapsingFilters(query to state.tab){scrolled.canScrollBackward}
     Scaffold(
+        snackbarHost={androidx.compose.material3.SnackbarHost(snack)},
         modifier=filters.scrollModifier,
         topBar = { Column {
             if (state.selectionMode) {
@@ -268,6 +288,7 @@ fun GalleryScreen(
                     },
                     actions = {
                         IconButton(
+                            enabled=!busy,
                             onClick = {
                                 if (allSelected) viewModel.clearSelection() else viewModel.selectAll()
                             }
@@ -298,7 +319,7 @@ fun GalleryScreen(
                             ) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(Res.string.common_download)) },
-                                    enabled = state.capabilities.canDownload,
+                                    enabled = !busy && state.capabilities.canDownload,
                                     onClick = {
                                         showSelectionOverflow = false
                                         viewModel.downloadSelected()
@@ -306,7 +327,7 @@ fun GalleryScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(Res.string.common_upload)) },
-                                    enabled = state.capabilities.canUpload,
+                                    enabled = !busy && state.capabilities.canUpload,
                                     onClick = {
                                         showSelectionOverflow = false
                                         viewModel.uploadSelected()
@@ -314,7 +335,7 @@ fun GalleryScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(Res.string.common_rename)) },
-                                    enabled = state.selection.size == 1,
+                                    enabled = !busy && state.selection.size == 1,
                                     onClick = {
                                         showSelectionOverflow = false
                                         viewModel.requestRenameSelected()
@@ -341,7 +362,7 @@ fun GalleryScreen(
             } else {
                 app.tgdrive.ui.ExpandableLibraryHeader(
                     query=if(state.tab==GalleryTab.ALBUMS)albumQuery else query,
-                    onQueryChange={if(state.tab==GalleryTab.ALBUMS)albumQuery=it else viewModel.setQuery(it)},
+                    onQueryChange={if(state.tab==GalleryTab.ALBUMS)viewModel.searchAlbums(it) else viewModel.setQuery(it)},
                     expanded=searching,onExpandedChange={searching=it},
                     placeholder=if(state.tab==GalleryTab.ALBUMS)"Search albums"else"Search photos and videos",
                     title = state.albumTitle ?: if(state.tab==GalleryTab.ALBUMS) "Albums" else stringResource(Res.string.gallery_title),
@@ -358,7 +379,7 @@ fun GalleryScreen(
                     actions = {
                         Box {
                             IconButton(onClick={sorting=true}){Icon(DriveIcons.Sort,"Sort gallery")}
-                            SortMenu(expanded=sorting,current=state.sortField,direction=state.sortDirection,onDismiss={sorting=false},onSelect={field,direction->sorting=false;viewModel.setSort(field,direction)},fields=listOf(FileSortField.DATE_MODIFIED,FileSortField.DATE_ADDED,FileSortField.NAME,FileSortField.SIZE,FileSortField.TYPE),prefixContent={
+                            SortMenu(expanded=sorting,current=state.sortField,direction=state.sortDirection,onDismiss={sorting=false},onSelect={field,direction->sorting=false;viewModel.setSort(field,direction)},fields=if(state.tab==GalleryTab.ALBUMS)listOf(FileSortField.NAME,FileSortField.DATE_MODIFIED)else listOf(FileSortField.DATE_MODIFIED,FileSortField.DATE_ADDED,FileSortField.NAME,FileSortField.SIZE,FileSortField.TYPE),prefixContent={
                                 if(!state.isAlbumView){
                                     Text("View",Modifier.padding(horizontal=16.dp,vertical=8.dp),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
                                     DropdownMenuItem(text={Text("All media")},onClick={sorting=false;viewModel.setTab(GalleryTab.ALL)},trailingIcon={if(state.tab!=GalleryTab.ALBUMS)Icon(DriveIcons.Check,null)})
@@ -384,7 +405,7 @@ fun GalleryScreen(
                     return@Column
                 }
                 AlbumGrid(
-                    albums = state.albums.filter { albumQuery.isBlank() || (it.name ?: "Not in a folder").contains(albumQuery.trim(),true) },
+                    albums = state.albums,
                     columns = state.albumGridSize,
                     bottomPadding = padding.calculateBottomPadding() + LocalBottomBarInset.current,
                     onOpenAlbum = onOpenAlbum,
@@ -396,7 +417,7 @@ fun GalleryScreen(
             }
 
             val mediaIdAt: (Int) -> String? = { index ->
-                (media.peek(index) as? GalleryListItem.Media)?.file?.id
+                (if(index in 0 until media.itemCount)media.peek(index) as? GalleryListItem.Media else null)?.file?.id
             }
             val listDragSelect = rememberDragSelect(
                 listState = mediaListState,

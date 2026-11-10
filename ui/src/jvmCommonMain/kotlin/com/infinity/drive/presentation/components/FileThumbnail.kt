@@ -54,7 +54,7 @@ fun FileThumbnail(
     var failed by remember(file.id,file.localPath,file.remoteFileId,file.modifiedAt) { mutableStateOf(false) }
 
     val context=LocalPlatformContext.current
-    val imageRequest=remember(context,file.id,file.modifiedAt,file.localPath){ImageRequest.Builder(context).data(ThumbnailModel(file.id)).crossfade(160).build()}
+    val imageRequest=remember(context,file.id,file.modifiedAt,file.localPath,file.remoteFileId){ImageRequest.Builder(context).data(ThumbnailModel(file.id,"${file.modifiedAt}:${file.localPath}:${file.remoteFileId}")).crossfade(160).build()}
     BoxWithConstraints(
         modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh),
         contentAlignment = Alignment.Center

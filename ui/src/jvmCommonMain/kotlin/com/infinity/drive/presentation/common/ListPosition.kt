@@ -16,15 +16,21 @@ import androidx.lifecycle.SavedStateHandle
  * device that destroys the activity behind the player, which some do while a
  * video decodes, otherwise comes back to the top of the list.
  */
-class ListPosition(private val state: SavedStateHandle) {
+class ListPosition(private val state: SavedStateHandle,private val scope:String="default") {
 
-    val index: Int get() = state[KEY_INDEX] ?: 0
-    val offset: Int get() = state[KEY_OFFSET] ?: 0
+    var anchorId:String?
+        get()=state["$scope:anchor"]
+        set(value){state["$scope:anchor"]=value}
+
+    val index: Int get() = state["$scope:$KEY_INDEX"] ?: 0
+    val offset: Int get() = state["$scope:$KEY_OFFSET"] ?: 0
 
     fun remember(index: Int, offset: Int) {
-        state[KEY_INDEX] = index
-        state[KEY_OFFSET] = offset
+        state["$scope:$KEY_INDEX"] = index
+        state["$scope:$KEY_OFFSET"] = offset
     }
+
+    fun discard(){state.remove<String>("$scope:anchor");state.remove<Int>("$scope:$KEY_INDEX");state.remove<Int>("$scope:$KEY_OFFSET")}
 
     private companion object {
         const val KEY_INDEX = "list-index"
@@ -39,7 +45,7 @@ class ListPosition(private val state: SavedStateHandle) {
  */
 @Composable
 fun LazyGridState.rememberPosition(position: ListPosition, itemCount: Int) {
-    var restored by remember { mutableStateOf(false) }
+    var restored by remember(this,position) { mutableStateOf(false) }
 
     LaunchedEffect(this, itemCount, restored) {
         if (restored || itemCount == 0) return@LaunchedEffect
@@ -60,7 +66,7 @@ fun LazyGridState.rememberPosition(position: ListPosition, itemCount: Int) {
 
 @Composable
 fun LazyListState.rememberPosition(position: ListPosition, itemCount: Int) {
-    var restored by remember { mutableStateOf(false) }
+    var restored by remember(this,position) { mutableStateOf(false) }
 
     LaunchedEffect(this, itemCount, restored) {
         if (restored || itemCount == 0) return@LaunchedEffect

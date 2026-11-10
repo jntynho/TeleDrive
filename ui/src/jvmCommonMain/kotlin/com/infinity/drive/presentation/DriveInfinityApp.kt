@@ -243,7 +243,7 @@ private fun MainScaffold(
     LaunchedEffect(requestedTab,backStackEntry) {
         val target=requestedTab ?: return@LaunchedEffect
         val entry=backStackEntry ?: return@LaunchedEffect
-        entry.lifecycle.currentStateFlow.first { it.isAtLeast(Lifecycle.State.RESUMED) }
+        entry.lifecycle.currentStateFlow.first { it.isAtLeast(Lifecycle.State.STARTED) }
         if(navController.currentBackStackEntry!==entry)return@LaunchedEffect
         selectedNavIndex=TopLevelDestination.entries.indexOf(target)
         if(navController.currentDestination?.hasRoute(target.route::class)!=true)navigateTopLevel(navController,target)
@@ -343,7 +343,9 @@ private fun MainScaffold(
             androidx.compose.foundation.layout.Column(Modifier.onSizeChanged {
                 bottomChromeHeight=with(chromeDensity){(it.height-if(useRail)0 else systemBottom).coerceAtLeast(0).toDp()}
             }) {
-                com.infinity.drive.presentation.audio.LibraryAudioMiniPlayer()
+                CompositionLocalProvider(com.infinity.drive.presentation.platform.LocalOpenAudioPlayer provides { id ->
+                    navController.navigateOnce(Route.Preview(fileId=id,categories="AUDIO",sortField=navigationPreferences.audioSortField.name,sortDescending=navigationPreferences.audioSortDirection==com.infinity.drive.domain.model.SortDirection.DESCENDING))
+                }){com.infinity.drive.presentation.audio.LibraryAudioMiniPlayer()}
                 if(!useRail&&!keyboardVisible)CompositionLocalProvider(com.infinity.drive.presentation.components.LocalNavigationScene provides navigationScene){FloatingNavigationBar(preferences=navigationPreferences,selectedIndex=topLevelIndex.takeIf{it>=0}?:selectedNavIndex,onNavigate={requestedTab=it})}
             }
         }

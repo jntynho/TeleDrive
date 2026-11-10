@@ -17,7 +17,7 @@ val mediaModule = module {
         ImageLoader.Builder(androidContext())
             .components {
                 add(ThumbnailFetcher.Factory(get<ThumbnailStore>()))
-                add(Keyer<ThumbnailModel> { data, _: Options -> thumbnailCacheKey(data.fileId) })
+                add(Keyer<ThumbnailModel> { data, _: Options -> thumbnailCacheKey(data.fileId) + ":" + data.revision })
             }
             .crossfade(true)
             .build()

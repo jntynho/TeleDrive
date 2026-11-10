@@ -49,6 +49,8 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Bo
     var page by remember{mutableStateOf("actions")}
     var closeSheet by remember{mutableStateOf(onDismiss)}
     var working by remember{mutableStateOf(false)}
+    val clipboard=androidx.compose.ui.platform.LocalClipboardManager.current
+    var telegramLink by remember(current.id){mutableStateOf<String?>(null)}
     var message by remember{mutableStateOf<String?>(null)}
     var failure by remember{mutableStateOf(false)}
     fun requireSuccess(result:AppResult<*>){if(result is AppResult.Failure)error("The operation couldn't be completed. Check your connection and try again.")}
@@ -91,12 +93,14 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Bo
             FileInfoSheet(current){page="actions"}
         }
         else if(shown=="send"){
-            TelegramChatPicker("Send in Telegram",onDismiss={if(!working)page="actions"}){chat->
+            TelegramChatPicker("Send in Telegram",onDismiss={if(!working)page="actions"},forSending=true){chat->
                 page="actions"
                 run {
                     check(!current.isEncrypted){"Download and use Share for encrypted files."}
                     val chatId=current.chatId?:error("Upload this file to Telegram first")
-                    val ids=parts.partsOf(current.id).sortedBy{it.partIndex}.mapNotNull{it.messageId}
+                    val storedParts=parts.partsOf(current.id)
+                    check(storedParts.size<=1){"This file is stored in multiple parts. Use Download, then Share to send the complete file."}
+                    val ids=storedParts.sortedBy{it.partIndex}.mapNotNull{it.messageId}
                         .ifEmpty{listOf(current.messageId?:error("Upload this file first"))}
                     telegram.sendToChat(chat.id,chatId,ids)
                 }
@@ -114,6 +118,7 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Bo
             }
             message?.let{Text(it,Modifier.padding(horizontal=24.dp,vertical=8.dp),color=if(failure)MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)}
             HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.5f))
+            telegramLink?.let{link->TextButton({clipboard.setText(androidx.compose.ui.text.AnnotatedString(link));message="Telegram link copied"},Modifier.padding(horizontal=16.dp)){Text("Copy Telegram link")}}
             when(shown){
                 "rename"->{
                     var name by remember(current.id){mutableStateOf(current.name)}
@@ -150,7 +155,12 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Bo
                     SheetActionRow("Move",DriveIcons.DriveFileMove,enabled=!working){page="move"}
                     SheetActionRow("Show in folder",DriveIcons.FolderOpen,enabled=!working){closeThen{navigateFolder(current.folderId)}}
                     SheetActionRow("Show in Telegram",DriveIcons.OpenInNew,enabled=!working&&current.hasRemoteCopy){
-                        run{check(linkOpener.open(telegram.messageLink(current.chatId!!,current.messageId!!))){"No app could open this Telegram link."}}
+                        run(false){
+                            val link=telegram.messageLink(current.chatId!!,current.messageId!!)
+                            telegramLink=link
+                            check(linkOpener.open(link)){"No app could open this link. Copy it and open it in Telegram using the account that owns this drive."}
+                            message="Opened Telegram. For a private channel, select the account that owns this drive. Split files open at their first part."
+                        }
                     }
                     SheetActionRow(if(current.isArchived)"Unarchive"else"Archive",app.tgdrive.ui.LibraryIcons.Archive,enabled=!working){run{repository.setFilesArchived(listOf(current.id),!current.isArchived)}}
                     SheetActionRow("Move to Trash",DriveIcons.DeleteOutline,enabled=!working){page="trash"}

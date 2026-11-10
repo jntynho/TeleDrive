@@ -47,40 +47,13 @@ class TelegramMediaByteSource(
         val info = telegramClient.resolveFile(remoteFileId)
         fileId = info.fileId
         totalSize = info.sizeBytes
-        if (!info.isDownloadingCompleted) {
-            telegramClient.requestFileRange(fileId, 0, 0)
-        }
+
     }
 
-    private suspend fun awaitAvailable(readPosition: Long, count: Long) {
-        val info = telegramClient.getFileInfo(fileId)
-        if (covers(info, readPosition, count)) return
-
-        val downloading = info.isDownloadingCompleted || info.downloadedPrefixSize > 0
-        if (!downloading ||
-            readPosition < info.downloadOffset ||
-            readPosition > info.downloadOffset + info.downloadedPrefixSize
-        ) {
-            telegramClient.requestFileRange(fileId, readPosition, 0)
-        }
-        withTimeout(BUFFER_TIMEOUT_MS.milliseconds) {
-            // File updates are a hot stream. Completion can arrive before a collector
-            // subscribes; bounded local TDLib queries also recover that missed update.
-            while (!covers(telegramClient.getFileInfo(fileId), readPosition, count)) delay(100)
-        }
-    }
-
-    private fun covers(info: TelegramFileInfo, readPosition: Long, count: Long): Boolean {
-        if (info.isDownloadingCompleted) return true
-        val start = info.downloadOffset
-        val end = start + info.downloadedPrefixSize
-        return readPosition >= start && readPosition + count <= end
-    }
+    private suspend fun awaitAvailable(readPosition:Long,count:Long)=awaitTelegramRange(telegramClient,fileId,readPosition,count)
 
     override fun close() {
-        if (fileId != 0) {
-            runCatching { runBlocking { telegramClient.cancelFileDownload(fileId) } }
-        }
+        // Reads request finite ranges. Closing one reader must not cancel a shared TDLib download.
         fileId = 0
         totalSize = -1
     }

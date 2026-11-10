@@ -162,3 +162,10 @@ val MIGRATION_11_12 = object : Migration(11, 12) {
         connection.execSQL("ALTER TABLE transfers ADD COLUMN retryCount INTEGER NOT NULL DEFAULT 0")
     }
 }
+
+val MIGRATION_12_13 = object : Migration(12,13) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("CREATE TABLE IF NOT EXISTS audio_tags (fileId TEXT NOT NULL PRIMARY KEY, modifiedAt INTEGER NOT NULL, localPath TEXT, title TEXT, artist TEXT)")
+        connection.execSQL("CREATE INDEX IF NOT EXISTS index_files_gallery ON files(chatId,trashedAt,modifiedAt DESC,id ASC,category)")
+    }
+}

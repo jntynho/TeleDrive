@@ -7,6 +7,8 @@ import com.infinity.drive.data.local.dao.CacheDao
 import com.infinity.drive.data.local.dao.ThumbnailDao
 import com.infinity.drive.data.local.entity.CacheEntryType
 import com.infinity.drive.domain.repository.CacheRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.io.File
@@ -23,7 +25,7 @@ class CacheRepositoryImpl(
 
     override fun observeStats(): Flow<CacheRepository.CacheStats> = stats
 
-    override suspend fun refreshStats() {
+    override suspend fun refreshStats() = withContext(Dispatchers.IO) {
         stats.value = CacheRepository.CacheStats(
             thumbnailBytes = thumbnailDao.totalSizeBytes(),
             previewBytes = cacheDao.sizeByType(CacheEntryType.PREVIEW),

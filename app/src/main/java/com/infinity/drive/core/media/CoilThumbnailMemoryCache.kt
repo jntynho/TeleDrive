@@ -1,14 +1,15 @@
 package com.infinity.drive.core.media
 
 import coil3.ImageLoader
-import coil3.memory.MemoryCache
 
 class CoilThumbnailMemoryCache(
     private val imageLoader: ImageLoader
 ) : ThumbnailMemoryCache {
 
     override fun remove(fileId: String) {
-        imageLoader.memoryCache?.remove(MemoryCache.Key(thumbnailCacheKey(fileId)))
+        val cache=imageLoader.memoryCache?:return
+        val base=thumbnailCacheKey(fileId)
+        cache.keys.filter{it.key==base||it.key.startsWith("$base:")}.forEach(cache::remove)
     }
 
     override fun clear() {

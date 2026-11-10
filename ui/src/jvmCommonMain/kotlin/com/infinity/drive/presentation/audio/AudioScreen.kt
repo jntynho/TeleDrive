@@ -28,6 +28,8 @@ import com.infinity.drive.presentation.files.SortMenu
 import com.infinity.drive.presentation.navigation.LocalBottomBarInset
 import com.infinity.drive.presentation.platform.*
 import com.infinity.drive.presentation.preview.PreviewSequence
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -36,7 +38,7 @@ fun AudioScreen(onOpenFile:(String,PreviewSequence)->Unit,viewModel:AudioViewMod
     val filter by viewModel.filter.collectAsStateWithLifecycle()
     val prefs by viewModel.preferences.collectAsStateWithLifecycle()
     val player=LocalAudioPlayback.current
-    val playback by player.state.collectAsStateWithLifecycle()
+    val playback by remember(player){player.state.map{it.copy(positionMs=0)}.distinctUntilChanged()}.collectAsStateWithLifecycle(player.state.value)
     val audio=viewModel.audio.collectAsLazyPagingItems()
     var searching by rememberSaveable{mutableStateOf(false)}
     com.infinity.drive.presentation.common.AppBackHandler(searching){searching=false;viewModel.search("")}
@@ -59,7 +61,7 @@ fun AudioScreen(onOpenFile:(String,PreviewSequence)->Unit,viewModel:AudioViewMod
         val bottom=padding.calculateBottomPadding()+LocalBottomBarInset.current
         when {
             audio.loadState.refresh is LoadState.Loading&&audio.itemCount==0->AudioSkeleton(Modifier.padding(top=padding.calculateTopPadding()),bottom)
-            audio.loadState.refresh is LoadState.Error->EmptyState(DriveIcons.Info,"Couldn't load audio","Try loading your library again.",Modifier.padding(top=padding.calculateTopPadding(),bottom=bottom),"Retry",{audio.retry()})
+            audio.loadState.refresh is LoadState.Error&&audio.itemCount==0->EmptyState(DriveIcons.Info,"Couldn't load audio","Try loading your library again.",Modifier.padding(top=padding.calculateTopPadding(),bottom=bottom),"Retry",{audio.retry()})
             audio.itemCount==0->EmptyState(DriveIcons.MusicNote,if(query.isNotBlank())"No matching audio"else when(filter){AudioFilter.FAVORITES->"No favorites yet";AudioFilter.ON_DEVICE->"No audio on this device";else->"Your sound, in one place"},if(query.isNotBlank())"Try another filename."else"Audio files in your drive will appear here.",Modifier.padding(top=padding.calculateTopPadding(),bottom=bottom))
             else->LazyColumn(state=listState,modifier=Modifier.fillMaxSize().padding(top=padding.calculateTopPadding()).resultReveal(query to audio.itemSnapshotList.items.take(8).map{it.id}),contentPadding=PaddingValues(start=16.dp,end=16.dp,top=8.dp,bottom=bottom+20.dp)){
 
@@ -69,6 +71,7 @@ fun AudioScreen(onOpenFile:(String,PreviewSequence)->Unit,viewModel:AudioViewMod
                         onOpenFile(file.id,PreviewSequence(categories=listOf(FileCategory.AUDIO),nameQuery=query.trim().takeIf{it.isNotBlank()},favoritesOnly=filter==AudioFilter.FAVORITES,localCopiesOnly=filter==AudioFilter.ON_DEVICE,sortField=prefs.audioSortField,sortDirection=prefs.audioSortDirection))
                     }
                 }
+                if(audio.loadState.refresh is LoadState.Error)item("audio-refresh-error"){TextButton({audio.retry()}){Text("Couldn't refresh · Retry")}}
                 if(audio.loadState.append is LoadState.Error)item{TextButton({audio.retry()}){Text("Couldn't load more · Retry")}}
             }
         }
@@ -86,7 +89,7 @@ fun AudioLibraryRow(file:DriveFile?,playing:Boolean=false,currentMetadata:AudioM
 ) {
     val loading=file==null
     val player=LocalAudioPlayback.current
-    val storedMetadata by produceState(AudioMetadata(),file?.id,file?.modifiedAt,file?.localPath){if(file!=null)value=player.metadata(file)}
+    val storedMetadata by produceState(AudioMetadata(),file?.id,file?.modifiedAt,file?.localPath){if(file!=null)value=player.basicMetadata(file)}
     val meta=if(currentMetadata!=null)AudioMetadata(currentMetadata.title?.takeIf(String::isNotBlank)?:storedMetadata.title,currentMetadata.artist?.takeIf(String::isNotBlank)?:storedMetadata.artist,currentMetadata.durationMs?:storedMetadata.durationMs)else storedMetadata
     var menu by remember(file?.id){mutableStateOf(false)}
     if(menu&&file!=null)com.infinity.drive.presentation.components.FileActionsSheet(file,onDismiss={menu=false},onOpen=onPlay)
@@ -101,7 +104,7 @@ fun AudioLibraryRow(file:DriveFile?,playing:Boolean=false,currentMetadata:AudioM
         Box(Modifier.width(56.dp),contentAlignment=Alignment.CenterEnd){
             androidx.compose.animation.Crossfade(playing,animationSpec=androidx.compose.animation.core.tween(220),label="audioDateOrPlayback"){active->
                 if(active)PlayingEqualizer()
-                else Text(if(loading)"Jan 20"else file?.addedAt?.takeIf{it>0}?.let{java.text.SimpleDateFormat("MMM d",java.util.Locale.getDefault()).format(java.util.Date(it))}.orEmpty(),
+                else Text(remember(loading,file?.addedAt,java.util.Locale.getDefault()){if(loading)"Jan 20"else file?.addedAt?.takeIf{it>0}?.let{java.text.SimpleDateFormat("MMM d",java.util.Locale.getDefault()).format(java.util.Date(it))}.orEmpty()},
                     Modifier.skeleton(loading),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1)
             }
         }

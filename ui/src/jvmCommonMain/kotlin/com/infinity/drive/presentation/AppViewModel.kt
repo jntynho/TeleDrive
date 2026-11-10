@@ -94,12 +94,18 @@ class AppViewModel(
                 _upgradeNotice.value=upgrade.prepare()
                 kotlinx.coroutines.withTimeoutOrNull(400){fileRepository.observeRecent(12).first()}
                 appLockManager.onAppStarted()
+                if(settingsRepository.preferences.first().onboardingComplete) {
+                    kotlinx.coroutines.withTimeoutOrNull(450){kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){fileRepository.warmLibrary()}}
+                }
+                upgradeReady.value=true
+                com.infinity.drive.core.common.StartupReadiness.markReady()
+                // Local navigation is usable before Telegram/network recovery completes.
                 backupRepository.refreshActiveSession()
                 val started = telegramAuthRepository.startFromStoredCredentials()
                 if (started is AppResult.Failure) _sessionBroken.value = true
             } catch(e:kotlinx.coroutines.CancellationException) { throw e }
             catch(_:Exception) { _sessionBroken.value=true }
-            finally { upgradeReady.value=true }
+            finally { upgradeReady.value=true;com.infinity.drive.core.common.StartupReadiness.markReady() }
 
         }
         checkForUpdate()

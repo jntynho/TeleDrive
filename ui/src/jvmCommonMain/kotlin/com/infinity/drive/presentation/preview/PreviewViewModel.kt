@@ -54,7 +54,8 @@ data class PreviewUiState(
     val files: List<DriveFile> = emptyList(),
     val initialIndex: Int = 0,
     val ready: Boolean = false,
-    val closed: Boolean = false
+    val closed: Boolean = false,
+    val windowAnchor:String?=null
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -78,6 +79,8 @@ class PreviewViewModel(
     private val _infoTarget = MutableStateFlow<DriveFile?>(null)
     val infoTarget: StateFlow<DriveFile?> = _infoTarget.asStateFlow()
 
+    private var sequenceSpec:FileQuerySpec?=null
+    private var windowJob:kotlinx.coroutines.Job?=null
     private val contentCache = mutableMapOf<String, StateFlow<PreviewContent>>()
 
     init {
@@ -134,7 +137,8 @@ class PreviewViewModel(
                     sortDirection = prefs.sortDirection
                 )
             }
-            val siblings = fileRepository.observeFiles(spec).first()
+            sequenceSpec=spec
+            val siblings = fileRepository.previewWindow(spec,target.id)
             val files = if (siblings.any { it.id == target.id }) siblings else listOf(target)
             _uiState.update {
                 it.copy(
@@ -187,23 +191,42 @@ class PreviewViewModel(
             }
                 .distinctUntilChanged()
                 .flatMapLatest { (latest, incoming) ->
-                    if (incoming != null) {
-                        flowOf(
-                            PreviewContent.DownloadProgress(
-                                transferred = incoming.transferredBytes,
-                                total = incoming.sizeBytes
-                            )
-                        )
-                    } else {
-                        contentResolver.resolve(latest)
+                    contentResolver.resolve(latest).map { content ->
+                        if(incoming!=null&&(content is PreviewContent.RequiresDownload||content is PreviewContent.Loading)) {
+                            PreviewContent.DownloadProgress(incoming.transferredBytes,incoming.sizeBytes)
+                        } else content
                     }
                 }
                 .stateIn(
                     viewModelScope,
-                    SharingStarted.Lazily,
+                    SharingStarted.WhileSubscribed(1500,0),
                     PreviewContent.Loading
                 )
         }
+
+    fun removeUnavailable(id:String){
+        _uiState.update { old ->
+            val rows=old.files.filterNot{it.id==id}
+            old.copy(files=rows,closed=rows.isEmpty(),initialIndex=old.initialIndex.coerceAtMost((rows.size-1).coerceAtLeast(0)))
+        }
+        contentCache.remove(id)
+    }
+
+    fun ensureWindow(id:String){
+        val rows=_uiState.value.files
+        val index=rows.indexOfFirst{it.id==id}
+        if(index<0||(index>8&&index<rows.size-9))return
+        val spec=sequenceSpec?:return
+        windowJob?.cancel()
+        windowJob=viewModelScope.launch {
+            val window=fileRepository.previewWindow(spec,id)
+            if(window.any{it.id==id}&&window.map{it.id}!=_uiState.value.files.map{it.id}){
+                _uiState.update{it.copy(files=window,initialIndex=window.indexOfFirst{it.id==id}.coerceAtLeast(0),windowAnchor=id)}
+                val retained=window.map{it.id}.toSet()
+                contentCache.keys.retainAll(retained)
+            }
+        }
+    }
 
     /** Live file for the info sheet and rename updates. */
     fun observeFile(fileId: String): Flow<DriveFile?> = fileRepository.observeFile(fileId)

@@ -56,6 +56,7 @@ class VideoPlayerRegressionTest {
                 "getPlaybackState"->state
                 "getDuration"->duration
                 "getCurrentPosition"->position
+                "getBufferedPosition"->position
                 "getPlaybackParameters"->PlaybackParameters(speed)
                 "getVolume"->volume
                 "getRepeatMode"->repeat
@@ -134,6 +135,12 @@ class VideoPlayerRegressionTest {
         install(video,compact=true)
         val landscape=compose.onNodeWithTag("video-play").assertHeightIsAtLeast(48.dp).fetchSemanticsNode().boundsInRoot
         assertTrue(landscape.width<portrait.width)
+    }
+    @Test fun completedVideoDoesNotRestartAfterDecoderReplacement(){
+        val video=FakeVideo().apply{state=Player.STATE_ENDED;requested=true}
+        val checkpoint=VideoPlaybackCheckpoint();checkpoint.capture(video.player)
+        val restored=FakeVideo();checkpoint.restore(restored.player)
+        assertFalse(restored.requested);assertEquals(0L,restored.position)
     }
     @Test fun lifecycleSuspensionPreservesIntentAndTheUserPausedState() {
         val video=FakeVideo();val checkpoint=VideoPlaybackCheckpoint()

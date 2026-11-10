@@ -18,6 +18,15 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FileDao {
+    @RawQuery
+    suspend fun queryCount(query:RoomRawQuery):Int
+
+    @Query("SELECT * FROM audio_tags WHERE fileId = :id")
+    suspend fun audioTagsById(id:String):com.infinity.drive.data.local.entity.AudioTagEntity?
+
+    @androidx.room.Upsert
+    suspend fun storeAudioTags(tags:com.infinity.drive.data.local.entity.AudioTagEntity)
+
 
     @Query("SELECT * FROM files WHERE chatId IS :chatId AND folderId IS :folderId AND name = :name COLLATE NOCASE AND trashedAt IS NULL LIMIT 1")
     suspend fun nameClash(name:String,folderId:String?,chatId:Long?):FileEntity?
@@ -108,10 +117,10 @@ interface FileDao {
         chatId: Long?
     ): List<FileEntity>
 
-    @RawQuery(observedEntities = [FileEntity::class])
+    @RawQuery(observedEntities = [FileEntity::class, com.infinity.drive.data.local.entity.AudioTagEntity::class])
     fun pagingSource(query: RoomRawQuery): PagingSource<Int, FileEntity>
 
-    @RawQuery(observedEntities = [FileEntity::class])
+    @RawQuery(observedEntities = [FileEntity::class, com.infinity.drive.data.local.entity.AudioTagEntity::class])
     fun observeList(query: RoomRawQuery): Flow<List<FileEntity>>
 
     @RawQuery
@@ -395,12 +404,12 @@ interface FileDao {
                   COUNT(*) AS itemCount,
                   MAX(f.modifiedAt) AS latestAt,
                   (SELECT c.id FROM files c
-                     WHERE c.folderId IS f.folderId
+                     WHERE c.folderId IS f.folderId AND c.chatId IS :chatId
                        AND c.trashedAt IS NULL
                        AND c.category IN ('IMAGE', 'VIDEO')
                        AND (:showHidden = 1 OR c.isHidden = 0)
                        AND (:showArchived = 1 OR c.isArchived = 0)
-                     ORDER BY c.modifiedAt DESC LIMIT 1) AS coverFileId
+                     ORDER BY c.modifiedAt DESC, c.id ASC LIMIT 1) AS coverFileId
            FROM files f
            LEFT JOIN folders fo ON fo.id = f.folderId
            WHERE f.trashedAt IS NULL AND f.chatId IS :chatId

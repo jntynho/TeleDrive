@@ -141,6 +141,8 @@ class SettingsRepositoryImpl(
                 this[PreferenceKeys.SORT_DIRECTION],
                 defaults.sortDirection
             ),
+            gallerySortField=enumOrDefault(this[PreferenceKeys.GALLERY_SORT_FIELD],defaults.gallerySortField),
+            gallerySortDirection=enumOrDefault(this[PreferenceKeys.GALLERY_SORT_DIRECTION],defaults.gallerySortDirection),
             audioSortField = enumOrDefault(this[PreferenceKeys.AUDIO_SORT_FIELD], defaults.audioSortField),
             audioSortDirection = enumOrDefault(this[PreferenceKeys.AUDIO_SORT_DIRECTION], defaults.audioSortDirection),
             backgroundPlayback = this[PreferenceKeys.BACKGROUND_PLAYBACK]
@@ -212,6 +214,8 @@ class SettingsRepositoryImpl(
         this[PreferenceKeys.PROXY_ENABLED] = prefs.proxyEnabled
         this[PreferenceKeys.ACTIVE_PROXY_ID] = prefs.activeProxyId
         this[PreferenceKeys.TEXT_PREVIEW_SCALE] = prefs.textPreviewScale
+        this[PreferenceKeys.GALLERY_SORT_FIELD]=prefs.gallerySortField.name
+        this[PreferenceKeys.GALLERY_SORT_DIRECTION]=prefs.gallerySortDirection.name
         this[PreferenceKeys.AUDIO_SORT_FIELD] = prefs.audioSortField.name
         this[PreferenceKeys.AUDIO_SORT_DIRECTION] = prefs.audioSortDirection.name
         this[PreferenceKeys.SORT_FIELD] = prefs.sortField.name

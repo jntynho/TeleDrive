@@ -2,6 +2,7 @@ package com.infinity.drive.data.local
 
 import androidx.room.RoomRawQuery
 import com.infinity.drive.data.local.FileQueryBuilder.build
+import com.infinity.drive.domain.model.DriveFile
 import com.infinity.drive.domain.model.FileQuerySpec
 import com.infinity.drive.domain.model.FileSortField
 import com.infinity.drive.domain.model.SortDirection
@@ -17,7 +18,23 @@ object FileQueryBuilder {
     /** Same filter and order as [build], reading only the ids of every match. */
     fun buildIds(spec: FileQuerySpec): RoomRawQuery = query("id", spec)
 
-    private fun query(projection: String, spec: FileQuerySpec): RoomRawQuery {
+    fun buildLimited(spec:FileQuerySpec,limit:Int):RoomRawQuery = query("*",spec,limit.coerceIn(1,400))
+
+    fun buildWindow(spec:FileQuerySpec,offset:Int,limit:Int):RoomRawQuery = query("*",spec,limit.coerceIn(1,400),offset.coerceAtLeast(0))
+    fun rank(spec:FileQuerySpec,file:DriveFile):RoomRawQuery {
+        val column=when(spec.sortField){
+            FileSortField.NAME->"name COLLATE NOCASE";FileSortField.DATE_MODIFIED->"modifiedAt";FileSortField.DATE_ADDED->"addedAt"
+            FileSortField.SIZE->"sizeBytes";FileSortField.TYPE->"mimeType";FileSortField.BACKUP_STATUS->"backupState"
+        }
+        val value:Any=when(spec.sortField){
+            FileSortField.NAME->file.name;FileSortField.DATE_MODIFIED->file.modifiedAt;FileSortField.DATE_ADDED->file.addedAt
+            FileSortField.SIZE->file.sizeBytes;FileSortField.TYPE->file.mimeType;FileSortField.BACKUP_STATUS->file.backupState.name
+        }
+        val operator=if(spec.sortDirection==SortDirection.ASCENDING)"<"else">"
+        return query("COUNT(*)",spec,extra=" AND ($column $operator ? OR ($column = ? AND id < ?))",extraArgs=listOf(value,value,file.id))
+    }
+
+    private fun query(projection: String, spec: FileQuerySpec,limit:Int?=null,offset:Int=0,extra:String="",extraArgs:List<Any> = emptyList()): RoomRawQuery {
         val where = StringBuilder("trashedAt IS NULL")
         val args = mutableListOf<Any>()
 
@@ -25,6 +42,8 @@ object FileQueryBuilder {
         if (chatId != null) {
             where.append(" AND chatId = ?")
             args.add(chatId)
+        } else if(spec.scopeToChat) {
+            where.append(" AND chatId IS NULL")
         }
 
         val folderId = spec.folderId
@@ -41,8 +60,8 @@ object FileQueryBuilder {
             args.addAll(spec.categories.map { it.name })
         }
         spec.nameQuery?.takeIf { it.isNotBlank() }?.let {
-            where.append(" AND name LIKE ? ESCAPE '\\'")
-            args.add("%${escapeLike(it)}%")
+            where.append(" AND (name LIKE ? ESCAPE '\\' OR EXISTS (SELECT 1 FROM audio_tags a WHERE a.fileId = files.id AND a.modifiedAt = files.modifiedAt AND a.localPath IS files.localPath AND (a.title LIKE ? ESCAPE '\\' OR a.artist LIKE ? ESCAPE '\\')))")
+            repeat(3){_->args.add("%${escapeLike(it)}%") }
         }
         spec.extension?.takeIf { it.isNotBlank() }?.let {
             where.append(" AND name LIKE ? ESCAPE '\\'")
@@ -86,8 +105,9 @@ object FileQueryBuilder {
             SortDirection.DESCENDING -> "DESC"
         }
 
+        where.append(extra);args.addAll(extraArgs)
         val sql = "SELECT $projection FROM files WHERE $where " +
-                "ORDER BY $orderColumn $direction, id ASC"
+                "ORDER BY $orderColumn $direction, id ASC" + (limit?.let{" LIMIT $it OFFSET $offset"}?:"")
         return RoomRawQuery(sql) { statement ->
             args.forEachIndexed { index, value ->
                 when (value) {

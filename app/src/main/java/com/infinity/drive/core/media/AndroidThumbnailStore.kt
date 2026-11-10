@@ -24,6 +24,8 @@ import com.infinity.drive.data.local.entity.FileEntity
 import com.infinity.drive.data.local.entity.ThumbnailEntity
 import com.infinity.drive.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import java.io.ByteArrayOutputStream
@@ -47,15 +49,23 @@ class AndroidThumbnailStore(
 ) : ThumbnailStore {
 
     private val generationSemaphore = Semaphore(3)
+    private val fileLocks=Array(64){Mutex()}
+    private fun thumbnailName(file:FileEntity):String {
+        val revision="${file.id}:${file.modifiedAt}:${file.localPath}:${file.remoteFileId}:${file.iconFileId}:${file.contentHash}"
+        val key=java.security.MessageDigest.getInstance("SHA-256").digest(revision.toByteArray()).joinToString(""){"%02x".format(it)}
+        return "$key.thumb"
+    }
 
     override suspend fun thumbnailBytes(fileId: String): ByteArray? {
+        return fileLocks[(fileId.hashCode() and Int.MAX_VALUE)%fileLocks.size].withLock {
+        val entity=fileDao.byId(fileId)?:return null
         if (!settingsRepository.preferences.first().linkPreviews && isNote(fileId)) {
             thumbnailDao.delete(fileId)
             return null
         }
         thumbnailDao.byFileId(fileId)?.let { cached ->
             val file = File(cached.path)
-            if (file.exists()) {
+            if (file.exists() && file.name==thumbnailName(entity)) {
                 thumbnailDao.touch(fileId, System.currentTimeMillis())
                 val raw = file.readBytes()
                 return if (cached.encrypted) {
@@ -64,9 +74,11 @@ class AndroidThumbnailStore(
                     }.getOrNull()
                 } else raw
             }
+            file.delete()
             thumbnailDao.delete(fileId)
         }
         return generationSemaphore.withPermit { generate(fileId) }
+        }
     }
 
     override suspend fun uploadThumbnailFile(fileId: String): File? {
@@ -133,7 +145,7 @@ class AndroidThumbnailStore(
         } else jpegBytes
 
         val dir = File(storagePaths.cacheDir, "thumbnails").apply { mkdirs() }
-        val target = File(dir, "$fileId.thumb")
+        val target = File(dir, thumbnailName(entity))
         runCatching { target.writeBytes(stored) }.onFailure { return jpegBytes }
 
         val now = System.currentTimeMillis()

@@ -212,11 +212,11 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
     val standardFolders = remember {
         StandardBackupFolder.entries.map { StandardFolderOption(it.labelRes, it.path) }
     }
-    val aboutIcon = remember(context) {
-        runCatching { context.packageManager.getApplicationIcon(context.packageName).toBitmap(256,256).asImageBitmap() }.getOrNull()
+    val aboutIcon by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null,context) {
+        value=withContext(Dispatchers.IO){runCatching { context.packageManager.getApplicationIcon(context.packageName).toBitmap(256,256).asImageBitmap() }.getOrNull()}
     }
     val appIcon: @Composable (Modifier) -> Unit = { modifier ->
-        if(aboutIcon!=null) Image(bitmap=aboutIcon,contentDescription=null,modifier=modifier)
+        if(aboutIcon!=null) Image(bitmap=aboutIcon!!,contentDescription=null,modifier=modifier)
         else androidx.compose.material3.Icon(app.tgdrive.ui.DriveIcons.CloudUpload,contentDescription=null,modifier=modifier)
     }
 

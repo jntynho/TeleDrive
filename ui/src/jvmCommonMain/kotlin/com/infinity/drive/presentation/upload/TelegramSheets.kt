@@ -29,7 +29,7 @@ import org.koin.compose.koinInject
 /** Search is debounced and canceled with the sheet. Loading and failures never look like an empty chat list. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TelegramChatPicker(title:String,onDismiss:()->Unit,onSelected:(TelegramChat)->Unit) {
+fun TelegramChatPicker(title:String,onDismiss:()->Unit,forSending:Boolean=false,onSelected:(TelegramChat)->Unit) {
     val client=koinInject<TelegramClient>()
     val photoSlots=remember(client){Semaphore(2)}
     var query by remember{mutableStateOf("")}
@@ -60,7 +60,8 @@ fun TelegramChatPicker(title:String,onDismiss:()->Unit,onSelected:(TelegramChat)
             else items(rows!!,key={it.id}){chat->
                 ListItem(headlineContent={Text(chat.title,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)},
                     leadingContent={TelegramChatAvatar(chat){photoSlots.withPermit{withTimeoutOrNull(8_000){client.fetchChannelPhoto(chat.id)}}}},
-                    trailingContent={Icon(DriveIcons.ChevronRight,null)},modifier=Modifier.clickable{onSelected(chat)})
+                    supportingContent={if(forSending&&!chat.canSendDocuments)Text("Documents are not allowed in this chat")},
+                    trailingContent={Icon(DriveIcons.ChevronRight,null)},modifier=Modifier.clickable(enabled=!forSending||chat.canSendDocuments){onSelected(chat)})
             }
         }
         Spacer(Modifier.height(16.dp))

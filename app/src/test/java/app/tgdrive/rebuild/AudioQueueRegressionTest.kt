@@ -96,4 +96,20 @@ class AudioQueueRegressionTest {
         try {vm.play(track,playback);advanceTimeBy(200);runCurrent();assertEquals(0,toggles);assertEquals(0,starts);assertTrue(playback.state.value.playing)}
         finally{ViewModelStore().apply{put("tested",vm);clear()};Dispatchers.resetMain()}
     }
+    @Test fun `channel switches restore their paused sessions without starting the other channel`()=runTest {
+        val track=file("saved-${System.nanoTime()}").copy(chatId=101)
+        val files=fake<FileRepository>{name,args->when(name){"observeFile"->flowOf(track.takeIf{it.id==args[0]});"getFile"->track.takeIf{it.id==args[0]};else->error(name)}}
+        val player=player(files)
+        try {
+            player.updateLibraryContext(101,true);runCurrent()
+            player.play(track);player.setQueue(listOf(track.id));runCurrent();player.pause();runCurrent()
+            player.updateLibraryContext(202,true);runCurrent();assertNull(player.state.value.file)
+            player.updateLibraryContext(101,true);runCurrent()
+            assertEquals(track.id,player.state.value.file?.id)
+            assertFalse(player.state.value.playRequested)
+            assertFalse(player.state.value.playing)
+            player.stop();runCurrent()
+        }finally{player.release()}
+    }
+
 }

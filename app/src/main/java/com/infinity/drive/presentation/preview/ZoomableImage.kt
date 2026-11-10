@@ -4,6 +4,7 @@ package com.infinity.drive.presentation.preview
 import app.tgdrive.ui.DriveIcons
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateDecay
 import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +23,15 @@ import coil3.compose.AsyncImagePainter
 import com.infinity.drive.presentation.components.EmptyState
 import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.preview_image_undecodable
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.MotionDurationScale
+import androidx.compose.animation.rememberSplineBasedDecay
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -29,6 +39,7 @@ import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 
 /** Fit-aware zoom. Drag transforms are synchronous; only double-tap uses an animation. */
+@kotlin.OptIn(kotlinx.coroutines.FlowPreview::class)
 @Composable
 fun ZoomableImage(model:Any,contentDescription:String?,modifier:Modifier=Modifier,
     onTap:()->Unit={},onZoomChanged:(Boolean)->Unit={}
@@ -40,6 +51,16 @@ fun ZoomableImage(model:Any,contentDescription:String?,modifier:Modifier=Modifie
     var imageSize by remember(model){mutableStateOf(IntSize.Zero)}
     var animation by remember(model){mutableStateOf<Job?>(null)}
     val scope=rememberCoroutineScope()
+    val decay=rememberSplineBasedDecay<Float>()
+    var region by remember(model){mutableStateOf<ZoomRegion?>(null)}
+    LaunchedEffect(model){
+        snapshotFlow{Triple(scale,offset,viewport)}.debounce(100).collectLatest{(zoom,pan,view)->
+            if(model is String){
+                val tile=withContext(Dispatchers.IO){decodeZoomRegion(model,view,zoom,pan)}
+                ensureActive();region=tile
+            } else region=null
+        }
+    }
     val tap by rememberUpdatedState(onTap)
     val zoomChanged by rememberUpdatedState(onZoomChanged)
     fun clamp(position:Offset,zoom:Float):Offset=clampImagePan(position,zoom,viewport,imageSize)
@@ -49,7 +70,11 @@ fun ZoomableImage(model:Any,contentDescription:String?,modifier:Modifier=Modifie
         LaunchedEffect(model){animation?.cancel();scale=1f;offset=Offset.Zero;zoomChanged(false)}
         EmptyState(DriveIcons.BrokenImage,stringResource(Res.string.preview_image_undecodable),modifier=modifier,
             actionLabel="Retry",onAction={failed=false});return}
-    Box(modifier.fillMaxSize().clipToBounds().onSizeChanged{viewport=it;offset=clamp(offset,scale)}
+    Box(modifier.fillMaxSize().semantics {
+        stateDescription="Zoom ${(scale*100).toInt()} percent"
+        customActions=listOf(CustomAccessibilityAction("Zoom in"){animation?.cancel();scale=(scale*1.5f).coerceAtMost(6f);offset=clamp(offset,scale);true},
+            CustomAccessibilityAction("Fit image"){animation?.cancel();scale=1f;offset=Offset.Zero;true})
+    }.clipToBounds().onSizeChanged{viewport=it;offset=clamp(offset,scale)}
         .pointerInput(model){detectTapGestures(onTap={tap()},onDoubleTap={point->
             animation?.cancel()
             val startScale=scale
@@ -66,12 +91,19 @@ fun ZoomableImage(model:Any,contentDescription:String?,modifier:Modifier=Modifie
         })}
         .pointerInput(model){awaitEachGesture{
             awaitFirstDown(requireUnconsumed=false)
+            animation?.cancel()
+            val velocity=VelocityTracker()
+            var moved=false
+            var multitouch=false
             do {
                 val event=awaitPointerEvent()
                 val pinching=event.changes.count{it.pressed}>1
+                if(pinching){multitouch=true;velocity.resetTracking()}
+                else event.changes.firstOrNull{it.pressed}?.let{velocity.addPosition(it.uptimeMillis,it.position)}
                 if(!pinching&&scale<=1.01f)continue
                 val zoom=event.calculateZoom()
                 val pan=event.calculatePan()
+                if(pan.getDistance()>.5f)moved=true
                 if(abs(zoom-1f)<.0001f&&pan==Offset.Zero)continue
                 animation?.cancel()
                 val next=(scale*zoom).coerceIn(1f,6f)
@@ -81,6 +113,13 @@ fun ZoomableImage(model:Any,contentDescription:String?,modifier:Modifier=Modifie
                 scale=next
                 event.changes.forEach{it.consume()}
             }while(event.changes.any{it.pressed})
+            if(moved&&!multitouch&&scale>1.01f&&scope.coroutineContext[MotionDurationScale]?.scaleFactor!=0f){
+                val speed=velocity.calculateVelocity()
+                animation=scope.launch{coroutineScope {
+                    launch{androidx.compose.animation.core.AnimationState(offset.x,speed.x).animateDecay(decay){val old=value;val next=clamp(Offset(value,offset.y),scale);offset=next;if(next.x!=old)cancelAnimation()}}
+                    launch{androidx.compose.animation.core.AnimationState(offset.y,speed.y).animateDecay(decay){val old=value;val next=clamp(Offset(offset.x,value),scale);offset=next;if(next.y!=old)cancelAnimation()}}
+                }}
+            }
         }}
     ) {
         val context=coil3.compose.LocalPlatformContext.current
@@ -92,6 +131,15 @@ fun ZoomableImage(model:Any,contentDescription:String?,modifier:Modifier=Modifie
                 else->Unit
             }
         },modifier=Modifier.fillMaxSize().graphicsLayer{scaleX=scale;scaleY=scale;translationX=offset.x;translationY=offset.y})
+        region?.let{tile->
+            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()){
+                val factor=minOf(size.width/tile.original.width,size.height/tile.original.height)*scale
+                val left=size.width/2-tile.original.width*factor/2+offset.x+tile.source.left*factor
+                val top=size.height/2-tile.original.height*factor/2+offset.y+tile.source.top*factor
+                drawImage(tile.bitmap.asImageBitmap(),dstOffset=IntOffset(left.roundToInt(),top.roundToInt()),
+                    dstSize=IntSize((tile.source.width()*factor).roundToInt().coerceAtLeast(1),(tile.source.height()*factor).roundToInt().coerceAtLeast(1)))
+            }
+        }
     }
 }
 

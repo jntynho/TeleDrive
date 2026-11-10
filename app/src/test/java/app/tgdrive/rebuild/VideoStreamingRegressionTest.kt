@@ -28,13 +28,14 @@ class VideoStreamingRegressionTest {
         var delayed=false
         var empty=false
         val cancelled=mutableListOf<Int>()
+        val ranges=mutableListOf<Long>()
         private fun info(id:Int,ready:Boolean)=TelegramFileInfo(id,3,null,ready,0,if(ready)3 else 0)
         val client:TelegramClient=Proxy.newProxyInstance(TelegramClient::class.java.classLoader,arrayOf(TelegramClient::class.java)){_,method,args->
             val a=args?:emptyArray()
             when(method.name){
                 "resolveFile"->{resolutions++;info(if(a[0]=="two")2 else 1,!delayed)}
                 "getFileInfo"->{infos++;info(a[0] as Int,!delayed||infos>=2)}
-                "requestFileRange"->Unit
+                "requestFileRange"->{ranges.add(a[2] as Long);Unit}
                 "readFilePart"->{reads++;if(empty||(delayed&&reads==1))byteArrayOf()else ByteArray((a[2] as Long).toInt()){7}}
                 "fileUpdates"->error("No update will arrive: it was emitted before subscription")
                 "cancelFileDownload"->{cancelled.add(a[0] as Int);Unit}
@@ -68,13 +69,21 @@ class VideoStreamingRegressionTest {
         assertEquals(2,wire.infos)
         source.close()
     }
-    @Test fun multipartRangesAreBoundedAndAllPrefetchedDownloadsAreClosed() {
+    @Test fun closingMultipartReadDoesNotCancelOtherConsumers() {
         val wire=Wire()
         val source=PartedTelegramDataSource(wire.client,StreamCrypto(),listOf(MediaPart("one",0,3),MediaPart("two",3,3)),false,null)
         assertEquals(6,source.open(spec(length=100)))
         assertEquals(3,source.read(ByteArray(10),0,10))
         source.close()
-        assertEquals(setOf(1,2),wire.cancelled.toSet())
+        assertTrue(wire.cancelled.isEmpty())
+    }
+    @Test fun missingRangesAreFiniteAndClosingDoesNotCancelSharedDownload()=runBlocking {
+        val wire=Wire().apply{delayed=true}
+        val source=TelegramMediaByteSource(wire.client,"one")
+        assertEquals(3,source.read(0,3).size)
+        source.close()
+        assertTrue(wire.ranges.isNotEmpty());assertTrue(wire.ranges.all{it in 1..2L*1024*1024})
+        assertTrue(wire.cancelled.isEmpty())
     }
     @Test fun encryptedFramesAndHeadersAcceptShortNativeReads()=runBlocking {
         val crypto=StreamCrypto()

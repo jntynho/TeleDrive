@@ -39,6 +39,13 @@ private fun cueText(cue: LyricCue, positionMs: Long, active: Boolean, color: Col
         }
     }
 
+@Composable
+internal fun LiveLyricsSnippet(lyrics:AudioLyrics,trackId:String,onOpen:()->Unit,modifier:Modifier){
+    val state by LocalAudioPlayback.current.state.collectAsStateWithLifecycle()
+    val position=if(state.file?.id==trackId&&lyrics.cues.isNotEmpty())interpolatedAudioPosition(state)else state.positionMs
+    LyricsSnippet(lyrics,position,onOpen,modifier,trackKey=trackId)
+}
+
 /** A virtualized, fixed-height viewport scrolls the actual lines instead of replacing three texts. */
 @Composable
 internal fun LyricsSnippet(lyrics:AudioLyrics,positionMs:Long,onOpen:()->Unit,modifier:Modifier=Modifier,trackKey:String?=null){
@@ -55,15 +62,15 @@ internal fun LyricsSnippet(lyrics:AudioLyrics,positionMs:Long,onOpen:()->Unit,mo
                 val list=rememberLazyListState(initialFirstVisibleItemIndex=active.coerceAtLeast(0))
                 BoxWithConstraints(Modifier.fillMaxSize()){
                     val lineHeight=with(androidx.compose.ui.platform.LocalDensity.current){MaterialTheme.typography.bodyLarge.lineHeight.toDp()}
-                    val row=maxOf(maxHeight/3,lineHeight).coerceAtMost(maxHeight)
-                    LaunchedEffect(active){list.animateScrollToItem(active.coerceAtLeast(0))}
+                    val row=maxOf(maxHeight/2,lineHeight*2).coerceAtMost(maxHeight)
+                    LaunchedEffect(active){val target=active.coerceAtLeast(0);if(kotlin.math.abs(target-list.firstVisibleItemIndex)>4)list.scrollToItem(target)else list.animateScrollToItem(target)}
                     androidx.compose.foundation.lazy.LazyColumn(state=list,userScrollEnabled=false,
                         modifier=Modifier.fillMaxSize(),contentPadding=PaddingValues(vertical=(maxHeight-row)/2)){
                         itemsIndexed(lyrics.cues,key={index,_->index}){index,cue->
                             val emphasis by androidx.compose.animation.core.animateFloatAsState(if(index==active)1f else .38f,tween(260),label="lyricFocus")
                             Box(Modifier.fillMaxWidth().height(row),contentAlignment=Alignment.Center){
                                 Text(cueText(cue,positionMs,index==active,Color.White),
-                                    Modifier.blur(((1-emphasis)/.62f).coerceIn(0f,1f).dp),maxLines=1,overflow=TextOverflow.Ellipsis,
+                                    Modifier.blur(((1-emphasis)/.62f).coerceIn(0f,1f).dp),maxLines=2,overflow=TextOverflow.Ellipsis,
                                     color=Color.White.copy(alpha=emphasis),style=MaterialTheme.typography.bodyLarge,
                                     fontWeight=FontWeight.Medium,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
                             }
@@ -106,7 +113,7 @@ internal fun LyricsTimeline(lyrics: AudioLyrics, positionMs: Long, onSeek: (Long
     val active = lyrics.activeIndex(positionMs)
     LaunchedEffect(dragging) { if (dragging) follow = false }
     LaunchedEffect(lyrics, active, follow) {
-        if (follow && lyrics.cues.isNotEmpty()) list.animateScrollToItem(active.coerceAtLeast(0))
+        if (follow && lyrics.cues.isNotEmpty()) {val target=active.coerceAtLeast(0);if(kotlin.math.abs(target-list.firstVisibleItemIndex)>6)list.scrollToItem(target)else list.animateScrollToItem(target)}
     }
     val cues = remember(lyrics) { lyrics.cues.ifEmpty { lyrics.plainText.lines().filter(String::isNotBlank).map { LyricCue(0, it) } } }
     Column(modifier) {

@@ -20,6 +20,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -53,7 +56,8 @@ fun FileGridItem(
                 if (selected) MaterialTheme.colorScheme.secondaryContainer
                 else MaterialTheme.colorScheme.surfaceContainerLow
             )
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .semantics { this.selected=selected }
+            .combinedClickable(role=Role.Checkbox,onClick = onClick, onLongClick = onLongClick)
     ) {
         Box {
             FileThumbnail(

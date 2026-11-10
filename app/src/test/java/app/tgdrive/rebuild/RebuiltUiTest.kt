@@ -372,7 +372,8 @@ class RebuiltUiTest {
         compose.waitUntil(15_000){compose.onAllNodesWithText("Midnight City",substring=false).fetchSemanticsNodes().isNotEmpty()}
         compose.runOnUiThread{playback.value=playback.value.copy(playing=true)}
         compose.onNodeWithText("Midnight City",substring=false).performClick()
-        compose.onNodeWithContentDescription("Back to library").assertIsDisplayed()
+        try {compose.waitUntil(10_000){runCatching{compose.onNodeWithContentDescription("Back",useUnmergedTree=false).assertIsDisplayed();true}.getOrDefault(false)}}
+        catch(error:Throwable){capture("audio-route-failure");throw error}
         capture("now-playing")
         compose.onNodeWithContentDescription("Open lyrics").performClick()
         compose.onNodeWithContentDescription("Back to player").assertIsDisplayed()
