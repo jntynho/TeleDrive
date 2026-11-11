@@ -32,7 +32,7 @@ fun AddFilesSheet(visible:Boolean,target:String?=null,onDismiss:()->Unit) {
     var error by remember{mutableStateOf<String?>(null)}
     var busy by remember{mutableStateOf(false)}
     var folderName by remember{mutableStateOf("")}
-    LaunchedEffect(visible){if(visible){page="actions";busy=false;folderName=""}}
+    LaunchedEffect(visible){if(visible){page="actions";busy=false;folderName="";error=null}}
     fun capture(result:CaptureResult){when(result){
         is CaptureResult.Ready->uploads.importAndUpload(listOf(result.reference),target,copyImmediately=true)
         is CaptureResult.Failed->error=result.message

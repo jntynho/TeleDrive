@@ -58,6 +58,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -103,6 +104,7 @@ import com.infinity.drive.presentation.navigation.BottomBarHeight
 import com.infinity.drive.presentation.navigation.LocalBottomBarHeight
 import com.infinity.drive.presentation.navigation.Route
 import com.infinity.drive.presentation.navigation.TopLevelDestination
+import com.infinity.drive.presentation.navigation.navigateTopLevelOnce
 import com.infinity.drive.presentation.navigation.navigateOnce
 import com.infinity.drive.presentation.theme.DriveInfinityTheme
 import kotlinx.coroutines.delay
@@ -244,16 +246,18 @@ private fun MainScaffold(
     val navigationKeyboard=androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     LaunchedEffect(backStackEntry?.id){navigationFocus.clearFocus();navigationKeyboard?.hide()}
     var selectedNavIndex by androidx.compose.runtime.saveable.rememberSaveable { mutableIntStateOf(0) }
-    var requestedTab by remember { mutableStateOf<TopLevelDestination?>(null) }
-    LaunchedEffect(requestedTab,backStackEntry) {
-        val target=requestedTab ?: return@LaunchedEffect
-        val entry=backStackEntry ?: return@LaunchedEffect
-        entry.lifecycle.currentStateFlow.first { it.isAtLeast(Lifecycle.State.STARTED) }
-        if(navController.currentBackStackEntry!==entry)return@LaunchedEffect
-        selectedNavIndex=TopLevelDestination.entries.indexOf(target)
-        if(navController.currentDestination?.hasRoute(target.route::class)!=true)navigateTopLevel(navController,target)
-        requestedTab=null
+    val directTabIndex=TopLevelDestination.entries.indexOfFirst{currentDestination?.hasRoute(it.route::class)==true}
+    // Saved deep destinations retain their owner when restoreState skips the root tab screen.
+    val savedTabOwner=backStackEntry?.savedStateHandle?.get<Int>("navigation-tab-owner")
+    val topLevelIndex=directTabIndex.takeIf{it>=0}?:savedTabOwner?:selectedNavIndex
+    LaunchedEffect(backStackEntry?.id,directTabIndex){
+        val owner=directTabIndex.takeIf{it>=0}?:savedTabOwner?:selectedNavIndex
+        backStackEntry?.savedStateHandle?.set("navigation-tab-owner",owner)
+        selectedNavIndex=owner
     }
+    val entryState=backStackEntry?.lifecycle?.currentStateFlow?.collectAsState()?.value
+    val navigating=entryState!=Lifecycle.State.RESUMED
+
 
     val showChrome=onboardingComplete&&currentDestination!=null&&
         currentDestination.hasRoute(Route.Onboarding::class).not()&&currentDestination.hasRoute(Route.Preview::class).not()&&
@@ -315,7 +319,11 @@ private fun MainScaffold(
     }
 
     val audioPlayer=com.infinity.drive.presentation.platform.LocalAudioPlayback.current
+    var measuredChromeHeight by remember { mutableStateOf(BottomBarHeight) }
     var bottomChromeHeight by remember { mutableStateOf(BottomBarHeight) }
+    LaunchedEffect(measuredChromeHeight,navigating){
+        if(!navigating){withFrameNanos{};bottomChromeHeight=measuredChromeHeight}
+    }
     val chromeDensity=androidx.compose.ui.platform.LocalDensity.current
     val systemBottom=WindowInsets.navigationBars.getBottom(chromeDensity)
 
@@ -323,6 +331,7 @@ private fun MainScaffold(
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val railWidth=if(useRail&&onboardingComplete)80.dp else 0.dp
         CompositionLocalProvider(
+            app.tgdrive.ui.LocalNavigationInProgress provides navigating,
             com.infinity.drive.presentation.components.LocalNavigationScene provides navigationScene,
             LocalBottomBarHeight provides if(onboardingComplete)bottomChromeHeight else 0.dp,
             com.infinity.drive.presentation.components.LocalFileFolderNavigation provides { id:String? -> navController.navigateOnce(Route.Files(id)) },
@@ -334,24 +343,22 @@ private fun MainScaffold(
             enter=fadeIn(tween(180)),exit=fadeOut(tween(180)),modifier=Modifier.align(Alignment.CenterStart)) {
             NavigationRail(modifier=Modifier.width(80.dp).fillMaxHeight(),containerColor=MaterialTheme.colorScheme.surfaceContainer) {
                 TopLevelDestination.entries.forEach { destination ->
-                    val selected=currentDestination?.hasRoute(destination.route::class)==true
-                    NavigationRailItem(selected=selected,onClick={if(!selected)requestedTab=destination},
+                    val selected=TopLevelDestination.entries.indexOf(destination)==topLevelIndex
+                    NavigationRailItem(selected=selected,onClick={if(!selected)navigateTopLevel(navController,destination)},
                         icon={Icon(if(selected)destination.selectedIcon else destination.icon,contentDescription=stringResource(destination.labelRes))},
                         label={Text(stringResource(destination.labelRes))})
                 }
             }
         }
-        val topLevelIndex=TopLevelDestination.entries.indexOfFirst { currentDestination?.hasRoute(it.route::class)==true }
-        LaunchedEffect(topLevelIndex){if(topLevelIndex>=0)selectedNavIndex=topLevelIndex}
         AnimatedVisibility(visible=showChrome,enter=fadeIn(tween(180)),exit=fadeOut(tween(180)),
             modifier=Modifier.align(Alignment.BottomCenter).padding(start=railWidth)) {
             androidx.compose.foundation.layout.Column(Modifier.onSizeChanged {
-                bottomChromeHeight=with(chromeDensity){(it.height-if(useRail)0 else systemBottom).coerceAtLeast(0).toDp()}
+                measuredChromeHeight=with(chromeDensity){(it.height-if(useRail)0 else systemBottom).coerceAtLeast(0).toDp()}
             }) {
                 CompositionLocalProvider(com.infinity.drive.presentation.platform.LocalOpenAudioPlayer provides { id ->
                     navController.navigateOnce(Route.Preview(fileId=id,categories="AUDIO",sortField=navigationPreferences.audioSortField.name,sortDescending=navigationPreferences.audioSortDirection==com.infinity.drive.domain.model.SortDirection.DESCENDING))
                 }){com.infinity.drive.presentation.audio.LibraryAudioMiniPlayer()}
-                if(!useRail&&!keyboardVisible)CompositionLocalProvider(com.infinity.drive.presentation.components.LocalNavigationScene provides navigationScene){FloatingNavigationBar(preferences=navigationPreferences,selectedIndex=topLevelIndex.takeIf{it>=0}?:selectedNavIndex,onNavigate={requestedTab=it})}
+                if(!useRail&&!keyboardVisible)CompositionLocalProvider(com.infinity.drive.presentation.components.LocalNavigationScene provides navigationScene){FloatingNavigationBar(preferences=navigationPreferences,selectedIndex=topLevelIndex.takeIf{it>=0}?:selectedNavIndex,onNavigate={navigateTopLevel(navController,it)})}
             }
         }
     }
@@ -387,7 +394,7 @@ private fun navigateTopLevel(
     navController: NavHostController,
     destination: TopLevelDestination
 ) {
-    navController.navigateOnce(destination.route) {
+    navController.navigateTopLevelOnce(destination.route) {
         popUpTo(Route.Home) { saveState = true }
         restoreState = true
         launchSingleTop = true

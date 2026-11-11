@@ -34,9 +34,10 @@ fun rememberCollapsingFilters(resetKey: Any?, canScrollBackward: () -> Boolean):
     val threshold = with(LocalDensity.current) { 24.dp.toPx() }
     val tracker = remember(resetKey, threshold) { FilterScrollThreshold(threshold, collapsed) }
     val canGoBack by rememberUpdatedState(canScrollBackward)
+    val navigating by rememberUpdatedState(app.tgdrive.ui.LocalNavigationInProgress.current)
     val connection = remember(tracker) { object : NestedScrollConnection {
         override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-            if (source == NestedScrollSource.UserInput) {
+            if (source == NestedScrollSource.UserInput && !navigating) {
                 val atStart = !canGoBack()
                 val delta = if (atStart && available.y > 0) available.y else consumed.y
                 collapsed = tracker.consume(delta, atStart)

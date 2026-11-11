@@ -7,6 +7,14 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class StartupPreparationTest {
+    @Test fun anExpiredPreparationBudgetDoesNotClaimAllOptionalWorkWasReady(){
+        val state=StartupPreparationState()
+        state.deferred("library")
+        assertEquals(com.infinity.drive.presentation.components.PreparationOutcome.DEFERRED,state.outcome("library"))
+        assertFalse(state.needs("library"))
+        state.complete("library")
+        assertEquals(com.infinity.drive.presentation.components.PreparationOutcome.READY,state.outcome("library"))
+    }
     private fun file(id:String,chat:Long?=1,category:FileCategory=FileCategory.IMAGE)=DriveFile(id,null,"$id.jpg",1,"image/jpeg",category,null,null,chat,null,null,null,BackupState.NONE,
         false,false,false,false,null,null,null,null,createdAt=1,modifiedAt=1,addedAt=1)
     @Test fun pagesAreOneShotAndMustMatchTheWholeQueryAndChannel(){

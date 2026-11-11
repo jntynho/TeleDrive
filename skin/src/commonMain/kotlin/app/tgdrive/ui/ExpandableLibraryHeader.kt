@@ -38,6 +38,7 @@ fun ExpandableLibraryHeader(
     val keyboard=LocalSoftwareKeyboardController.current
     val requester=remember{FocusRequester()}
     val owner=LocalLifecycleOwner.current
+    val navigating=LocalNavigationInProgress.current
     LaunchedEffect(expanded){if(!expanded&&requestSearchFocus){focus.clearFocus();keyboard?.hide()}}
     fun close(){focus.clearFocus();keyboard?.hide();onQueryChange("");onExpandedChange(false)}
     Surface(color=MaterialTheme.colorScheme.background) {
@@ -57,11 +58,13 @@ fun ExpandableLibraryHeader(
                             modifier=Modifier.weight(1f).heightIn(min=48.dp).focusRequester(requester).semantics{contentDescription=placeholder},
                             decorationBox={input->Box(contentAlignment=Alignment.CenterStart){if(query.isEmpty())Text(placeholder,color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodyLarge);input()}})
                         if(query.isNotEmpty())IconButton({onQueryChange("")}){Icon(DriveIcons.Close,"Clear search")}
-                        LaunchedEffect(expanded,owner){
-                             if(expanded&&requestSearchFocus){
+                        LaunchedEffect(expanded,owner,navigating){
+                             if(expanded&&requestSearchFocus&&!navigating){
                                  owner.lifecycle.currentStateFlow.first{it.isAtLeast(Lifecycle.State.RESUMED)}
-                                 kotlinx.coroutines.delay(180)
-                                 requester.requestFocus();keyboard?.show()
+                                 withFrameNanos{}
+                                 if(owner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)){
+                                     requester.requestFocus();keyboard?.show()
+                                 }
                              }
                          }
                     }else{

@@ -18,7 +18,8 @@ class AudioViewModel(private val handle:SavedStateHandle,private val files:FileR
     fun search(value:String){handle["audioQuery"]=value}
     fun filter(value:AudioFilter){handle["audioFilter"]=value}
     val preferences=settings.preferences.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),UserPreferences())
-    private val spec=combine(query.debounce { if(it.isBlank())0L else 180L },filter,settings.preferences){text,filter,prefs->
+    val appliedQuery=query.debounce { if(it.isBlank())0L else 180L }.stateIn(viewModelScope,SharingStarted.Eagerly,query.value)
+    private val spec=combine(appliedQuery,filter,settings.preferences){text,filter,prefs->
         FileQuerySpec(categories=listOf(FileCategory.AUDIO),nameQuery=text.trim().takeIf{it.isNotEmpty()},
             favoritesOnly=filter==AudioFilter.FAVORITES,localCopiesOnly=filter==AudioFilter.ON_DEVICE,
             sortField=prefs.audioSortField,sortDirection=prefs.audioSortDirection)

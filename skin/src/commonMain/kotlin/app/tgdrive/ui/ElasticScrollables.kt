@@ -21,7 +21,8 @@ private fun edge(delta:Float,start:Float,end:Float,zone:Float):Float=
 @Composable
 private fun listEffect(state:LazyListState,horizontal:Boolean,reverse:Boolean):OverscrollEffect {
     val zone=with(LocalDensity.current){48.dp.toPx()}
-    return remember(state,zone,horizontal,reverse){ElasticOverscrollEffect { delta ->
+    val suspended=LocalNavigationInProgress.current
+    val effect=remember(state,zone,horizontal,reverse){ElasticOverscrollEffect { delta ->
         val layout=state.layoutInfo
         val first=layout.visibleItemsInfo.firstOrNull()
         val last=layout.visibleItemsInfo.lastOrNull()
@@ -31,6 +32,8 @@ private fun listEffect(state:LazyListState,horizontal:Boolean,reverse:Boolean):O
         val amount=edge(if(reverse)-input else input,start,end,zone)*(if(reverse)-1 else 1)
         if(horizontal)Offset(amount,0f)else Offset(0f,amount)
     }}
+    SideEffect{effect.updateEnabled(!suspended)}
+    return effect
 }
 
 @Composable
@@ -70,6 +73,8 @@ fun ElasticLazyVerticalGrid(columns:GridCells,modifier:Modifier=Modifier,state:L
         val end=if(!state.canScrollForward)0f else last?.let{(it.offset.y+it.size.height+layout.afterContentPadding-layout.viewportEndOffset).toFloat().coerceAtLeast(0f)}?:Float.POSITIVE_INFINITY
         Offset(0f,edge(if(reverseLayout)-delta.y else delta.y,start,end,zone)*(if(reverseLayout)-1 else 1))
     }}
+    val suspended=LocalNavigationInProgress.current
+    SideEffect{effect.updateEnabled(!suspended)}
     androidx.compose.foundation.lazy.grid.LazyVerticalGrid(columns=columns,modifier=modifier,state=state,contentPadding=contentPadding,
         reverseLayout=reverseLayout,verticalArrangement=verticalArrangement,horizontalArrangement=horizontalArrangement,
         flingBehavior=flingBehavior,userScrollEnabled=userScrollEnabled,overscrollEffect=effect,content=content)
@@ -86,10 +91,13 @@ fun Modifier.elasticHorizontalScroll(state:ScrollState,enabled:Boolean=true,flin
 @Composable
 private fun scrollEffect(state:ScrollState,horizontal:Boolean,reverse:Boolean):OverscrollEffect {
     val zone=with(LocalDensity.current){48.dp.toPx()}
-    return remember(state,zone,horizontal,reverse){ElasticOverscrollEffect { delta ->
+    val suspended=LocalNavigationInProgress.current
+    val effect=remember(state,zone,horizontal,reverse){ElasticOverscrollEffect { delta ->
         val amount=if(state.maxValue==Int.MAX_VALUE)0f else edge(
             (if(horizontal)delta.x else delta.y)*(if(reverse)-1 else 1),state.value.toFloat(),
             (state.maxValue-state.value).toFloat(),zone)*(if(reverse)-1 else 1)
         if(horizontal)Offset(amount,0f)else Offset(0f,amount)
     }}
+    SideEffect{effect.updateEnabled(!suspended)}
+    return effect
 }

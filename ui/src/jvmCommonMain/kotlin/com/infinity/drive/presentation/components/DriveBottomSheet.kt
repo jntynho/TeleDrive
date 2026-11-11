@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 
 private data class SheetHost(val dismiss:()->Unit)
 val LocalSheetCloseThen=staticCompositionLocalOf<((()->Unit)->Unit)>{{it()}}
+private val LocalSheetClosing=staticCompositionLocalOf{false}
 private val LocalSheetHost=staticCompositionLocalOf<SheetHost?>{null}
 
 /** Bounded, non-overshooting motion also respects the system animator duration scale. */
@@ -60,7 +61,7 @@ fun DriveBottomSheet(
     val dismiss:()->Unit={closeThen{}}
     MaterialTheme(motionScheme=SheetMotion){
     androidx.compose.material3.ModalBottomSheet(
-        onDismissRequest = onDismissRequest,
+        onDismissRequest = {if(!closing)latestDismiss()},
         sheetState = sheetState,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         containerColor = surface,
@@ -79,7 +80,7 @@ fun DriveBottomSheet(
         // Default ListItems must blend into the modal rather than painting rectangular patches.
         MaterialTheme(colorScheme = colors.copy(surface = surface, surfaceContainer = surface,
             surfaceContainerLow = surface, surfaceContainerHigh = surface)) {
-            CompositionLocalProvider(LocalSheetHost provides SheetHost(dismiss),LocalSheetCloseThen provides closeThen){content(scope,dismiss)}
+            CompositionLocalProvider(LocalSheetHost provides SheetHost(dismiss),LocalSheetCloseThen provides closeThen,LocalSheetClosing provides closing){content(scope,dismiss)}
         }
     }
     }
@@ -87,10 +88,11 @@ fun DriveBottomSheet(
 
 @Composable
 fun SheetActionRow(label: String, icon: ImageVector, enabled: Boolean = true, detail:String? = null, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick)
+    val interactive=enabled&&!LocalSheetClosing.current
+    Row(Modifier.fillMaxWidth().clickable(enabled = interactive, onClick = onClick)
         .heightIn(min = 56.dp).padding(horizontal = 24.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-        val color = MaterialTheme.colorScheme.onSurface.copy(alpha = if(enabled)1f else .38f)
+        val color = MaterialTheme.colorScheme.onSurface.copy(alpha = if(interactive)1f else .38f)
         Icon(icon, null, Modifier.size(24.dp), tint = color)
         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)) {
             Text(label, style = MaterialTheme.typography.bodyLarge, color = color)

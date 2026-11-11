@@ -134,6 +134,11 @@ class RebuiltUiTest {
         capture("floating-navigation-settings")
         for(tab in listOf("home","gallery","audio","settings","audio","home")){
             compose.onNodeWithTag("navigation-$tab").performClick()
+            // Selection follows the committed destination, including a queued tap during a transition.
+            compose.waitUntil(5000){
+                compose.waitForIdle()
+                compose.onNodeWithTag("navigation-$tab").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Selected]
+            }
             compose.onNodeWithTag("navigation-$tab").assertIsSelected()
         }
         assertTrue(runBlocking{repository.preferences.first().floatingNavigationBar})

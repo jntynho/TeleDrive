@@ -41,19 +41,20 @@ import kotlin.math.abs
 /** Fit-aware zoom. Drag transforms are synchronous; only double-tap uses an animation. */
 @kotlin.OptIn(kotlinx.coroutines.FlowPreview::class)
 @Composable
-fun ZoomableImage(model:Any,contentDescription:String?,modifier:Modifier=Modifier,
-    onTap:()->Unit={},onZoomChanged:(Boolean)->Unit={}
+fun ZoomableImage(model:Any?,contentDescription:String?,modifier:Modifier=Modifier,
+    onTap:()->Unit={},onZoomChanged:(Boolean)->Unit={},contentKey:Any?=model,previewModel:Any?=null
 ) {
     var failed by remember(model){mutableStateOf(false)}
-    var scale by remember(model){mutableFloatStateOf(1f)}
-    var offset by remember(model){mutableStateOf(Offset.Zero)}
-    var viewport by remember(model){mutableStateOf(IntSize.Zero)}
-    var imageSize by remember(model){mutableStateOf(IntSize.Zero)}
-    var animation by remember(model){mutableStateOf<Job?>(null)}
+    var scale by remember(contentKey){mutableFloatStateOf(1f)}
+    var offset by remember(contentKey){mutableStateOf(Offset.Zero)}
+    var viewport by remember(contentKey){mutableStateOf(IntSize.Zero)}
+    var imageSize by remember(contentKey){mutableStateOf(IntSize.Zero)}
+    var animation by remember(contentKey){mutableStateOf<Job?>(null)}
     val scope=rememberCoroutineScope()
     val decay=rememberSplineBasedDecay<Float>()
     var region by remember(model){mutableStateOf<ZoomRegion?>(null)}
     LaunchedEffect(model){
+        region=null
         snapshotFlow{Triple(scale,offset,viewport)}.debounce(100).collectLatest{(zoom,pan,view)->
             if(model is String){
                 val tile=withContext(Dispatchers.IO){decodeZoomRegion(model,view,zoom,pan)}
@@ -64,8 +65,8 @@ fun ZoomableImage(model:Any,contentDescription:String?,modifier:Modifier=Modifie
     val tap by rememberUpdatedState(onTap)
     val zoomChanged by rememberUpdatedState(onZoomChanged)
     fun clamp(position:Offset,zoom:Float):Offset=clampImagePan(position,zoom,viewport,imageSize)
-    LaunchedEffect(model){snapshotFlow{scale>1.01f}.distinctUntilChanged().collect{zoomChanged(it)}}
-    DisposableEffect(model){onDispose{animation?.cancel();zoomChanged(false)}}
+    LaunchedEffect(contentKey){snapshotFlow{scale>1.01f}.distinctUntilChanged().collect{zoomChanged(it)}}
+    DisposableEffect(contentKey){onDispose{animation?.cancel();zoomChanged(false)}}
     if(failed){
         LaunchedEffect(model){animation?.cancel();scale=1f;offset=Offset.Zero;zoomChanged(false)}
         EmptyState(DriveIcons.BrokenImage,stringResource(Res.string.preview_image_undecodable),modifier=modifier,
@@ -75,7 +76,7 @@ fun ZoomableImage(model:Any,contentDescription:String?,modifier:Modifier=Modifie
         customActions=listOf(CustomAccessibilityAction("Zoom in"){animation?.cancel();scale=(scale*1.5f).coerceAtMost(6f);offset=clamp(offset,scale);true},
             CustomAccessibilityAction("Fit image"){animation?.cancel();scale=1f;offset=Offset.Zero;true})
     }.clipToBounds().onSizeChanged{viewport=it;offset=clamp(offset,scale)}
-        .pointerInput(model){detectTapGestures(onTap={tap()},onDoubleTap={point->
+        .pointerInput(contentKey){detectTapGestures(onTap={tap()},onDoubleTap={point->
             animation?.cancel()
             val startScale=scale
             val startOffset=offset
@@ -89,7 +90,7 @@ fun ZoomableImage(model:Any,contentDescription:String?,modifier:Modifier=Modifie
                 }
             }
         })}
-        .pointerInput(model){awaitEachGesture{
+        .pointerInput(contentKey){awaitEachGesture{
             awaitFirstDown(requireUnconsumed=false)
             animation?.cancel()
             val velocity=VelocityTracker()
@@ -123,10 +124,10 @@ fun ZoomableImage(model:Any,contentDescription:String?,modifier:Modifier=Modifie
         }}
     ) {
         val context=coil3.compose.LocalPlatformContext.current
-        val imageRequest=remember(model,context){coil3.request.ImageRequest.Builder(context).data(model).crossfade(220).build()}
+        val imageRequest=remember(model,previewModel,context){coil3.request.ImageRequest.Builder(context).data(model?:previewModel).crossfade(160).build()}
         AsyncImage(imageRequest,contentDescription,contentScale=ContentScale.Fit,onState={state->
             when(state){
-                is AsyncImagePainter.State.Error->failed=true
+                is AsyncImagePainter.State.Error->if(model!=null)failed=true
                 is AsyncImagePainter.State.Success->{imageSize=IntSize(state.result.image.width,state.result.image.height);offset=clamp(offset,scale)}
                 else->Unit
             }

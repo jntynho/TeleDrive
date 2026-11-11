@@ -67,7 +67,12 @@ fun PlayerControls(
     DisposableEffect(activity,orientationOwner){onDispose{
         if(orientationOwner==null&&activity!=null&&!activity.isChangingConfigurations)activity.requestedOrientation=originalOrientation
     }}
-    LaunchedEffect(player,visible){while(visible){position=player.currentPosition.coerceAtLeast(0);duration=player.duration.coerceAtLeast(0);buffered=player.bufferedPosition.coerceAtLeast(0);delay(250)}}
+    // Read the authoritative clock only while visible. The isolated timeline owns frame updates.
+    LaunchedEffect(player,visible){while(visible){
+        position=player.currentPosition.coerceAtLeast(0)
+        duration=player.duration.coerceAtLeast(0);buffered=player.bufferedPosition.coerceAtLeast(0)
+        delay(250)
+    }}
     LaunchedEffect(speedMenu){overlay(speedMenu)}
     LaunchedEffect(visible){if(!visible){speedMenu=false;scrub=null;scrubbing(false)}}
 
@@ -114,15 +119,13 @@ fun PlayerControls(
             }}
             val timeline:@Composable (Modifier)->Unit={trackModifier->
                 Box(trackModifier){
-                androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(48.dp)){
-                    val fraction=if(duration>0)(buffered.toFloat()/duration).coerceIn(0f,1f)else 0f
-                    drawLine(Color.White.copy(alpha=.4f),androidx.compose.ui.geometry.Offset(0f,size.height/2),androidx.compose.ui.geometry.Offset(size.width*fraction,size.height/2),2.dp.toPx(),androidx.compose.ui.graphics.StrokeCap.Round)
-                }
-                SlimSlider(scrub?:position.coerceIn(0,duration).toFloat(),onValueChange={scrub=it;scrubbing(true);onInteraction()},
+                val displayPosition=interpolatedVideoPosition(player,position,visible,requested&&playbackState==Player.STATE_READY,rate)
+                SlimSlider(scrub?:displayPosition.coerceIn(0,duration).toFloat(),onValueChange={scrub=it;scrubbing(true);onInteraction()},
                     onValueChangeFinished={scrub?.let{player.seekTo(videoSeekTarget(it.toLong(),0,duration))};scrub=null;scrubbing(false);onInteraction()},
                     valueRange=0f..duration.coerceAtLeast(1).toFloat(),enabled=canSeek,
                     trackHeight=2.dp,thumbSize=6.dp,
                     activeColor=Color.White,inactiveColor=Color.White.copy(alpha=.3f),
+                    bufferedFraction=if(duration>0)buffered.toFloat()/duration else 0f,bufferedColor=Color.White.copy(alpha=.4f),
                     modifier=Modifier.fillMaxWidth().semantics{contentDescription="Seek video"})
                 }
             }
@@ -189,4 +192,17 @@ internal enum class PlayerRotation(
     );
 
     fun next(): PlayerRotation = entries[(ordinal + 1) % entries.size]
+}
+
+/** Only the timeline interpolates; transport/header composition remains at player-event frequency. */
+@Composable
+private fun interpolatedVideoPosition(player:Player,anchor:Long,visible:Boolean,advancing:Boolean,speed:Float):Long {
+    val position by produceState(anchor,player,anchor,visible,advancing,speed){
+        value=anchor
+        if(visible&&advancing){
+            val start=androidx.compose.animation.core.withInfiniteAnimationFrameNanos{it}
+            while(true)androidx.compose.animation.core.withInfiniteAnimationFrameNanos{frame->value=anchor+(((frame-start)/1_000_000).coerceIn(0,350)*speed).toLong()}
+        }
+    }
+    return position
 }

@@ -51,10 +51,12 @@ fun FileThumbnail(
     val access=com.infinity.drive.presentation.platform.LocalHiddenContentAccess.current
     val lock=access?.lock?.state?.collectAsStateWithLifecycle()?.value
     val protectedFolders=access?.protectedFolders?.collectAsStateWithLifecycle()?.value
-    var allowed by remember(file.id,file.modifiedAt,file.isHidden,file.folderId,lock?.epoch,lock?.restricted,protectedFolders){mutableStateOf(access==null||lock?.restricted==false)}
-    LaunchedEffect(file.id,file.modifiedAt,file.isHidden,file.folderId,lock?.epoch,lock?.restricted,protectedFolders){allowed=access?.canReadSnapshot(file)!=false}
-    if(!allowed){
-        Box(modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh),contentAlignment=Alignment.Center){Icon(DriveIcons.Lock,"Locked item",Modifier.size(24.dp))}
+    // The observed policy is shared by every row; public thumbnails do not flash a lock per epoch.
+    val allowed=if(access==null)true else access.snapshotCanRead(file)
+    if(allowed!=true){
+        Box(modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh),contentAlignment=Alignment.Center){
+            if(allowed==false)Icon(DriveIcons.Lock,"Locked item",Modifier.size(24.dp))
+        }
         return
     }
     // Text can carry one too: a note holding a link previews as that link.
@@ -65,7 +67,7 @@ fun FileThumbnail(
     var failed by remember(file.id,file.localPath,file.remoteFileId,file.modifiedAt) { mutableStateOf(false) }
 
     val context=LocalPlatformContext.current
-    val imageRequest=remember(context,file.id,file.modifiedAt,file.localPath,file.remoteFileId){ImageRequest.Builder(context).data(ThumbnailModel(file.id,"${file.modifiedAt}:${file.localPath}:${file.remoteFileId}")).crossfade(160).build()}
+    val imageRequest=remember(context,file.id,file.modifiedAt,file.localPath,file.remoteFileId){ImageRequest.Builder(context).data(com.infinity.drive.core.media.thumbnailModel(file)).crossfade(160).build()}
     BoxWithConstraints(
         modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh),
         contentAlignment = Alignment.Center

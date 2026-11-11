@@ -20,7 +20,8 @@ fun SlimSlider(value:Float,onValueChange:(Float)->Unit,modifier:Modifier=Modifie
     valueRange:ClosedFloatingPointRange<Float> = 0f..1f,steps:Int=0,enabled:Boolean=true,
     onValueChangeFinished:(()->Unit)?=null,trackHeight:Dp=4.dp,thumbSize:Dp=16.dp,
     activeColor:Color=MaterialTheme.colorScheme.primary,
-    inactiveColor:Color=MaterialTheme.colorScheme.outlineVariant
+    inactiveColor:Color=MaterialTheme.colorScheme.outlineVariant,
+    bufferedFraction:Float?=null,bufferedColor:Color=inactiveColor
 ) {
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     Slider(value.coerceIn(valueRange),onValueChange,modifier.heightIn(min=48.dp),enabled=enabled,
@@ -36,6 +37,10 @@ fun SlimSlider(value:Float,onValueChange:(Float)->Unit,modifier:Modifier=Modifie
                 val start=if(rtl)size.width else 0f
                 val color=if(enabled)activeColor else inactiveColor
                 drawLine(inactiveColor,Offset(0f,y),Offset(size.width,y),trackHeight.toPx(),StrokeCap.Round)
+                bufferedFraction?.coerceIn(0f,1f)?.let { buffered ->
+                    val end=size.width*(if(rtl)1f-buffered else buffered)
+                    drawLine(bufferedColor,Offset(start,y),Offset(end,y),trackHeight.toPx(),StrokeCap.Round)
+                }
                 if(fraction>0f)drawLine(color,Offset(start,y),Offset(x,y),trackHeight.toPx(),StrokeCap.Round)
                 if(thumbSize>0.dp)drawCircle(color,thumbSize.toPx()/2f,Offset(x,y))
             }

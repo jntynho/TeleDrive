@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
@@ -40,7 +41,15 @@ val LocalSettingsSearchTarget = staticCompositionLocalOf<String?> { null }
 private fun Modifier.searchTarget(title:String):Modifier {
     val target=LocalSettingsSearchTarget.current
     val requester=remember{BringIntoViewRequester()}
-    LaunchedEffect(title,target){if(title==target){delay(320);requester.bringIntoView()}}
+    val owner=androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val navigating=app.tgdrive.ui.LocalNavigationInProgress.current
+    LaunchedEffect(title,target,owner,navigating){
+        if(title==target&&!navigating){
+            owner.lifecycle.currentStateFlow.first{it.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)}
+            androidx.compose.runtime.withFrameNanos{}
+            requester.bringIntoView()
+        }
+    }
     return this.bringIntoViewRequester(requester).background(if(title==target)MaterialTheme.colorScheme.primary.copy(alpha=.10f)else Color.Transparent)
 }
 

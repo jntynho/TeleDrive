@@ -32,9 +32,10 @@ fun rememberStartupPreparation(loading:Boolean,mode:String,glass:Boolean,state:S
         if(loading||!state.needs(mode))return@LaunchedEffect
         lifecycle.currentStateFlow.first{it.isAtLeast(Lifecycle.State.STARTED)}
         try {
-            withTimeoutOrNull(550){
+            val completed=withTimeoutOrNull(550){
+                // First lay out the real destination; optional probes cannot compete with that frame.
+                if(mode=="library"){libraryFrame.await();withFrameNanos{}}
                 coroutineScope {
-                    if(mode=="library")launch { libraryFrame.await() }
                     if(mode=="library"&&platform!=null)launch {
                         try{withTimeoutOrNull(220){platform.prepareImages(files.preparedStartupFiles(),window.width,window.height)}}
                         catch(cancel:CancellationException){throw cancel}
@@ -45,9 +46,10 @@ fun rememberStartupPreparation(loading:Boolean,mode:String,glass:Boolean,state:S
                         finished.await()
                     }
                     withFrameNanos{};withFrameNanos{}
+                    true
                 }
             }
-            state.complete(mode)
+            if(completed==true)state.complete(mode)else state.deferred(mode)
         } finally { render=false }
     }
     return StartupPreparationUi(visibility,render,resourceKey,mode,glass,{libraryFrame.complete(Unit)}){finished.complete(Unit)}

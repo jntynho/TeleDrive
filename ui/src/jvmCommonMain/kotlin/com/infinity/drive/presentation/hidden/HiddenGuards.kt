@@ -8,29 +8,39 @@ import com.infinity.drive.presentation.collection.CollectionScreen
 import com.infinity.drive.presentation.collection.CollectionType
 import com.infinity.drive.presentation.preview.PreviewSequence
 import com.infinity.drive.presentation.components.LoadingState
+import kotlinx.coroutines.flow.map
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun HiddenCollectionGate(onBack:()->Unit,onOpenFile:(String,PreviewSequence)->Unit){
     val vm:HiddenLockViewModel=koinViewModel()
+    val listState=androidx.compose.foundation.lazy.rememberLazyListState()
     val lock by vm.manager.state.collectAsStateWithLifecycle()
     val ui by vm.ui.collectAsStateWithLifecycle()
     SensitiveScreen()
-    if(lock.unlocked&&ui.stage==HiddenStage.UNLOCK&&!ui.working)CollectionScreen(onBack,onOpenFile,onManageHidden=vm::manage)
+    if(lock.unlocked&&ui.stage==HiddenStage.UNLOCK&&!ui.working)CollectionScreen(onBack,onOpenFile,onManageHidden=vm::manage,listState=listState)
     else HiddenLockScreen(onBack,vm)
 }
 
-/** Fail closed immediately on every epoch; the actual viewer isn't composed while access is checked. */
+/** Keep public content mounted across unrelated lock epochs; private revocation stays synchronous. */
 @Composable
 fun HiddenContentGuard(fileId:String?=null,folderId:String?=null,onBack:()->Unit,content:@Composable ()->Unit){
     val access=koinInject<HiddenContentAccess>()
     val lock by access.lock.state.collectAsStateWithLifecycle()
     val protected by access.protectedFolders.collectAsStateWithLifecycle()
-    var allowed by remember(fileId,folderId,lock.epoch,lock.restricted,protected){mutableStateOf<Boolean?>(null)}
-    LaunchedEffect(fileId,folderId,lock.epoch,lock.restricted,protected){
-        if(fileId!=null)access.observeCanRead(fileId).collect{allowed=it&&access.canRead(fileId)}
-        else allowed=access.canReadFolder(folderId)
+    val allowed:Boolean?=if(fileId!=null){
+        val observed by remember(access,fileId){access.observeAccessFile(fileId).map{Pair<String?,com.infinity.drive.domain.model.DriveFile?>(fileId,it)}}
+            .collectAsStateWithLifecycle(initialValue=null to null)
+        when {
+            !lock.ready||observed.first!=fileId->null
+            observed.second==null->false
+            else->access.snapshotCanRead(observed.second!!)
+        }
+    }else when {
+        !lock.ready->null
+        !lock.restricted||folderId==null->true
+        else->access.snapshotCanReadFolder(folderId)
     }
     when(allowed){
         null->LoadingState(Modifier)

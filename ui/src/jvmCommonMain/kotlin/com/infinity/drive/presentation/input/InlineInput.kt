@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
@@ -73,7 +74,15 @@ fun InlineInputField(value:String,onChange:(String)->Unit,label:String,modifier:
         editor=if(clean==next.text)next else TextFieldValue(clean,TextRange(clean.length))
         currentChange(clean)
     },{currentEnabled},{text->if(currentPaste!=null)currentPaste!!.invoke(text)else controller.insert(text)})}
-    LaunchedEffect(id){if(autoActivate&&controller.target==null){controller.target=target;withFrameNanos{};bring.bringIntoView()}}
+    val owner=androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val navigating=app.tgdrive.ui.LocalNavigationInProgress.current
+    LaunchedEffect(id,navigating){
+        if(autoActivate&&controller.target==null)controller.target=target
+        if(controller.target?.id==id&&!navigating){
+            owner.lifecycle.currentStateFlow.first{it.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)}
+            withFrameNanos{};bring.bringIntoView()
+        }
+    }
     DisposableEffect(id){onDispose{if(controller.target?.id==id)controller.target=null}}
     val active=controller.target?.id==id
     val border by animateColorAsState(if(active)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,label="input-border")
@@ -89,7 +98,7 @@ fun InlineInputField(value:String,onChange:(String)->Unit,label:String,modifier:
                 textStyle=MaterialTheme.typography.bodyLarge.copy(color=MaterialTheme.colorScheme.onSurface),
                 cursorBrush=SolidColor(MaterialTheme.colorScheme.primary),
                 visualTransformation=if(password&&!revealed)PasswordVisualTransformation()else VisualTransformation.None,
-                modifier=Modifier.weight(1f).padding(vertical=16.dp).onFocusChanged{if(it.isFocused){controller.target=target;scope.launch{bring.bringIntoView()}}}.semantics{
+                modifier=Modifier.weight(1f).padding(vertical=16.dp).onFocusChanged{if(it.isFocused){controller.target=target;scope.launch{owner.lifecycle.currentStateFlow.first{it.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)};withFrameNanos{};bring.bringIntoView()}}}.semantics{
                     contentDescription=label
                     onClick{controller.target=target;true}
                     setText{if(enabled){controller.target=target;target.write(TextFieldValue(it.text,TextRange(it.length)));true}else false}
@@ -113,14 +122,14 @@ fun InlineKeyboard(controller:InlineInputController,modifier:Modifier=Modifier,c
         if(numeric){
             listOf(listOf("1","2","3"),listOf("4","5","6"),listOf("7","8","9"),listOf(numericLeading.orEmpty(),"0","delete")).forEach{row->
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                    row.forEach{key->InputKey(key,enabled,Modifier.weight(1f).height(if(compact)44.dp else 56.dp)){
+                    row.forEach{key->InputKey(key,enabled,Modifier.weight(1f).height(if(compact)48.dp else 56.dp)){
                         when(key){"fingerprint"->onLeadingAction?.invoke();"delete"->controller.backspace();"paste"->clipboard.getText()?.text?.let(controller::paste);else->controller.insert(key)}
                     }}
                 }
             }
         }else{
             val rows=when {
-                target.mode==InlineInputMode.HEX->listOf("1234567890","ABCDEF")
+                target.mode==InlineInputMode.HEX->listOf("012345","6789AB","CDEF")
                 symbols==1->listOf("1234567890","@#%&*()-_=","+[]{}!?.,")
                 symbols==2->listOf("~`|\\/<>:;","$€£¥^°•…'\"","áàâäéèêëçñ")
                 language==1->if(shift)listOf("أإآٱپچڤگژ","ئؤءةى","لا")else listOf("ضصثقفغعهخحجد","شسيبلاتنمكط","ئءؤرلاىةوزظذ")
@@ -129,18 +138,18 @@ fun InlineKeyboard(controller:InlineInputController,modifier:Modifier=Modifier,c
             }
             rows.forEachIndexed{index,row->
                 Row(Modifier.fillMaxWidth().padding(horizontal=if(index==1)10.dp else 0.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)){
-                    if(index==rows.lastIndex&&symbols==0&&target.mode!=InlineInputMode.HEX)InputKey("shift",enabled,Modifier.weight(1.2f).height(if(compact)44.dp else 54.dp)){shift=!shift}
+                    if(index==rows.lastIndex&&symbols==0&&target.mode!=InlineInputMode.HEX)InputKey("shift",enabled,Modifier.weight(1.2f).height(if(compact)48.dp else 54.dp)){shift=!shift}
                     row.forEach{ch->val key=if(shift)ch.uppercaseChar().toString()else ch.toString()
-                        InputKey(key,enabled,Modifier.weight(1f).height(if(compact)44.dp else 54.dp),small=true){controller.insert(key)}
+                        InputKey(key,enabled,Modifier.weight(1f).height(if(compact)48.dp else 54.dp),small=true){controller.insert(key)}
                     }
-                    if(index==rows.lastIndex)InputKey("delete",enabled,Modifier.weight(1.2f).height(if(compact)44.dp else 54.dp)){controller.backspace()}
+                    if(index==rows.lastIndex)InputKey("delete",enabled,Modifier.weight(1.2f).height(if(compact)48.dp else 54.dp)){controller.backspace()}
                 }
             }
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                InputKey(if(symbols==0)"123"else if(symbols==1)"#+="else"ABC",enabled,Modifier.weight(1.3f).height(if(compact)44.dp else 54.dp),small=true){symbols=(symbols+1)%3}
-                InputKey("language",enabled,Modifier.weight(1f).height(if(compact)44.dp else 54.dp)){language=(language+1)%3;symbols=0}
-                InputKey("space",enabled,Modifier.weight(4f).height(if(compact)44.dp else 54.dp)){controller.insert(" ")}
-                InputKey("paste",enabled,Modifier.weight(1f).height(if(compact)44.dp else 54.dp)){clipboard.getText()?.text?.let(controller::paste)}
+                if(target.mode!=InlineInputMode.HEX)InputKey(if(symbols==0)"123"else if(symbols==1)"#+="else"ABC",enabled,Modifier.weight(1.3f).height(if(compact)48.dp else 54.dp),small=true){symbols=(symbols+1)%3}
+                if(target.mode!=InlineInputMode.HEX)InputKey("language",enabled,Modifier.weight(1f).height(if(compact)48.dp else 54.dp)){language=(language+1)%3;symbols=0}
+                if(target.mode!=InlineInputMode.HEX)InputKey("space",enabled,Modifier.weight(4f).height(if(compact)48.dp else 54.dp)){controller.insert(" ")}
+                InputKey("paste",enabled,Modifier.weight(1f).height(if(compact)48.dp else 54.dp)){clipboard.getText()?.text?.let(controller::paste)}
             }
         }
     }

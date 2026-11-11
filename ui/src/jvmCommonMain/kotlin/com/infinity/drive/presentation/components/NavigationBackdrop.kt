@@ -16,8 +16,15 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.unit.dp
 
 val LocalNavigationScene=staticCompositionLocalOf<GraphicsLayer?>{null}
-fun Modifier.recordNavigationScene(scene:GraphicsLayer,enabled:Boolean)=drawWithContent{
-    if(enabled){scene.record{this@drawWithContent.drawContent()};drawLayer(scene)}else drawContent()
+@Composable
+fun Modifier.recordNavigationScene(scene:GraphicsLayer,enabled:Boolean):Modifier {
+    val navigating=app.tgdrive.ui.LocalNavigationInProgress.current
+    return drawWithContent{
+        if(enabled){
+            if(!navigating||scene.size.width==0)scene.record{this@drawWithContent.drawContent()}
+            if(navigating)drawContent()else drawLayer(scene)
+        }else drawContent()
+    }
 }
 /** Blur the captured library only. Navigation icons/text remain crisp and fully interactive. */
 @Composable

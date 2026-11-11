@@ -102,6 +102,9 @@ class GalleryViewModel(
     val query = MutableStateFlow(savedStateHandle.get<String>("gallery-query").orEmpty())
     fun setQuery(value:String) { if(query.value==value)return;invalidateSelection();query.value=value;savedStateHandle["gallery-query"]=value;listPosition.remember(0,0);clearSelection() }
 
+    val appliedQuery=query.debounce { if(it.isBlank())0L else 180L }
+        .stateIn(viewModelScope,SharingStarted.Eagerly,query.value)
+
     val albumQuery = savedStateHandle.getStateFlow("album-query", "")
     fun searchAlbums(value:String) { savedStateHandle["album-query"] = value }
     private val _message = MutableSharedFlow<String>(extraBufferCapacity=8)
@@ -124,7 +127,7 @@ class GalleryViewModel(
     private val positions=linkedMapOf<String,ListPosition>()
     private var channelKey="initial"
     fun positionFor(mode:ViewMode):ListPosition {
-        val key="$channelKey:${tab.value}:${query.value}:${sort.value}:$mode"
+        val key="$channelKey:${tab.value}:${appliedQuery.value}:${sort.value}:$mode"
         positions[key]?.let{return it}
         if(positions.size>=24)positions.remove(positions.keys.first())?.discard()
         return ListPosition(savedStateHandle,"gallery:$key").also{positions[key]=it}
@@ -144,7 +147,7 @@ class GalleryViewModel(
     private val spec: Flow<FileQuerySpec> = combine(
         tab,
         sort,
-        settingsRepository.preferences, query.debounce { if(it.isBlank())0L else 180L }
+        settingsRepository.preferences, appliedQuery
     ) { currentTab, (field, direction), _, nameQuery ->
         FileQuerySpec(
             folderId = albumFolderId,

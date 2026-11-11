@@ -101,7 +101,7 @@ class TransfersViewModel(
          * moves rows between sections instead of reshuffling them.
          */
         val TRANSFER_ORDER: Comparator<TransferTask> =
-            compareByDescending<TransferTask> { it.progress }.thenBy { it.createdAt }
+            compareBy<TransferTask> { it.createdAt }.thenBy { it.id }
 
         /** Finished transfers read as a history, so the latest one sits on top. */
         val FINISHED_ORDER: Comparator<TransferTask> =

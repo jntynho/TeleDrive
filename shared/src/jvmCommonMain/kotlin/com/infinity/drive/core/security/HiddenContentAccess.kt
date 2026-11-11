@@ -2,6 +2,7 @@ package com.infinity.drive.core.security
 
 import com.infinity.drive.data.local.dao.FileDao
 import com.infinity.drive.data.local.dao.FolderDao
+import com.infinity.drive.data.mapper.toDomain
 import com.infinity.drive.domain.model.DriveFile
 import com.infinity.drive.domain.model.FileQuerySpec
 import kotlinx.coroutines.*
@@ -17,10 +18,27 @@ class HiddenContentAccess(val lock:HiddenLockManager,private val files:FileDao,p
     val protectedFolders:StateFlow<Set<String>?> = lock.state.filter{it.ready}.map{it.configured||it.error}.distinctUntilChanged()
         .flatMapLatest{configured->
             folderIndexReady=false
-            if(configured)folders.observeProtectedFolderIds().map{it.toSet()}.onEach{folderIndexReady=true}else flowOf(emptySet())
+            if(configured)folders.observeProtectedFolderIds().map{it.toSet() as Set<String>?}
+                .onStart{emit(null)}.onEach{folderIndexReady=it!=null}else flowOf(emptySet())
         }
         .stateIn(scope,SharingStarted.Eagerly,null)
     override fun close(){scope.cancel()}
+    /** Synchronous fail-closed policy for already observed rows; no per-thumbnail database work. */
+    fun snapshotCanRead(file:DriveFile):Boolean? {
+        val state=lock.state.value
+        if(!state.ready)return null
+        if(!state.restricted)return true
+        if(file.isHidden)return false
+        return snapshotCanReadFolder(file.folderId)
+    }
+    fun snapshotCanReadFolder(id:String?):Boolean? {
+        val state=lock.state.value
+        if(!state.ready)return null
+        if(!state.restricted||id==null)return true
+        if(!folderIndexReady)return null
+        return protectedFolders.value?.let{id !in it}
+    }
+    fun observeAccessFile(id:String):Flow<DriveFile?> = files.observeById(id).map{it?.toDomain()}
     fun observeCanRead(id:String):Flow<Boolean> = combine(files.observeById(id),lock.state,protectedFolders){file,state,protected->
         state.ready&&(!state.restricted||(protected!=null&&file!=null&&!file.isHidden&&file.folderId !in protected))
     }

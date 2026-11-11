@@ -70,3 +70,15 @@ private fun GalleryListSkeleton(modifier:Modifier,bottomPadding:androidx.compose
         }
     }
 }
+
+/** Collections reuse the actual row, preserving thumbnail, text and separator geometry. */
+@Composable
+fun FileListSkeleton(modifier:Modifier=Modifier){
+    SkeletonScene(modifier){LazyColumn(contentPadding=PaddingValues(horizontal=16.dp,vertical=8.dp)){
+        item{Text("Your collection",Modifier.padding(horizontal=12.dp,vertical=16.dp).skeleton(),style=MaterialTheme.typography.bodyMedium)}
+        items(8){index->
+            ActivityLibraryRow("File from your library","2.4 MB · Jan 20",index==0,index==7,false,{},{},
+                leading={SkeletonBlock(Modifier.fillMaxSize(),12.dp)},modifier=Modifier.skeleton())
+        }
+    }}
+}

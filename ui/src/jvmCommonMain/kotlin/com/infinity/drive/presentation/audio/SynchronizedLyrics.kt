@@ -42,7 +42,7 @@ private fun cueText(cue: LyricCue, positionMs: Long, active: Boolean, color: Col
 @Composable
 internal fun LiveLyricsSnippet(lyrics:AudioLyrics,trackId:String,onOpen:()->Unit,modifier:Modifier){
     val state by LocalAudioPlayback.current.state.collectAsStateWithLifecycle()
-    val position=if(state.file?.id==trackId&&lyrics.cues.isNotEmpty())interpolatedAudioPosition(state)else state.positionMs
+    val position=if(state.file?.id==trackId&&lyrics.cues.any{it.words.isNotEmpty()})interpolatedAudioPosition(state)else state.positionMs
     LyricsSnippet(lyrics,position,onOpen,modifier,trackKey=trackId)
 }
 
@@ -83,10 +83,12 @@ internal fun LyricsSnippet(lyrics:AudioLyrics,positionMs:Long,onOpen:()->Unit,mo
 }
 
 @Composable
-internal fun SynchronizedLyrics(lyrics: AudioLyrics, onDismiss: () -> Unit) {
+internal fun SynchronizedLyrics(onDismiss: () -> Unit) {
     val player = LocalAudioPlayback.current
     val state by player.state.collectAsStateWithLifecycle()
-    val position=if(lyrics.cues.isNotEmpty())interpolatedAudioPosition(state)else state.positionMs
+    val trackId=state.file?.id
+    val lyrics=remember(trackId,state.metadata.lyrics){AudioLyricsParser.parse(state.metadata.lyrics)}
+    val position=if(lyrics.cues.any{it.words.isNotEmpty()})interpolatedAudioPosition(state)else state.positionMs
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         CompositionLocalProvider(LocalContentColor provides Color.White) {
             Column(Modifier.fillMaxSize().ambientArtwork(state).systemBarsPadding()) {
@@ -94,7 +96,9 @@ internal fun SynchronizedLyrics(lyrics: AudioLyrics, onDismiss: () -> Unit) {
                     IconButton(onDismiss) { Icon(DriveIcons.ArrowBack, "Back to player") }
                     state.file?.let { AudioNowPlayingTitle(it, Modifier.weight(1f)) }
                 }
-                LyricsTimeline(lyrics, position, player::seek, Modifier.weight(1f).fillMaxWidth())
+                key(trackId,lyrics){
+                    LyricsTimeline(lyrics,position,{target->if(player.state.value.file?.id==trackId)player.seek(target)},Modifier.weight(1f).fillMaxWidth())
+                }
                 Column(Modifier.padding(horizontal = 24.dp)) {
                     AudioSeekBar(state)
                     AudioTransport(state)
@@ -118,6 +122,7 @@ internal fun LyricsTimeline(lyrics: AudioLyrics, positionMs: Long, onSeek: (Long
     val cues = remember(lyrics) { lyrics.cues.ifEmpty { lyrics.plainText.lines().filter(String::isNotBlank).map { LyricCue(0, it) } } }
     Column(modifier) {
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+            if(cues.isEmpty())Text("No embedded lyrics available",color=Color.White.copy(alpha=.6f),modifier=Modifier.align(Alignment.Center))
             LazyColumn(state = list, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(
                 start = 28.dp, end = 28.dp, top = maxHeight * .32f, bottom = maxHeight * .5f),
                 verticalArrangement = Arrangement.spacedBy(24.dp)) {

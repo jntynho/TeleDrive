@@ -43,6 +43,7 @@ class OnboardingViewModel(
     private val platformCapabilities: PlatformCapabilities
 ) : ViewModel() {
 
+    val inputDrafts=com.infinity.drive.presentation.input.InlineDrafts()
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
 
@@ -53,6 +54,7 @@ class OnboardingViewModel(
     }
 
     private fun onAuthStateChanged(state: TelegramAuthState) {
+        if(state is TelegramAuthState.Ready)inputDrafts.clear()
         _uiState.update { current ->
             when (state) {
                 /* Falling back here from a QR wait means the token died, so the

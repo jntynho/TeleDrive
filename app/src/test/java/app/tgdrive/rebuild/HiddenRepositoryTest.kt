@@ -58,6 +58,15 @@ class HiddenRepositoryTest {
             val changes=Channel<Set<String>>(Channel.UNLIMITED)
             val job=launch{repo.observeFiles(spec).map{rows->rows.map{it.id}.toSet()}.distinctUntilChanged().collect{changes.send(it)}}
             assertEquals(setOf("public","visible-child"),withTimeout(5000){changes.receive()})
+            val publicSnapshot=access.observeAccessFile("public").first()!!
+            val hiddenSnapshot=access.observeAccessFile("hidden").first()!!
+            val childSnapshot=access.observeAccessFile("child").first()!!
+            withTimeout(5000){access.protectedFolders.filterNotNull().first()}
+            assertEquals(true,access.snapshotCanRead(publicSnapshot))
+            assertEquals(false,access.snapshotCanRead(hiddenSnapshot))
+            assertEquals(false,access.snapshotCanRead(childSnapshot))
+            // No-op public navigation epochs must not flash a public row or expose a private one.
+            repeat(3){lock.lock();assertEquals(true,access.snapshotCanRead(publicSnapshot));assertEquals(false,access.snapshotCanRead(hiddenSnapshot))}
             assertTrue(repo.fileIdsInTree("private-folder").isEmpty())
             assertFalse(access.canRead("hidden"));assertFalse(access.canRead("child"));assertTrue(access.canRead("public"))
             assertTrue(repo.observeFiles(spec.copy(respectHiddenLock=false)).first().any{it.id=="hidden"})

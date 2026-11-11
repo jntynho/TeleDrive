@@ -183,6 +183,7 @@ fun GalleryScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
+    val appliedQuery by viewModel.appliedQuery.collectAsStateWithLifecycle()
     val albumQuery by viewModel.albumQuery.collectAsStateWithLifecycle()
     var searching by rememberSaveable { mutableStateOf(false) }
     AppBackHandler(searching){searching=false;viewModel.setQuery("");viewModel.searchAlbums("")}
@@ -226,37 +227,45 @@ fun GalleryScreen(
     AppBackHandler(enabled = state.selectionMode) { viewModel.clearSelection() }
 
     val contextRevision by viewModel.contextRevision.collectAsStateWithLifecycle()
-    val mediaListState = rememberSaveable(state.tab,contextRevision,query,state.sortField,state.sortDirection, saver = LazyListState.Saver) {
+    val mediaListState = rememberSaveable(state.tab,contextRevision,appliedQuery,state.sortField,state.sortDirection, saver = LazyListState.Saver) {
         LazyListState()
     }
     val allSelected by viewModel.allSelected.collectAsStateWithLifecycle()
     val previewSequence by viewModel.previewSequence.collectAsStateWithLifecycle()
-    val mediaGridState = rememberSaveable(state.tab,contextRevision,query,state.sortField,state.sortDirection, saver = LazyGridState.Saver) {
+    val mediaGridState = rememberSaveable(state.tab,contextRevision,appliedQuery,state.sortField,state.sortDirection, saver = LazyGridState.Saver) {
         LazyGridState()
     }
     var pinchAnchor by remember{mutableStateOf<Pair<String,Int>?>(null)}
     val capturePinchAnchor:(androidx.compose.ui.geometry.Offset)->Unit={point->
-        val item=mediaGridState.layoutInfo.visibleItemsInfo.filter{info->
-            info.index in 0 until media.itemCount&&media.peek(info.index) is GalleryListItem.Media
-        }.minByOrNull{info->
-            val dx=info.offset.x+info.size.width/2f-point.x;val dy=info.offset.y+info.size.height/2f-point.y;dx*dx+dy*dy
+        val indexAndOffset=if(state.viewMode==ViewMode.LIST){
+            mediaListState.layoutInfo.visibleItemsInfo.filter{it.index in 0 until media.itemCount&&media.peek(it.index) is GalleryListItem.Media}
+                .minByOrNull{kotlin.math.abs(it.offset+it.size/2f-point.y)}?.let{it.index to it.offset}
+        }else{
+            mediaGridState.layoutInfo.visibleItemsInfo.filter{it.index in 0 until media.itemCount&&media.peek(it.index) is GalleryListItem.Media}
+                .minByOrNull{val dx=it.offset.x+it.size.width/2f-point.x;val dy=it.offset.y+it.size.height/2f-point.y;dx*dx+dy*dy}
+                ?.let{it.index to it.offset.y}
         }
-        val file=item?.index?.let{if(it in 0 until media.itemCount)(media.peek(it) as? GalleryListItem.Media)?.file else null}
-        pinchAnchor=if(file!=null&&item!=null)file.id to item.offset.y else null
+        val file=indexAndOffset?.first?.let{(media.peek(it) as? GalleryListItem.Media)?.file}
+        pinchAnchor=if(file!=null)file.id to indexAndOffset!!.second else null
     }
     LaunchedEffect(state.gridSize,state.viewMode){
         val anchor=pinchAnchor
-        if(anchor!=null&&state.viewMode==ViewMode.GRID){
+        if(anchor!=null){
+            androidx.compose.runtime.withFrameNanos{}
             val index=media.itemSnapshotList.items.indexOfFirst{it is GalleryListItem.Media&&it.file.id==anchor.first}
-            if(index>=0)mediaGridState.scrollToItem(index,-anchor.second)
+            if(index>=0){
+                if(state.viewMode==ViewMode.GRID)mediaGridState.scrollToItem(index,-anchor.second)
+                else mediaListState.scrollToItem(index,-anchor.second)
+            }
             pinchAnchor=null
         }
     }
+
     val scrolled = if (state.viewMode == ViewMode.LIST) mediaListState else mediaGridState
-    val position=remember(viewModel,state.tab,query,state.sortField,state.sortDirection,state.viewMode,contextRevision){viewModel.positionFor(state.viewMode)}
+    val position=remember(viewModel,state.tab,appliedQuery,state.sortField,state.sortDirection,state.viewMode,contextRevision){viewModel.positionFor(state.viewMode)}
     var anchorRestored by remember(position){mutableStateOf(false)}
     LaunchedEffect(position,media.itemCount){
-        if(!anchorRestored&&media.itemCount>0){
+        if(!anchorRestored&&media.itemCount>0&&pinchAnchor==null){
             val wanted=position.anchorId
             val index=if(wanted==null)0 else media.itemSnapshotList.items.indexOfFirst{(it as? GalleryListItem.Media)?.file?.id==wanted}
             if(index>=0){
@@ -413,7 +422,7 @@ fun GalleryScreen(
         } }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(top=padding.calculateTopPadding())) {
-            androidx.compose.animation.AnimatedVisibility(!state.isAlbumView && !state.selectionMode && state.tab!=GalleryTab.ALBUMS && filters.visible,enter=androidx.compose.animation.fadeIn()+androidx.compose.animation.expandVertically(),exit=androidx.compose.animation.fadeOut()+androidx.compose.animation.shrinkVertically()) {
+            androidx.compose.animation.AnimatedVisibility(!state.isAlbumView && !state.selectionMode && state.tab!=GalleryTab.ALBUMS && filters.visible,enter=androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180))+androidx.compose.animation.expandVertically(androidx.compose.animation.core.tween(220)),exit=androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140))+androidx.compose.animation.shrinkVertically(androidx.compose.animation.core.tween(220))) {
                 GalleryTabSelector(selected=state.tab,onSelect=viewModel::setTab)
             }
 
@@ -482,7 +491,7 @@ fun GalleryScreen(
                                 onGestureStarted=capturePinchAnchor,
                                 onGestureFinished={committed->if(!committed||!viewModel.flushZoom())pinchAnchor=null}
                             )
-                            .then(listDragSelect).resultReveal(query to media.itemSnapshotList.items.take(8).map{it.key}),
+                            .then(listDragSelect).resultReveal(media.itemSnapshotList.items.take(8).map{it.key}),
                         contentPadding = PaddingValues(
                             start = 8.dp,
                             end = 8.dp,
@@ -535,7 +544,7 @@ fun GalleryScreen(
                                 onGestureStarted=capturePinchAnchor,
                                 onGestureFinished={committed->if(!committed||!viewModel.flushZoom())pinchAnchor=null}
                             )
-                            .then(gridDragSelect).resultReveal(query to media.itemSnapshotList.items.take(8).map{it.key}),
+                            .then(gridDragSelect).resultReveal(media.itemSnapshotList.items.take(8).map{it.key}),
                         contentPadding = PaddingValues(
                             start = 0.dp,
                             end = 0.dp,

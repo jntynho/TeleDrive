@@ -268,7 +268,7 @@ fun OnboardingScreen(
                                     .using(SizeTransform(clip=true){_,_->snap()})
                             },label="sign-in-step"){step->
                                 val pageInput=inputs.getOrPut(step){InlineInputController()}
-                                CompositionLocalProvider(LocalInlineInput provides pageInput){
+                                CompositionLocalProvider(LocalInlineInput provides pageInput,com.infinity.drive.presentation.input.LocalInlineDrafts provides viewModel.inputDrafts){
                                     formStates.SaveableStateProvider(step.name){
                         when (step) {
                             OnboardingStep.WELCOME -> WelcomeStep(onContinue = viewModel::start)
@@ -587,7 +587,7 @@ private fun CredentialsStep(
     onSubmit: (String, String) -> Unit
 ) {
     var apiId by rememberSaveable { mutableStateOf("") }
-    var apiHash by remember { mutableStateOf("") }
+    var apiHash by com.infinity.drive.presentation.input.inlineDraft("api-hash")
     var showGuide by rememberSaveable { mutableStateOf(false) }
 
     OnboardingPage(
@@ -1082,7 +1082,7 @@ private fun EmailCodeStep(
     codeLength: Int?,
     onSubmit: (String) -> Unit
 ) {
-    var code by remember { mutableStateOf("") }
+    var code by com.infinity.drive.presentation.input.inlineDraft("email-code")
     OnboardingPage(
         icon = DriveIcons.Email,
         title = stringResource(Res.string.onboarding_email_code_title),
@@ -1109,7 +1109,7 @@ private fun CodeStep(
     onSubmit: (String) -> Unit,
     onResend: () -> Unit
 ) {
-    var code by remember { mutableStateOf("") }
+    var code by com.infinity.drive.presentation.input.inlineDraft("phone-code")
     OnboardingPage(
         icon = DriveIcons.Sms,
         title = if(channel==CodeDeliveryChannel.TELEGRAM_APP)"Check Telegram"else"Enter your code",
@@ -1167,7 +1167,7 @@ private fun PasswordStep(
     hint: String?,
     onSubmit: (String) -> Unit
 ) {
-    var password by remember { mutableStateOf("") }
+    var password by com.infinity.drive.presentation.input.inlineDraft("telegram-password")
     OnboardingPage(
         icon = DriveIcons.Lock,
         title = "Your password",

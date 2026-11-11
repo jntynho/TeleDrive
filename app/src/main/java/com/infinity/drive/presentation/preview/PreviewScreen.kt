@@ -462,6 +462,14 @@ private fun PreviewPage(
         }
     }
     if(file.category==FileCategory.AUDIO){com.infinity.drive.presentation.audio.FullscreenAudioPlayer(file,isActivePage,Modifier.fillMaxSize(),onAudioTrackChanged);return}
+    if(file.category==FileCategory.IMAGE&&(content is PreviewContent.Loading||content is PreviewContent.DownloadProgress||content is PreviewContent.Image)){
+        Box(Modifier.fillMaxSize().background(Color.Black)){
+            ZoomableImage(model=(content as? PreviewContent.Image)?.model,contentKey=file.id,
+                previewModel=com.infinity.drive.core.media.thumbnailModel(file),contentDescription=file.name,
+                onTap=onToggleChrome,onZoomChanged=onImageZoomChanged)
+        }
+        return
+    }
     when (content) {
         is PreviewContent.Loading,is PreviewContent.DownloadProgress -> {
             Box(Modifier.fillMaxSize().background(Color.Black),contentAlignment=Alignment.Center){

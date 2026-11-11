@@ -48,13 +48,20 @@ fun AppNavHost(
     startDestination: Route,
     modifier: Modifier = Modifier
 ) {
+    NavigationCoordinator(navController)
     val entry by navController.currentBackStackEntryAsState()
+    val previousInside=androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     val hidden=org.koin.compose.koinInject<com.infinity.drive.core.security.HiddenContentAccess>()
     val hiddenState by hidden.lock.state.collectAsStateWithLifecycle()
     if(hiddenState.unlocked)SensitiveScreen()
     val rawFiles=org.koin.compose.koinInject<com.infinity.drive.domain.repository.FileRepository>()
     LaunchedEffect(entry?.id){
         val current=entry?:return@LaunchedEffect
+        val leavingSensitive=previousInside.value
+        // Record potential ownership before a suspending lookup so rapid departure cancels verification.
+        previousInside.value=current.destination.hasRoute<Route.Preview>()||current.destination.hasRoute<Route.NoteEditor>()||
+            (current.destination.hasRoute<Route.Files>()&&current.toRoute<Route.Files>().folderId!=null)||
+            (current.destination.hasRoute<Route.Collection>()&&current.toRoute<Route.Collection>().type==com.infinity.drive.presentation.collection.CollectionType.HIDDEN.name)
         val inside=when {
             current.destination.hasRoute<Route.Collection>()->current.toRoute<Route.Collection>().type==com.infinity.drive.presentation.collection.CollectionType.HIDDEN.name
             current.destination.hasRoute<Route.Preview>()->rawFiles.getFile(current.toRoute<Route.Preview>().fileId)?.let{hidden.protectedFile(it)}==true
@@ -62,7 +69,9 @@ fun AppNavHost(
             current.destination.hasRoute<Route.Files>()->hidden.protectedFolder(current.toRoute<Route.Files>().folderId)
             else->false
         }
-        if(!inside)hidden.lock.lock()
+        // Public-to-public navigation must not revoke/recheck every thumbnail and viewer.
+        if(!inside&&(leavingSensitive||hidden.lock.state.value.unlocked))hidden.lock.lock()
+        previousInside.value=inside
     }
     NavHost(
         navController = navController,

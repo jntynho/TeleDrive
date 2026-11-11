@@ -130,7 +130,7 @@ fun SearchScreen(
 
                 else -> LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize().resultReveal(state.query to state.results.take(8).map{it.id}),
+                    modifier = Modifier.fillMaxSize().resultReveal(state.results.take(8).map{it.id} to state.folders.take(8).map{it.id}),
                     contentPadding = PaddingValues(
                         start = 12.dp,
                         end = 12.dp,

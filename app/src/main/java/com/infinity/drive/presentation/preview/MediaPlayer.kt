@@ -58,6 +58,7 @@ import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.player_codec_unsupported
 import com.infinity.drive.resources.player_playback_failed
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -120,9 +121,18 @@ fun MediaPlayer(
     val touchExploration = app.tgdrive.ui.rememberTouchExploration()
     var initializationFailed by remember(content, isActivePage, retryInitialization) { mutableStateOf(false) }
 
-    DisposableEffect(fileId,content, isActivePage, retryInitialization,checkpointReady) {
+    var activationReady by remember(fileId,content,isActivePage){mutableStateOf(false)}
+    val navigationBusy=app.tgdrive.ui.LocalNavigationInProgress.current
+    LaunchedEffect(fileId,content,isActivePage,navigationBusy){
+        if(isActivePage&&!navigationBusy){
+            lifecycleOwner.lifecycle.currentStateFlow.first{it.isAtLeast(Lifecycle.State.RESUMED)}
+            activationReady=true
+        }
+    }
+    // Once activated, background lifecycle changes are handled by the existing session policy.
+    DisposableEffect(fileId,content,isActivePage,retryInitialization,checkpointReady,activationReady) {
         var owned: ExoPlayer? = null
-        if (isActivePage && checkpointReady) {
+        if (isActivePage && activationReady && checkpointReady) {
             try {
                 // Pause the application-owned music queue before video claims audio focus.
                 audioPlayback.pause()

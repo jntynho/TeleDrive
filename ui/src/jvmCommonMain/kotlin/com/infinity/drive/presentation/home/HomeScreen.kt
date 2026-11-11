@@ -77,6 +77,16 @@ fun HomeScreen(
     viewModel: HomeViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val libraryListState=androidx.compose.foundation.lazy.rememberLazyListState()
+    val storageGroups=remember(state.storage){
+        val totals=state.storage.groupBy{it.category}.mapValues{(_,rows)->rows.sumOf{it.totalBytes}}
+        val media=setOf(com.infinity.drive.domain.model.FileCategory.IMAGE,com.infinity.drive.domain.model.FileCategory.VIDEO,com.infinity.drive.domain.model.FileCategory.AUDIO)
+        listOf(totals[com.infinity.drive.domain.model.FileCategory.IMAGE]?:0L,
+            totals[com.infinity.drive.domain.model.FileCategory.VIDEO]?:0L,
+            totals[com.infinity.drive.domain.model.FileCategory.AUDIO]?:0L,
+            totals.filterKeys{it !in media}.values.sum())
+    }
+    val lastUpload=remember(state.recentFiles){state.recentFiles.filter{it.remoteFileId!=null||it.messageId!=null}.maxOfOrNull{it.addedAt}}
     val firstFrame=com.infinity.drive.presentation.platform.LocalFirstLibraryFrame.current
     LaunchedEffect(state.loading,firstFrame){
         if(!state.loading){androidx.compose.runtime.withFrameNanos{};firstFrame()}
@@ -135,6 +145,7 @@ fun HomeScreen(
             return@Scaffold
         }
         LazyColumn(
+            state=libraryListState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = padding.add(
                 horizontal = 16.dp,
@@ -143,17 +154,9 @@ fun HomeScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item {
-                val groups=listOf(
-                    state.storage.filter{it.category==com.infinity.drive.domain.model.FileCategory.IMAGE}.sumOf{it.totalBytes},
-                    state.storage.filter{it.category==com.infinity.drive.domain.model.FileCategory.VIDEO}.sumOf{it.totalBytes},
-                    state.storage.filter{it.category==com.infinity.drive.domain.model.FileCategory.AUDIO}.sumOf{it.totalBytes},
-                    state.storage.filter{it.category !in setOf(com.infinity.drive.domain.model.FileCategory.IMAGE,com.infinity.drive.domain.model.FileCategory.VIDEO,com.infinity.drive.domain.model.FileCategory.AUDIO)}.sumOf{it.totalBytes}
-                )
-                val lastUpload = state.recentFiles.filter { it.remoteFileId != null || it.messageId != null }
-                    .maxOfOrNull { it.addedAt }
+            item("library-overview") {
                 app.tgdrive.ui.LibraryDashboard(
-                    app.tgdrive.ui.LibraryOverview(state.backedUpCount, state.remoteBytes, groups, state.localBytes),
+                    app.tgdrive.ui.LibraryOverview(state.backedUpCount, state.remoteBytes, storageGroups, state.localBytes),
                     { showUploadSheet = true }, showAddAction = false,
                     updatedLabel = lastUpload?.let { "Added ${com.infinity.drive.presentation.common.Formatters.date(it)}" }
                         ?: state.lastBackupAt?.let { "Backup ${com.infinity.drive.presentation.common.Formatters.date(it)}" }
@@ -170,7 +173,7 @@ fun HomeScreen(
                 ))
             }
             if (state.autoBackupEnabled && state.missingPermissions.isNotEmpty()) {
-                item {
+                item("permission-warning") {
                     PermissionWarningCard(
                         missing = state.missingPermissions,
                         onGrant = {
@@ -182,7 +185,7 @@ fun HomeScreen(
                 }
             }
             if (state.favoriteFolders.isNotEmpty()) {
-                item {
+                item("favorite-folders") {
                     SectionHeader(stringResource(Res.string.home_section_favorites))
                     Spacer(Modifier.height(8.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

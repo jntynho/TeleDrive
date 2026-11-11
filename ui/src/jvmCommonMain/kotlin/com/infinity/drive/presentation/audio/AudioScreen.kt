@@ -37,6 +37,7 @@ fun AudioScreen(onOpenFile:(String,PreviewSequence)->Unit,viewModel:AudioViewMod
     val query by viewModel.query.collectAsStateWithLifecycle()
     val filter by viewModel.filter.collectAsStateWithLifecycle()
     val prefs by viewModel.preferences.collectAsStateWithLifecycle()
+    val appliedQuery by viewModel.appliedQuery.collectAsStateWithLifecycle()
     val player=LocalAudioPlayback.current
     val playback by remember(player){player.state.map{it.copy(positionMs=0)}.distinctUntilChanged()}.collectAsStateWithLifecycle(player.state.value)
     val audio=viewModel.audio.collectAsLazyPagingItems()
@@ -44,9 +45,13 @@ fun AudioScreen(onOpenFile:(String,PreviewSequence)->Unit,viewModel:AudioViewMod
     com.infinity.drive.presentation.common.AppBackHandler(searching){searching=false;viewModel.search("")}
     var sorting by rememberSaveable{mutableStateOf(false)}
     val listState=rememberLazyListState()
-    val scopeKey=listOf(query,filter.name,prefs.audioSortField.name,prefs.audioSortDirection.name).joinToString("\u0000")
+    val scopeKey=listOf(appliedQuery,filter.name,prefs.audioSortField.name,prefs.audioSortDirection.name).joinToString("\u0000")
     var lastScope by rememberSaveable{mutableStateOf(scopeKey)}
-    LaunchedEffect(scopeKey){if(lastScope!=scopeKey){listState.scrollToItem(0);lastScope=scopeKey}}
+    LaunchedEffect(scopeKey,audio.loadState.refresh){
+        if(lastScope!=scopeKey){
+            if(audio.loadState.refresh !is LoadState.Loading){listState.scrollToItem(0);lastScope=scopeKey}
+        }
+    }
 
     val filters=com.infinity.drive.presentation.components.rememberCollapsingFilters(query to filter){listState.canScrollBackward}
     Scaffold(modifier=filters.scrollModifier,topBar={Column{
@@ -54,7 +59,7 @@ fun AudioScreen(onOpenFile:(String,PreviewSequence)->Unit,viewModel:AudioViewMod
             IconButton({sorting=true}){Icon(DriveIcons.Sort,"Sort audio",Modifier.size(24.dp))}
             SortMenu(sorting,prefs.audioSortField,prefs.audioSortDirection,{sorting=false},{field,direction->sorting=false;viewModel.sort(field,direction)},fields=listOf(FileSortField.NAME,FileSortField.DATE_ADDED,FileSortField.DATE_MODIFIED,FileSortField.SIZE))
         }})
-        androidx.compose.animation.AnimatedVisibility(filters.visible,enter=androidx.compose.animation.fadeIn()+androidx.compose.animation.expandVertically(),exit=androidx.compose.animation.fadeOut()+androidx.compose.animation.shrinkVertically()){
+        androidx.compose.animation.AnimatedVisibility(filters.visible,enter=androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180))+androidx.compose.animation.expandVertically(androidx.compose.animation.core.tween(220)),exit=androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140))+androidx.compose.animation.shrinkVertically(androidx.compose.animation.core.tween(220))){
             LibraryFilters(listOf("All","Favorites","On device"),filter.ordinal,{viewModel.filter(AudioFilter.entries[it])})
         }
     }}){padding->
@@ -63,12 +68,12 @@ fun AudioScreen(onOpenFile:(String,PreviewSequence)->Unit,viewModel:AudioViewMod
             audio.loadState.refresh is LoadState.Loading&&audio.itemCount==0->AudioSkeleton(Modifier.padding(top=padding.calculateTopPadding()),bottom)
             audio.loadState.refresh is LoadState.Error&&audio.itemCount==0->EmptyState(DriveIcons.Info,"Couldn't load audio","Try loading your library again.",Modifier.padding(top=padding.calculateTopPadding(),bottom=bottom),"Retry",{audio.retry()})
             audio.itemCount==0->EmptyState(DriveIcons.MusicNote,if(query.isNotBlank())"No matching audio"else when(filter){AudioFilter.FAVORITES->"No favorites yet";AudioFilter.ON_DEVICE->"No audio on this device";else->"Your sound, in one place"},if(query.isNotBlank())"Try another filename."else"Audio files in your drive will appear here.",Modifier.padding(top=padding.calculateTopPadding(),bottom=bottom))
-            else->LazyColumn(state=listState,modifier=Modifier.fillMaxSize().padding(top=padding.calculateTopPadding()).resultReveal(query to audio.itemSnapshotList.items.take(8).map{it.id}),contentPadding=PaddingValues(start=16.dp,end=16.dp,top=8.dp,bottom=bottom+20.dp)){
+            else->LazyColumn(state=listState,modifier=Modifier.fillMaxSize().padding(top=padding.calculateTopPadding()).resultReveal(audio.itemSnapshotList.items.take(8).map{it.id}),contentPadding=PaddingValues(start=16.dp,end=16.dp,top=8.dp,bottom=bottom+20.dp)){
 
                 items(audio.itemCount,key=audio.itemKey{it.id}){index->
                     val file=audio[index]?:return@items
-                    AudioLibraryRow(file,playback.file?.id==file.id&&playback.playing,playback.metadata.takeIf{playback.file?.id==file.id},modifier=Modifier.animateItem(fadeInSpec=androidx.compose.animation.core.tween(240)),onPlay={viewModel.play(file,player);onOpenFile(file.id,PreviewSequence(categories=listOf(FileCategory.AUDIO),localCopiesOnly=filter==AudioFilter.ON_DEVICE,favoritesOnly=filter==AudioFilter.FAVORITES,nameQuery=query.trim().takeIf{it.isNotBlank()},sortField=prefs.audioSortField,sortDirection=prefs.audioSortDirection))},onFavorite={viewModel.favorite(file)}){
-                        onOpenFile(file.id,PreviewSequence(categories=listOf(FileCategory.AUDIO),nameQuery=query.trim().takeIf{it.isNotBlank()},favoritesOnly=filter==AudioFilter.FAVORITES,localCopiesOnly=filter==AudioFilter.ON_DEVICE,sortField=prefs.audioSortField,sortDirection=prefs.audioSortDirection))
+                    AudioLibraryRow(file,playback.file?.id==file.id&&playback.playing,playback.metadata.takeIf{playback.file?.id==file.id},modifier=Modifier.animateItem(fadeInSpec=androidx.compose.animation.core.tween(240)),onPlay={viewModel.play(file,player);onOpenFile(file.id,PreviewSequence(categories=listOf(FileCategory.AUDIO),localCopiesOnly=filter==AudioFilter.ON_DEVICE,favoritesOnly=filter==AudioFilter.FAVORITES,nameQuery=appliedQuery.trim().takeIf{it.isNotBlank()},sortField=prefs.audioSortField,sortDirection=prefs.audioSortDirection))},onFavorite={viewModel.favorite(file)}){
+                        onOpenFile(file.id,PreviewSequence(categories=listOf(FileCategory.AUDIO),nameQuery=appliedQuery.trim().takeIf{it.isNotBlank()},favoritesOnly=filter==AudioFilter.FAVORITES,localCopiesOnly=filter==AudioFilter.ON_DEVICE,sortField=prefs.audioSortField,sortDirection=prefs.audioSortDirection))
                     }
                 }
                 if(audio.loadState.refresh is LoadState.Error)item("audio-refresh-error"){TextButton({audio.retry()}){Text("Couldn't refresh · Retry")}}
@@ -94,8 +99,8 @@ fun AudioLibraryRow(file:DriveFile?,playing:Boolean=false,currentMetadata:AudioM
     val meta=if(currentMetadata!=null)AudioMetadata(currentMetadata.title?.takeIf(String::isNotBlank)?:storedMetadata.title,currentMetadata.artist?.takeIf(String::isNotBlank)?:storedMetadata.artist,currentMetadata.durationMs?:storedMetadata.durationMs)else storedMetadata
     var menu by remember(file?.id){mutableStateOf(false)}
     if(menu&&file!=null)com.infinity.drive.presentation.components.FileActionsSheet(file,onDismiss={menu=false},onOpen=onPlay)
-    Column {
-    Row(modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(enabled=!loading,onClick=onPlay).padding(vertical=LibraryLayout.AudioRowPadding),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(LibraryLayout.AudioRowGap)){
+    Column(modifier) {
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(enabled=!loading,onClick=onPlay).padding(vertical=LibraryLayout.AudioRowPadding),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(LibraryLayout.AudioRowGap)){
         if(file!=null)FileThumbnail(file,Modifier.size(LibraryLayout.AudioCover).clip(RoundedCornerShape(LibraryLayout.CoverCorner)))
         else SkeletonBlock(Modifier.size(LibraryLayout.AudioCover),LibraryLayout.CoverCorner)
         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)){

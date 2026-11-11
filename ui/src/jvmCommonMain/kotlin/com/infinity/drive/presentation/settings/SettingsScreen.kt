@@ -56,9 +56,9 @@ fun SettingsScreen(onBack:(()->Unit)?,onOpenSection:(SettingsSectionType)->Unit,
         "App" to listOf(SettingsSectionType.NOTIFICATIONS,SettingsSectionType.PERMISSIONS,SettingsSectionType.ADVANCED,SettingsSectionType.ABOUT)
     )
     val sections=SettingsSectionType.entries.filterNot{it in hidden}
-    val indexed=settingsSearchEntries().filterNot{it.section in hidden}
-    val results=indexed.map { Triple(it,stringResource(it.title),stringResource(it.section.titleRes)) }
-        .filter{ (_,title,parent)->"$title $parent".contains(query.trim(),true) }
+    val indexed=remember(hidden){settingsSearchEntries().filterNot{it.section in hidden}}
+    val labels=indexed.map { Triple(it,stringResource(it.title),stringResource(it.section.titleRes)) }
+    val results=remember(labels,query){labels.filter{(_,title,parent)->"$title $parent".contains(query.trim(),true)}}
     Scaffold(topBar={Column {
         ExpandableLibraryHeader("Settings",query,{query=it},searching,{searching=it},"Search settings",navigationIcon={if(onBack!=null)IconButton(onBack){Icon(DriveIcons.ArrowBack,"Back")}})
     }}) { padding ->

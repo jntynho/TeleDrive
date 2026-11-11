@@ -52,6 +52,12 @@ internal class ElasticOverscrollEffect(private val proximity:(Offset)->Offset={O
     private var maxPixels=72f
     private var settling:Job?=null
     private var flinging=false
+    private var enabled by mutableStateOf(true)
+    fun updateEnabled(value:Boolean){
+        enabled=value
+        if(!value){settling?.cancel();raw=Offset.Zero;offset=Offset.Zero;approach=Offset.Zero}
+    }
+    private var pivot=TransformOrigin.Center
     private val layer=object:Modifier.Node(),LayoutModifierNode {
         override fun onDetach(){settling?.cancel();raw=Offset.Zero;offset=Offset.Zero;approach=Offset.Zero}
         override fun MeasureScope.measure(measurable:Measurable,constraints:Constraints):MeasureResult {
@@ -59,10 +65,10 @@ internal class ElasticOverscrollEffect(private val proximity:(Offset)->Offset={O
             width=child.width.toFloat().coerceAtLeast(1f);height=child.height.toFloat().coerceAtLeast(1f)
             maxPixels=72.dp.toPx()
             return layout(child.width,child.height){child.placeWithLayer(0,0){
-                translationX=offset.x;translationY=offset.y
-                scaleX=1f+(abs(offset.x)/width*.3f+abs(approach.x)*.009f).coerceAtMost(.04f)
-                scaleY=1f+(abs(offset.y)/height*.3f+abs(approach.y)*.009f).coerceAtMost(.04f)
-                transformOrigin=TransformOrigin(if(offset.x+approach.x>=0)0f else 1f,if(offset.y+approach.y>=0)0f else 1f)
+                translationX=if(enabled)offset.x else 0f;translationY=if(enabled)offset.y else 0f
+                scaleX=if(enabled)1f+(abs(offset.x)/width*.3f+abs(approach.x)*.009f).coerceAtMost(.04f)else 1f
+                scaleY=if(enabled)1f+(abs(offset.y)/height*.3f+abs(approach.y)*.009f).coerceAtMost(.04f)else 1f
+                transformOrigin=pivot
             }}
         }
         fun settle(leftover:Velocity) {
@@ -72,7 +78,7 @@ internal class ElasticOverscrollEffect(private val proximity:(Offset)->Offset={O
             settling=coroutineScope.launch {
                 val animation=Animatable(1f)
                 animation.animateTo(0f,spring(dampingRatio=1f,stiffness=190f),
-                    initialVelocity=(abs(leftover.x)/width+abs(leftover.y)/height).coerceAtMost(2f)) {
+                    initialVelocity=-(abs(leftover.x)/width+abs(leftover.y)/height).coerceAtMost(2f)) {
                     val fraction=value.coerceAtLeast(0f)
                     offset=start*fraction;approach=pre*fraction
                 }
@@ -90,6 +96,8 @@ internal class ElasticOverscrollEffect(private val proximity:(Offset)->Offset={O
     private fun unwind(delta:Float,current:Float):Float=
         if(current!=0f&&sign(delta)!=sign(current))sign(delta)*min(abs(delta),abs(current))else 0f
     override fun applyToScroll(delta:Offset,source:NestedScrollSource,performScroll:(Offset)->Offset):Offset {
+        if(!enabled){settling?.cancel();raw=Offset.Zero;offset=Offset.Zero;approach=Offset.Zero;return performScroll(delta)}
+        if(!isInProgress && delta!=Offset.Zero){pivot=TransformOrigin(if(delta.x>=0)0f else 1f,if(delta.y>=0)0f else 1f)}
         if(source!=NestedScrollSource.UserInput){
             val consumed=performScroll(delta)
             if(flinging){val remaining=delta-consumed;raw+=remaining*.35f;approach=proximity(delta)*.35f;update()}
@@ -106,7 +114,8 @@ internal class ElasticOverscrollEffect(private val proximity:(Offset)->Offset={O
         // Layout changes, scrollTo and selection auto-scroll never drive anticipatory motion.
         approach=proximity(delta)
         update()
-        return released+consumed+remaining
+        // Give nested parents the unconsumed drag (notably pull-to-refresh).
+        return released+consumed
     }
     override suspend fun applyToFling(velocity:Velocity,performFling:suspend(Velocity)->Velocity){
         flinging=true

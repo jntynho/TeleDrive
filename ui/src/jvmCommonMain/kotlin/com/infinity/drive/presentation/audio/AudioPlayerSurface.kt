@@ -50,7 +50,7 @@ fun LibraryAudioMiniPlayer(){
     var expanded by rememberSaveable{mutableStateOf(false)}
     SideEffect { if(state.file!=null)last=state }
     LaunchedEffect(state.file?.id){if(state.file==null)expanded=false}
-    AnimatedVisibility(state.file!=null,enter=expandVertically(tween(260))+fadeIn(tween(220)),exit=shrinkVertically(tween(200))+fadeOut(tween(160))){
+    AnimatedVisibility(state.file!=null,enter=fadeIn(tween(220)),exit=fadeOut(tween(160))){
         val current=if(state.file!=null)state else last
         val file=current.file
         if(file!=null){
@@ -58,9 +58,11 @@ fun LibraryAudioMiniPlayer(){
             val second by animateColorAsState(artworkTone(current.metadata,1),tween(800),label="miniSecond")
             val pause=(current.playing||current.playRequested)&&current.error==null
             Surface(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=8.dp),shape=RoundedCornerShape(18.dp),color=Color.Transparent,contentColor=Color.White){
+                BoxWithConstraints {
+                val compact=maxWidth<360.dp||androidx.compose.ui.platform.LocalDensity.current.fontScale>1.3f
                 Column(Modifier.background(Brush.linearGradient(listOf(first,second)))
                     .border(1.dp,Color.White.copy(alpha=.08f),RoundedCornerShape(18.dp)).testTag("audio-mini-player")){
-                    Row(Modifier.fillMaxWidth().height(66.dp).clickable(onClickLabel="Open now playing"){if(openPlayer!=null)openPlayer(file.id)else expanded=true}
+                    Row(Modifier.fillMaxWidth().heightIn(min=66.dp).clickable(onClickLabel="Open now playing"){if(openPlayer!=null)openPlayer(file.id)else expanded=true}
                         .padding(start=10.dp,end=4.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(2.dp)){
                         TrackArtwork(file,current.metadata,Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)))
                         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(2.dp)){
@@ -70,11 +72,12 @@ fun LibraryAudioMiniPlayer(){
                         }
                         IconButton(player::toggle){Icon(if(pause)DriveIcons.Pause else DriveIcons.PlayArrow,
                             if(current.error!=null)"Retry audio"else if(pause)"Pause audio"else"Play audio",Modifier.size(24.dp))}
-                        IconButton(player::next,enabled=current.canSkipNext){Icon(DriveIcons.SkipNext,"Next audio",Modifier.size(22.dp))}
+                        if(!compact)IconButton(player::next,enabled=current.canSkipNext){Icon(DriveIcons.SkipNext,"Next audio",Modifier.size(22.dp))}
                         IconButton(player::stop){Icon(DriveIcons.Close,"Dismiss audio player",Modifier.size(21.dp))}
                     }
                     MiniPlayerProgress(file.id)
                     Spacer(Modifier.height(6.dp))
+                }
                 }
             }
         }
@@ -105,7 +108,7 @@ private fun MiniPlayerProgress(fileId:String){
 fun FullscreenAudioPlayer(file:DriveFile,isActivePage:Boolean,modifier:Modifier=Modifier,onTrackChanged:(String)->Unit={}){
     val audio=LocalAudioPlayback.current
     val state by remember(audio){audio.state.map{it.copy(positionMs=0)}.distinctUntilChanged()}.collectAsStateWithLifecycle(remember(audio){audio.state.value.copy(positionMs=0)})
-    Box(modifier.fillMaxSize().ambientArtwork(state).systemBarsPadding().padding(top=audioHeaderHeight())){
+    Box(modifier.fillMaxSize().ambientArtwork(if(isActivePage)state else state.copy(playing=false)).systemBarsPadding().padding(top=audioHeaderHeight())){
         NowPlayingContent(if(isActivePage)state.file?:file else file,Modifier.fillMaxSize())
     }
 }
@@ -253,7 +256,7 @@ internal fun NowPlayingContent(file:DriveFile,modifier:Modifier=Modifier){
             }
         }
     }
-    if(showLyrics&&active)SynchronizedLyrics(lyrics,{showLyrics=false})
+    if(showLyrics&&active)SynchronizedLyrics({showLyrics=false})
 }
 
 /** Frozen target snapshot keeps the outgoing artwork attached to the correct song during a fade. */
@@ -282,7 +285,7 @@ internal fun Modifier.ambientArtwork(state:AudioPlaybackState):Modifier {
         val observer=androidx.lifecycle.LifecycleEventObserver{_,_->resumed=owner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)}
         owner.lifecycle.addObserver(observer);onDispose{owner.lifecycle.removeObserver(observer)}
     }
-    val motion=if(state.playing&&resumed){
+    val motion=if(state.playing&&resumed&&!app.tgdrive.ui.LocalNavigationInProgress.current){
         val start=remember{frozen.floatValue}
         androidx.compose.animation.core.rememberInfiniteTransition(label="ambientMotion").animateFloat(
             initialValue=start,targetValue=if(start<.5f)1f else 0f,
@@ -309,7 +312,7 @@ private fun AudioArtwork(file:DriveFile,metadata:AudioMetadata,modifier:Modifier
     val context=coil3.compose.LocalPlatformContext.current
     val model=remember(file.id,file.modifiedAt,file.localPath,metadata.artworkPath){
         metadata.artworkPath?:if(file.hasLocalCopy||file.hasRemoteCopy)
-            coil3.request.ImageRequest.Builder(context).data(com.infinity.drive.core.media.ThumbnailModel(file.id,"${file.modifiedAt}:${file.localPath}")).crossfade(160).build()else null
+            coil3.request.ImageRequest.Builder(context).data(com.infinity.drive.core.media.thumbnailModel(file)).crossfade(160).build()else null
     }
     Box(modifier.background(Brush.linearGradient(listOf(artworkTone(metadata,0),artworkTone(metadata,1)))),contentAlignment=Alignment.Center){
         Icon(DriveIcons.MusicNotes,null,Modifier.size(56.dp),tint=Color.White.copy(alpha=.5f))

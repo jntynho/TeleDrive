@@ -56,7 +56,8 @@ fun CollectionScreen(
     onBack: () -> Unit,
     onOpenFile: (String, PreviewSequence) -> Unit,
     viewModel: CollectionViewModel = koinViewModel(),
-    onManageHidden:()->Unit={}
+    onManageHidden:()->Unit={},
+    listState:androidx.compose.foundation.lazy.LazyListState=rememberLazyListState()
 ) {
     val files = viewModel.files.collectAsLazyPagingItems()
     val selection by viewModel.selection.collectAsStateWithLifecycle()
@@ -80,7 +81,6 @@ fun CollectionScreen(
         )
     }
 
-    val listState = rememberLazyListState()
     val lifted by rememberToolbarLift(listState)
 
     Scaffold(
@@ -155,8 +155,8 @@ fun CollectionScreen(
             )
         }
     ) { padding ->
-        if (files.isInitialLoad) {
-            LoadingState(Modifier.padding(padding))
+        if (files.isInitialLoad && files.itemCount==0) {
+            com.infinity.drive.presentation.components.FileListSkeleton(Modifier.padding(padding))
             return@Scaffold
         }
         if(files.loadState.refresh is androidx.paging.LoadState.Error && files.itemCount==0){

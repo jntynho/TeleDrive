@@ -3,10 +3,19 @@ package app.tgdrive.rebuild
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import com.infinity.drive.presentation.input.editInlineText
+import com.infinity.drive.presentation.input.InlineDrafts
 import org.junit.Assert.*
 import org.junit.Test
 
 class InlineInputTest {
+    @Test fun sensitiveDraftsSurviveViewRecreationInMemoryAndAreErasedAfterSignIn(){
+        val drafts=InlineDrafts()
+        val first=drafts.value("password");first.value="sensitive draft"
+        assertSame(first,drafts.value("password"))
+        drafts.clear()
+        assertEquals("",first.value)
+        assertEquals("",drafts.value("password").value)
+    }
     @Test fun insertionReplacesTheSelectionRatherThanAppendingToTheWrongField(){
         val next=editInlineText(TextFieldValue("123456",TextRange(2,5)),"90")
         assertEquals("12906",next.text);assertEquals(TextRange(4),next.selection)

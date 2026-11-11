@@ -802,7 +802,7 @@ private fun FilesContent(
         state = gridState,
         columns = GridCells.Fixed(columns),
         modifier = Modifier
-            .fillMaxSize().resultReveal(gridState)
+            .fillMaxSize().resultReveal(state.folderId to (state.sortField to state.sortDirection))
 
             .then(dragSelect),
         contentPadding = padding.add(horizontal = 12.dp, top = 12.dp, bottom = 100.dp),
