@@ -224,9 +224,14 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
         Environment.getExternalStorageDirectory().absolutePath
     }
 
+    val startupLoader=org.koin.compose.koinInject<coil3.ImageLoader>()
+    val startupThumbnails=org.koin.compose.koinInject<com.infinity.drive.data.local.dao.ThumbnailDao>()
+    val startupPreparation=remember(context,startupLoader,startupThumbnails){com.infinity.drive.presentation.startup.AndroidStartupPreparation(context,startupLoader,startupThumbnails)}
     val liquidNavigation=if(android.os.Build.VERSION.SDK_INT>=33)com.infinity.drive.presentation.navigation.liquid.rememberLiquidNavigation()else null
     CompositionLocalProvider(
         LocalLiquidNavigation provides liquidNavigation,
+        LocalStartupPreparation provides startupPreparation,
+        LocalFullyDrawn provides {activity?.reportFullyDrawn()},
         LocalProfilePalette provides {path->withContext(Dispatchers.IO){runCatching{val file=File(path);if(file.length() in 1..5_000_000)com.infinity.drive.presentation.audio.artworkColors(file.readBytes())else emptyList()}.getOrDefault(emptyList())}},
         LocalAudioPlayback provides audio,
         LocalAppIcon provides appIcon,

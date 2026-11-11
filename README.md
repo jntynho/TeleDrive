@@ -105,6 +105,7 @@ Ordinary channels are not end-to-end encrypted. Keep encryption recovery materia
 | [UI review and fixes · Arabic](docs/UI-UX-SKILL-REVIEW.ar.md) | The full interface review, applied corrections and validation |
 | [Solar and approved layouts · Arabic](docs/SOLAR-0.11.ar.md) | Icon sources, semicircle dashboard and grouped Activity |
 | [Telegram and Gallery follow-up · Arabic](docs/reviews/TELEGRAM-GALLERY-STARTUP-FOLLOWUP.ar.md) | Telegram actions, pinch stability, startup and the restored icon |
+| [Startup preparation · Arabic](docs/reviews/STARTUP-PREPARATION.ar.md) | Bounded local preparation, animation probes and manual performance profiling |
 | [Saved audit corrections · Arabic](docs/reviews/AUDIT-IMPLEMENTATION.ar.md) | Navigation, Audio, Gallery, video, Telegram actions and validation limits |
 | [App icon artwork](docs/brand/README.md) | Editable SVG layers, adaptive sizing and system-themed icons |
 

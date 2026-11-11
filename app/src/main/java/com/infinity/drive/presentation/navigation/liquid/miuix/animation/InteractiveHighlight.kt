@@ -123,4 +123,4 @@ private const val HIGHLIGHT_SHADER_SOURCE = """
 """
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-private fun createHighlightShader(): RuntimeShader = RuntimeShader(HIGHLIGHT_SHADER_SOURCE)
+internal fun createHighlightShader(): RuntimeShader = RuntimeShader(HIGHLIGHT_SHADER_SOURCE)

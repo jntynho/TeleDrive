@@ -5,3 +5,5 @@ dependencyResolutionManagement {
 }
 rootProject.name = "TG Drive"
 include(":app", ":shared", ":ui", ":skin")
+
+if(providers.gradleProperty("startupBenchmark").orNull=="true")include(":startup-benchmark")

@@ -43,6 +43,8 @@ import com.infinity.drive.domain.repository.FileRepository
 import com.infinity.drive.domain.repository.SettingsRepository
 import com.infinity.drive.domain.usecase.FolderCycleCheck
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.Flow
@@ -70,6 +72,10 @@ class FileRepositoryImpl(
     private val fileImporter: FileImporter
 ) : FileRepository {
 
+    private val startupCache=StartupFileCache()
+    override fun clearStartupCache()=startupCache.clear()
+    override suspend fun preparedStartupFiles():List<DriveFile> = startupCache.assets(activeChannel.id())
+
     override suspend fun resolveImportFolder(relativePath: String, parentId: String?): String? =
         if (relativePath.isBlank()) {
             parentId
@@ -89,6 +95,8 @@ class FileRepositoryImpl(
 
     override fun pagedFiles(spec: FileQuerySpec): Flow<PagingData<DriveFile>> =
         activeChannel.observe().flatMapLatest { chatId ->
+            val scoped=spec.copy(chatId=chatId,scopeToChat=true)
+            val seed=if(spec.initialLoadIndex==null||spec.initialLoadIndex==0)startupCache.takePage(scoped)else null
             Pager(
                 initialKey = spec.initialLoadIndex,
                 config = PagingConfig(
@@ -101,6 +109,7 @@ class FileRepositoryImpl(
                     fileDao.pagingSource(FileQueryBuilder.build(spec.copy(chatId = chatId,scopeToChat=true)))
                 }
             ).flow.map { paging -> paging.map { it.toDomain() } }
+                .onStart{if(seed!=null)emit(PagingData.from(seed))}
         }
 
     override suspend fun indexOfFile(spec:FileQuerySpec,id:String):Int {
@@ -156,14 +165,24 @@ class FileRepositoryImpl(
 
     override suspend fun warmLibrary() {
         val chat=activeChannel.id()
-        for(category in listOf(FileCategory.IMAGE,FileCategory.AUDIO)) {
-            fileDao.observeList(FileQueryBuilder.buildLimited(FileQuerySpec(chatId=chat,scopeToChat=true,categories=listOf(category),sortField=FileSortField.DATE_MODIFIED,sortDirection=SortDirection.DESCENDING),24)).first()
+        val prefs=settingsRepository.preferences.first()
+        startupCache.putRecent(chat,fileDao.observeRecent(12,chat).first().map{it.toDomain()})
+        val specs=listOf(
+            FileQuerySpec(chatId=chat,scopeToChat=true,categories=listOf(FileCategory.IMAGE,FileCategory.VIDEO),sortField=prefs.gallerySortField,sortDirection=prefs.gallerySortDirection),
+            FileQuerySpec(chatId=chat,scopeToChat=true,categories=listOf(FileCategory.AUDIO),sortField=prefs.audioSortField,sortDirection=prefs.audioSortDirection)
+        )
+        for(spec in specs){
+            val rows=fileDao.observeList(FileQueryBuilder.buildLimited(spec,40)).first().map{it.toDomain()}
+            if(activeChannel.id()!=chat){startupCache.clear();return}
+            startupCache.putPage(spec,rows)
         }
     }
 
     override fun observeRecent(limit: Int): Flow<List<DriveFile>> =
         activeChannel.observe().flatMapLatest { chatId ->
+            val seed=startupCache.takeRecent(chatId,limit)
             fileDao.observeRecent(limit, chatId).map { list -> list.map { it.toDomain() } }
+                .onStart{if(seed!=null)emit(seed)}.distinctUntilChanged()
         }
 
     override fun observeAlbums(

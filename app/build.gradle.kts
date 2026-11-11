@@ -31,6 +31,7 @@ android {
         versionCode = setting("APP_VERSION_CODE").ifBlank { "24" }.toInt().also { require(it > 0) }
         versionName = setting("APP_VERSION_NAME").ifBlank { "1.0.0" }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("boolean","STARTUP_BENCHMARK","false")
         buildConfigField("String", "TELEGRAM_API_ID", literal(setting("TELEGRAM_API_ID")))
         buildConfigField("String", "TELEGRAM_API_HASH", literal(setting("TELEGRAM_API_HASH")))
     }
@@ -53,6 +54,18 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             if (hasSigning) signingConfig = signingConfigs.getByName("release")
+        }
+        if(providers.gradleProperty("startupBenchmark").orNull=="true")create("benchmark"){
+            initWith(getByName("release"))
+            applicationIdSuffix=".benchmark"
+            buildConfigField("boolean","STARTUP_BENCHMARK","true")
+            signingConfig=signingConfigs.getByName("debug")
+            isDebuggable=false
+            isMinifyEnabled=providers.gradleProperty("startupMeasure").orNull=="true"
+            isShrinkResources=isMinifyEnabled
+            matchingFallbacks+=listOf("release")
+            buildConfigField("String","TELEGRAM_API_ID",literal(""))
+            buildConfigField("String","TELEGRAM_API_HASH",literal(""))
         }
     }
     // Opt in for distribution; ordinary debug/emulator builds retain their current packaging.

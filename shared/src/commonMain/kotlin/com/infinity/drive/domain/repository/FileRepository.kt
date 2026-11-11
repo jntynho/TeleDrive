@@ -39,6 +39,8 @@ interface FileRepository {
     suspend fun storeAudioTags(file:DriveFile,title:String?,artist:String?) {}
 
     suspend fun warmLibrary() {}
+    suspend fun preparedStartupFiles():List<DriveFile> = emptyList()
+    fun clearStartupCache() {}
 
     fun observeRecent(limit: Int): Flow<List<DriveFile>>
 

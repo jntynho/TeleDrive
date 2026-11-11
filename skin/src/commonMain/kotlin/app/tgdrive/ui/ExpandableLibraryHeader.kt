@@ -31,13 +31,14 @@ fun ExpandableLibraryHeader(
     title:String, query:String, onQueryChange:(String)->Unit, expanded:Boolean,
     onExpandedChange:(Boolean)->Unit, placeholder:String,
     navigationIcon:@Composable ()->Unit={}, actions:@Composable RowScope.()->Unit={},
-    titleStyle:androidx.compose.ui.text.TextStyle?=null
+    titleStyle:androidx.compose.ui.text.TextStyle?=null,
+    requestSearchFocus:Boolean=true
 ) {
     val focus=LocalFocusManager.current
     val keyboard=LocalSoftwareKeyboardController.current
     val requester=remember{FocusRequester()}
     val owner=LocalLifecycleOwner.current
-    LaunchedEffect(expanded){if(!expanded){focus.clearFocus();keyboard?.hide()}}
+    LaunchedEffect(expanded){if(!expanded&&requestSearchFocus){focus.clearFocus();keyboard?.hide()}}
     fun close(){focus.clearFocus();keyboard?.hide();onQueryChange("");onExpandedChange(false)}
     Surface(color=MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxWidth().statusBarsPadding().height(64.dp)) {
@@ -57,7 +58,7 @@ fun ExpandableLibraryHeader(
                             decorationBox={input->Box(contentAlignment=Alignment.CenterStart){if(query.isEmpty())Text(placeholder,color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodyLarge);input()}})
                         if(query.isNotEmpty())IconButton({onQueryChange("")}){Icon(DriveIcons.Close,"Clear search")}
                         LaunchedEffect(expanded,owner){
-                             if(expanded){
+                             if(expanded&&requestSearchFocus){
                                  owner.lifecycle.currentStateFlow.first{it.isAtLeast(Lifecycle.State.RESUMED)}
                                  kotlinx.coroutines.delay(180)
                                  requester.requestFocus();keyboard?.show()

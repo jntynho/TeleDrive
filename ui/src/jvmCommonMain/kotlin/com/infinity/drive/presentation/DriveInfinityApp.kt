@@ -173,11 +173,14 @@ fun DriveInfinityApp(
             (LocalLocaleList as ProvidableCompositionLocal<LocaleList>) provides targetLocaleList,
             LocalCompactLayout provides state.compactLayout
         ) {
-            var contentFrameReady by remember { mutableStateOf(false) }
-            LaunchedEffect(state.loading){if(!state.loading){withFrameNanos{};withFrameNanos{};contentFrameReady=true}}
-            val warmup=remember{androidx.compose.animation.core.MutableTransitionState(true)}
-            warmup.targetState=state.loading||!contentFrameReady
+            val startupFiles=org.koin.compose.koinInject<com.infinity.drive.domain.repository.FileRepository>()
+            val startupMode=if(state.locked)"locked"else if(state.onboardingComplete)"library"else"sign-in"
+            val startup=com.infinity.drive.presentation.components.rememberStartupPreparation(state.loading,startupMode,state.warmupGlass,viewModel.startupPreparation,startupFiles)
+            val warmup=startup.visibility
             val preparing=warmup.currentState||warmup.targetState
+            val fullyDrawn=com.infinity.drive.presentation.platform.LocalFullyDrawn.current
+            LaunchedEffect(preparing,state.loading){if(!preparing&&!state.loading){withFrameNanos{};viewModel.firstContentDrawn();fullyDrawn()}}
+            CompositionLocalProvider(com.infinity.drive.presentation.platform.LocalFirstLibraryFrame provides startup.onLibraryFrame){
             Box(Modifier.fillMaxSize()){
             Box(Modifier.fillMaxSize().then(if(preparing)Modifier.clearAndSetSemantics{}else Modifier)){
             when {
@@ -195,7 +198,9 @@ fun DriveInfinityApp(
                 }
             }
             }
+            com.infinity.drive.presentation.components.StartupRenderProbe(startup)
             androidx.compose.animation.AnimatedVisibility(visibleState=warmup,enter=fadeIn(tween(200)),exit=fadeOut(tween(360))){com.infinity.drive.presentation.components.StartupSurface()}
+            }
             }
             if(state.onboardingComplete&&!state.loading&&!state.locked&&!preparing)com.infinity.drive.presentation.upload.UploadConflictHost()
             if(upgradeNotice!=null&&!state.loading&&!state.locked&&!preparing)androidx.compose.material3.AlertDialog(onDismissRequest=viewModel::dismissUpgradeNotice,title={Text("Previous library preserved")},text={Text(upgradeNotice.orEmpty())},confirmButton={androidx.compose.material3.TextButton(viewModel::dismissUpgradeNotice){Text("Continue")}})

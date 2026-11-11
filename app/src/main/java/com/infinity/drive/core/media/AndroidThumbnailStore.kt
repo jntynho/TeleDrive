@@ -56,6 +56,19 @@ class AndroidThumbnailStore(
         return "$key.thumb"
     }
 
+    override suspend fun cachedThumbnailBytes(fileId:String):ByteArray? {
+        try{
+            val entity=fileDao.byId(fileId)?:return null
+            if(!settingsRepository.preferences.first().linkPreviews&&MimeTypes.isText(entity.mimeType))return null
+            val cached=thumbnailDao.byFileId(fileId)?:return null
+            val target=File(cached.path)
+            if(target.name!=thumbnailName(entity)||!target.isFile)return null
+            val bytes=target.readBytes()
+            return if(cached.encrypted)streamCrypto.decryptBytes(thumbnailKey(),bytes)else bytes
+        }catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}
+        catch(_:Exception){return null}
+    }
+
     override suspend fun thumbnailBytes(fileId: String): ByteArray? {
         return fileLocks[(fileId.hashCode() and Int.MAX_VALUE)%fileLocks.size].withLock {
         val entity=fileDao.byId(fileId)?:return null

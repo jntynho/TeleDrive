@@ -1,6 +1,6 @@
 package com.infinity.drive.core.media
 
 /** Coil request model resolved by [ThumbnailFetcher]. */
-data class ThumbnailModel(val fileId: String, val revision:String="")
+data class ThumbnailModel(val fileId: String, val revision:String="",val cacheOnly:Boolean=false)
 
 fun thumbnailCacheKey(fileId: String): String = "thumb:$fileId"

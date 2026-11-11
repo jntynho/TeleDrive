@@ -43,7 +43,8 @@ data class AppUiState(
     val language: AppLanguage = AppLanguage.ENGLISH,
     val dynamicColor: Boolean = false,
     val compactLayout: Boolean = false,
-    val locked: Boolean = false
+    val locked: Boolean = false,
+    val warmupGlass:Boolean=false
 )
 
 class AppViewModel(
@@ -58,6 +59,8 @@ class AppViewModel(
     private val fileRepository:com.infinity.drive.domain.repository.FileRepository,
     private val upgrade:com.infinity.drive.core.common.AppUpgrade
 ) : ViewModel() {
+
+    val startupPreparation=com.infinity.drive.presentation.components.StartupPreparationState()
 
     private val upgradeReady = MutableStateFlow(false)
     private val _upgradeNotice = MutableStateFlow<String?>(null)
@@ -84,7 +87,8 @@ class AppViewModel(
             language = prefs.language,
             dynamicColor = prefs.dynamicColor,
             compactLayout = prefs.layoutDensity == LayoutDensity.COMPACT,
-            locked = locked
+            locked = locked,
+            warmupGlass=prefs.floatingNavigationBar&&prefs.navigationBarBlur&&prefs.navigationBarStyle==com.infinity.drive.domain.model.NavigationBarStyle.FLOATING
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, AppUiState())
 
@@ -92,20 +96,22 @@ class AppViewModel(
         viewModelScope.launch {
             try {
                 _upgradeNotice.value=upgrade.prepare()
-                kotlinx.coroutines.withTimeoutOrNull(400){fileRepository.observeRecent(12).first()}
                 appLockManager.onAppStarted()
-                if(settingsRepository.preferences.first().onboardingComplete) {
-                    kotlinx.coroutines.withTimeoutOrNull(450){kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){fileRepository.warmLibrary()}}
+                if(settingsRepository.preferences.first().onboardingComplete&&!appLockManager.locked.value) {
+                    // Optional cache preparation never marks a valid Telegram session as broken.
+                    try{kotlinx.coroutines.withTimeoutOrNull(450){withContext(kotlinx.coroutines.Dispatchers.IO){fileRepository.warmLibrary()}}}
+                    catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}
+                    catch(_:Exception){fileRepository.clearStartupCache()}
                 }
                 upgradeReady.value=true
-                com.infinity.drive.core.common.StartupReadiness.markReady()
-                // Local navigation is usable before Telegram/network recovery completes.
+                // Initial local frames take priority; a missing UI cannot hold recovery forever.
+                kotlinx.coroutines.withTimeoutOrNull(1500){com.infinity.drive.core.common.StartupReadiness.ready.first{it}}
                 backupRepository.refreshActiveSession()
                 val started = telegramAuthRepository.startFromStoredCredentials()
                 if (started is AppResult.Failure) _sessionBroken.value = true
             } catch(e:kotlinx.coroutines.CancellationException) { throw e }
             catch(_:Exception) { _sessionBroken.value=true }
-            finally { upgradeReady.value=true;com.infinity.drive.core.common.StartupReadiness.markReady() }
+            finally { upgradeReady.value=true }
 
         }
         checkForUpdate()
@@ -134,6 +140,8 @@ class AppViewModel(
         backupRepository.startBackup(BackupTrigger.SCHEDULED)
     }
 
+    fun firstContentDrawn(){com.infinity.drive.core.common.StartupReadiness.markReady()}
+
     fun onAppStopped() = appLockManager.onAppStopped()
 
     fun onAppStarted() {
@@ -146,6 +154,7 @@ class AppViewModel(
      */
     fun checkForUpdate(force: Boolean = false) {
         viewModelScope.launch {
+            if(!force)kotlinx.coroutines.withTimeoutOrNull(1500){com.infinity.drive.core.common.StartupReadiness.ready.first{it}}
             val prefs = settingsRepository.preferences.first()
             if (!prefs.onboardingComplete || (!force&&!prefs.updateCheckEnabled)) return@launch
             val elapsed = System.currentTimeMillis() - prefs.lastUpdateCheckAt
@@ -165,6 +174,8 @@ class AppViewModel(
     fun resetSession() {
         viewModelScope.launch {
             withContext(NonCancellable) {
+                fileRepository.clearStartupCache()
+                startupPreparation.reset()
                 telegramAuthRepository.logout()
                 localDataWiper.wipe()
                 settingsRepository.clearTelegramCredentials()

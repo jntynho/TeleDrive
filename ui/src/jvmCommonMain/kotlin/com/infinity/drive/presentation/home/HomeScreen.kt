@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -76,6 +77,10 @@ fun HomeScreen(
     viewModel: HomeViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val firstFrame=com.infinity.drive.presentation.platform.LocalFirstLibraryFrame.current
+    LaunchedEffect(state.loading,firstFrame){
+        if(!state.loading){androidx.compose.runtime.withFrameNanos{};firstFrame()}
+    }
     val uploads= koinInject<com.infinity.drive.presentation.upload.UploadCoordinator>()
     val uploadPicker=com.infinity.drive.presentation.platform.LocalMultiFilePicker.current
     val folderPicker=com.infinity.drive.presentation.platform.LocalFolderPicker.current
