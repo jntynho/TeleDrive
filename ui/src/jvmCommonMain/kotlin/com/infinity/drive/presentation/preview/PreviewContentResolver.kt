@@ -46,10 +46,12 @@ class PreviewContentResolver(
     private val cacheDao: CacheDao,
     private val filePartDao: FilePartDao,
     private val settingsRepository: SettingsRepository,
-    private val dispatchers: DispatcherProvider
+    private val dispatchers: DispatcherProvider,
+    private val hiddenAccess:com.infinity.drive.core.security.HiddenContentAccess
 ) {
 
     fun resolve(file: DriveFile): Flow<PreviewContent> = flow {
+        if(!hiddenAccess.canRead(file.id)){emit(PreviewContent.Failed(Res.string.preview_read_failed));return@flow}
         emit(PreviewContent.Loading)
         val localPath = file.localPath?.takeIf { File(it).exists() }
         if (localPath != null) {

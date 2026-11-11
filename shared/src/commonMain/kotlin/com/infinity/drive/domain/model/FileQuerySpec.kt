@@ -22,5 +22,7 @@ data class FileQuerySpec(
     val sortField: FileSortField = FileSortField.NAME,
     val sortDirection: SortDirection = SortDirection.ASCENDING,
     val initialLoadIndex:Int?=null,
-    val scopeToChat:Boolean=false
+    val scopeToChat:Boolean=false,
+    val respectHiddenLock:Boolean=true,
+    val excludeHiddenAncestors:Boolean=false
 )

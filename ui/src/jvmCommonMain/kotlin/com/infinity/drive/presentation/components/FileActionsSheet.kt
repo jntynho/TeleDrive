@@ -35,6 +35,12 @@ val LocalFileFolderNavigation=staticCompositionLocalOf<(String?)->Unit>{{}}
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Boolean=false) {
+    val privacy=com.infinity.drive.presentation.platform.LocalHiddenContentAccess.current
+    val privacyState=privacy?.lock?.state?.collectAsStateWithLifecycle()?.value
+    var readable by remember(file.id,privacyState?.epoch,privacyState?.restricted){mutableStateOf(privacy==null||privacyState?.restricted==false)}
+    LaunchedEffect(file.id,privacyState?.epoch,privacyState?.restricted){readable=privacy?.canRead(file.id)!=false;if(!readable)onDismiss()}
+    if(!readable)return
+
     val repository=koinInject<FileRepository>()
     val transfers=koinInject<TransferRepository>()
     val telegram=koinInject<TelegramClient>()

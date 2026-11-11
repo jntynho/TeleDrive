@@ -23,7 +23,7 @@ import java.io.File
 @androidx.annotation.OptIn(UnstableApi::class)
 class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentResolver,
     private val sources:TelegramDataSourceFactory, private val files:FileRepository,
-    private val ioDispatcher:CoroutineDispatcher=Dispatchers.IO,ownerScope:CoroutineScope?=null):AudioPlayback {
+    private val ioDispatcher:CoroutineDispatcher=Dispatchers.IO,ownerScope:CoroutineScope?=null,private val hiddenAccess:com.infinity.drive.core.security.HiddenContentAccess?=null):AudioPlayback {
     private val appContext=context.applicationContext
     private val scope=ownerScope?:CoroutineScope(SupervisorJob()+Dispatchers.Main.immediate)
     private val mutable=MutableStateFlow(AudioPlaybackState())
@@ -115,6 +115,12 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
     }
     init {
         observeCurrentFile()
+        hiddenAccess?.let{access->scope.launch{
+            access.lock.state.collect{lock->
+                val file=mutable.value.file
+                if(lock.restricted&&file!=null&&!access.canRead(file.id))stop()
+            }
+        }}
         scope.launch { state.map{it.copy(positionMs=it.positionMs/5000*5000)}.distinctUntilChanged().filter{restorationChecked&&libraryContext?.second==true}.collectLatest{saveSession(it)} }
         scope.launch {
             state.map{it.file!=null&&(it.playing||it.loading)}.distinctUntilChanged().collectLatest { active ->
@@ -165,6 +171,13 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
     }
     override fun play(file:DriveFile){queueJob?.cancel();start(file,true)}
     private fun start(file:DriveFile,autoplay:Boolean,initialPosition:Long=0){
+        if(hiddenAccess?.lock?.state?.value?.restricted==true){
+            scope.launch{if(hiddenAccess.canRead(file.id))startAuthorized(file,autoplay,initialPosition)}
+            return
+        }
+        startAuthorized(file,autoplay,initialPosition)
+    }
+    private fun startAuthorized(file:DriveFile,autoplay:Boolean,initialPosition:Long=0){
         val epoch=++playbackEpoch
         resolveJob?.cancel();metadataJob?.cancel();preloadJob?.cancel();preparedNext=null
         if(file.id !in queue)queue=listOf(file.id)
@@ -365,6 +378,7 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
             runCatching{org.json.JSONObject(raw)}.getOrNull()
         }?:return
         val file=withContext(ioDispatcher){files.getFile(saved.optString("id"))}?:return
+        if(hiddenAccess!=null&&!hiddenAccess.canRead(file.id))return
         if(mutable.value.file!=null||libraryContext!=chatId to true||file.isTrashed||file.category!=com.infinity.drive.domain.model.FileCategory.AUDIO||file.chatId!=chatId)return
         val values=saved.optJSONArray("queue")
         queue=if(values==null)listOf(file.id)else (0 until minOf(values.length(),2000)).map{values.getString(it)}.distinct()

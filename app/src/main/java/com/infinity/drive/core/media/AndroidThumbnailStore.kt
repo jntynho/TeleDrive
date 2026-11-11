@@ -45,7 +45,8 @@ class AndroidThumbnailStore(
     private val telegramClient: TelegramClient,
     private val streamCrypto: StreamCrypto,
     private val wrappedKeyRepository: WrappedKeyRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val hiddenAccess:com.infinity.drive.core.security.HiddenContentAccess
 ) : ThumbnailStore {
 
     private val generationSemaphore = Semaphore(3)
@@ -57,6 +58,7 @@ class AndroidThumbnailStore(
     }
 
     override suspend fun cachedThumbnailBytes(fileId:String):ByteArray? {
+        if(!hiddenAccess.canRead(fileId))return null
         try{
             val entity=fileDao.byId(fileId)?:return null
             if(!settingsRepository.preferences.first().linkPreviews&&MimeTypes.isText(entity.mimeType))return null
@@ -70,6 +72,12 @@ class AndroidThumbnailStore(
     }
 
     override suspend fun thumbnailBytes(fileId: String): ByteArray? {
+        if(!hiddenAccess.canRead(fileId))return null
+        return thumbnailForUpload(fileId)
+    }
+
+    /** Trusted background upload preparation does not grant UI thumbnail access. */
+    private suspend fun thumbnailForUpload(fileId:String):ByteArray? {
         return fileLocks[(fileId.hashCode() and Int.MAX_VALUE)%fileLocks.size].withLock {
         val entity=fileDao.byId(fileId)?:return null
         if (!settingsRepository.preferences.first().linkPreviews && isNote(fileId)) {
@@ -95,7 +103,7 @@ class AndroidThumbnailStore(
     }
 
     override suspend fun uploadThumbnailFile(fileId: String): File? {
-        val bytes = thumbnailBytes(fileId) ?: return null
+        val bytes = thumbnailForUpload(fileId) ?: return null
         val dir = File(storagePaths.cacheDir, "upload-thumbs").apply { mkdirs() }
         val target = File(dir, "$fileId.jpg")
         return runCatching {

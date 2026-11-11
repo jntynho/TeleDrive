@@ -21,6 +21,11 @@ class AppNotifications(
     private val context: Context
 ) {
 
+    fun clearFileDetails(){
+        val manager=NotificationManagerCompat.from(context)
+        manager.cancel(NOTIFICATION_ID_FAILURE);manager.cancel(NOTIFICATION_ID_BACKUP)
+    }
+
     @SuppressLint("MissingPermission")
     fun notifyFailure(title: String, message: String) {
         if (!hasPermission()) return

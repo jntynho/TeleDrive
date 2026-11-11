@@ -43,6 +43,8 @@ import com.infinity.drive.domain.repository.FileRepository
 import com.infinity.drive.domain.repository.SettingsRepository
 import com.infinity.drive.domain.usecase.FolderCycleCheck
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.combine
@@ -69,9 +71,12 @@ class FileRepositoryImpl(
     private val streamCrypto: StreamCrypto,
     private val wrappedKeyRepository: WrappedKeyRepository,
     private val settingsRepository: SettingsRepository,
-    private val fileImporter: FileImporter
+    private val fileImporter: FileImporter,
+    private val hiddenAccess:com.infinity.drive.core.security.HiddenContentAccess
 ) : FileRepository {
 
+    private val visibility=combine(hiddenAccess.lock.state.filter{it.ready}.map{it.restricted}.distinctUntilChanged(),hiddenAccess.protectedFolders.filterNotNull()){restricted,folders->restricted to folders}.distinctUntilChanged()
+    private fun visibleChannel()=combine(activeChannel.observe(),visibility){chat,_->chat}
     private val startupCache=StartupFileCache()
     override fun clearStartupCache()=startupCache.clear()
     override suspend fun preparedStartupFiles():List<DriveFile> = startupCache.assets(activeChannel.id())
@@ -94,8 +99,8 @@ class FileRepositoryImpl(
     }
 
     override fun pagedFiles(spec: FileQuerySpec): Flow<PagingData<DriveFile>> =
-        activeChannel.observe().flatMapLatest { chatId ->
-            val scoped=spec.copy(chatId=chatId,scopeToChat=true)
+        visibleChannel().flatMapLatest { chatId ->
+            val scoped=hiddenAccess.query(spec.copy(chatId=chatId,scopeToChat=true))
             val seed=if(spec.initialLoadIndex==null||spec.initialLoadIndex==0)startupCache.takePage(scoped)else null
             Pager(
                 initialKey = spec.initialLoadIndex,
@@ -106,7 +111,7 @@ class FileRepositoryImpl(
                     enablePlaceholders = false
                 ),
                 pagingSourceFactory = {
-                    fileDao.pagingSource(FileQueryBuilder.build(spec.copy(chatId = chatId,scopeToChat=true)))
+                    fileDao.pagingSource(FileQueryBuilder.build(hiddenAccess.query(spec.copy(chatId = chatId,scopeToChat=true))))
                 }
             ).flow.map { paging -> paging.map { it.toDomain() } }
                 .onStart{if(seed!=null)emit(PagingData.from(seed))}
@@ -116,17 +121,17 @@ class FileRepositoryImpl(
         val file=getFile(id)?:return 0
         val chat=activeChannel.id()
         if(file.chatId!=chat)return 0
-        return fileDao.queryCount(FileQueryBuilder.rank(spec.copy(chatId=chat,scopeToChat=true),file))
+        return fileDao.queryCount(FileQueryBuilder.rank(hiddenAccess.query(spec.copy(chatId=chat,scopeToChat=true)),file))
     }
     override suspend fun previewWindow(spec:FileQuerySpec,id:String,radius:Int):List<DriveFile> {
         val rank=indexOfFile(spec,id)
         val chat=activeChannel.id()
-        return fileDao.observeList(FileQueryBuilder.buildWindow(spec.copy(chatId=chat,scopeToChat=true),(rank-radius).coerceAtLeast(0),radius*2+1)).first().map{it.toDomain()}
+        return fileDao.observeList(FileQueryBuilder.buildWindow(hiddenAccess.query(spec.copy(chatId=chat,scopeToChat=true)),(rank-radius).coerceAtLeast(0),radius*2+1)).first().map{it.toDomain()}
     }
 
     override fun observeFiles(spec: FileQuerySpec): Flow<List<DriveFile>> =
-        activeChannel.observe().flatMapLatest { chatId ->
-            fileDao.observeList(FileQueryBuilder.build(spec.copy(chatId = chatId,scopeToChat=true)))
+        visibleChannel().flatMapLatest { chatId ->
+            fileDao.observeList(FileQueryBuilder.build(hiddenAccess.query(spec.copy(chatId = chatId,scopeToChat=true))))
                 .map { list -> list.map { it.toDomain() } }
         }
 
@@ -136,7 +141,7 @@ class FileRepositoryImpl(
         var guard = 0
         while (frontier.isNotEmpty() && guard++ < MAX_FOLDER_DEPTH) {
             for (id in frontier) {
-                ids += fileDao.filesInFolder(id).map { it.id }
+                ids += fileIds(FileQuerySpec(folderId=id,filterByFolder=true,showHidden=true,showArchived=true))
             }
             frontier = frontier.flatMap { parent ->
                 folderDao.childrenOf(parent, activeChannel.id()).map { it.id }
@@ -146,10 +151,10 @@ class FileRepositoryImpl(
     }
 
     override suspend fun fileIds(spec: FileQuerySpec): List<String> =
-        fileDao.idList(FileQueryBuilder.buildIds(spec.copy(chatId = activeChannel.id(),scopeToChat=true)))
+        fileDao.idList(FileQueryBuilder.buildIds(hiddenAccess.query(spec.copy(chatId = activeChannel.id(),scopeToChat=true))))
 
     override fun observeFile(id: String): Flow<DriveFile?> =
-        fileDao.observeById(id).map { it?.toDomain() }
+        combine(fileDao.observeById(id),visibility){row,_->row?.toDomain()?.takeIf{hiddenAccess.canRead(it.id)}}
 
     override suspend fun getFile(id: String): DriveFile? = fileDao.byId(id)?.toDomain()
 
@@ -164,14 +169,16 @@ class FileRepositoryImpl(
         ids.distinct().chunked(400).flatMap { fileDao.byIds(it) }.map { it.toDomain() }
 
     override suspend fun warmLibrary() {
+        hiddenAccess.lock.awaitReady()
         val chat=activeChannel.id()
         val prefs=settingsRepository.preferences.first()
-        startupCache.putRecent(chat,fileDao.observeRecent(12,chat).first().map{it.toDomain()})
+        startupCache.putRecent(chat,fileDao.observeRecent(12,chat).first().filter{hiddenAccess.canRead(it.id)}.map{it.toDomain()})
         val specs=listOf(
             FileQuerySpec(chatId=chat,scopeToChat=true,categories=listOf(FileCategory.IMAGE,FileCategory.VIDEO),sortField=prefs.gallerySortField,sortDirection=prefs.gallerySortDirection),
             FileQuerySpec(chatId=chat,scopeToChat=true,categories=listOf(FileCategory.AUDIO),sortField=prefs.audioSortField,sortDirection=prefs.audioSortDirection)
         )
-        for(spec in specs){
+        for(rawSpec in specs){
+            val spec=hiddenAccess.query(rawSpec)
             val rows=fileDao.observeList(FileQueryBuilder.buildLimited(spec,40)).first().map{it.toDomain()}
             if(activeChannel.id()!=chat){startupCache.clear();return}
             startupCache.putPage(spec,rows)
@@ -179,9 +186,9 @@ class FileRepositoryImpl(
     }
 
     override fun observeRecent(limit: Int): Flow<List<DriveFile>> =
-        activeChannel.observe().flatMapLatest { chatId ->
-            val seed=startupCache.takeRecent(chatId,limit)
-            fileDao.observeRecent(limit, chatId).map { list -> list.map { it.toDomain() } }
+        visibleChannel().flatMapLatest { chatId ->
+            val seed=startupCache.takeRecent(chatId,limit)?.filter{hiddenAccess.canRead(it.id)}
+            fileDao.observeRecent(limit, chatId).map { list -> list.filter{hiddenAccess.canRead(it.id)}.map { it.toDomain() } }
                 .onStart{if(seed!=null)emit(seed)}.distinctUntilChanged()
         }
 
@@ -189,9 +196,9 @@ class FileRepositoryImpl(
         showHidden: Boolean,
         showArchived: Boolean
     ): Flow<List<MediaAlbum>> =
-        activeChannel.observe().flatMapLatest { chatId ->
-            fileDao.observeAlbumsScoped(showHidden, showArchived, chatId).map { list ->
-                list.map { it.toDomain() }
+        visibleChannel().flatMapLatest { chatId ->
+            fileDao.observeAlbumsScoped(showHidden&&!hiddenAccess.lock.state.value.restricted, showArchived, chatId).map { list ->
+                list.map { it.toDomain() }.filter{hiddenAccess.canReadFolder(it.folderId)}
             }
         }
 
@@ -202,9 +209,9 @@ class FileRepositoryImpl(
         sortField: FileSortField,
         sortDirection: SortDirection
     ): Flow<List<DriveFolder>> =
-        activeChannel.observe().flatMapLatest { chatId ->
-            folderDao.observeChildrenWithCountsScoped(parentId, chatId, showHidden, showArchived)
-                .map { list -> list.map { it.toDomain() }.sortedBy(sortField, sortDirection) }
+        visibleChannel().flatMapLatest { chatId ->
+            folderDao.observeChildrenWithCountsScoped(parentId, chatId, showHidden&&!hiddenAccess.lock.state.value.restricted, showArchived)
+                .map { list -> list.map { it.toDomain() }.filter{hiddenAccess.canReadFolder(it.id)}.sortedBy(sortField, sortDirection) }
         }
 
     /**
@@ -229,31 +236,31 @@ class FileRepositoryImpl(
         showHidden: Boolean,
         showArchived: Boolean
     ): Flow<List<DriveFolder>> =
-        activeChannel.observe().flatMapLatest { chatId ->
+        visibleChannel().flatMapLatest { chatId ->
             folderDao.observeMatchingWithCountsScoped(
                 pattern = "%${escapeLike(nameQuery)}%",
                 chatId = chatId,
-                showHidden = showHidden,
+                showHidden = showHidden&&!hiddenAccess.lock.state.value.restricted,
                 showArchived = showArchived,
                 limit = FOLDER_SEARCH_LIMIT
-            ).map { list -> list.map { it.toDomain() } }
+            ).map { list -> list.map { it.toDomain() }.filter{hiddenAccess.canReadFolder(it.id)} }
         }
 
     override fun observeStorageByCategory(): Flow<List<StorageSlice>> =
-        activeChannel.observe().flatMapLatest { chatId ->
+        visibleChannel().flatMapLatest { chatId ->
             fileDao.observeUsageByCategory(chatId).map { rows ->
                 rows.map { StorageSlice(it.category, it.fileCount, it.totalBytes) }
             }
         }
 
     override fun observeFolder(id: String): Flow<DriveFolder?> =
-        folderDao.observeById(id).map { it?.toDomain() }
+        combine(folderDao.observeById(id),visibility){row,_->row?.toDomain()?.takeIf{hiddenAccess.canReadFolder(it.id)}}
 
     override suspend fun getFolder(id: String): DriveFolder? = folderDao.byId(id)?.toDomain()
 
     override fun observeFavoriteFolders(): Flow<List<DriveFolder>> =
-        activeChannel.observe().flatMapLatest { chatId ->
-            folderDao.observeFavorites(chatId).map { list -> list.map { it.toDomain() } }
+        visibleChannel().flatMapLatest { chatId ->
+            folderDao.observeFavorites(chatId).map { list -> list.map { it.toDomain() }.filter{hiddenAccess.canReadFolder(it.id)} }
         }
 
     override suspend fun createFolder(parentId: String?, name: String): AppResult<DriveFolder> {
@@ -450,7 +457,7 @@ class FileRepositoryImpl(
     }
 
     override fun observeReclaimableBytes(): Flow<Long> =
-        activeChannel.observe().flatMapLatest { chatId ->
+        visibleChannel().flatMapLatest { chatId ->
             fileDao.observeReclaimableBytes(chatId)
         }
 
@@ -503,6 +510,7 @@ class FileRepositoryImpl(
 
     override suspend fun setFilesHidden(ids: List<String>, hidden: Boolean) {
         fileDao.setHidden(ids, hidden)
+        if(hidden&&hiddenAccess.lock.state.value.configured)hiddenAccess.lock.lock()
         markFilesDirty(ids)
     }
 

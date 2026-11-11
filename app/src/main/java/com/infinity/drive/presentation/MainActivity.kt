@@ -25,6 +25,7 @@ import com.infinity.drive.core.common.AppNotifications
 import com.infinity.drive.core.files.PendingShare
 import com.infinity.drive.domain.repository.SettingsRepository
 import com.infinity.drive.presentation.platform.ProvidePlatformActions
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -38,6 +39,8 @@ import org.koin.android.ext.android.inject
 open class MainActivity : FragmentActivity() {
 
     private val settingsRepository: SettingsRepository by inject()
+    private val hiddenLock:com.infinity.drive.core.security.HiddenLockManager by inject()
+    private val sensitiveScreens:com.infinity.drive.core.security.SensitiveScreens by inject()
 
 
     /**
@@ -52,8 +55,7 @@ open class MainActivity : FragmentActivity() {
     private fun observeScreenshotProtection() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                settingsRepository.preferences
-                    .map { it.appLockEnabled || it.blockScreenCapture }
+                combine(settingsRepository.preferences,sensitiveScreens.active){prefs,sensitive->prefs.appLockEnabled||prefs.blockScreenCapture||sensitive>0}
                     .distinctUntilChanged()
                     .collect { locked ->
                         if (locked) {
@@ -72,6 +74,8 @@ open class MainActivity : FragmentActivity() {
     private val pendingShare: PendingShare by inject()
 
     private val destination = MutableStateFlow<String?>(null)
+
+    override fun onStop(){hiddenLock.lock();super.onStop()}
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

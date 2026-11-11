@@ -30,7 +30,8 @@ class TransferQueueWorker(
     private val settingsRepository: SettingsRepository,
     private val appNotifications: AppNotifications,
     private val scheduler:TransferScheduler,
-    private val auth:com.infinity.drive.domain.repository.TelegramAuthRepository
+    private val auth:com.infinity.drive.domain.repository.TelegramAuthRepository,
+    private val hiddenAccess:com.infinity.drive.core.security.HiddenContentAccess
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
@@ -61,7 +62,7 @@ class TransferQueueWorker(
                                 TransferType.RESTORE -> R.string.notification_download_failed
                             }
                         ),
-                        message = transfer.displayName
+                        message = hiddenAccess.notificationName(transfer.fileId,transfer.displayName)
                     )
                 }
             }
@@ -75,7 +76,7 @@ class TransferQueueWorker(
         val completed=transferDao.observeCompleted(100).first().filter{(it.completedAt?:0)>=startedAt}
         val completedCount=transferDao.completedSince(startedAt)
         if(completedCount>0&&settingsRepository.preferences.first().backupNotifications){
-            appNotifications.notifyBackupResult("$completedCount transfers completed",completed.take(4).joinToString(" · "){it.displayName})
+            appNotifications.notifyBackupResult("$completedCount transfers completed",completed.take(4).map{hiddenAccess.notificationName(it.fileId,it.displayName)}.joinToString(" · "))
         }
         return when (result) {
             TransferDrainResult.COMPLETED -> Result.success()
@@ -109,15 +110,16 @@ class TransferQueueWorker(
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
 
-    private fun progressInfo(tasks:List<com.infinity.drive.data.local.entity.TransferEntity>,count:Int):ForegroundInfo {
+    private suspend fun progressInfo(tasks:List<com.infinity.drive.data.local.entity.TransferEntity>,count:Int):ForegroundInfo {
         val total=tasks.sumOf{it.sizeBytes.coerceAtLeast(0).toDouble()}
         val done=tasks.sumOf{it.transferredBytes.coerceIn(0,it.sizeBytes.coerceAtLeast(0)).toDouble()}
         val percent=if(total>0)(done/total*100).toInt().coerceIn(0,100)else 0
+        val names=tasks.take(5).associate{it.id to hiddenAccess.notificationName(it.fileId,it.displayName)}
         val style=NotificationCompat.InboxStyle()
-        tasks.take(5).forEach{style.addLine("${it.displayName} · ${if(it.sizeBytes>0)(it.transferredBytes.toDouble()/it.sizeBytes*100).toInt().coerceIn(0,100).toString()+"%"else "Preparing"}")}
+        tasks.take(5).forEach{style.addLine("${names[it.id]} · ${if(it.sizeBytes>0)(it.transferredBytes.toDouble()/it.sizeBytes*100).toInt().coerceIn(0,100).toString()+"%"else "Preparing"}")}
         val notification=NotificationCompat.Builder(applicationContext,AppNotifications.CHANNEL_TRANSFERS)
             .setSmallIcon(R.drawable.ic_notification).setContentTitle("$count active transfers")
-            .setContentText("$percent% · ${tasks.firstOrNull()?.displayName.orEmpty()}").setStyle(style)
+            .setContentText("$percent% · ${tasks.firstOrNull()?.let{names[it.id]}.orEmpty()}").setStyle(style)
             .setProgress(100,percent,total<=0).setOnlyAlertOnce(true).setOngoing(true)
             .setContentIntent(appNotifications.screenIntent(AppNotifications.DESTINATION_TRANSFERS,QUEUE_REQUEST_CODE)).build()
         return if(Build.VERSION.SDK_INT>=29)ForegroundInfo(AppNotifications.NOTIFICATION_ID_TRANSFER_QUEUE,notification,ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)

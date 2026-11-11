@@ -14,6 +14,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +48,15 @@ fun FileThumbnail(
     contentScale: ContentScale = ContentScale.Crop,
     galleryTile:Boolean=false
 ) {
+    val access=com.infinity.drive.presentation.platform.LocalHiddenContentAccess.current
+    val lock=access?.lock?.state?.collectAsStateWithLifecycle()?.value
+    val protectedFolders=access?.protectedFolders?.collectAsStateWithLifecycle()?.value
+    var allowed by remember(file.id,file.modifiedAt,file.isHidden,file.folderId,lock?.epoch,lock?.restricted,protectedFolders){mutableStateOf(access==null||lock?.restricted==false)}
+    LaunchedEffect(file.id,file.modifiedAt,file.isHidden,file.folderId,lock?.epoch,lock?.restricted,protectedFolders){allowed=access?.canReadSnapshot(file)!=false}
+    if(!allowed){
+        Box(modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh),contentAlignment=Alignment.Center){Icon(DriveIcons.Lock,"Locked item",Modifier.size(24.dp))}
+        return
+    }
     // Text can carry one too: a note holding a link previews as that link.
     val supportsThumbnail = file.category == FileCategory.IMAGE ||
             file.category == FileCategory.VIDEO || file.category == FileCategory.AUDIO ||

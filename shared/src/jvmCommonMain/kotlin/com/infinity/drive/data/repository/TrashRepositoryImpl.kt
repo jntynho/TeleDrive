@@ -38,17 +38,18 @@ class TrashRepositoryImpl(
     private val pendingDeleteDao: PendingDeleteDao,
     private val filePartDao: FilePartDao,
     private val activeChannel: ActiveChannel,
-    private val transferRepository: TransferRepository
+    private val transferRepository: TransferRepository,
+    private val hidden:com.infinity.drive.core.security.HiddenContentAccess
 ) : TrashRepository {
 
     override fun observeTrash(): Flow<List<TrashItem>> =
-        activeChannel.observe().flatMapLatest { chatId ->
+        combine(activeChannel.observe(),hidden.lock.state){chat,_->chat}.flatMapLatest { chatId ->
             combine(
                 fileDao.observeTrashRoots(chatId),
                 folderDao.observeTrashRoots(chatId)
             ) { files, folders ->
-                (files.map { TrashItem.File(it.toDomain()) } +
-                        folders.map { TrashItem.Folder(it.toDomain()) })
+                (files.filter{hidden.canRead(it.id)}.map { TrashItem.File(it.toDomain()) } +
+                        folders.filter{hidden.canReadFolder(it.id)}.map { TrashItem.Folder(it.toDomain()) })
                     .sortedByDescending { it.trashedAt }
             }
         }
@@ -66,10 +67,10 @@ class TrashRepositoryImpl(
     }
 
     override suspend fun trashedChildren(folderId: String): List<TrashItem> {
-        val folders = folderDao.trashedChildrenOf(listOf(folderId))
+        val folders = folderDao.trashedChildrenOf(listOf(folderId)).filter{hidden.canReadFolder(it.id)}
             .map { TrashItem.Folder(it.toDomain()) }
             .sortedBy { it.name.lowercase() }
-        val files = fileDao.trashedInFolders(listOf(folderId))
+        val files = fileDao.trashedInFolders(listOf(folderId)).filter{hidden.canRead(it.id)}
             .map { TrashItem.File(it.toDomain()) }
             .sortedBy { it.name.lowercase() }
         return folders + files

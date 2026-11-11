@@ -39,6 +39,15 @@ class AudioQueueRegressionTest {
     private fun file(id:String)=DriveFile(id,null,"$id.mp3",10,"audio/mpeg",FileCategory.AUDIO,null,null,null,null,null,null,BackupState.NONE,
         false,false,false,false,null,null,60_000,null,createdAt=1,modifiedAt=1,addedAt=1)
     private fun settings()=fake<SettingsRepository>{name,_->when(name){"getPreferences"->flowOf(UserPreferences());else->error(name)}}
+    private fun openHiddenAccess():com.infinity.drive.core.security.HiddenContentAccess {
+        val store=object:com.infinity.drive.core.security.HiddenLockStore {
+            override suspend fun read():com.infinity.drive.core.security.HiddenLockRecord?=null
+            override suspend fun write(record:com.infinity.drive.core.security.HiddenLockRecord){}
+            override suspend fun clear(){}
+        }
+        return com.infinity.drive.core.security.HiddenContentAccess(com.infinity.drive.core.security.HiddenLockManager(store),
+            fake<FileDao>{_,_->null},fake<FolderDao>{_,_->null})
+    }
     private fun TestScope.player(files:FileRepository):AndroidAudioPlayback {
         val context=RuntimeEnvironment.getApplication()
         val dispatcher=StandardTestDispatcher(testScheduler)
@@ -46,7 +55,7 @@ class AudioQueueRegressionTest {
         val keys=fake<WrappedKeyRepository>{_,_->null}
         val telegram=fake<TelegramClient>{name,_->error("Unexpected Telegram call $name")}
         val dispatchers=object:DispatcherProvider {override val main=dispatcher;override val io=dispatcher;override val default=dispatcher}
-        val resolver=PreviewContentResolver(paths,telegram,StreamCrypto(),keys,fake<CacheDao>{_,_->Unit},fake<FilePartDao>{_,_->emptyList<Any>()},settings(),dispatchers)
+        val resolver=PreviewContentResolver(paths,telegram,StreamCrypto(),keys,fake<CacheDao>{_,_->Unit},fake<FilePartDao>{_,_->emptyList<Any>()},settings(),dispatchers,openHiddenAccess())
         return AndroidAudioPlayback(context,resolver,TelegramDataSourceFactory(telegram,StreamCrypto(),keys),files,dispatcher,CoroutineScope(SupervisorJob()+dispatcher))
     }
     @Test fun `rapid Next presses reserve each destination and stale lookups cannot restart an intermediate track`()=runTest {

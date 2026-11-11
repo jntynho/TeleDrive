@@ -10,6 +10,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FolderDao {
+    @Query("WITH RECURSIVE ancestors(id,parentId,isHidden) AS (SELECT id,parentId,isHidden FROM folders WHERE id = :id UNION SELECT f.id,f.parentId,f.isHidden FROM folders f JOIN ancestors a ON f.id = a.parentId) SELECT COUNT(*) > 0 FROM ancestors WHERE isHidden = 1")
+    suspend fun isProtectedFolder(id:String):Boolean
+
+    @Query("WITH RECURSIVE protected_folders(id) AS (SELECT id FROM folders WHERE isHidden = 1 UNION SELECT f.id FROM folders f JOIN protected_folders p ON f.parentId = p.id) SELECT id FROM protected_folders")
+    fun observeProtectedFolderIds():Flow<List<String>>
+
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(folder: FolderEntity)

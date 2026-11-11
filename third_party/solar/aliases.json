@@ -147,5 +147,8 @@
   "ZoomOutMap": "full-screen-linear",
   "SkipPrevious": "skip-previous-linear",
   "SkipNext": "skip-next-linear",
-  "PhotoCamera": "camera-linear"
+  "PhotoCamera": "camera-linear",
+  "Backspace": "backspace-linear",
+  "Visibility": "eye-linear",
+  "Language": "global-linear"
 }

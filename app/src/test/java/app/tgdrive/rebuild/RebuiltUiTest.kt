@@ -224,7 +224,7 @@ class RebuiltUiTest {
         runBlocking { GlobalContext.get().get<SettingsRepository>().update { it.copy(onboardingComplete=false) } }
         compose.waitUntil(10_000){compose.onAllNodesWithText("Get started").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("Get started").performScrollTo().performClick()
-        compose.onNodeWithText("Continue",substring=false).performScrollTo().assertIsDisplayed().assertIsNotEnabled()
+        compose.onNodeWithText("Continue",substring=false).assertIsDisplayed().assertIsNotEnabled()
         capture("api-large-text")
     }
 

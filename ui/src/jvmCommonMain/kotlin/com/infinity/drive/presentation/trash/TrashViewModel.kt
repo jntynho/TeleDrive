@@ -43,7 +43,8 @@ data class TrashUiState(
 
 class TrashViewModel(
     private val trashRepository: TrashRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val hidden:com.infinity.drive.core.security.HiddenContentAccess
 ) : ViewModel() {
 
     private val selection = MutableStateFlow<Set<String>>(emptySet())
@@ -79,6 +80,9 @@ class TrashViewModel(
             autoClearDays = prefs.trashAutoClearDays,
             loading = false
         )
+    }.combine(hidden.lock.state){state,_->
+        suspend fun readable(item:TrashItem)=when(item){is TrashItem.File->hidden.canRead(item.file.id);is TrashItem.Folder->hidden.canReadFolder(item.folder.id)}
+        state.copy(items=state.items.filter{readable(it)},rows=state.rows.filter{readable(it.item)})
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TrashUiState())
 
     fun toggleExpanded(folderId: String) {

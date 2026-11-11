@@ -91,6 +91,7 @@ object FileQueryBuilder {
         if (spec.archivedOnly) where.append(" AND isArchived = 1")
         if (!spec.showHidden) where.append(" AND isHidden = 0")
         if (!spec.showArchived) where.append(" AND isArchived = 0")
+        if (spec.excludeHiddenAncestors) where.append(" AND (folderId IS NULL OR folderId NOT IN (SELECT id FROM protected_folders))")
 
         val orderColumn = when (spec.sortField) {
             FileSortField.NAME -> "name COLLATE NOCASE"
@@ -106,7 +107,8 @@ object FileQueryBuilder {
         }
 
         where.append(extra);args.addAll(extraArgs)
-        val sql = "SELECT $projection FROM files WHERE $where " +
+        val prefix=if(spec.excludeHiddenAncestors) "WITH RECURSIVE protected_folders(id) AS (SELECT id FROM folders WHERE isHidden = 1 UNION SELECT f.id FROM folders f JOIN protected_folders p ON f.parentId = p.id) " else ""
+        val sql = prefix+"SELECT $projection FROM files WHERE $where " +
                 "ORDER BY $orderColumn $direction, id ASC" + (limit?.let{" LIMIT $it OFFSET $offset"}?:"")
         return RoomRawQuery(sql) { statement ->
             args.forEachIndexed { index, value ->

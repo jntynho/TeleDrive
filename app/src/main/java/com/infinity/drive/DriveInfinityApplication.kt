@@ -69,6 +69,16 @@ open class DriveInfinityApplication : Application(), SingletonImageLoader.Factor
             modules(appModules)
         }
         appNotifications.createChannels()
+        applicationScope.launch {
+            val access=org.koin.core.context.GlobalContext.get().get<com.infinity.drive.core.security.HiddenContentAccess>()
+            kotlinx.coroutines.flow.combine(access.lock.state,access.protectedFolders){lock,folders->lock to folders}.collect{(lock,_)->
+                if(lock.ready&&lock.restricted&&(lock.configured||lock.error)){
+                    appNotifications.clearFileDetails()
+                    val id=kotlinx.coroutines.withContext(Dispatchers.Main.immediate){com.infinity.drive.presentation.preview.VideoSessionPool.currentFileId}
+                    if(id!=null&&!access.canRead(id))kotlinx.coroutines.withContext(Dispatchers.Main.immediate){com.infinity.drive.presentation.preview.VideoSessionPool.revoke(id)}
+                }
+            }
+        }
         mediaStoreWatcher.start()
         proxyFailover.start(applicationScope)
         applicationScope.launch {

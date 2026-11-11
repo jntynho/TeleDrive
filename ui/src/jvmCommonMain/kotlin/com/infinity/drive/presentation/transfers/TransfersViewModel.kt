@@ -24,7 +24,8 @@ data class TransfersUiState(
 )
 
 class TransfersViewModel(
-    private val transferRepository: TransferRepository
+    private val transferRepository: TransferRepository,
+    private val hidden:com.infinity.drive.core.security.HiddenContentAccess
 ) : ViewModel() {
 
     private val rows = combine(
@@ -52,7 +53,8 @@ class TransfersViewModel(
         transferRepository.observeSectionCount(TransferSection.COMPLETED)
     ) { counts -> counts.toList() }
 
-    val uiState: StateFlow<TransfersUiState> = combine(rows, totals) { sections, counts ->
+    val uiState: StateFlow<TransfersUiState> = combine(rows, totals,hidden.lock.state,hidden.protectedFolders) { rawSections, counts, _, _ ->
+        val sections=rawSections.map{section->section.map{task->task.copy(displayName=hidden.notificationName(task.fileId,task.displayName),errorMessage=if(task.fileId?.let{!hidden.canRead(it)}==true)null else task.errorMessage)}}
         TransfersUiState(
             active = sections[0],
             paused = sections[1],

@@ -10,6 +10,7 @@ import androidx.room.RawQuery
 import androidx.room.RoomRawQuery
 import androidx.room.Update
 import com.infinity.drive.data.local.entity.AlbumSummary
+import com.infinity.drive.data.local.entity.FolderEntity
 import com.infinity.drive.data.local.entity.FileEntity
 import com.infinity.drive.data.local.entity.HomeAggregates
 import com.infinity.drive.data.local.entity.LocalCopyRef
@@ -117,10 +118,10 @@ interface FileDao {
         chatId: Long?
     ): List<FileEntity>
 
-    @RawQuery(observedEntities = [FileEntity::class, com.infinity.drive.data.local.entity.AudioTagEntity::class])
+    @RawQuery(observedEntities = [FileEntity::class, com.infinity.drive.data.local.entity.AudioTagEntity::class, FolderEntity::class])
     fun pagingSource(query: RoomRawQuery): PagingSource<Int, FileEntity>
 
-    @RawQuery(observedEntities = [FileEntity::class, com.infinity.drive.data.local.entity.AudioTagEntity::class])
+    @RawQuery(observedEntities = [FileEntity::class, com.infinity.drive.data.local.entity.AudioTagEntity::class, FolderEntity::class])
     fun observeList(query: RoomRawQuery): Flow<List<FileEntity>>
 
     @RawQuery

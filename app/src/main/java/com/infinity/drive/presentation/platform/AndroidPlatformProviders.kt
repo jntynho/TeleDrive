@@ -209,6 +209,9 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
         }
     }
 
+    val sensitiveClipboard=remember(context){com.infinity.drive.core.security.AndroidSensitiveClipboard(context)}
+    androidx.compose.runtime.DisposableEffect(sensitiveClipboard){onDispose{sensitiveClipboard.close()}}
+    val hiddenBiometrics=remember(activity){(activity as? FragmentActivity)?.let{com.infinity.drive.core.security.AndroidHiddenBiometrics(it)}}
     val standardFolders = remember {
         StandardBackupFolder.entries.map { StandardFolderOption(it.labelRes, it.path) }
     }
@@ -247,6 +250,9 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
         LocalPermissionRequester provides permissionRequester,
         LocalSystemScreens provides systemScreens,
         LocalDeviceOwnerGate provides deviceOwnerGate,
+        LocalHiddenBiometrics provides hiddenBiometrics,
+        LocalSensitiveClipboard provides sensitiveClipboard,
+        LocalHiddenContentAccess provides org.koin.compose.koinInject<com.infinity.drive.core.security.HiddenContentAccess>(),
         LocalAppVersion provides BuildConfig.VERSION_NAME,
         LocalPlatformScreens provides AndroidPlatformScreens,
         LocalPlatformCapabilities provides capabilities

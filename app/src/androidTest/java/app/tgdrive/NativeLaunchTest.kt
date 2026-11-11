@@ -13,11 +13,18 @@ class NativeLaunchTest {
     @Test fun actualActivityStartsWithPrivateChannelOnboarding() {
         compose.waitUntil(15_000) { compose.onAllNodesWithText("Get started").fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodesWithText("TeleDrive").onFirst().assertIsDisplayed()
-        compose.onNodeWithText("Your files. Your Telegram.\nKeep everything in your private cloud.").assertIsDisplayed()
+        compose.onNodeWithText("Your files.\nAlways with you.").assertIsDisplayed()
         compose.onNodeWithText("Get started").performScrollTo().performClick()
-        compose.onNodeWithText("API access").assertIsDisplayed()
-        compose.onNodeWithText("API ID").assertIsDisplayed()
-        compose.onNodeWithText("API hash").assertIsDisplayed()
+        compose.onNodeWithText("API access").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("API ID").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("API hash").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Continue").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("API ID").performScrollTo().performClick()
+        compose.onNodeWithText("1").performClick()
+        compose.onNodeWithContentDescription("API ID").assertTextContains("1")
+        compose.runOnIdle {
+            val insets=androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
+            org.junit.Assert.assertFalse(insets?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())==true)
+        }
     }
 }

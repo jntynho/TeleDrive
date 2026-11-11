@@ -32,7 +32,7 @@ class UploadCoordinator(private val fileRepository:FileRepository,
     })
     private suspend fun choice(name:String,size:Long,target:String?,remaining:Int,apply:Answer?):Pair<Answer?,String> {
         val existing=fileRepository.findNameClash(name,target)?:return null to name
-        val siblings=fileRepository.observeFiles(com.infinity.drive.domain.model.FileQuerySpec(folderId=target,filterByFolder=true,showHidden=true,showArchived=true)).first()
+        val siblings=fileRepository.observeFiles(com.infinity.drive.domain.model.FileQuerySpec(folderId=target,filterByFolder=true,respectHiddenLock=false,showHidden=true,showArchived=true)).first()
         val taken=siblings.map{it.name.lowercase()}.toSet()
         val alternate=FileNameUtils.uniqueName(name){it.lowercase() in taken}
         val answer=apply?:run {

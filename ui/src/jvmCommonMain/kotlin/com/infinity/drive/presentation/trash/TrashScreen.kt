@@ -82,6 +82,23 @@ fun TrashScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var confirmEmpty by remember { mutableStateOf(false) }
     var confirmDeleteSelected by remember { mutableStateOf(false) }
+    val hidden=org.koin.compose.koinInject<com.infinity.drive.core.security.HiddenLockManager>()
+    val lock by hidden.state.collectAsStateWithLifecycle()
+    var unlocking by remember{mutableStateOf(false)}
+    var pendingAction by remember{mutableStateOf<String?>(null)}
+    androidx.compose.runtime.LaunchedEffect(lock.unlocked){
+        if(lock.unlocked&&unlocking){
+            unlocking=false
+            when(pendingAction){"empty"->confirmEmpty=true;"delete"->confirmDeleteSelected=true}
+            pendingAction=null
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(lock.epoch){confirmEmpty=false;confirmDeleteSelected=false;viewModel.clearSelection()}
+    if(unlocking){
+        com.infinity.drive.presentation.hidden.HiddenLockScreen(onBack={unlocking=false;pendingAction=null})
+        return
+    }
+
 
     CollectSnackbarMessages(viewModel.messages, snackbarHostState)
 
@@ -150,7 +167,7 @@ fun TrashScreen(
                                 contentDescription = stringResource(Res.string.common_restore)
                             )
                         }
-                        IconButton(onClick = { confirmDeleteSelected = true }) {
+                        IconButton(onClick = { if(lock.configured&&!lock.unlocked){pendingAction="delete";unlocking=true}else confirmDeleteSelected=true }) {
                             Icon(
                                 DriveIcons.DeleteForever,
                                 contentDescription = stringResource(Res.string.common_delete_forever)
@@ -171,8 +188,9 @@ fun TrashScreen(
                         }
                     },
                     actions = {
+                        if(lock.configured)IconButton(onClick={if(lock.unlocked)hidden.lock()else{pendingAction=null;unlocking=true}}){Icon(DriveIcons.Lock,if(lock.unlocked)"Lock Hidden"else"Unlock hidden items")}
                         if (state.items.isNotEmpty()) {
-                            IconButton(onClick = { confirmEmpty = true }) {
+                            IconButton(onClick = { if(lock.configured&&!lock.unlocked){pendingAction="empty";unlocking=true}else confirmEmpty=true }) {
                                 Icon(
                                     DriveIcons.DeleteForever,
                                     contentDescription = stringResource(Res.string.trash_empty_trash_action)

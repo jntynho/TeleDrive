@@ -55,7 +55,8 @@ import com.infinity.drive.presentation.preview.PreviewSequence
 fun CollectionScreen(
     onBack: () -> Unit,
     onOpenFile: (String, PreviewSequence) -> Unit,
-    viewModel: CollectionViewModel = koinViewModel()
+    viewModel: CollectionViewModel = koinViewModel(),
+    onManageHidden:()->Unit={}
 ) {
     val files = viewModel.files.collectAsLazyPagingItems()
     val selection by viewModel.selection.collectAsStateWithLifecycle()
@@ -114,6 +115,7 @@ fun CollectionScreen(
                     }
                 },
                 actions = {
+                    if(viewModel.type==CollectionType.HIDDEN&&!selectionMode)IconButton(onManageHidden){Icon(DriveIcons.Lock,"Manage Hidden lock")}
                     if (selectionMode) {
                         IconButton(
                             onClick = {

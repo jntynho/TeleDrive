@@ -11,6 +11,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.staticCompositionLocalOf
 
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.navigation.compose.currentBackStackEntryAsState
+import com.infinity.drive.presentation.hidden.*
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import org.jetbrains.compose.resources.stringResource
@@ -43,6 +48,22 @@ fun AppNavHost(
     startDestination: Route,
     modifier: Modifier = Modifier
 ) {
+    val entry by navController.currentBackStackEntryAsState()
+    val hidden=org.koin.compose.koinInject<com.infinity.drive.core.security.HiddenContentAccess>()
+    val hiddenState by hidden.lock.state.collectAsStateWithLifecycle()
+    if(hiddenState.unlocked)SensitiveScreen()
+    val rawFiles=org.koin.compose.koinInject<com.infinity.drive.domain.repository.FileRepository>()
+    LaunchedEffect(entry?.id){
+        val current=entry?:return@LaunchedEffect
+        val inside=when {
+            current.destination.hasRoute<Route.Collection>()->current.toRoute<Route.Collection>().type==com.infinity.drive.presentation.collection.CollectionType.HIDDEN.name
+            current.destination.hasRoute<Route.Preview>()->rawFiles.getFile(current.toRoute<Route.Preview>().fileId)?.let{hidden.protectedFile(it)}==true
+            current.destination.hasRoute<Route.NoteEditor>()->current.toRoute<Route.NoteEditor>().let{route->route.fileId?.let{rawFiles.getFile(it)?.let{file->hidden.protectedFile(file)}}?:hidden.protectedFolder(route.folderId)}
+            current.destination.hasRoute<Route.Files>()->hidden.protectedFolder(current.toRoute<Route.Files>().folderId)
+            else->false
+        }
+        if(!inside)hidden.lock.lock()
+    }
     NavHost(
         navController = navController,
         startDestination = startDestination,
@@ -97,6 +118,7 @@ fun AppNavHost(
         ) { entry ->
             UnderBottomBar {
                 val isRoot = entry.toRoute<Route.Files>().folderId == null
+                HiddenContentGuard(folderId=entry.toRoute<Route.Files>().folderId,onBack={navController.popBackStackOnce()}){
                 FilesScreen(
                     requestUpload=entry.toRoute<Route.Files>().upload,
                 onOpenFolder = { navController.navigateOnce(Route.Files(it)) },
@@ -120,6 +142,7 @@ fun AppNavHost(
                     },
                     onBack = { navController.popBackStackOnce() }
                 )
+                }
             }
         }
         stableComposable<Route.Audio>(navController) {
@@ -155,7 +178,8 @@ fun AppNavHost(
             exitTransition = { NavigationTransitions.exit(forward(true)) },
             popEnterTransition = { NavigationTransitions.enter(forward(false)) },
             popExitTransition = { NavigationTransitions.exit(forward(false)) }
-        ) {
+        ) { entry ->
+            HiddenContentGuard(fileId=entry.toRoute<Route.Preview>().fileId,onBack={navController.popBackStackOnce()}){
             LocalPlatformScreens.current.Preview(
                 onBack = { navController.popBackStackOnce() },
                 onEditNote = { fileId, title ->
@@ -164,6 +188,7 @@ fun AppNavHost(
                     )
                 }
             )
+            }
         }
         stableComposable<Route.Transfers>(navController) {
             TransfersScreen(onBack = { navController.popBackStackOnce() })
@@ -177,16 +202,17 @@ fun AppNavHost(
                 onOpenFolder = { navController.navigateOnce(Route.Files(it)) }
             )
         }
-        stableComposable<Route.Collection>(navController) {
-            CollectionScreen(
-                onBack = { navController.popBackStackOnce() },
-                onOpenFile = { id, sequence ->
-                    navController.navigateOnce(sequence.routeFor(id))
-                }
-            )
+        stableComposable<Route.Collection>(navController) { entry ->
+            val back:()->Unit={navController.popBackStackOnce()}
+            val open:(String,com.infinity.drive.presentation.preview.PreviewSequence)->Unit={id,sequence->navController.navigateOnce(sequence.routeFor(id))}
+            if(entry.toRoute<Route.Collection>().type==com.infinity.drive.presentation.collection.CollectionType.HIDDEN.name)HiddenCollectionGate(back,open)
+            else CollectionScreen(onBack=back,onOpenFile=open)
         }
-        stableComposable<Route.NoteEditor>(navController) {
-            NoteEditorScreen(onBack = { navController.popBackStackOnce() })
+        stableComposable<Route.NoteEditor>(navController) { entry ->
+            val route=entry.toRoute<Route.NoteEditor>()
+            HiddenContentGuard(fileId=route.fileId,folderId=route.folderId,onBack={navController.popBackStackOnce()}){
+                NoteEditorScreen(onBack={navController.popBackStackOnce()})
+            }
         }
         stableComposable<Route.Channels>(navController) {
             ChannelsScreen(onBack = { navController.popBackStackOnce() })
