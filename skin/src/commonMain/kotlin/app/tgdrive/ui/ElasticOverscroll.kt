@@ -14,6 +14,10 @@ import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.node.LayoutModifierNode
+import androidx.compose.ui.node.PointerInputModifierNode
+import androidx.compose.ui.input.pointer.PointerEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
@@ -31,7 +35,7 @@ fun edgeApproach(distance:Float,zone:Float):Float {
 }
 
 fun elasticDisplacement(raw:Float,viewport:Float,maxPixels:Float):Float {
-    val limit=min(viewport*.18f,maxPixels).coerceAtLeast(1f)
+    val limit=min(viewport*.22f,maxPixels).coerceAtLeast(1f)
     val damped=raw*.65f
     return damped/(1f+abs(damped)/limit)
 }
@@ -49,7 +53,7 @@ internal class ElasticOverscrollEffect(private val proximity:(Offset)->Offset={O
     private var raw=Offset.Zero
     private var width=1f
     private var height=1f
-    private var maxPixels=72f
+    private var maxPixels=96f
     private var settling:Job?=null
     private var flinging=false
     private var enabled by mutableStateOf(true)
@@ -58,16 +62,27 @@ internal class ElasticOverscrollEffect(private val proximity:(Offset)->Offset={O
         if(!value){settling?.cancel();raw=Offset.Zero;offset=Offset.Zero;approach=Offset.Zero}
     }
     private var pivot=TransformOrigin.Center
-    private val layer=object:Modifier.Node(),LayoutModifierNode {
+    private val layer=object:Modifier.Node(),LayoutModifierNode,PointerInputModifierNode {
+        override fun onPointerEvent(pointerEvent:PointerEvent,pass:PointerEventPass,bounds:IntSize){
+            if(pass==PointerEventPass.Initial&&pointerEvent.changes.any{it.pressed&&!it.previousPressed}){
+                // Stop the return animation on finger-down, even before touch slop is crossed.
+                settling?.cancel()
+                raw=Offset(restore(offset.x,width),restore(offset.y,height))
+            }else if(pass==PointerEventPass.Initial&&pointerEvent.changes.none{it.pressed}&&pointerEvent.changes.any{it.previousPressed}){
+                // A tap can interrupt a return without starting a drag/fling. Resume on release too.
+                settle(Velocity.Zero)
+            }
+        }
+        override fun onCancelPointerInput(){if(isAttached)settle(Velocity.Zero)}
         override fun onDetach(){settling?.cancel();raw=Offset.Zero;offset=Offset.Zero;approach=Offset.Zero}
         override fun MeasureScope.measure(measurable:Measurable,constraints:Constraints):MeasureResult {
             val child=measurable.measure(constraints)
             width=child.width.toFloat().coerceAtLeast(1f);height=child.height.toFloat().coerceAtLeast(1f)
-            maxPixels=72.dp.toPx()
+            maxPixels=96.dp.toPx()
             return layout(child.width,child.height){child.placeWithLayer(0,0){
                 translationX=if(enabled)offset.x else 0f;translationY=if(enabled)offset.y else 0f
-                scaleX=if(enabled)1f+(abs(offset.x)/width*.3f+abs(approach.x)*.009f).coerceAtMost(.04f)else 1f
-                scaleY=if(enabled)1f+(abs(offset.y)/height*.3f+abs(approach.y)*.009f).coerceAtMost(.04f)else 1f
+                scaleX=if(enabled)1f+(abs(offset.x)/width*.42f+abs(approach.x)*.014f).coerceAtMost(.065f)else 1f
+                scaleY=if(enabled)1f+(abs(offset.y)/height*.42f+abs(approach.y)*.014f).coerceAtMost(.065f)else 1f
                 transformOrigin=pivot
             }}
         }
@@ -90,7 +105,7 @@ internal class ElasticOverscrollEffect(private val proximity:(Offset)->Offset={O
     override val isInProgress:Boolean get()=offset.getDistance()>.1f||approach.getDistance()>.001f
     private fun update(){offset=Offset(elasticDisplacement(raw.x,width,maxPixels),elasticDisplacement(raw.y,height,maxPixels))}
     private fun restore(value:Float,size:Float):Float {
-        val limit=min(size*.18f,maxPixels).coerceAtLeast(1f)
+        val limit=min(size*.22f,maxPixels).coerceAtLeast(1f)
         return value/(1f-(abs(value)/limit).coerceAtMost(.99f))/.65f
     }
     private fun unwind(delta:Float,current:Float):Float=
@@ -112,7 +127,8 @@ internal class ElasticOverscrollEffect(private val proximity:(Offset)->Offset={O
         val remaining=delta-released-consumed
         raw=Offset((raw.x+remaining.x).coerceIn(-width*2,width*2),(raw.y+remaining.y).coerceIn(-height*2,height*2))
         // Layout changes, scrollTo and selection auto-scroll never drive anticipatory motion.
-        approach=proximity(delta)
+        val next=proximity(delta)
+        approach=Offset(stableElasticApproach(raw.x,delta.x,approach.x,next.x),stableElasticApproach(raw.y,delta.y,approach.y,next.y))
         update()
         // Give nested parents the unconsumed drag (notably pull-to-refresh).
         return released+consumed
@@ -122,4 +138,18 @@ internal class ElasticOverscrollEffect(private val proximity:(Offset)->Offset={O
         try { val consumed=performFling(velocity);layer.settle(velocity-consumed) }
         finally { flinging=false }
     }
+}
+
+/** Tiny/stationary pointer samples cannot toggle the anticipation term while a pull is held. */
+fun stableElasticApproach(raw:Float,delta:Float,previous:Float,next:Float):Float = when {
+    abs(raw)>.1f->sign(raw)*maxOf(abs(previous),abs(next))
+    abs(delta)<.5f->previous
+    else->next
+}
+
+/** Edge proximity follows the boundary, not each tiny reversal of finger direction. */
+fun elasticEdgeProximity(start:Float,end:Float,zone:Float,direction:Float):Float = when {
+    start<end->edgeApproach(start,zone)
+    end<start->-edgeApproach(end,zone)
+    else->sign(direction)*edgeApproach(start,zone)
 }

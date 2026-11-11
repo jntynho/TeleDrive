@@ -13,10 +13,9 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import kotlin.math.sign
 
 private fun edge(delta:Float,start:Float,end:Float,zone:Float):Float=
-    if(delta==0f)0f else sign(delta)*edgeApproach(if(delta>0)start else end,zone)
+    elasticEdgeProximity(start,end,zone,delta)
 
 @Composable
 private fun listEffect(state:LazyListState,horizontal:Boolean,reverse:Boolean):OverscrollEffect {
@@ -41,10 +40,10 @@ fun ElasticLazyColumn(modifier:Modifier=Modifier,state:LazyListState=rememberLaz
     contentPadding:PaddingValues=PaddingValues(0.dp),reverseLayout:Boolean=false,
     verticalArrangement:Arrangement.Vertical=if(!reverseLayout)Arrangement.Top else Arrangement.Bottom,
     horizontalAlignment:Alignment.Horizontal=Alignment.Start,flingBehavior:FlingBehavior=ScrollableDefaults.flingBehavior(),
-    userScrollEnabled:Boolean=true,content:LazyListScope.()->Unit) {
+    userScrollEnabled:Boolean=true,elasticEnabled:Boolean=true,content:LazyListScope.()->Unit) {
     androidx.compose.foundation.lazy.LazyColumn(modifier=modifier,state=state,contentPadding=contentPadding,reverseLayout=reverseLayout,
         verticalArrangement=verticalArrangement,horizontalAlignment=horizontalAlignment,flingBehavior=flingBehavior,
-        userScrollEnabled=userScrollEnabled,overscrollEffect=listEffect(state,false,reverseLayout),content=content)
+        userScrollEnabled=userScrollEnabled,overscrollEffect=if(elasticEnabled)listEffect(state,false,reverseLayout)else null,content=content)
 }
 
 @Composable
@@ -52,10 +51,10 @@ fun ElasticLazyRow(modifier:Modifier=Modifier,state:LazyListState=rememberLazyLi
     contentPadding:PaddingValues=PaddingValues(0.dp),reverseLayout:Boolean=false,
     horizontalArrangement:Arrangement.Horizontal=if(!reverseLayout)Arrangement.Start else Arrangement.End,
     verticalAlignment:Alignment.Vertical=Alignment.Top,flingBehavior:FlingBehavior=ScrollableDefaults.flingBehavior(),
-    userScrollEnabled:Boolean=true,content:LazyListScope.()->Unit) {
+    userScrollEnabled:Boolean=true,elasticEnabled:Boolean=true,content:LazyListScope.()->Unit) {
     androidx.compose.foundation.lazy.LazyRow(modifier=modifier,state=state,contentPadding=contentPadding,reverseLayout=reverseLayout,
         horizontalArrangement=horizontalArrangement,verticalAlignment=verticalAlignment,flingBehavior=flingBehavior,
-        userScrollEnabled=userScrollEnabled,overscrollEffect=listEffect(state,true,reverseLayout),content=content)
+        userScrollEnabled=userScrollEnabled,overscrollEffect=if(elasticEnabled)listEffect(state,true,reverseLayout)else null,content=content)
 }
 
 @Composable
@@ -63,7 +62,7 @@ fun ElasticLazyVerticalGrid(columns:GridCells,modifier:Modifier=Modifier,state:L
     contentPadding:PaddingValues=PaddingValues(0.dp),reverseLayout:Boolean=false,
     verticalArrangement:Arrangement.Vertical=if(!reverseLayout)Arrangement.Top else Arrangement.Bottom,
     horizontalArrangement:Arrangement.Horizontal=Arrangement.Start,flingBehavior:FlingBehavior=ScrollableDefaults.flingBehavior(),
-    userScrollEnabled:Boolean=true,content:LazyGridScope.()->Unit) {
+    userScrollEnabled:Boolean=true,elasticEnabled:Boolean=true,content:LazyGridScope.()->Unit) {
     val zone=with(LocalDensity.current){48.dp.toPx()}
     val effect=remember(state,zone,reverseLayout){ElasticOverscrollEffect { delta ->
         val layout=state.layoutInfo
@@ -74,7 +73,7 @@ fun ElasticLazyVerticalGrid(columns:GridCells,modifier:Modifier=Modifier,state:L
         Offset(0f,edge(if(reverseLayout)-delta.y else delta.y,start,end,zone)*(if(reverseLayout)-1 else 1))
     }}
     val suspended=LocalNavigationInProgress.current
-    SideEffect{effect.updateEnabled(!suspended)}
+    SideEffect{effect.updateEnabled(!suspended&&elasticEnabled)}
     androidx.compose.foundation.lazy.grid.LazyVerticalGrid(columns=columns,modifier=modifier,state=state,contentPadding=contentPadding,
         reverseLayout=reverseLayout,verticalArrangement=verticalArrangement,horizontalArrangement=horizontalArrangement,
         flingBehavior=flingBehavior,userScrollEnabled=userScrollEnabled,overscrollEffect=effect,content=content)

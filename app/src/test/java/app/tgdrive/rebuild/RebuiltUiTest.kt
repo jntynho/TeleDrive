@@ -102,7 +102,7 @@ class RebuiltUiTest {
         compose.onNodeWithContentDescription("Close search").performClick()
         capture("settings")
         compose.onNodeWithText("Telegram account").performClick()
-        compose.onNodeWithText("Previous library").assertIsDisplayed()
+        compose.onNodeWithText("Previous library").assertDoesNotExist()
         runBlocking { GlobalContext.get().get<SettingsRepository>().update { it.copy(onboardingComplete=false) } }
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Get started").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Get started").performClick()

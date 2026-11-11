@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -113,6 +114,28 @@ class UiComponentRegressionTest {
         compose.waitForIdle()
         assertEquals(original,controller.get().requestedOrientation)
     }
+    @Test fun aDensityTransitionSettlesAndKeepsBothEndsOfTheGridReachable(){
+        var columns by mutableIntStateOf(3)
+        controller.get().setContent{
+            androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                androidx.compose.foundation.lazy.grid.GridCells.Fixed(columns),
+                modifier=Modifier.size(360.dp,500.dp).testTag("density-grid").pinchZoom(
+                    {columns=(columns-1).coerceAtLeast(2)},{columns=(columns+1).coerceAtMost(6)},densityKey=columns)){
+                items(30,key={it}){Text("Media $it",Modifier.aspectRatio(4f/5f))}
+            }
+        }
+        compose.onNodeWithTag("density-grid").performTouchInput{
+            down(0,center.copy(x=center.x-50));down(1,center.copy(x=center.x+50))
+            moveTo(0,center.copy(x=center.x-100));moveTo(1,center.copy(x=center.x+100));up(0);up(1)
+        }
+        compose.waitForIdle();assertEquals(2,columns)
+        compose.onNodeWithText("Media 0",substring=false).assertIsDisplayed()
+        compose.onNodeWithTag("density-grid").performScrollToIndex(29)
+        compose.onNodeWithText("Media 29",substring=false).assertIsDisplayed()
+        compose.onNodeWithTag("density-grid").performScrollToIndex(0)
+        compose.onNodeWithText("Media 0",substring=false).assertIsDisplayed()
+    }
+
     @Test fun pinchCommitsOnlyOnReleaseAndSurvivesCallbackRecomposition(){
         var revision by mutableIntStateOf(0)
         var steps=0
@@ -126,7 +149,7 @@ class UiComponentRegressionTest {
         }
         compose.runOnIdle{assertEquals(0,steps);revision++}
         compose.onNodeWithTag("pinch-grid").performTouchInput{up(0);up(1)}
-        compose.waitForIdle();assertEquals(2,steps)
+        compose.waitForIdle();assertEquals(1,steps)
     }
 
 }

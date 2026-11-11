@@ -184,6 +184,7 @@ fun ChannelsScreen(
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
+                modifier=Modifier.padding(bottom=com.infinity.drive.presentation.navigation.LocalBottomBarHeight.current),
                 onClick = { showCreate = true },
                 icon = { Icon(DriveIcons.Add, contentDescription = null) },
                 text = { Text(stringResource(Res.string.channels_new_drive)) }
@@ -209,7 +210,7 @@ fun ChannelsScreen(
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = padding.add(horizontal = 16.dp, top = 8.dp, bottom = 96.dp),
+            contentPadding = padding.add(horizontal = 16.dp, top = 8.dp, bottom = 96.dp + com.infinity.drive.presentation.navigation.LocalBottomBarHeight.current),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item("drive-explanation") {

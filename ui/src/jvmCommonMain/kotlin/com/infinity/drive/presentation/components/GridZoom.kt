@@ -12,6 +12,10 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.draw.drawWithContent
+import kotlinx.coroutines.delay
 import androidx.compose.ui.input.pointer.*
 import com.infinity.drive.domain.model.ViewMode
 import kotlinx.coroutines.Job
@@ -34,11 +38,11 @@ fun GridZoomLevel.zoomedOut():GridZoomLevel = when {
 class GridPinchSession {
     var zoom=1f;private set
     fun add(factor:Float){if(factor.isFinite()&&factor>0)zoom=(zoom*factor).coerceIn(.25f,4f)}
-    val steps:Int get()=(ln(zoom.toDouble())/ln(1.28)).toInt().coerceIn(-4,4)
+    val steps:Int get()=(ln(zoom.toDouble())/ln(1.22)).toInt().coerceIn(-1,1)
 }
 
 fun Modifier.pinchZoom(onZoomIn:()->Unit,onZoomOut:()->Unit,
-    onGestureStarted:(Offset)->Unit={},onGestureFinished:(Boolean)->Unit={}):Modifier = composed {
+    onGestureStarted:(Offset)->Unit={},onGestureFinished:(Boolean)->Unit={},densityKey:Any?=null):Modifier = composed {
     val inward by rememberUpdatedState(onZoomIn)
     val outward by rememberUpdatedState(onZoomOut)
     val started by rememberUpdatedState(onGestureStarted)
@@ -47,6 +51,22 @@ fun Modifier.pinchZoom(onZoomIn:()->Unit,onZoomOut:()->Unit,
     var pivot by remember{mutableStateOf(TransformOrigin.Center)}
     var settling by remember{mutableStateOf<Job?>(null)}
     val scope=rememberCoroutineScope()
+    val currentDensity by rememberUpdatedState(densityKey)
+    val firstLayer=rememberGraphicsLayer()
+    val secondLayer=rememberGraphicsLayer()
+    var captureIndex by remember{mutableIntStateOf(0)}
+    var frozenIndex by remember{mutableStateOf<Int?>(null)}
+    var transitionPending by remember{mutableStateOf(false)}
+    var committedDensity by remember{mutableStateOf<Any?>(null)}
+    var oldOpacity by remember{mutableFloatStateOf(0f)}
+    LaunchedEffect(transitionPending,densityKey){
+        if(transitionPending){
+            // Keep the last frame while preferences/layout/anchor settle, without a bitmap readback.
+            if(densityKey==committedDensity)delay(600)else{withFrameNanos{};withFrameNanos{}}
+            Animatable(oldOpacity).animateTo(0f,tween(260,easing=FastOutSlowInEasing)){oldOpacity=value}
+            frozenIndex=null;transitionPending=false
+        }
+    }
     this.wheelZoom({inward()},{outward()}).pointerInput(Unit){
         awaitEachGesture {
             val session=GridPinchSession()
@@ -57,7 +77,7 @@ fun Modifier.pinchZoom(onZoomIn:()->Unit,onZoomOut:()->Unit,
                     val event=awaitPointerEvent(PointerEventPass.Initial)
                     if(event.changes.count{it.pressed}>=2){
                         if(!multitouch){
-                            multitouch=true;settling?.cancel();visualScale=1f
+                            multitouch=true;settling?.cancel();visualScale=1f;transitionPending=false;frozenIndex=null;oldOpacity=0f
                             val center=event.calculateCentroid()
                             if(center.x.isFinite()&&center.y.isFinite()){
                                 pivot=TransformOrigin((center.x/size.width.coerceAtLeast(1)).coerceIn(0f,1f),(center.y/size.height.coerceAtLeast(1)).coerceIn(0f,1f))
@@ -65,12 +85,18 @@ fun Modifier.pinchZoom(onZoomIn:()->Unit,onZoomOut:()->Unit,
                             }
                         }
                         session.add(event.calculateZoom())
-                        visualScale=session.zoom.coerceIn(.9f,1.1f)
+                        visualScale=session.zoom.coerceIn(.88f,1.14f)
                     }
                     if(multitouch)event.changes.forEach{it.consume()}
                 }while(event.changes.any{it.pressed})
                 completed=true
-                if(multitouch)repeat(abs(session.steps)){if(session.steps>0)inward()else outward()}
+                if(multitouch&&session.steps!=0){
+                    if(currentDensity!=null){
+                        committedDensity=currentDensity;frozenIndex=captureIndex;captureIndex=1-captureIndex
+                        oldOpacity=1f;transitionPending=true
+                    }
+                    if(session.steps>0)inward()else outward()
+                }
             }finally{
                 if(multitouch){
                     finished(completed&&session.steps!=0)
@@ -79,7 +105,15 @@ fun Modifier.pinchZoom(onZoomIn:()->Unit,onZoomOut:()->Unit,
                 }
             }
         }
-    }.graphicsLayer{scaleX=visualScale;scaleY=visualScale;transformOrigin=pivot;clip=true}
+    }.graphicsLayer{scaleX=visualScale;scaleY=visualScale;transformOrigin=pivot;clip=true}.drawWithContent{
+        if(densityKey==null){drawContent();return@drawWithContent}
+        val live=if(captureIndex==0)firstLayer else secondLayer
+        live.alpha=1f;live.record{this@drawWithContent.drawContent()};drawLayer(live)
+        frozenIndex?.let{index->
+            val frozen=if(index==0)firstLayer else secondLayer
+            if(frozen.size.width>0){frozen.alpha=oldOpacity;drawLayer(frozen)}
+        }
+    }
 }
 
 private fun Modifier.wheelZoom(onZoomIn:()->Unit,onZoomOut:()->Unit):Modifier=pointerInput(onZoomIn,onZoomOut){

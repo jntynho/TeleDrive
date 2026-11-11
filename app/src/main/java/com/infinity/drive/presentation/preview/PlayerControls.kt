@@ -6,6 +6,8 @@ import android.content.pm.ActivityInfo
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
@@ -28,6 +30,7 @@ import com.infinity.drive.presentation.common.Formatters
 import kotlinx.coroutines.delay
 
 /** One quiet toolbar in both orientations. No subtitle/audio-track picker or expandable tools. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerControls(
     player:Player,visible:Boolean,audioOnly:Boolean,resizeMode:PlayerResizeMode,
@@ -76,6 +79,23 @@ fun PlayerControls(
     LaunchedEffect(speedMenu){overlay(speedMenu)}
     LaunchedEffect(visible){if(!visible){speedMenu=false;scrub=null;scrubbing(false)}}
 
+    if(speedMenu){
+        MaterialTheme(colorScheme=darkColorScheme(primary=Color.White,surface=Color(0xFF191B1E),surfaceContainerLow=Color(0xFF191B1E))){
+            com.infinity.drive.presentation.components.DriveBottomSheet(onDismissRequest={speedMenu=false;onInteraction()}){dismiss->
+                val closeThen=com.infinity.drive.presentation.components.LocalSheetCloseThen.current
+                Column(Modifier.fillMaxWidth().heightIn(max=440.dp).verticalScroll(rememberScrollState()).padding(bottom=16.dp)){
+                    Text("Playback speed",Modifier.padding(horizontal=24.dp,vertical=12.dp),style=MaterialTheme.typography.titleLarge)
+                    listOf(.5f,.75f,1f,1.25f,1.5f,1.75f,2f).forEach{value->
+                        ListItem(headlineContent={Text(if(value==1f)"Normal · 1×"else speedLabel(value))},
+                            leadingContent={Icon(DriveIcons.SlowMotionVideo,null)},
+                            trailingContent={if(kotlin.math.abs(value-rate)<.001f)Icon(DriveIcons.Check,"Selected")},
+                            colors=ListItemDefaults.colors(containerColor=Color.Transparent),
+                            modifier=Modifier.clickable{closeThen{player.setPlaybackSpeed(value);speedMenu=false;onInteraction()}})
+                    }
+                }
+            }
+        }
+    }
     AnimatedVisibility(visible,enter=fadeIn(tween(200)),exit=fadeOut(tween(160)),modifier=modifier.fillMaxSize()){
         BoxWithConstraints(Modifier.fillMaxSize()){
             val viewportHeight=maxHeight
@@ -99,16 +119,8 @@ fun PlayerControls(
                 SeekButton(DriveIcons.Forward10,"Forward 10 seconds",iconSize,canSeek){onInteraction();player.seekTo(videoSeekTarget(player.currentPosition,10_000,player.duration))}
             }
             val speed:@Composable ()->Unit={
-                Box {
-                    TextButton({onInteraction();speedMenu=true},Modifier.heightIn(min=48.dp)){
-                        Text(speedLabel(rate),color=Color.White,style=MaterialTheme.typography.labelMedium)
-                    }
-                    DropdownMenu(speedMenu,{speedMenu=false;onInteraction()},containerColor=Color(0xFF191B1E)){
-                        listOf(.5f,.75f,1f,1.25f,1.5f,2f).forEach{value->
-                            DropdownMenuItem(text={Text(speedLabel(value),color=Color.White)},trailingIcon={if(kotlin.math.abs(value-rate)<.001f)Icon(DriveIcons.Check,null,tint=Color.White)},
-                                onClick={player.setPlaybackSpeed(value);speedMenu=false;onInteraction()})
-                        }
-                    }
+                IconButton({onInteraction();speedMenu=true},modifier=Modifier.semantics{contentDescription="Playback speed, ${speedLabel(rate)}"}){
+                    Icon(DriveIcons.SlowMotionVideo,null,Modifier.size(if(compact)21.dp else 24.dp),tint=Color.White)
                 }
             }
             val fit:@Composable ()->Unit={IconButton({onInteraction();onCycleResizeMode()}){
@@ -123,7 +135,7 @@ fun PlayerControls(
                 SlimSlider(scrub?:displayPosition.coerceIn(0,duration).toFloat(),onValueChange={scrub=it;scrubbing(true);onInteraction()},
                     onValueChangeFinished={scrub?.let{player.seekTo(videoSeekTarget(it.toLong(),0,duration))};scrub=null;scrubbing(false);onInteraction()},
                     valueRange=0f..duration.coerceAtLeast(1).toFloat(),enabled=canSeek,
-                    trackHeight=2.dp,thumbSize=6.dp,
+                    trackHeight=3.dp,thumbSize=8.dp,
                     activeColor=Color.White,inactiveColor=Color.White.copy(alpha=.3f),
                     bufferedFraction=if(duration>0)buffered.toFloat()/duration else 0f,bufferedColor=Color.White.copy(alpha=.4f),
                     modifier=Modifier.fillMaxWidth().semantics{contentDescription="Seek video"})

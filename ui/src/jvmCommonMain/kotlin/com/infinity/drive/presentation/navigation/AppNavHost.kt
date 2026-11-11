@@ -294,7 +294,7 @@ private inline fun <reified T:Any> androidx.navigation.NavGraphBuilder.stableCom
     composable<T>(enterTransition=enterTransition,exitTransition=exitTransition,popEnterTransition=popEnterTransition,popExitTransition=popExitTransition){entry->
         com.infinity.drive.presentation.common.AppBackHandler(controller.previousBackStackEntry!=null){controller.popBackStackOnce()}
         val chrome = T::class !in setOf<kotlin.reflect.KClass<*>>(Route.Onboarding::class, Route.Preview::class, Route.NoteEditor::class, Route.Search::class)
-        val ownsBottomInset = T::class in setOf<kotlin.reflect.KClass<*>>(Route.Home::class, Route.Gallery::class, Route.Audio::class, Route.Settings::class, Route.Files::class)
+        val ownsBottomInset = T::class in setOf<kotlin.reflect.KClass<*>>(Route.Home::class, Route.Gallery::class, Route.Audio::class, Route.Settings::class, Route.SettingsSection::class, Route.Proxy::class, Route.Exclusions::class, Route.Channels::class, Route.Files::class)
         Box(Modifier.fillMaxSize().padding(start = if(chrome) LocalNavigationRailWidth.current else 0.dp,
             bottom = if(chrome && !ownsBottomInset) LocalBottomBarHeight.current else 0.dp)) {
             content(entry)

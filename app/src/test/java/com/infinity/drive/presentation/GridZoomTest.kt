@@ -70,9 +70,9 @@ class GridZoomTest {
         gesture.add(Float.NaN);gesture.add(0f)
         assertEquals(0,gesture.steps)
         gesture.add(2f)
-        assertEquals(2,gesture.steps)
+        assertEquals(1,gesture.steps)
         gesture.add(.25f)
-        assertEquals(-2,gesture.steps)
+        assertEquals(-1,gesture.steps)
     }
 
 }

@@ -146,11 +146,13 @@ private fun AlbumGrid(
         )
         return
     }
+    var pinching by remember{mutableStateOf(false)}
     LazyVerticalGrid(
+        elasticEnabled=!pinching,
         columns = GridCells.Fixed(columns),
         modifier = Modifier
             .fillMaxSize().resultReveal(albums.map{it.folderId})
-            .pinchZoom(onZoomIn = onZoomIn, onZoomOut = onZoomOut),
+            .pinchZoom(onZoomIn=onZoomIn,onZoomOut=onZoomOut,onGestureStarted={pinching=true},onGestureFinished={pinching=false},densityKey=columns),
         contentPadding = PaddingValues(
             start = 12.dp,
             end = 12.dp,
@@ -235,8 +237,10 @@ fun GalleryScreen(
     val mediaGridState = rememberSaveable(state.tab,contextRevision,appliedQuery,state.sortField,state.sortDirection, saver = LazyGridState.Saver) {
         LazyGridState()
     }
+    var pinching by remember{mutableStateOf(false)}
     var pinchAnchor by remember{mutableStateOf<Pair<String,Int>?>(null)}
     val capturePinchAnchor:(androidx.compose.ui.geometry.Offset)->Unit={point->
+        pinching=true;viewModel.endRangeSelection()
         val indexAndOffset=if(state.viewMode==ViewMode.LIST){
             mediaListState.layoutInfo.visibleItemsInfo.filter{it.index in 0 until media.itemCount&&media.peek(it.index) is GalleryListItem.Media}
                 .minByOrNull{kotlin.math.abs(it.offset+it.size/2f-point.y)}?.let{it.index to it.offset}
@@ -283,7 +287,7 @@ fun GalleryScreen(
         }
     }
     val lifted by rememberToolbarLift(scrolled)
-    val scopeKey=listOf(query,state.tab.name,state.sortField.name,state.sortDirection.name).joinToString("\u0000")
+    val scopeKey=listOf(appliedQuery,state.tab.name,state.sortField.name,state.sortDirection.name).joinToString("\u0000")
     var lastScope by rememberSaveable{mutableStateOf(scopeKey)}
     LaunchedEffect(scopeKey){if(lastScope!=scopeKey){mediaListState.scrollToItem(0);mediaGridState.scrollToItem(0);lastScope=scopeKey}}
 
@@ -483,13 +487,15 @@ fun GalleryScreen(
 
                     state.viewMode == ViewMode.LIST -> LazyColumn(
                         state = mediaListState,
+                        elasticEnabled=!pinching,
                         modifier = Modifier
                             .fillMaxSize()
                             .pinchZoom(
                                 onZoomIn = viewModel::zoomIn,
                                 onZoomOut = viewModel::zoomOut,
                                 onGestureStarted=capturePinchAnchor,
-                                onGestureFinished={committed->if(!committed||!viewModel.flushZoom())pinchAnchor=null}
+                                onGestureFinished={committed->pinching=false;if(!committed||!viewModel.flushZoom())pinchAnchor=null},
+                                densityKey=state.viewMode to state.gridSize
                             )
                             .then(listDragSelect).resultReveal(media.itemSnapshotList.items.take(8).map{it.key}),
                         contentPadding = PaddingValues(
@@ -535,6 +541,7 @@ fun GalleryScreen(
 
                     else -> LazyVerticalGrid(
                         state = mediaGridState,
+                        elasticEnabled=!pinching,
                         columns = GridCells.Fixed(state.gridSize),
                         modifier = Modifier
                             .fillMaxSize()
@@ -542,7 +549,8 @@ fun GalleryScreen(
                                 onZoomIn = viewModel::zoomIn,
                                 onZoomOut = viewModel::zoomOut,
                                 onGestureStarted=capturePinchAnchor,
-                                onGestureFinished={committed->if(!committed||!viewModel.flushZoom())pinchAnchor=null}
+                                onGestureFinished={committed->pinching=false;if(!committed||!viewModel.flushZoom())pinchAnchor=null},
+                                densityKey=state.viewMode to state.gridSize
                             )
                             .then(gridDragSelect).resultReveal(media.itemSnapshotList.items.take(8).map{it.key}),
                         contentPadding = PaddingValues(

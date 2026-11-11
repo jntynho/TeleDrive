@@ -28,7 +28,7 @@ class RebuiltNavigationTest {
         settings.update { UserPreferences(onboardingComplete=true,updateCheckEnabled=false) }
     }
     @After fun restore()=runBlocking { settings.update { previous };Unit }
-    @Test fun fourTabsSearchSortingAndPreviousLibraryAreReachable() {
+    @Test fun fourTabsSearchSortingAndAccountAreReachable() {
         val pending=GlobalContext.get().get<PendingShare>()
         compose.setContent { ProvidePlatformActions { DriveInfinityApp(pending) } }
         compose.waitUntil(15_000) { compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty() }
@@ -48,7 +48,7 @@ class RebuiltNavigationTest {
         compose.onNodeWithText("Search settings").assertIsDisplayed()
         compose.onNodeWithContentDescription("Close search").performClick()
         compose.onNodeWithText("Telegram account",substring=false).performClick()
-        compose.onNodeWithText("Previous library").performClick()
-        compose.onNodeWithText("Previous library").assertIsDisplayed()
+        compose.onNodeWithText("Previous library").assertDoesNotExist()
+        compose.onNodeWithText("Storage channels").performScrollTo().assertIsDisplayed()
     }
 }

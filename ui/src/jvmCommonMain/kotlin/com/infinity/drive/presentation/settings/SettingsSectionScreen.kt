@@ -249,7 +249,6 @@ fun SettingsSectionScreen(
             when (section) {
                 SettingsSectionType.ACCOUNT -> AccountSection(
                     onPickChannel = onOpenChannels,
-                    onPreviousLibrary = onOpenPreviousLibrary,
                     state = state,
                     viewModel = viewModel,
                     onLogout = { confirmLogout = true }
@@ -283,7 +282,7 @@ fun SettingsSectionScreen(
                 )
                 SettingsSectionType.ABOUT -> AboutSection(state, viewModel)
             }
-            Spacer(Modifier.height(24.dp + padding.calculateBottomPadding()))
+            Spacer(Modifier.height(24.dp + padding.calculateBottomPadding()+com.infinity.drive.presentation.navigation.LocalBottomBarHeight.current))
         }
     }
 
@@ -320,7 +319,6 @@ private fun AccountSection(
     state: SettingsUiState,
     viewModel: SettingsViewModel,
     onPickChannel: () -> Unit,
-    onPreviousLibrary: () -> Unit,
     onLogout: () -> Unit
 ) {
     val indexedSoFar by viewModel.indexedSoFar.collectAsStateWithLifecycle()
@@ -337,7 +335,6 @@ private fun AccountSection(
             }
         }
         add { Text(buildString {
-                    state.user?.phoneNumber?.let { append("+${it.trimStart('+')} · ") }
                     append(
                         accountConnectionLabel(authorization,state.connection)
                     )
@@ -367,13 +364,6 @@ private fun AccountSection(
                 title = stringResource(Res.string.common_storage_channels),
                 subtitle = stringResource(Res.string.settings_switch_drives_create_another),
                 onClick = onPickChannel
-            )
-        }
-        add {
-            SettingsClickRow(
-                title = "Previous library",
-                subtitle = "Save verified copies of files from your previous Saved Messages library.",
-                onClick = onPreviousLibrary
             )
         }
         add {

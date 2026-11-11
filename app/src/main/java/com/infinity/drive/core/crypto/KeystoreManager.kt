@@ -31,6 +31,8 @@ class KeystoreManager : CredentialCipher {
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(256)
+                // Local encrypted records (including Hidden PIN verifiers) never require a phone prompt.
+                .setUserAuthenticationRequired(false)
                 .build()
         )
         return generator.generateKey()

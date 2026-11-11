@@ -97,6 +97,16 @@ class VideoPlayerRegressionTest {
         compose.waitForIdle()
     }
 
+    @Test fun playbackSpeedOpensASheetAndAppliesOneSelectedRate(){
+        val video=FakeVideo();install(video)
+        compose.onNodeWithContentDescription("Playback speed, 1×").performClick()
+        compose.onNodeWithText("Playback speed",substring=false).assertIsDisplayed()
+        compose.onNodeWithText("1.5×",substring=false).performScrollTo().performClick()
+        compose.waitUntil(5000){video.speed==1.5f}
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("Playback speed, 1.5×").assertIsDisplayed()
+        compose.onNodeWithText("Playback speed",substring=false).assertDoesNotExist()
+    }
     @Test fun bufferingCanBePausedAndStartedAgain() {
         val video=FakeVideo();install(video)
         compose.onNodeWithContentDescription("Pause").assertIsDisplayed().performClick()

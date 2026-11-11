@@ -34,6 +34,54 @@ class ElasticUiTest {
     @Before fun start(){activity=Robolectric.buildActivity(ComponentActivity::class.java).setup().visible()}
     @After fun stop(){activity.pause().stop().destroy()}
 
+    @Test fun aHeldBoundaryPullRemainsSteadyUntilTheFingerIsReleased(){
+        lateinit var state:ScrollState
+        activity.get().setContent{DriveTheme{
+            state=rememberScrollState()
+            Column(Modifier.size(300.dp,300.dp).testTag("held-scroll").elasticVerticalScroll(state)){
+                repeat(15){Text("Held row $it",Modifier.fillMaxWidth().height(60.dp).testTag("held-$it"))}
+            }
+        }}
+        compose.waitForIdle()
+        compose.runOnUiThread{runBlocking{state.scrollTo(state.maxValue)}}
+        compose.onNodeWithTag("held-scroll").performTouchInput{down(center);moveBy(Offset(0f,-90f),200)}
+        compose.waitForIdle()
+        val before=compose.onNodeWithTag("held-14").getUnclippedBoundsInRoot()
+        compose.mainClock.advanceTimeBy(1200)
+        val held=compose.onNodeWithTag("held-14").getUnclippedBoundsInRoot()
+        assertEquals(before.top.value,held.top.value,.5f)
+        assertEquals(before.bottom.value,held.bottom.value,.5f)
+        compose.onNodeWithTag("held-scroll").performTouchInput{up()}
+        compose.mainClock.advanceTimeBy(1200)
+        compose.waitForIdle()
+        assertEquals(state.maxValue,state.value)
+    }
+
+    @Test fun tappingDuringReturnResumesSettlingWhenTheFingerLifts(){
+        lateinit var state:ScrollState
+        activity.get().setContent{DriveTheme{
+            state=rememberScrollState()
+            Column(Modifier.size(300.dp,300.dp).testTag("tap-scroll").elasticVerticalScroll(state)){
+                repeat(15){Text("Tap row $it",Modifier.fillMaxWidth().height(60.dp).testTag("tap-$it"))}
+            }
+        }}
+        compose.waitForIdle()
+        compose.runOnUiThread{runBlocking{state.scrollTo(state.maxValue)}}
+        val baseline=compose.onNodeWithTag("tap-14").getUnclippedBoundsInRoot()
+        compose.mainClock.autoAdvance=false
+        compose.onNodeWithTag("tap-scroll").performTouchInput{down(center);moveBy(Offset(0f,-100f),200);up()}
+        compose.mainClock.advanceTimeBy(64)
+        compose.onNodeWithTag("tap-scroll").performTouchInput{down(center)}
+        val held=compose.onNodeWithTag("tap-14").getUnclippedBoundsInRoot()
+        compose.mainClock.advanceTimeBy(600)
+        assertEquals(held.top.value,compose.onNodeWithTag("tap-14").getUnclippedBoundsInRoot().top.value,.5f)
+        compose.onNodeWithTag("tap-scroll").performTouchInput{up()}
+        compose.mainClock.advanceTimeBy(1600)
+        val settled=compose.onNodeWithTag("tap-14").getUnclippedBoundsInRoot()
+        assertEquals(baseline.top.value,settled.top.value,.5f)
+        assertEquals(state.maxValue,state.value)
+    }
+
     @Test fun nearEdgeStretchSettlesWithoutMovingTheLogicalScrollPosition(){
         lateinit var state:ScrollState
         activity.get().setContent{DriveTheme{

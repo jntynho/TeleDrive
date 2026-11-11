@@ -128,7 +128,7 @@ fun ExclusionsScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
+            FloatingActionButton(onClick = { showAddDialog = true },modifier=Modifier.padding(bottom=com.infinity.drive.presentation.navigation.LocalBottomBarHeight.current)) {
                 Icon(
                     DriveIcons.Add,
                     contentDescription = stringResource(Res.string.settings_add_exclusion)
@@ -148,7 +148,7 @@ fun ExclusionsScreen(
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = padding.add(top = 8.dp, bottom = 96.dp)
+            contentPadding = padding.add(top = 8.dp, bottom = 96.dp + com.infinity.drive.presentation.navigation.LocalBottomBarHeight.current)
         ) {
             items(exclusions, key = { it.id }) { exclusion ->
                 Row(

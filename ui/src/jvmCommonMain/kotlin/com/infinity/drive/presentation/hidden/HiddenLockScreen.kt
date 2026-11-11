@@ -29,7 +29,6 @@ import app.tgdrive.ui.DriveIcons
 import com.infinity.drive.presentation.components.LoadingState
 import com.infinity.drive.presentation.components.PageHeader
 import com.infinity.drive.presentation.input.*
-import com.infinity.drive.presentation.platform.LocalHiddenBiometrics
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -49,7 +48,6 @@ fun HiddenLockScreen(onBack:()->Unit,viewModel:HiddenLockViewModel=koinViewModel
     }
     val lock by viewModel.manager.state.collectAsStateWithLifecycle()
     val state by viewModel.ui.collectAsStateWithLifecycle()
-    val biometrics=LocalHiddenBiometrics.current
     val clipboard=LocalClipboardManager.current
     val secureClipboard=com.infinity.drive.presentation.platform.LocalSensitiveClipboard.current
     val pinStage=state.stage in setOf(HiddenStage.UNLOCK,HiddenStage.CHOOSE,HiddenStage.CONFIRM)
@@ -69,20 +67,40 @@ fun HiddenLockScreen(onBack:()->Unit,viewModel:HiddenLockViewModel=koinViewModel
             Text("The lock data couldn't be read on this device. It has not been reset or bypassed.")
         };return@Scaffold}
         BoxWithConstraints(Modifier.fillMaxSize().padding(padding)){
-            val compact=maxHeight<620.dp
+            val compact=maxHeight<720.dp
+            val informationWidth=if(maxWidth>600.dp&&maxWidth>maxHeight)maxWidth/2 else maxWidth
+            val pinCellWidth=minOf(32.dp,((informationWidth-98.dp)/6).coerceAtLeast(14.dp))
             val information:@Composable (Modifier)->Unit={modifier->
-                Column(modifier.verticalScroll(rememberScrollState()).padding(horizontal=24.dp,vertical=20.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(16.dp)){
-                    Surface(shape=RoundedCornerShape(24.dp),color=MaterialTheme.colorScheme.surfaceContainerHigh){Icon(
+                Column(modifier.padding(horizontal=24.dp,vertical=if(compact)8.dp else 16.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(if(compact)10.dp else 12.dp)){
+                    Surface(shape=CircleShape,color=MaterialTheme.colorScheme.surfaceContainerHigh){Icon(
                         if(state.stage==HiddenStage.RECOVER||state.stage==HiddenStage.RECOVERY_OPTIONS)DriveIcons.Key else DriveIcons.Lock,
-                        null,Modifier.padding(18.dp).size(36.dp))}
+                        null,Modifier.padding(if(compact)12.dp else 16.dp).size(if(compact)24.dp else 28.dp))}
                     val heading=when(state.stage){HiddenStage.UNLOCK->"Your private space";HiddenStage.CHOOSE->if(lock.configured)"Create a new PIN"else"Protect Hidden";HiddenStage.CONFIRM->"Confirm your PIN";HiddenStage.SAVE_KEY->"Save your recovery key";HiddenStage.RECOVER,HiddenStage.RECOVERY_OPTIONS->"Forgot your PIN?";HiddenStage.MANAGE->"Your Hidden lock"}
                     AnimatedContent(heading,transitionSpec={fadeIn(tween(180)) togetherWith fadeOut(tween(140))},label="hidden-heading"){Text(it,style=MaterialTheme.typography.headlineSmall)}
-                    Text(when(state.stage){HiddenStage.UNLOCK->"Enter your 6-digit PIN";HiddenStage.CHOOSE->"Choose 6 digits to protect Hidden";HiddenStage.CONFIRM->"Enter the same PIN again";HiddenStage.SAVE_KEY->"Keep this key somewhere safe, outside TeleDrive. You can use it to create a new PIN.";HiddenStage.RECOVER->"Enter the recovery key you saved during setup.";HiddenStage.RECOVERY_OPTIONS->"Verify your identity to create a new PIN.";HiddenStage.MANAGE->"This lock protects Hidden inside TeleDrive on this device."},style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    if(pinStage){Row(horizontalArrangement=Arrangement.spacedBy(15.dp),modifier=Modifier.padding(vertical=14.dp).semantics{password();contentDescription="PIN, ${state.entry.length} of 6 digits entered"}){
-                        repeat(6){index->val fill by androidx.compose.animation.animateColorAsState(if(index<state.entry.length)MaterialTheme.colorScheme.onSurface else androidx.compose.ui.graphics.Color.Transparent,animationSpec=tween(130),label="pin-dot")
-                            Box(Modifier.size(12.dp).background(fill,CircleShape)
-                            .border(1.5.dp,MaterialTheme.colorScheme.onSurfaceVariant,CircleShape))}
-                    }}
+                    Text(when(state.stage){HiddenStage.UNLOCK->"Use the 6-digit PIN you created for TeleDrive.";HiddenStage.CHOOSE->"Choose a PIN just for Hidden. It is separate from your phone lock.";HiddenStage.CONFIRM->"Enter the same PIN again";HiddenStage.SAVE_KEY->"Keep this key somewhere safe, outside TeleDrive. You can use it to create a new PIN.";HiddenStage.RECOVER->"Enter the recovery key you saved during setup.";HiddenStage.RECOVERY_OPTIONS->"Use your saved recovery key to create a new Hidden PIN.";HiddenStage.MANAGE->"This lock protects Hidden inside TeleDrive on this device."},style=if(compact)MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    if(pinStage){
+                        Row(horizontalArrangement=Arrangement.spacedBy(10.dp),modifier=Modifier.padding(vertical=if(compact)6.dp else 10.dp).height(48.dp).semantics{
+                            password();contentDescription="PIN, ${state.entry.length} of 6 digits entered"
+                        }){
+                            repeat(6){index->
+                                val entered=index<state.entry.length
+                                val fill by androidx.compose.animation.animateColorAsState(if(entered)MaterialTheme.colorScheme.primary.copy(alpha=.12f)else MaterialTheme.colorScheme.surfaceContainer,animationSpec=tween(160),label="pin-cell")
+                                Box(Modifier.size(pinCellWidth,44.dp).background(fill,RoundedCornerShape(10.dp))
+                                    .border(1.dp,if(entered)MaterialTheme.colorScheme.primary.copy(alpha=.5f)else MaterialTheme.colorScheme.outlineVariant,RoundedCornerShape(10.dp)),contentAlignment=Alignment.Center){
+                                    val opacity by androidx.compose.animation.core.animateFloatAsState(if(entered)1f else 0f,tween(140),label="pin-dot")
+                                    Box(Modifier.size(8.dp).background(MaterialTheme.colorScheme.onSurface.copy(alpha=opacity),CircleShape))
+                                }
+                            }
+                        }
+                        Box(Modifier.fillMaxWidth().height(maxOf(if(compact)40.dp else 54.dp,(32*androidx.compose.ui.platform.LocalDensity.current.fontScale).dp)),contentAlignment=Alignment.Center){
+                            when{
+                                state.working->CircularProgressIndicator(Modifier.size(22.dp),strokeWidth=2.dp)
+                                state.delaySeconds>0->Text("Try again in ${state.delaySeconds}s",color=MaterialTheme.colorScheme.error)
+                                state.message!=null->Text(state.message.orEmpty(),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall,modifier=Modifier.semantics{liveRegion=LiveRegionMode.Polite})
+                                else->Text("App PIN · Stored securely on this device",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
                     if(state.stage==HiddenStage.SAVE_KEY){
                         Surface(shape=RoundedCornerShape(20.dp),color=MaterialTheme.colorScheme.surfaceContainerHigh){
                             Text(state.recovery.chunked(4).chunked(4).joinToString("\n"){it.joinToString(" ")},Modifier.padding(18.dp),style=MaterialTheme.typography.titleMedium,fontFamily=FontFamily.Monospace)
@@ -94,7 +112,6 @@ fun HiddenLockScreen(onBack:()->Unit,viewModel:HiddenLockViewModel=koinViewModel
                     }
                     if(state.stage==HiddenStage.RECOVERY_OPTIONS){
                         RecoveryAction("Use recovery key","The key you saved during setup",DriveIcons.Key,viewModel::enterRecovery)
-                        if(lock.biometrics&&biometrics?.available==true)RecoveryAction("Use fingerprint","If enabled for recovery",DriveIcons.Fingerprint){viewModel.biometric(biometrics,true)}
                         Text("Your files stay locked until verification succeeds.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                         TextButton({viewModel.back()}){Text("Back to unlock")}
                     }
@@ -103,25 +120,32 @@ fun HiddenLockScreen(onBack:()->Unit,viewModel:HiddenLockViewModel=koinViewModel
                     }}
                     if(state.stage==HiddenStage.MANAGE){
                         RecoveryAction("Change PIN","Verify access before changing the lock",DriveIcons.Key,viewModel::changePin)
-                        if(biometrics?.available==true)RecoveryAction(if(lock.biometrics)"Disable fingerprint"else"Enable fingerprint","Optional on this device",DriveIcons.Fingerprint){viewModel.toggleBiometric(biometrics)}
                         RecoveryAction("Lock now","Hide this collection immediately",DriveIcons.Lock){viewModel.manager.lock()}
                     }
-                    state.message?.let{Text(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.semantics{liveRegion=LiveRegionMode.Polite})}
-                    if(state.delaySeconds>0)Text("Try again in ${state.delaySeconds}s",color=MaterialTheme.colorScheme.error)
-                    if(state.working)CircularProgressIndicator(Modifier.size(22.dp),strokeWidth=2.dp)
+                    if(!pinStage)state.message?.let{Text(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.semantics{liveRegion=LiveRegionMode.Polite})}
+                    if(!pinStage&&state.delaySeconds>0)Text("Try again in ${state.delaySeconds}s",color=MaterialTheme.colorScheme.error)
+                    if(!pinStage&&state.working)CircularProgressIndicator(Modifier.size(22.dp),strokeWidth=2.dp)
                 }
             }
             val keyboard:@Composable (Modifier)->Unit={modifier->
                 if(pinStage||state.stage==HiddenStage.RECOVER){Column(modifier.padding(horizontal=24.dp).padding(bottom=16.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)){
                     if(state.stage==HiddenStage.RECOVER)Button(viewModel::verifyRecovery,enabled=state.entry.length==32&&!state.working&&state.delaySeconds==0L,modifier=Modifier.fillMaxWidth()){Text("Verify recovery key")}
-                    InlineKeyboard(input,compact=compact,numericLeading=if(pinStage&&state.stage==HiddenStage.UNLOCK&&lock.biometrics&&biometrics?.available==true)"fingerprint"else null,
-                        onLeadingAction={if(biometrics!=null)viewModel.biometric(biometrics)})
+                    InlineKeyboard(input,compact=compact,numericLeading=null,hapticKeys=pinStage)
                     if(state.stage==HiddenStage.UNLOCK)TextButton(viewModel::recoveryOptions,enabled=!state.working){Text("Forgot PIN?")}
                     Text("Locks when you leave Hidden",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }}
             }
-            if(maxWidth>600.dp&&maxWidth>maxHeight)Row(Modifier.fillMaxSize(),verticalAlignment=Alignment.CenterVertically){information(Modifier.weight(1f).fillMaxHeight());keyboard(Modifier.weight(1f))}
-            else Column(Modifier.fillMaxSize()){information(Modifier.weight(1f).fillMaxWidth());keyboard(Modifier.fillMaxWidth())}
+            if(maxWidth>600.dp&&maxWidth>maxHeight)Row(Modifier.fillMaxSize(),verticalAlignment=Alignment.CenterVertically){
+                information(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()))
+                keyboard(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()))
+            }else if(maxHeight<520.dp||androidx.compose.ui.platform.LocalDensity.current.fontScale>1.5f){
+                // One scroll owner in short/large-text windows; neither the heading nor keypad is clipped.
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())){
+                    information(Modifier.fillMaxWidth());keyboard(Modifier.fillMaxWidth())
+                }
+            }else Column(Modifier.fillMaxSize()){
+                information(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()));keyboard(Modifier.fillMaxWidth())
+            }
         }
     }
 }

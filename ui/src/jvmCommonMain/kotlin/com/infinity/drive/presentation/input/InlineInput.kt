@@ -110,9 +110,10 @@ fun InlineInputField(value:String,onChange:(String)->Unit,label:String,modifier:
 }
 
 @Composable
-fun InlineKeyboard(controller:InlineInputController,modifier:Modifier=Modifier,compact:Boolean=false,numericLeading:String?="paste",onLeadingAction:(()->Unit)?=null) {
+fun InlineKeyboard(controller:InlineInputController,modifier:Modifier=Modifier,compact:Boolean=false,numericLeading:String?="paste",onLeadingAction:(()->Unit)?=null,hapticKeys:Boolean=false) {
     val target=controller.target?:return
     val clipboard=LocalClipboardManager.current
+    val haptics=androidx.compose.ui.platform.LocalHapticFeedback.current
     val numeric=target.mode==InlineInputMode.NUMBER||target.mode==InlineInputMode.PHONE
     var shift by remember{mutableStateOf(false)}
     var symbols by remember{mutableIntStateOf(0)}
@@ -123,6 +124,7 @@ fun InlineKeyboard(controller:InlineInputController,modifier:Modifier=Modifier,c
             listOf(listOf("1","2","3"),listOf("4","5","6"),listOf("7","8","9"),listOf(numericLeading.orEmpty(),"0","delete")).forEach{row->
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
                     row.forEach{key->InputKey(key,enabled,Modifier.weight(1f).height(if(compact)48.dp else 56.dp)){
+                        if(hapticKeys&&(key.singleOrNull()?.isDigit()==true||key=="delete"))haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
                         when(key){"fingerprint"->onLeadingAction?.invoke();"delete"->controller.backspace();"paste"->clipboard.getText()?.text?.let(controller::paste);else->controller.insert(key)}
                     }}
                 }
