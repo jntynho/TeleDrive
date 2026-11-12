@@ -8,33 +8,36 @@
 <p align="center">A native Android home for your files, photos and music — stored in your own private Telegram channels.</p>
 
 <p align="center">
-  <a href="https://github.com/jntynho/TG-Drive/releases/latest"><img src="https://img.shields.io/github/v/release/jntynho/TG-Drive?style=flat&color=1684FA&label=release" alt="Latest release"></a>
-  <a href="https://github.com/jntynho/TG-Drive/actions/workflows/release-no-secrets.yml"><img src="https://github.com/jntynho/TG-Drive/actions/workflows/release-no-secrets.yml/badge.svg?branch=main" alt="Android build and checks"></a>
+  <a href="https://github.com/jntynho/TeleDrive/releases/latest"><img src="https://img.shields.io/github/v/release/jntynho/TeleDrive?style=flat&color=1684FA&label=release" alt="Latest release"></a>
+  <a href="https://github.com/jntynho/TeleDrive/actions/workflows/release-no-secrets.yml"><img src="https://github.com/jntynho/TeleDrive/actions/workflows/release-no-secrets.yml/badge.svg?branch=main" alt="Android build and checks"></a>
   <a href="#download"><img src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=flat&logo=android&logoColor=white" alt="Requires Android 8.0 or later"></a>
-  <a href="https://github.com/jntynho/TG-Drive/releases"><img src="https://img.shields.io/github/downloads/jntynho/TG-Drive/total?style=flat&color=64748B" alt="GitHub release downloads"></a>
+  <a href="https://github.com/jntynho/TeleDrive/releases"><img src="https://img.shields.io/github/downloads/jntynho/TeleDrive/total?style=flat&color=64748B" alt="GitHub release downloads"></a>
 </p>
 
 <p align="center">
+  <a href="https://jntynho.github.io/TeleDrive/">Website</a> ·
   <a href="#download">Download</a> ·
   <a href="#features">Features</a> ·
   <a href="#getting-started">Getting started</a> ·
   <a href="#documentation">Documentation</a> ·
-  <a href="https://github.com/jntynho/TG-Drive/issues">Report an issue</a>
+  <a href="https://github.com/jntynho/TeleDrive/issues">Report an issue</a>
 </p>
 
 ## Download
 
+Visit the [TeleDrive website](https://jntynho.github.io/TeleDrive/) for app previews, installation guidance and both Android downloads. Website development and publishing instructions are in [site/README.md](site/README.md).
+
 <p align="center">
-  <a href="https://github.com/jntynho/TG-Drive/releases/latest/download/tg-drive-arm64-v8a.apk"><img src="https://img.shields.io/badge/Download_APK-ARM64_%C2%B7_Recommended-1684FA?style=for-the-badge&logo=android&logoColor=white" alt="Download latest ARM64 APK — recommended for most phones"></a>
+  <a href="https://github.com/jntynho/TeleDrive/releases/latest/download/tg-drive-arm64-v8a.apk"><img src="https://img.shields.io/badge/Download_APK-ARM64_%C2%B7_Recommended-1684FA?style=for-the-badge&logo=android&logoColor=white" alt="Download latest ARM64 APK — recommended for most phones"></a>
 </p>
 <p align="center">
-  <a href="https://github.com/jntynho/TG-Drive/releases/latest/download/tg-drive-armeabi-v7a.apk"><img src="https://img.shields.io/badge/Older_phones-ARM32-475569?style=for-the-badge&logo=android&logoColor=white" alt="Download latest ARM32 APK for older phones"></a>
+  <a href="https://github.com/jntynho/TeleDrive/releases/latest/download/tg-drive-armeabi-v7a.apk"><img src="https://img.shields.io/badge/Older_phones-ARM32-475569?style=for-the-badge&logo=android&logoColor=white" alt="Download latest ARM32 APK for older phones"></a>
 </p>
 
 | Your device | Choose |
 | --- | --- |
-| Most modern Android phones and tablets | **[ARM64 · arm64-v8a](https://github.com/jntynho/TG-Drive/releases/latest/download/tg-drive-arm64-v8a.apk)** |
-| Older devices running a 32-bit ARM system | [ARM32 · armeabi-v7a](https://github.com/jntynho/TG-Drive/releases/latest/download/tg-drive-armeabi-v7a.apk) |
+| Most modern Android phones and tablets | **[ARM64 · arm64-v8a](https://github.com/jntynho/TeleDrive/releases/latest/download/tg-drive-arm64-v8a.apk)** |
+| Older devices running a 32-bit ARM system | [ARM32 · armeabi-v7a](https://github.com/jntynho/TeleDrive/releases/latest/download/tg-drive-armeabi-v7a.apk) |
 
 All variants require **Android 8.0 or later** and install independently. Download **one `.apk`**; no ZIP extraction or split-APK installer is needed. The buttons always target the latest published release.
 
@@ -115,8 +118,8 @@ Ordinary channels are not end-to-end encrypted. Keep encryption recovery materia
 Use **JDK 21**, Android SDK **37.0**, Build Tools **37.0.0**, and the checked-in Gradle wrapper. Set `ANDROID_HOME`, or add `sdk.dir` to an ignored `local.properties` file.
 
 ```sh
-git clone https://github.com/jntynho/TG-Drive.git
-cd TG-Drive
+git clone https://github.com/jntynho/TeleDrive.git
+cd TeleDrive
 ./gradlew --max-workers=1 assembleDebug
 ```
 
@@ -142,7 +145,7 @@ Local release outputs are unsigned unless the Next signing configuration is supp
 
 ## Contributing
 
-[Report a bug](https://github.com/jntynho/TG-Drive/issues) with your app version, Android version, device architecture and steps to reproduce. Remove phone numbers, login codes, API credentials and private file details from reports and screenshots.
+[Report a bug](https://github.com/jntynho/TeleDrive/issues) with your app version, Android version, device architecture and steps to reproduce. Remove phone numbers, login codes, API credentials and private file details from reports and screenshots.
 
 For code contributions, keep changes focused and run the checks relevant to the change. See [Testing](docs/TESTING.md) for the full validation guide.
 

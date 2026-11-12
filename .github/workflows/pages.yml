@@ -1,0 +1,102 @@
+name: Website · GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "docs/brand/**"
+      - "third_party/solar/**"
+      - "third_party/fonts/**"
+      - ".github/workflows/pages.yml"
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - run: npm ci --prefix site
+      - name: Read the latest published Android release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh api "repos/$GH_REPO/releases/latest" > "$RUNNER_TEMP/teledrive-release.json"
+      - name: Validate and build the static website
+        env:
+          TELEDRIVE_RELEASE_FILE: ${{ runner.temp }}/teledrive-release.json
+        run: |
+          npm test --prefix site
+          npm run build --prefix site
+      - name: Install test browser
+        working-directory: site
+        run: npx playwright install --with-deps chromium
+      - name: Test the phone and desktop website
+        run: npm run test:browser --prefix site
+      - name: Save website previews and browser reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-previews-and-tests
+          path: |
+            site/test-results/
+            site/playwright-report/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # First-time repository activation needs an administrator in Settings > Pages.
+      # GITHUB_TOKEN cannot grant itself the administration permission to enable Pages.
+      - uses: actions/configure-pages@v5
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Verify the public website
+        env:
+          SITE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          python3 - <<'PY'
+          import os, time, urllib.request
+          base = os.environ['SITE_URL'].rstrip('/') + '/'
+          for attempt in range(12):
+              try:
+                  with urllib.request.urlopen(base, timeout=15) as response:
+                      html = response.read().decode()
+                      assert response.status == 200 and 'A home for' in html and 'TeleDrive' in html
+                  with urllib.request.urlopen(base + 'release.json', timeout=15) as response:
+                      import json
+                      metadata = json.load(response)
+                      assert len(metadata['assets']) == 2
+                  print('Verified public page and both APK records:', base)
+                  break
+              except Exception:
+                  if attempt == 11:
+                      raise
+                  time.sleep(5)
+          PY

@@ -1,0 +1,779 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data:; font-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f6f5f1" />
+    <title>TeleDrive — A home for everything you keep.</title>
+    <meta
+      name="description"
+      content="Your files, photos and music, organized in your own private Telegram channels. Download TeleDrive for Android directly from GitHub."
+    />
+    <link rel="canonical" href="https://jntynho.github.io/TeleDrive/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="TeleDrive — Your files. Your space." />
+    <meta
+      property="og:description"
+      content="A native Android home for your files, photos and music. Stored in your own private Telegram channels."
+    />
+    <meta property="og:url" content="https://jntynho.github.io/TeleDrive/" />
+    <meta
+      property="og:image"
+      content="https://jntynho.github.io/TeleDrive/assets/share.png"
+    />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="TeleDrive for Android: a home for your photos, files and music."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/svg+xml" href="./assets/icon.svg" />
+    <link rel="apple-touch-icon" href="./assets/icon-180.png" />
+    <link
+      rel="preload"
+      href="./assets/fonts/roboto-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./theme.js"></script>
+    <script src="./site.js" defer></script>
+  </head>
+  <body>
+    <!-- ICONS -->
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="TeleDrive home"
+        ><img src="./assets/icon.svg" width="36" height="36" alt="" /><span
+          >TeleDrive<span class="brand-dot">.</span></span
+        ></a
+      >
+      <button
+        class="menu-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="site-nav"
+      >
+        Menu
+      </button>
+      <nav id="site-nav" aria-label="Main navigation">
+        <a href="#features">Features</a><a href="#preview">A look inside</a
+        ><a href="#questions">FAQ</a
+        ><a class="source-link" href="https://github.com/jntynho/TeleDrive"
+          >GitHub <span aria-hidden="true">↗</span></a
+        >
+      </nav>
+      <div class="header-actions">
+        <button
+          class="theme-toggle icon-button"
+          type="button"
+          aria-label="Switch to dark theme"
+          title="Switch theme"
+          hidden
+        >
+          <svg class="icon" aria-hidden="true">
+            <use href="#i-theme"></use>
+          </svg></button
+        ><a class="button button-small button-dark" href="#download"
+          >Get TeleDrive
+          <svg class="icon" aria-hidden="true"><use href="#i-arrow"></use></svg
+        ></a>
+      </div>
+    </header>
+    <main id="main">
+      <section class="hero section-shell" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">
+            <span class="status-dot" aria-hidden="true"></span> YOUR TELEGRAM. A
+            LITTLE MORE ORGANIZED.
+          </p>
+          <h1 id="hero-title">
+            A home for<br />everything<br />you
+            <span class="word-keep"
+              >keep<svg viewBox="0 0 230 15" aria-hidden="true">
+                <path d="M3 11C68 2 160 2 226 7" /></svg></span
+            >.
+          </h1>
+          <p class="hero-description">
+            All the photos, files and songs that matter.<br
+              class="desktop-break"
+            />
+            One calm place to keep them — in your own<br
+              class="desktop-break"
+            />
+            private Telegram channels.
+          </p>
+          <div class="hero-cta">
+            <a
+              class="button button-primary"
+              data-download="arm64-v8a"
+              href="https://github.com/jntynho/TeleDrive/releases/latest/download/tg-drive-arm64-v8a.apk"
+              ><svg class="icon" aria-hidden="true">
+                <use href="#i-download"></use></svg
+              >Download for Android</a
+            ><a class="text-link" href="#preview"
+              >Take a look <span aria-hidden="true">↗</span></a
+            >
+          </div>
+          <p class="hero-note">
+            Free to use <span aria-hidden="true">·</span> Android 8.0+
+            <span aria-hidden="true">·</span> Source on GitHub
+          </p>
+          <a
+            class="release-pill"
+            data-release-link
+            href="https://github.com/jntynho/TeleDrive/releases/latest"
+            ><span class="release-dot" aria-hidden="true"></span
+            ><span data-release-name>Latest release on GitHub</span
+            ><svg class="icon" aria-hidden="true">
+              <use href="#i-arrow"></use></svg
+          ></a>
+        </div>
+        <div class="hero-visual">
+          <div class="hero-orbit orbit-one" aria-hidden="true"></div>
+          <div class="hero-orbit orbit-two" aria-hidden="true"></div>
+          <div class="hero-label label-original">
+            <span class="label-icon"
+              ><svg class="icon" aria-hidden="true">
+                <use href="#i-gallery"></use></svg></span
+            ><span
+              ><strong>Keep the original.</strong
+              ><small>Full-quality photos & videos</small></span
+            >
+          </div>
+          <div class="phone hero-phone">
+            <div class="phone-screen">
+              <div class="phone-status" aria-hidden="true">
+                <span>9:41</span><span class="status-camera"></span
+                ><span class="status-signals"
+                  >▴▴▴ <span class="battery"></span
+                ></span>
+              </div>
+              <img
+                src="./assets/screens/home.webp"
+                width="786"
+                height="1704"
+                alt="TeleDrive Home in dark mode, with the Your library card, collection shortcuts and recent files. Sample library."
+                fetchpriority="high"
+              />
+              <div class="phone-gesture" aria-hidden="true"></div>
+            </div>
+          </div>
+          <div class="hero-label label-private">
+            <span class="label-icon"
+              ><svg class="icon" aria-hidden="true">
+                <use href="#i-lock"></use></svg></span
+            ><span
+              ><strong>Your own private channels.</strong
+              ><small>Your library, on your Telegram.</small></span
+            ><span class="tiny-check" aria-hidden="true">✓</span>
+          </div>
+          <p class="preview-caption hero-caption">
+            A real app preview. Sample files.
+          </p>
+        </div>
+      </section>
+      <div class="trust-strip section-shell" aria-label="At a glance">
+        <span
+          ><svg class="icon" aria-hidden="true">
+            <use href="#i-folder"></use></svg
+          >Your own storage channels</span
+        ><span
+          ><svg class="icon" aria-hidden="true">
+            <use href="#i-gallery"></use></svg
+          >Original-quality uploads</span
+        ><span
+          ><svg class="icon" aria-hidden="true"><use href="#i-code"></use></svg
+          >Built in the open</span
+        ><span
+          ><svg class="icon" aria-hidden="true"><use href="#i-phone"></use></svg
+          >Made for Android</span
+        >
+      </div>
+
+      <section
+        id="features"
+        class="features section-shell section-space"
+        aria-labelledby="features-title"
+      >
+        <div class="section-heading reveal">
+          <div>
+            <p class="eyebrow">LESS LOOKING. MORE FINDING.</p>
+            <h2 id="features-title">
+              More than a place<br />to put your files.
+            </h2>
+          </div>
+          <p>
+            Give everything its own place.<br />Then get back to enjoying it.
+          </p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card feature-files reveal">
+            <div class="card-heading">
+              <span class="feature-icon"
+                ><svg class="icon" aria-hidden="true">
+                  <use href="#i-folder"></use></svg></span
+              ><span class="mini-label">A LITTLE ORDER</span>
+            </div>
+            <h3>Files, minus the digging.</h3>
+            <p>
+              Folders, search, favorites, Archive and Trash.<br />Familiar tools
+              for a library that feels like yours.
+            </p>
+            <div class="file-illustration" aria-hidden="true">
+              <div>
+                <span class="file-square peach"
+                  ><svg class="icon"><use href="#i-folder"></use></svg></span
+                ><span
+                  ><strong>Weekend plans</strong
+                  ><small>Everything for a little escape</small></span
+                ><span>↗</span>
+              </div>
+              <div>
+                <span class="file-square blue"
+                  ><svg class="icon"><use href="#i-document"></use></svg></span
+                ><span
+                  ><strong>The good ideas.pdf</strong
+                  ><small>Kept right where you left it</small></span
+                ><span>↗</span>
+              </div>
+              <div>
+                <span class="file-square mint"
+                  ><svg class="icon"><use href="#i-audio"></use></svg></span
+                ><span
+                  ><strong>A soundtrack for the day</strong
+                  ><small>Your music, a tap away</small></span
+                ><span>↗</span>
+              </div>
+            </div>
+          </article>
+          <article class="feature-card feature-photos reveal">
+            <div class="card-heading">
+              <span class="feature-icon"
+                ><svg class="icon" aria-hidden="true">
+                  <use href="#i-gallery"></use></svg></span
+              ><span class="mini-label">EVERY LITTLE MOMENT</span>
+            </div>
+            <h3>Memories, in full quality.</h3>
+            <p>
+              A gallery for photos and videos. Upload originals, browse albums,
+              and back up selected folders.
+            </p>
+            <div class="memory-grid" aria-hidden="true">
+              <div class="memory memory-sky"><span></span></div>
+              <div class="memory memory-sand"><span></span></div>
+              <div class="memory memory-water"><span></span></div>
+            </div>
+            <span class="illustration-label">Made for your originals</span>
+          </article>
+          <article class="feature-card feature-music reveal">
+            <div class="card-heading">
+              <span class="feature-icon"
+                ><svg class="icon" aria-hidden="true">
+                  <use href="#i-audio"></use></svg></span
+              ><span class="mini-label">PRESS PLAY</span>
+            </div>
+            <h3>Your library has a soundtrack.</h3>
+            <p>
+              Stream music and video, enjoy available artwork, and follow
+              embedded lyrics when a track includes them.
+            </p>
+            <div class="music-illustration" aria-hidden="true">
+              <div class="album-art">
+                <svg class="icon"><use href="#i-audio"></use></svg>
+              </div>
+              <div class="music-lines">
+                <strong>A little background music</strong
+                ><span>Your favorite corner of the day</span>
+                <div class="decorative-progress"><i></i></div>
+              </div>
+              <span class="music-bars"><i></i><i></i><i></i><i></i></span>
+            </div>
+          </article>
+          <article class="feature-card feature-private reveal">
+            <div class="card-heading">
+              <span class="feature-icon"
+                ><svg class="icon" aria-hidden="true">
+                  <use href="#i-shield"></use></svg></span
+              ><span class="mini-label">A LITTLE PEACE OF MIND</span>
+            </div>
+            <h3>Privacy, with your choices.</h3>
+            <p>
+              Device authentication for Hidden. Optional file encryption. Your
+              private channels, with controls you can understand.
+            </p>
+            <a class="text-link" href="./privacy.html"
+              >How your data is handled <span aria-hidden="true">↗</span></a
+            >
+          </article>
+        </div>
+      </section>
+
+      <section
+        id="preview"
+        class="preview-section section-space"
+        aria-labelledby="preview-title"
+      >
+        <div class="section-shell preview-layout">
+          <div class="preview-intro reveal">
+            <p class="eyebrow">FEELS FAMILIAR. FITS EVERYTHING.</p>
+            <h2 id="preview-title">Four tabs.<br />One happy home.</h2>
+            <p>
+              Browse a real preview of TeleDrive.<br />No account needed to take
+              a look.
+            </p>
+            <div class="preview-tabs" role="tablist" aria-label="App screens">
+              <button
+                id="tab-home"
+                type="button"
+                role="tab"
+                aria-selected="true"
+                aria-controls="app-preview"
+                data-screen="home"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-home"></use></svg
+                >Home</button
+              ><button
+                id="tab-gallery"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="app-preview"
+                tabindex="-1"
+                data-screen="gallery"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-gallery"></use></svg
+                >Gallery</button
+              ><button
+                id="tab-audio"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="app-preview"
+                tabindex="-1"
+                data-screen="audio"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-audio"></use></svg
+                >Audio</button
+              ><button
+                id="tab-settings"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="app-preview"
+                tabindex="-1"
+                data-screen="settings"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-settings"></use></svg
+                >Settings
+              </button>
+            </div>
+            <div id="preview-copy" class="preview-copy">
+              <h3 id="preview-heading">The big picture, at a glance.</h3>
+              <p id="preview-description">
+                Your library overview, recent files and the collections you
+                reach for most. Everything starts here.
+              </p>
+            </div>
+            <p class="preview-caption">
+              Screens captured from the Android app with sample data.<br />Gallery
+              and music artwork depend on the files in your library.
+            </p>
+            <noscript
+              ><p>
+                The preview shows Home. Download the app to explore all four
+                tabs.
+              </p></noscript
+            >
+          </div>
+          <div
+            id="app-preview"
+            class="preview-device"
+            role="tabpanel"
+            aria-labelledby="tab-home"
+            tabindex="0"
+          >
+            <div class="phone">
+              <div class="phone-screen">
+                <div class="phone-status" aria-hidden="true">
+                  <span>9:41</span><span class="status-camera"></span
+                  ><span class="status-signals"
+                    >▴▴▴ <span class="battery"></span
+                  ></span>
+                </div>
+                <img
+                  id="preview-image"
+                  src="./assets/screens/home.webp"
+                  width="786"
+                  height="1704"
+                  alt="TeleDrive Home: library overview, shortcuts and recent files, using sample data."
+                  loading="lazy"
+                />
+                <div class="phone-gesture" aria-hidden="true"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="how-section section-shell section-space"
+        aria-labelledby="how-title"
+      >
+        <div class="section-heading reveal">
+          <div>
+            <p class="eyebrow">YOUR TELEGRAM, UNDERNEATH IT ALL.</p>
+            <h2 id="how-title">A simple idea.<br />A space of your own.</h2>
+          </div>
+          <p>
+            Normal uploads go straight from your phone<br />to the private
+            Telegram channel you choose.
+          </p>
+        </div>
+        <div class="storage-path reveal">
+          <div>
+            <span class="path-icon"
+              ><svg class="icon" aria-hidden="true">
+                <use href="#i-phone"></use></svg></span
+            ><strong>Your Android phone</strong
+            ><small>TeleDrive organizes your library</small>
+          </div>
+          <span class="path-connector" aria-hidden="true"
+            ><i></i><svg class="icon"><use href="#i-arrow"></use></svg><i></i
+          ></span>
+          <div>
+            <span class="path-icon path-cloud"
+              ><svg class="icon" aria-hidden="true">
+                <use href="#i-cloud"></use></svg></span
+            ><strong>Your private Telegram channel</strong
+            ><small>The files stay on your account</small>
+          </div>
+        </div>
+        <div class="privacy-note">
+          <svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
+          <p>
+            Telegram cloud chats are not end-to-end encrypted by default.
+            TeleDrive offers optional file encryption; keep your recovery
+            material safe. Telegram limits and server-requested waits still
+            apply.
+            <a href="./privacy.html"
+              >Read how it works <span aria-hidden="true">↗</span></a
+            >
+          </p>
+        </div>
+      </section>
+
+      <section
+        id="download"
+        class="download-section section-space"
+        aria-labelledby="download-title"
+      >
+        <div class="section-shell">
+          <div class="download-heading reveal">
+            <img src="./assets/icon.svg" width="76" height="76" alt="" />
+            <p class="eyebrow">MAKE A LITTLE ROOM.</p>
+            <h2 id="download-title">
+              Your next favorite<br />place for everything.
+            </h2>
+            <p>
+              Download one APK. Sign in with Telegram.<br />Make yourself at
+              home.
+            </p>
+            <p class="download-version">
+              <a
+                data-release-link
+                data-release-name
+                href="https://github.com/jntynho/TeleDrive/releases/latest"
+                >Latest release on GitHub</a
+              ><span aria-hidden="true"> · </span>Android 8.0 or newer
+            </p>
+          </div>
+          <div class="download-grid">
+            <article class="download-card recommended reveal">
+              <span class="recommendation">FOR MOST ANDROID PHONES</span>
+              <div class="download-card-title">
+                <h3>ARM64</h3>
+                <span data-size="arm64-v8a">Standalone APK</span>
+              </div>
+              <p>
+                The recommended download for most modern Android phones and
+                tablets.
+              </p>
+              <code>tg-drive-arm64-v8a.apk</code
+              ><a
+                class="button button-primary"
+                data-download="arm64-v8a"
+                href="https://github.com/jntynho/TeleDrive/releases/latest/download/tg-drive-arm64-v8a.apk"
+                ><svg class="icon" aria-hidden="true">
+                  <use href="#i-download"></use></svg
+                >Download ARM64</a
+              >
+            </article>
+            <article class="download-card reveal">
+              <span class="recommendation recommendation-muted"
+                >FOR OLDER 32-BIT DEVICES</span
+              >
+              <div class="download-card-title">
+                <h3>ARM32</h3>
+                <span data-size="armeabi-v7a">Standalone APK</span>
+              </div>
+              <p>
+                Choose this if your phone runs a 32-bit ARM system. Android 8.0+
+                is still required.
+              </p>
+              <code>tg-drive-armeabi-v7a.apk</code
+              ><a
+                class="button button-outline"
+                data-download="armeabi-v7a"
+                href="https://github.com/jntynho/TeleDrive/releases/latest/download/tg-drive-armeabi-v7a.apk"
+                ><svg class="icon" aria-hidden="true">
+                  <use href="#i-download"></use></svg
+                >Download ARM32</a
+              >
+            </article>
+          </div>
+          <div class="download-extras">
+            <p>Just an APK. No ZIP extraction or split installer.</p>
+            <button class="text-link" id="phone-button" type="button" hidden>
+              <svg class="icon" aria-hidden="true"><use href="#i-qr"></use></svg
+              >Open on your phone</button
+            ><a
+              class="text-link"
+              href="https://github.com/jntynho/TeleDrive/releases"
+              >Release notes <span aria-hidden="true">↗</span></a
+            >
+          </div>
+          <details class="checksums" id="checksums" hidden>
+            <summary>Verify your download (SHA-256)</summary>
+            <p>
+              Compare the SHA-256 of your APK with its published release digest.
+            </p>
+            <div id="checksum-list"></div>
+          </details>
+          <div class="install-steps">
+            <article>
+              <span class="step-number">01</span>
+              <h3>Download & install.</h3>
+              <p>
+                Open your APK from Downloads. If Android asks, allow your
+                browser or file manager to install it, then tap Install.
+              </p>
+            </article>
+            <article>
+              <span class="step-number">02</span>
+              <h3>Sign in with Telegram.</h3>
+              <p>
+                Use your Telegram phone number and follow its verification
+                steps. Official releases include the app’s API identity.
+              </p>
+            </article>
+            <article>
+              <span class="step-number">03</span>
+              <h3>Pick your own channel.</h3>
+              <p>
+                Choose or create a private storage channel, then upload files or
+                set up the backup folders you want.
+              </p>
+            </article>
+          </div>
+          <p class="update-note">
+            <svg class="icon" aria-hidden="true">
+              <use href="#i-history"></use></svg
+            >Already using TeleDrive? Install the newer release over your
+            current version. Keep the same app data and signing identity.
+          </p>
+        </div>
+      </section>
+
+      <section
+        id="questions"
+        class="faq-section section-shell section-space"
+        aria-labelledby="faq-title"
+      >
+        <div class="faq-intro">
+          <p class="eyebrow">A FEW GOOD QUESTIONS.</p>
+          <h2 id="faq-title">Good to know<br />before you go.</h2>
+          <p>Something else on your mind?</p>
+          <a
+            class="text-link"
+            href="https://github.com/jntynho/TeleDrive/issues"
+            >Ask on GitHub <span aria-hidden="true">↗</span></a
+          >
+        </div>
+        <div class="faq-list">
+          <details>
+            <summary>Where do my files actually live?</summary>
+            <div>
+              <p>
+                In the private Telegram storage channels you choose in
+                TeleDrive. The app uses TDLib to connect to Telegram and keeps a
+                local index so you can browse your library.
+              </p>
+              <p>
+                Deleting a storage channel or its file messages in Telegram can
+                remove the underlying files. Keep a separate copy of anything
+                important.
+              </p>
+            </div>
+          </details>
+          <details>
+            <summary>Is there a storage subscription?</summary>
+            <div>
+              <p>
+                TeleDrive is free to use and does not sell a separate
+                cloud-storage plan. Storage is provided by Telegram and remains
+                subject to its account, file-size and service limits. No app can
+                remove Telegram’s server-requested waiting periods.
+              </p>
+            </div>
+          </details>
+          <details>
+            <summary>Does TeleDrive compress my photos?</summary>
+            <div>
+              <p>
+                Original-file uploads keep the original files rather than
+                sending compressed chat photos. Folder backup follows your
+                chosen network, charging and exclusion preferences. Android may
+                defer background work.
+              </p>
+            </div>
+          </details>
+          <details>
+            <summary>Do I need an API ID and API hash?</summary>
+            <div>
+              <p>
+                The official release APKs include TeleDrive’s Telegram
+                application identity, so normal sign-in starts with your phone
+                number. Telegram decides how verification codes are delivered
+                and may ask for your two-step password or other account checks.
+                Debug builds can still use manual API setup.
+              </p>
+            </div>
+          </details>
+          <details>
+            <summary>How does Hidden lock work?</summary>
+            <div>
+              <p>
+                Enable Lock Hidden in Settings → Security, or open Hidden → ⋮ →
+                Hidden settings. It uses your phone’s fingerprint or screen
+                lock. Enabling and disabling both require confirmation;
+                cancelling leaves the setting unchanged.
+              </p>
+              <p>
+                A secure phone lock must be set up. Hidden lock controls access
+                inside TeleDrive; optional file encryption is a separate
+                setting.
+              </p>
+            </div>
+          </details>
+          <details>
+            <summary>Which APK should I choose?</summary>
+            <div>
+              <p>
+                ARM64 is the usual choice for modern Android phones. Devices
+                running a 32-bit ARM system need ARM32 (armeabi-v7a). Both
+                require Android 8.0 or newer. These releases do not include an
+                x86 or universal APK.
+              </p>
+            </div>
+          </details>
+          <details>
+            <summary>Is there an iPhone or desktop version?</summary>
+            <div>
+              <p>
+                This project currently publishes Android APKs only. There is no
+                iOS or desktop download on this website.
+              </p>
+            </div>
+          </details>
+          <details>
+            <summary>Is this an official Telegram app?</summary>
+            <div>
+              <p>
+                No. TeleDrive is an independent project, not made by or
+                affiliated with Telegram. You can review the project’s source,
+                dependencies and implementation notes on GitHub.
+              </p>
+            </div>
+          </details>
+        </div>
+      </section>
+      <section class="final-cta section-shell reveal">
+        <div>
+          <p class="eyebrow">YOUR FILES. YOUR SPACE.</p>
+          <h2>Keep a little<br />more of what matters.</h2>
+        </div>
+        <a class="button button-primary" href="#download"
+          >Get TeleDrive
+          <svg class="icon" aria-hidden="true"><use href="#i-arrow"></use></svg
+        ></a>
+      </section>
+    </main>
+    <footer class="site-footer section-shell">
+      <div class="footer-top">
+        <a class="brand" href="./"
+          ><img src="./assets/icon.svg" width="32" height="32" alt="" /><span
+            >TeleDrive<span class="brand-dot">.</span></span
+          ></a
+        >
+        <p>Everything you keep, in one place.</p>
+        <nav aria-label="Footer navigation">
+          <a href="./privacy.html">Privacy & data</a
+          ><a href="https://github.com/jntynho/TeleDrive">Source code</a
+          ><a href="https://github.com/jntynho/TeleDrive/releases">Releases</a
+          ><a href="https://github.com/jntynho/TeleDrive/issues">Support</a>
+        </nav>
+      </div>
+      <div class="footer-bottom">
+        <p>TeleDrive is independent and is not affiliated with Telegram.</p>
+        <p>
+          Icons:
+          <a href="https://www.figma.com/community/file/1166831539721848736"
+            >Solar by 480 Design</a
+          >
+          · <a href="./assets/licenses/Solar.txt">CC BY 4.0</a>. Typeface:
+          <a href="./assets/licenses/Roboto.txt">Roboto · OFL</a>.
+        </p>
+      </div>
+    </footer>
+    <dialog id="phone-dialog" aria-labelledby="phone-dialog-title">
+      <button
+        class="icon-button dialog-close"
+        type="button"
+        aria-label="Close phone link"
+      >
+        <svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg>
+      </button>
+      <p class="eyebrow">A LITTLE HANDOFF.</p>
+      <h2 id="phone-dialog-title">Meet you on<br />your phone.</h2>
+      <p>
+        Scan this code with your Android phone’s camera<br />to open the
+        download page.
+      </p>
+      <img
+        class="phone-qr"
+        src="./assets/phone-qr.svg"
+        width="240"
+        height="240"
+        alt="QR code linking to the TeleDrive download page"
+      /><button class="button button-dark" id="copy-link" type="button">
+        Copy download-page link
+      </button>
+      <p id="copy-status" role="status" aria-live="polite"></p>
+      <a class="text-link" href="https://jntynho.github.io/TeleDrive/#download"
+        >jntynho.github.io/TeleDrive</a
+      >
+    </dialog>
+  </body>
+</html>
