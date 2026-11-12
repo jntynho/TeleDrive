@@ -1,24 +1,10 @@
 package app.tgdrive.rebuild
 
-import androidx.compose.ui.geometry.Offset
 import com.infinity.drive.presentation.components.*
 import org.junit.Assert.*
 import org.junit.Test
 
 class GalleryDensityPolicyTest {
-    @Test fun headersKeepTheirHeightAndEveryPhotoRetainsFourByFiveAtAllDensities() {
-        val items=listOf(DensityItem("today",true))+List(19){DensityItem("photo-$it")}+DensityItem("yesterday",true)+DensityItem("last")
-        for(columns in 2..6){
-            val boxes=densityGeometry(items,columns,393f,2f,.8f,42f)
-            assertEquals(42f,boxes.getValue("today").height,.01f)
-            assertEquals(42f,boxes.getValue("yesterday").height,.01f)
-            boxes.filterKeys{it!="today"&&it!="yesterday"}.values.forEach{rect->
-                assertEquals(.8f,rect.width/rect.height,.001f)
-                assertTrue(rect.left>=0);assertTrue(rect.right<=393.01f)
-            }
-            assertTrue(boxes.getValue("yesterday").top>=boxes.getValue("photo-18").bottom)
-        }
-    }
     @Test fun focalPointSurvivesAChangeOfCellSizeIncludingContentPadding() {
         val anchor=DensityAnchor("photo",.7f,310f)
         for(height in listOf(80f,160f,240f,400f)){
@@ -45,11 +31,5 @@ class GalleryDensityPolicyTest {
         listOf(Float.NaN,Float.POSITIVE_INFINITY,0f,-1f).forEach(session::add)
         assertEquals(0,session.steps)
     }
-    @Test fun albumLabelsDoNotScaleWithTheCover() {
-        val items=List(9){DensityItem("album-$it")}
-        for(n in 2..6){
-            val r=densityGeometry(items,n,369f,10f,1f,0f,64f).getValue("album-0")
-            assertEquals(64f,r.height-r.width,.01f)
-        }
-    }
+
 }

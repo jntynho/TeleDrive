@@ -47,7 +47,8 @@ fun FileGridItem(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
     galleryTile:Boolean=false,
-    selectionMode:Boolean=selected
+    selectionMode:Boolean=selected,
+    enabled:Boolean=true
 ) {
     val checkAlpha by animateFloatAsState(if(selected)1f else 0f,tween(180),label="selectionBadge")
     val selectionScale by animateFloatAsState(if(selected).94f else 1f,tween(200),label="selectionScale")
@@ -59,7 +60,7 @@ fun FileGridItem(
                 else MaterialTheme.colorScheme.surfaceContainerLow
             )
             .semantics { this.selected=selected;if(selectionMode)toggleableState=if(selected)androidx.compose.ui.state.ToggleableState.On else androidx.compose.ui.state.ToggleableState.Off }
-            .combinedClickable(role=if(selectionMode)Role.Checkbox else Role.Button,onClick = onClick, onLongClick = onLongClick)
+            .combinedClickable(enabled=enabled,role=if(selectionMode)Role.Checkbox else Role.Button,onClick = onClick, onLongClick = onLongClick)
     ) {
         Box {
             FileThumbnail(

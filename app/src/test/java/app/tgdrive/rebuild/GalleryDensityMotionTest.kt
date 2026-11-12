@@ -11,7 +11,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -34,6 +33,7 @@ class GalleryDensityMotionTest {
     private var columns by mutableIntStateOf(3)
     private lateinit var motion:GridDensityMotion
     private var opened:String?=null
+    private var commitOpacity:Float?=null
     private var viewportHeight by mutableStateOf(500.dp)
     @Before fun setup(){
         activity=Robolectric.buildActivity(ComponentActivity::class.java).setup().visible()
@@ -42,14 +42,15 @@ class GalleryDensityMotionTest {
             motion=rememberGridDensityMotion(grid,"sample")
             val items=remember{List(80){DensityItem("photo-$it")}}
             LazyVerticalGrid(GridCells.Fixed(columns),state=grid,userScrollEnabled=!motion.busy,
-                modifier=Modifier.size(360.dp,viewportHeight).testTag("grid").pinchZoom(
+                modifier=Modifier.size(360.dp,viewportHeight).then(motion.fade()).testTag("grid").pinchZoom(
                     {columns=(columns-1).coerceAtLeast(2)},{columns=(columns+1).coerceAtMost(6)},
-                    onGestureStarted={motion.begin(grid,columns,items,it,0f,.8f)},
-                    onGestureProgress=motion::preview,onGestureFinished={motion.finish(grid,it){columns}},
+                    onGestureStarted={motion.begin(columns,items,it)},
+                    onDensityCommit={step->motion.release(step,{columns}){commitOpacity=motion.opacity;columns=(columns-step).coerceIn(2,6)}},
+                    onGestureFinished={if(!it)motion.cancel()},enabled=!motion.transitioning,
                     columns=columns,canZoomIn=columns>2,canZoomOut=columns<6,commitAllowed={motion.dragging})){
                 items(items,key={it.key}){item->
-                    Box(Modifier.fillMaxWidth().aspectRatio(.8f).then(motion.cell(item.key)).testTag(item.key)
-                        .clickable{opened=item.key}.background(Color(0xff365b69))){Text(item.key,color=Color.White)}
+                    Box(Modifier.fillMaxWidth().aspectRatio(.8f).testTag(item.key)
+                        .clickable(enabled=motion.acceptsInput){opened=item.key}.background(Color(0xff365b69))){Text(item.key,color=Color.White)}
                 }
             }
         }
@@ -78,6 +79,22 @@ class GalleryDensityMotionTest {
         compose.onNodeWithTag("grid").performTouchInput{up(1)}
         compose.waitForIdle();assertFalse(motion.busy)
     }
+    @Test fun gridStaysStillDuringPinchAndCommitsOnlyAfterFadeOut(){
+        val before=compose.onNodeWithTag("photo-4").getUnclippedBoundsInRoot()
+        compose.onNodeWithTag("grid").performTouchInput{
+            down(0,center.copy(x=center.x-50));down(1,center.copy(x=center.x+50))
+            moveTo(0,center.copy(x=center.x-100));moveTo(1,center.copy(x=center.x+100))
+        }
+        compose.runOnIdle{assertEquals(3,columns);assertEquals(1f,motion.opacity,0f)}
+        assertEquals(before,compose.onNodeWithTag("photo-4").getUnclippedBoundsInRoot())
+        compose.mainClock.autoAdvance=false
+        compose.onNodeWithTag("grid").performTouchInput{up(0);up(1)}
+        compose.mainClock.advanceTimeBy(32)
+        compose.runOnUiThread{assertEquals(3,columns);assertTrue(motion.transitioning)}
+        compose.mainClock.autoAdvance=true
+        compose.waitForIdle()
+        assertEquals(2,columns);assertEquals(0f,commitOpacity!!,0f);assertEquals(1f,motion.opacity,0f);assertFalse(motion.busy)
+    }
     @Test fun originalFocalPointSurvivesReflow(){
         val old=compose.onNodeWithTag("photo-4").getUnclippedBoundsInRoot()
         val fraction=((250f-old.top.value)/(old.bottom.value-old.top.value)).coerceIn(0f,1f)
@@ -95,6 +112,22 @@ class GalleryDensityMotionTest {
         compose.onNodeWithTag("grid").performTouchInput{up(0);up(1)}
         compose.waitForIdle();assertEquals(3,columns);assertFalse(motion.busy)
         compose.onNodeWithTag("grid").performScrollToIndex(0)
+        compose.onNodeWithTag("photo-0").performClick();assertEquals("photo-0",opened)
+    }
+
+    @Test fun cancellingFadeOutDoesNotCommitALateColumnChange(){
+        compose.onNodeWithTag("grid").performTouchInput{
+            down(0,center.copy(x=center.x-50));down(1,center.copy(x=center.x+50))
+            moveTo(0,center.copy(x=center.x-100));moveTo(1,center.copy(x=center.x+100))
+        }
+        compose.mainClock.autoAdvance=false
+        compose.onNodeWithTag("grid").performTouchInput{up(0);up(1)}
+        compose.mainClock.advanceTimeBy(32)
+        compose.runOnUiThread{motion.cancel()}
+        compose.mainClock.autoAdvance=true
+        compose.waitForIdle()
+        assertEquals(3,columns);assertNull(commitOpacity)
+        assertEquals(1f,motion.opacity,0f);assertFalse(motion.busy)
         compose.onNodeWithTag("photo-0").performClick();assertEquals("photo-0",opened)
     }
 

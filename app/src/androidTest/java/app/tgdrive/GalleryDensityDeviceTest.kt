@@ -31,13 +31,14 @@ class GalleryDensityDeviceTest {
             motion=rememberGridDensityMotion(grid,"device")
             val rows=remember{List(90){DensityItem("photo-$it")}}
             LazyVerticalGrid(GridCells.Fixed(columns),state=grid,userScrollEnabled=!motion.busy,
-                modifier=Modifier.size(360.dp,500.dp).testTag("density-grid").pinchZoom(
+                modifier=Modifier.size(360.dp,500.dp).then(motion.fade()).testTag("density-grid").pinchZoom(
                     {columns=(columns-1).coerceAtLeast(2)},{columns=(columns+1).coerceAtMost(6)},
-                    onGestureStarted={motion.begin(grid,columns,rows,it,0f,.8f)},onGestureProgress=motion::preview,
-                    onGestureFinished={motion.finish(grid,it){columns}},columns=columns,commitAllowed={motion.dragging})){
+                    onGestureStarted={motion.begin(columns,rows,it)},
+                    onDensityCommit={step->motion.release(step,{columns}){columns=(columns-step).coerceIn(2,6)}},
+                    onGestureFinished={if(!it)motion.cancel()},columns=columns,commitAllowed={motion.dragging},enabled=!motion.transitioning)){
                 items(rows,key={it.key}){row->
-                    Box(Modifier.fillMaxWidth().aspectRatio(.8f).then(motion.cell(row.key)).testTag(row.key)
-                        .clickable{opened=row.key}.background(Color.DarkGray)){Text(row.key,color=Color.White)}
+                    Box(Modifier.fillMaxWidth().aspectRatio(.8f).testTag(row.key)
+                        .clickable(enabled=motion.acceptsInput){opened=row.key}.background(Color.DarkGray)){Text(row.key,color=Color.White)}
                 }
             }
         }

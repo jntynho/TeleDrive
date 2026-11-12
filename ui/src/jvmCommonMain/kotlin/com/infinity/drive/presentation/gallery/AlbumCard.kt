@@ -36,14 +36,15 @@ fun AlbumCard(
     album: MediaAlbum,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    loading:Boolean=false
+    loading:Boolean=false,
+    enabled:Boolean=true
 ) {
     val albumName = album.name ?: stringResource(Res.string.album_not_in_folder)
     Column(
         modifier = modifier
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .clickable(enabled=!loading,onClick = onClick)
+            .clickable(enabled=!loading&&enabled,onClick = onClick)
             .padding(6.dp)
     ) {
         Box(

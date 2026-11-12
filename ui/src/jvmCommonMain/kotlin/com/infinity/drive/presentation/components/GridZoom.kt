@@ -48,7 +48,8 @@ fun Modifier.pinchZoom(
     densityKey: Any? = null, columns: Int? = null, enabled: Boolean = true,
     onGestureProgress: (Float, Offset) -> Unit = { _, _ -> },
     canZoomIn: Boolean = true, canZoomOut: Boolean = true,
-    commitAllowed:()->Boolean={true}
+    commitAllowed:()->Boolean={true},
+    onDensityCommit:((Int)->Unit)?=null
 ): Modifier = composed {
     val inward by rememberUpdatedState(onZoomIn)
     val outward by rememberUpdatedState(onZoomOut)
@@ -59,6 +60,7 @@ fun Modifier.pinchZoom(
     val allowOut by rememberUpdatedState(canZoomOut)
     val initialColumns by rememberUpdatedState(columns)
     val mayCommit by rememberUpdatedState(commitAllowed)
+    val densityCommit by rememberUpdatedState(onDensityCommit)
     // The caller's context, rather than the committed column count, cancels obsolete gestures.
     this.pointerInput(enabled, densityKey) {
         if (!enabled) return@pointerInput
@@ -73,7 +75,10 @@ fun Modifier.pinchZoom(
                 ended = true
                 val step = session.steps
                 val changed = commit && mayCommit() && ((step > 0 && allowIn) || (step < 0 && allowOut))
-                if (changed) { if (step > 0) inward() else outward() }
+                if (changed) {
+                    val custom=densityCommit
+                    if(custom!=null)custom(step)else if (step > 0) inward() else outward()
+                }
                 finished(changed)
             }
             try {
