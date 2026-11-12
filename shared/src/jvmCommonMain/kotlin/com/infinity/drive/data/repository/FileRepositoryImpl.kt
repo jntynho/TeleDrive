@@ -108,6 +108,7 @@ class FileRepositoryImpl(
                     pageSize = 40,
                     initialLoadSize = 40,
                     prefetchDistance = 20,
+                    maxSize = 400,
                     enablePlaceholders = false
                 ),
                 pagingSourceFactory = {

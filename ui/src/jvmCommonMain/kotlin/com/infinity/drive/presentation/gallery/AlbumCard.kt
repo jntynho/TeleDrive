@@ -57,12 +57,12 @@ fun AlbumCard(
             val coverFileId = album.coverFileId
             Icon(DriveIcons.PhotoLibrary,null,Modifier.size(28.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)
             if (coverFileId != null) {
-                AsyncImage(
-                    model = ThumbnailModel(coverFileId,album.latestAt.toString()),
+                androidx.compose.runtime.key(com.infinity.drive.presentation.components.LocalThumbnailRetryEpoch.current,album.coverRevision){AsyncImage(
+                    model = ThumbnailModel(coverFileId,album.coverRevision.ifEmpty{album.latestAt.toString()}),
                     contentDescription = albumName,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
-                )
+                )}
             } else {
                 Icon(
                     imageVector = DriveIcons.PhotoLibrary,

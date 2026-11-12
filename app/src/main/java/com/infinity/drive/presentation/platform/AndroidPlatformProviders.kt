@@ -243,6 +243,14 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
         Environment.getExternalStorageDirectory().absolutePath
     }
 
+    val thumbnailNetwork=org.koin.compose.koinInject<com.infinity.drive.core.network.NetworkMonitor>()
+    val thumbnailRetryEpoch by androidx.compose.runtime.produceState(0,thumbnailNetwork){
+        var previous=thumbnailNetwork.currentStatus()
+        thumbnailNetwork.status.collect { next ->
+            if(previous==com.infinity.drive.core.network.NetworkStatus.UNAVAILABLE&&next!=previous)value++
+            previous=next
+        }
+    }
     val startupLoader=org.koin.compose.koinInject<coil3.ImageLoader>()
     val startupThumbnails=org.koin.compose.koinInject<com.infinity.drive.data.local.dao.ThumbnailDao>()
     val startupPreparation=remember(context,startupLoader,startupThumbnails){com.infinity.drive.presentation.startup.AndroidStartupPreparation(context,startupLoader,startupThumbnails)}
@@ -250,6 +258,7 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
     CompositionLocalProvider(
         LocalLiquidNavigation provides liquidNavigation,
         LocalStartupPreparation provides startupPreparation,
+        com.infinity.drive.presentation.components.LocalThumbnailRetryEpoch provides thumbnailRetryEpoch,
         LocalFullyDrawn provides {activity?.reportFullyDrawn()},
         LocalProfilePalette provides {path->withContext(Dispatchers.IO){runCatching{val file=File(path);if(file.length() in 1..5_000_000)com.infinity.drive.presentation.audio.artworkColors(file.readBytes())else emptyList()}.getOrDefault(emptyList())}},
         LocalAudioPlayback provides audio,

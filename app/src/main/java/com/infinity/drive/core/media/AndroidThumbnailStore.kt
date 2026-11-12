@@ -50,6 +50,7 @@ class AndroidThumbnailStore(
 ) : ThumbnailStore {
 
     private val generationSemaphore = Semaphore(3)
+    private val remoteSemaphore = Semaphore(2)
     private val fileLocks=Array(64){Mutex()}
     private fun thumbnailName(file:FileEntity):String {
         val revision="${file.id}:${file.modifiedAt}:${file.localPath}:${file.remoteFileId}:${file.iconFileId}:${file.contentHash}"
@@ -98,7 +99,7 @@ class AndroidThumbnailStore(
             file.delete()
             thumbnailDao.delete(fileId)
         }
-        return generationSemaphore.withPermit { generate(fileId) }
+        return generate(fileId)
         }
     }
 
@@ -135,7 +136,7 @@ class AndroidThumbnailStore(
 
     private suspend fun generate(fileId: String): ByteArray? {
         val entity = fileDao.byId(fileId) ?: return null
-        val bitmap = entity.localPath?.let { path ->
+        val bitmap = generationSemaphore.withPermit { entity.localPath?.let { path ->
             val file = File(path)
             when {
                 !file.exists() -> null
@@ -145,6 +146,7 @@ class AndroidThumbnailStore(
             }
         }
 
+        }
         val jpegBytes = if (bitmap != null) {
             ByteArrayOutputStream().use { output ->
                 bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)
@@ -152,11 +154,12 @@ class AndroidThumbnailStore(
                 output.toByteArray()
             }
         } else {
-            val iconFileId = entity.iconFileId
-            if (iconFileId != null) {
-                fetchIconBytes(entity, iconFileId) ?: fetchRemoteThumbnail(entity)
-            } else {
-                fetchRemoteThumbnail(entity)
+            remoteSemaphore.withPermit {
+                kotlinx.coroutines.withTimeoutOrNull(8_000) {
+                    val iconFileId = entity.iconFileId
+                    if (iconFileId != null) fetchIconBytes(entity, iconFileId) ?: fetchRemoteThumbnail(entity)
+                    else fetchRemoteThumbnail(entity)
+                }
             }
         } ?: return null
 
@@ -296,7 +299,9 @@ class AndroidThumbnailStore(
         if (MimeTypes.isText(entity.mimeType) &&
             !settingsRepository.preferences.first().linkPreviews
         ) return null
-        return runCatching { telegramClient.fetchThumbnail(chatId, messageId) }.getOrNull()
+        return try { telegramClient.fetchThumbnail(chatId, messageId) }
+        catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}
+        catch(_:Exception){null}
     }
 
     private fun thumbnailKey(): ByteArray =

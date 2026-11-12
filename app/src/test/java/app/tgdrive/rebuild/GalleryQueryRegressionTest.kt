@@ -37,6 +37,19 @@ class GalleryQueryRegressionTest {
         }finally{db.close()}
     }
 
+    @Test fun albumCoverVersionTracksNewArtworkWithoutChangingTheFileTimestamp()=runTest {
+        val db=database()
+        try {
+            val dao=db.fileDao();val row=file("cover").copy(iconFileId="old-thumb",contentHash="hash-one")
+            dao.upsert(row)
+            val old=dao.observeAlbumsScoped(false,false,null).first().single().coverRevision
+            dao.upsert(row.copy(iconFileId="new-thumb",contentHash="hash-two"))
+            val next=dao.observeAlbumsScoped(false,false,null).first().single().coverRevision
+            assertNotEquals(old,next)
+            assertEquals(com.infinity.drive.core.media.thumbnailModel(row.copy(iconFileId="new-thumb",contentHash="hash-two").toDomain()).revision,next)
+        }finally{db.close()}
+    }
+
     @Test fun previewRankUsesSameCaseInsensitiveOrderingAndStableTieBreakAsPaging()=runTest {
         val db=database()
         try {

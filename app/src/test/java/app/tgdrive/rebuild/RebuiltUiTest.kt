@@ -86,6 +86,20 @@ class RebuiltUiTest {
         compose.onNodeWithText("Security",substring=false).performScrollTo().performClick()
         compose.onNodeWithText("Lock Hidden",substring=false).performScrollTo().assertIsDisplayed()
     }
+    @Test fun galleryReturnsFromAlbumsToAllMediaAfterFilteringPhotos() {
+        compose.waitUntil(15000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("navigation-gallery").performClick()
+        compose.onNodeWithText("Photos",substring=false).performClick()
+        compose.waitUntil(10000){compose.onAllNodesWithTag("gallery-file-Photo.jpg").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithContentDescription("Sort gallery").performClick()
+        compose.onNodeWithText("Albums",substring=false).performClick()
+        compose.waitUntil(10000){compose.onAllNodesWithText("Not in a folder",substring=false).fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithContentDescription("Sort gallery").performClick()
+        compose.onNodeWithText("All media",substring=false).performClick()
+        compose.waitUntil(10000){compose.onAllNodesWithTag("gallery-file-Photo.jpg").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("gallery-file-Photo.jpg").assertIsDisplayed()
+    }
+
     @Test fun realEmptyLibraryNavigatesAcrossAllFourTabs() {
         compose.waitUntil(15_000) { compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Your library").assertIsDisplayed()

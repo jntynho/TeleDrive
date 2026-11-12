@@ -64,10 +64,16 @@ fun FileThumbnail(
             file.category == FileCategory.VIDEO || file.category == FileCategory.AUDIO ||
             MimeTypes.isText(file.mimeType) ||
             MimeTypes.isApk(file.mimeType, file.name)
-    var failed by remember(file.id,file.localPath,file.remoteFileId,file.modifiedAt) { mutableStateOf(false) }
+    val retryEpoch=LocalThumbnailRetryEpoch.current
+    val model=com.infinity.drive.core.media.thumbnailModel(file)
+    var failed by remember(model,retryEpoch) { mutableStateOf(false) }
+    var attempts by remember(model,retryEpoch) { androidx.compose.runtime.mutableIntStateOf(0) }
+    LaunchedEffect(failed,model,retryEpoch){
+        if(failed&&attempts<2){kotlinx.coroutines.delay(1500L*(attempts+1));attempts++;failed=false}
+    }
 
     val context=LocalPlatformContext.current
-    val imageRequest=remember(context,file.id,file.modifiedAt,file.localPath,file.remoteFileId){ImageRequest.Builder(context).data(com.infinity.drive.core.media.thumbnailModel(file)).crossfade(160).build()}
+    val imageRequest=remember(context,model,retryEpoch){ImageRequest.Builder(context).data(model).crossfade(160).build()}
     BoxWithConstraints(
         modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh),
         contentAlignment = Alignment.Center

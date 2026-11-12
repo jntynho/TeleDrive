@@ -8,5 +8,6 @@ fun AlbumSummary.toDomain(): MediaAlbum = MediaAlbum(
     name = name,
     itemCount = itemCount,
     coverFileId = coverFileId,
-    latestAt = latestAt
+    latestAt = latestAt,
+    coverRevision = coverRevision
 )

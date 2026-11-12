@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,7 +46,8 @@ fun FileGridItem(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
-    galleryTile:Boolean=false
+    galleryTile:Boolean=false,
+    selectionMode:Boolean=selected
 ) {
     val checkAlpha by animateFloatAsState(if(selected)1f else 0f,tween(180),label="selectionBadge")
     val selectionScale by animateFloatAsState(if(selected).94f else 1f,tween(200),label="selectionScale")
@@ -56,8 +58,8 @@ fun FileGridItem(
                 if (selected) MaterialTheme.colorScheme.secondaryContainer
                 else MaterialTheme.colorScheme.surfaceContainerLow
             )
-            .semantics { this.selected=selected }
-            .combinedClickable(role=Role.Checkbox,onClick = onClick, onLongClick = onLongClick)
+            .semantics { this.selected=selected;if(selectionMode)toggleableState=if(selected)androidx.compose.ui.state.ToggleableState.On else androidx.compose.ui.state.ToggleableState.Off }
+            .combinedClickable(role=if(selectionMode)Role.Checkbox else Role.Button,onClick = onClick, onLongClick = onLongClick)
     ) {
         Box {
             FileThumbnail(

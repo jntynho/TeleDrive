@@ -49,7 +49,7 @@ class AndroidStartupPreparation(private val context:Context,private val loader:I
             coroutineScope {files.distinctBy{it.id}.take(count).map{file->async{
                 slots.withPermit{
                     if(thumbnails.byFileId(file.id)==null)return@withPermit
-                    val model=ThumbnailModel(file.id,"${file.modifiedAt}:${file.localPath}:${file.remoteFileId}",cacheOnly=true)
+                    val model=com.infinity.drive.core.media.thumbnailModel(file).copy(cacheOnly=true)
                     val audio=file.category==com.infinity.drive.domain.model.FileCategory.AUDIO
                     val width=if(audio)minOf(side,(context.resources.displayMetrics.density*64).toInt())else side
                     val height=if(audio)width else width*5/4

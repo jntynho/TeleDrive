@@ -73,6 +73,8 @@ data class GalleryUiState(
     val gridSize: Int = 3,
     val albumGridSize: Int = 3,
     val loaded: Boolean = false,
+    val albumsLoading: Boolean = false,
+    val albumsError: Boolean = false,
     val capabilities: SelectionCapabilities = SelectionCapabilities(),
     val sortField: FileSortField = FileSortField.DATE_MODIFIED,
     val sortDirection: SortDirection = SortDirection.DESCENDING,
@@ -91,6 +93,10 @@ class GalleryViewModel(
     private val syncRepository: SyncRepository
 ) : ViewModel() {
 
+    private val preferencesReady=MutableStateFlow(false)
+    private val albumRetry=MutableStateFlow(0)
+    fun retryAlbums(){albumsLoading.value=true;albumRetry.value++}
+
     private val route: Route.GalleryAlbum? = runCatching {
         savedStateHandle.toRoute<Route.GalleryAlbum>()
     }.getOrNull()
@@ -100,13 +106,13 @@ class GalleryViewModel(
 
     private val tab = MutableStateFlow(runCatching{GalleryTab.valueOf(savedStateHandle.get<String>("gallery-tab")?:savedStateHandle.get<String>("initialTab")?:"ALL")}.getOrDefault(GalleryTab.ALL))
     val query = MutableStateFlow(savedStateHandle.get<String>("gallery-query").orEmpty())
-    fun setQuery(value:String) { if(query.value==value)return;invalidateSelection();query.value=value;savedStateHandle["gallery-query"]=value;listPosition.remember(0,0);clearSelection() }
+    fun setQuery(value:String) { if(query.value==value)return;invalidateSelection();query.value=value;savedStateHandle["gallery-query"]=value;clearSelection() }
 
     val appliedQuery=query.debounce { if(it.isBlank())0L else 180L }
         .stateIn(viewModelScope,SharingStarted.Eagerly,query.value)
 
     val albumQuery = savedStateHandle.getStateFlow("album-query", "")
-    fun searchAlbums(value:String) { savedStateHandle["album-query"] = value }
+    fun searchAlbums(value:String) { if(value==albumQuery.value)return;albumsLoading.value=true;savedStateHandle["album-query"] = value }
     private val _message = MutableSharedFlow<String>(extraBufferCapacity=8)
     val messages = _message.asSharedFlow()
     val working = MutableStateFlow(false)
@@ -117,7 +123,7 @@ class GalleryViewModel(
     private fun invalidateSelection() { generation++; selectJob?.cancel(); clearSelection(); rangeBase=null }
     init { viewModelScope.launch {
         settingsRepository.preferences.map { it.storageChatId }.distinctUntilChanged().drop(1).collect {
-            invalidateSelection(); listPosition.remember(0,0)
+            invalidateSelection()
         }
     } }
     private val sort = MutableStateFlow(
@@ -127,7 +133,7 @@ class GalleryViewModel(
     private val positions=linkedMapOf<String,ListPosition>()
     private var channelKey="initial"
     fun positionFor(mode:ViewMode):ListPosition {
-        val key="$channelKey:${tab.value}:${appliedQuery.value}:${sort.value}:$mode"
+        val key="$channelKey:${tab.value}:${if(tab.value==GalleryTab.ALBUMS)albumQuery.value else appliedQuery.value}:${sort.value}:$mode"
         positions[key]?.let{return it}
         if(positions.size>=24)positions.remove(positions.keys.first())?.discard()
         return ListPosition(savedStateHandle,"gallery:$key").also{positions[key]=it}
@@ -136,7 +142,7 @@ class GalleryViewModel(
     val contextRevision=MutableStateFlow(0L)
     init {
         viewModelScope.launch {settingsRepository.preferences.map{it.storageChatId}.distinctUntilChanged().collect{channelKey=it.toString();contextRevision.value++}}
-        viewModelScope.launch {val prefs=settingsRepository.preferences.first();if(savedStateHandle.get<String>("gallery-sort")==null)sort.value=prefs.gallerySortField to prefs.gallerySortDirection}
+        viewModelScope.launch {val prefs=settingsRepository.preferences.first();if(savedStateHandle.get<String>("gallery-sort")==null)sort.value=prefs.gallerySortField to prefs.gallerySortDirection;preferencesReady.value=true}
     }
 
     private val selection = MutableStateFlow<Set<String>>(emptySet())
@@ -144,12 +150,8 @@ class GalleryViewModel(
     private val _allSelected = MutableStateFlow(false)
     val allSelected: StateFlow<Boolean> = _allSelected.asStateFlow()
 
-    private val spec: Flow<FileQuerySpec> = combine(
-        tab,
-        sort,
-        settingsRepository.preferences, appliedQuery
-    ) { currentTab, (field, direction), _, nameQuery ->
-        FileQuerySpec(
+    private val mediaRequest = combine(tab,sort,appliedQuery,preferencesReady) { currentTab,(field,direction),nameQuery,ready ->
+        if(!ready)null else currentTab to FileQuerySpec(
             folderId = albumFolderId,
             nameQuery = nameQuery.trim().takeIf { it.isNotBlank() },
             filterByFolder = isAlbumView,
@@ -163,18 +165,28 @@ class GalleryViewModel(
             sortField = field,
             sortDirection = direction
         )
-    }.distinctUntilChanged()
+    }.filterNotNull().distinctUntilChanged()
+    private val spec:Flow<FileQuerySpec> = mediaRequest.map{it.second}.distinctUntilChanged()
 
-    private val albums: Flow<List<MediaAlbum>> = combine(tab,albumQuery,sort) { t,q,s -> Triple(t,q,s) }
+    private val albumsLoading = MutableStateFlow(false)
+    private val albumsError = MutableStateFlow(false)
+    private val requestedDensity = MutableStateFlow<GridZoomLevel?>(null)
+    private val requestedAlbumColumns = MutableStateFlow<Int?>(null)
+
+    private val albums: Flow<List<MediaAlbum>> = combine(tab,albumQuery,sort,albumRetry) { t,q,s,_ -> Triple(t,q,s) }
         .flatMapLatest { (t,q,s) ->
             if (isAlbumView || t!=GalleryTab.ALBUMS) flowOf(emptyList())
-            else fileRepository.observeAlbums(false,false).map { rows ->
+            else fileRepository.observeAlbums(false,false).onStart { albumsLoading.value=true;albumsError.value=false }.map { rows ->
+                albumsLoading.value=false
                 val filtered=rows.filter { q.isBlank() || (it.name?:"Not in a folder").contains(q.trim(),true) }
                 val ordered=when(s.first){
                     FileSortField.NAME->filtered.sortedWith(compareBy<MediaAlbum>{it.name?.lowercase().orEmpty()}.thenBy{it.folderId.orEmpty()})
                     else->filtered.sortedWith(compareBy<MediaAlbum>{it.latestAt}.thenBy{it.folderId.orEmpty()})
                 }
                 if(s.second==SortDirection.DESCENDING)ordered.asReversed()else ordered
+            }.catch { error ->
+                if(error is CancellationException)throw error
+                albumsLoading.value=false;albumsError.value=true;emit(emptyList())
             }.flowOn(Dispatchers.Default)
         }
 
@@ -183,11 +195,20 @@ class GalleryViewModel(
             categories=current.categories,sortField=current.sortField,sortDirection=current.sortDirection)
     }.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5_000),PreviewSequence())
 
-    val pagedMedia: Flow<PagingData<GalleryListItem>> = spec
-        .flatMapLatest { current ->
-            if(tab.value==GalleryTab.ALBUMS) flowOf(PagingData.empty()) else flow {
-                val anchor=positionFor(uiState.value.viewMode).anchorId
-                val rank=anchor?.let{fileRepository.indexOfFile(current,it)}
+    val pagedMedia: Flow<PagingData<GalleryListItem>> = mediaRequest
+        .flatMapLatest { (currentTab,current) ->
+            if(currentTab==GalleryTab.ALBUMS) flowOf(PagingData.empty()) else flow {
+                val prefs=settingsRepository.preferences.first()
+                val position=positionFor(requestedDensity.value?.viewMode?:prefs.galleryViewMode)
+                val original=position.anchorId
+                val anchor=(listOfNotNull(original)+position.neighborIds).distinct().firstOrNull{id->
+                    val file=fileRepository.getFile(id)
+                    file!=null&&!file.isTrashed&&!file.isHidden&&!file.isArchived&&file.chatId==prefs.storageChatId&&
+                        file.category in current.categories&&(!current.filterByFolder||file.folderId==current.folderId)&&
+                        (current.nameQuery?.let{file.name.contains(it,true)}?:true)
+                }
+                if(anchor!=original){position.anchorId=anchor;position.remember(position.index,0)}
+                val rank=anchor?.let{fileRepository.indexOfFile(current,it)}?:position.index.takeIf{it>0}
                 emitAll(fileRepository.pagedFiles(current.copy(initialLoadIndex=rank)).map{data->withDayHeaders(data,current)})
             }
         }
@@ -203,12 +224,13 @@ class GalleryViewModel(
         tab,
         sort,
         selectionCapabilities,
-        settingsRepository.preferences
-            .map { it.galleryGridSize to it.albumGridSize }
-            .distinctUntilChanged(),
+        combine(settingsRepository.preferences,requestedDensity,requestedAlbumColumns) { prefs,density,albumColumns ->
+                (density?.gridSize ?: prefs.galleryGridSize).coerceIn(MIN_GRID_COLUMNS,MAX_GRID_COLUMNS) to
+                    (albumColumns ?: prefs.albumGridSize).coerceIn(MIN_GRID_COLUMNS,MAX_GRID_COLUMNS)
+            }.distinctUntilChanged(),
         combine(
             albums,
-            settingsRepository.preferences.map { it.galleryViewMode }.distinctUntilChanged()
+            combine(settingsRepository.preferences,requestedDensity) { prefs,density -> density?.viewMode ?: prefs.galleryViewMode }.distinctUntilChanged()
         ) { albumList, mode -> albumList to mode }
     ) { currentTab, (field, direction), selectionState, sizes, extras ->
         val (selected, capabilities) = selectionState
@@ -228,6 +250,8 @@ class GalleryViewModel(
             capabilities = capabilities,
             loaded = true
         )
+    }.combine(combine(albumsLoading,albumsError,preferencesReady){loading,error,ready->Triple(loading,error,ready)}) { state,status ->
+        state.copy(albumsLoading=status.first,albumsError=status.second,loaded=status.third)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GalleryUiState())
 
     private fun withDayHeaders(
@@ -261,7 +285,7 @@ class GalleryViewModel(
         if (_refreshing.value) return
         _refreshing.update { true }
         viewModelScope.launch {
-            try { check(syncRepository.fullResync().isSuccess){"Refresh failed"} }
+            try { check(syncRepository.incrementalSync().isSuccess){"Refresh failed"} }
             catch(cancel:CancellationException){throw cancel}
             catch(_:Exception){_message.tryEmit("Couldn't refresh the gallery. Your current files are still available.")}
             finally { _refreshing.value=false }
@@ -271,7 +295,8 @@ class GalleryViewModel(
 
     fun setTab(value: GalleryTab) {
         if(tab.value==value)return
-        invalidateSelection();listPosition.remember(0,0)
+        invalidateSelection()
+        albumsLoading.value=value==GalleryTab.ALBUMS;albumsError.value=false
         savedStateHandle["gallery-tab"]=value.name
         tab.update { value }
     }
@@ -280,49 +305,44 @@ class GalleryViewModel(
         invalidateSelection()
         savedStateHandle["gallery-sort"]=field.name;savedStateHandle["gallery-direction"]=direction.name
         viewModelScope.launch{settingsRepository.update{it.copy(gallerySortField=field,gallerySortDirection=direction)}}
-        listPosition.remember(0,0);sort.value=field to direction
+        sort.value=field to direction
     }
 
     fun zoomIn() = applyZoom(GridZoomLevel::zoomedIn)
-
     fun zoomOut() = applyZoom { current -> if(current.viewMode==ViewMode.LIST)current else current.copy(gridSize=(current.gridSize+1).coerceAtMost(MAX_GRID_COLUMNS)) }
-
     fun zoomAlbumsIn() = stepAlbumColumns(-1)
-
     fun zoomAlbumsOut() = stepAlbumColumns(1)
-
-    private fun stepAlbumColumns(step: Int) {
-        viewModelScope.launch {
-            settingsRepository.update { prefs ->
-                prefs.copy(
-                    albumGridSize = (prefs.albumGridSize + step)
-                        .coerceIn(MIN_GRID_COLUMNS, MAX_GRID_COLUMNS)
-                )
-            }
+    private var albumZoomJob:Job?=null
+    private fun stepAlbumColumns(step:Int) {
+        val desired=((requestedAlbumColumns.value?:uiState.value.albumGridSize)+step).coerceIn(MIN_GRID_COLUMNS,MAX_GRID_COLUMNS)
+        if(desired==(requestedAlbumColumns.value?:uiState.value.albumGridSize))return
+        requestedAlbumColumns.value=desired
+        albumZoomJob?.cancel()
+        albumZoomJob=viewModelScope.launch {
+            try {
+                delay(320)
+                settingsRepository.update { it.copy(albumGridSize=desired) }
+                if(requestedAlbumColumns.value==desired)requestedAlbumColumns.value=null
+            } catch(cancel:CancellationException){throw cancel}
+            catch(_:Exception){requestedAlbumColumns.value=null;_message.tryEmit("Couldn't save the gallery layout. Try again.")}
         }
     }
-
     private var zoomJob:Job?=null
-    private var pendingZoom:GridZoomLevel?=null
-    fun flushZoom():Boolean {
-        zoomJob?.cancel()
-        val desired=pendingZoom?:return false
-        pendingZoom=null
-        if(desired==GridZoomLevel(uiState.value.viewMode,uiState.value.gridSize))return false
-        viewModelScope.launch{settingsRepository.update{it.copy(galleryViewMode=desired.viewMode,galleryGridSize=desired.gridSize)}}
-        return true
-    }
-    private fun applyZoom(transform: (GridZoomLevel) -> GridZoomLevel) {
-        pendingZoom=transform(pendingZoom?:GridZoomLevel(uiState.value.viewMode,uiState.value.gridSize))
+    // Kept for list/grid switching callers. The visible state has already committed synchronously.
+    fun flushZoom():Boolean = requestedDensity.value!=null
+    private fun applyZoom(transform:(GridZoomLevel)->GridZoomLevel) {
+        val current=requestedDensity.value?:GridZoomLevel(uiState.value.viewMode,uiState.value.gridSize)
+        val desired=transform(current)
+        if(desired==current)return
+        requestedDensity.value=desired
         zoomJob?.cancel()
         zoomJob=viewModelScope.launch {
-            delay(160)
-            val desired=pendingZoom?:return@launch
-            pendingZoom=null
-            settingsRepository.update { prefs ->
-                val next = desired
-                prefs.copy(galleryViewMode = next.viewMode, galleryGridSize = next.gridSize)
-            }
+            try {
+                delay(320)
+                settingsRepository.update { it.copy(galleryViewMode=desired.viewMode,galleryGridSize=desired.gridSize) }
+                if(requestedDensity.value==desired)requestedDensity.value=null
+            } catch(cancel:CancellationException){throw cancel}
+            catch(_:Exception){requestedDensity.value=null;_message.tryEmit("Couldn't save the gallery layout. Try again.")}
         }
     }
 

@@ -41,6 +41,7 @@ fun rememberDragSelect(
     onRange: (IntRange) -> Unit,
     onEnd: () -> Unit,
     edgeSize: Dp = EDGE_SIZE,
+    enabled: Boolean = true,
     scrollPerFrame: Dp = SCROLL_PER_FRAME
 ): Modifier = dragSelect(
     scrollable = gridState,
@@ -56,7 +57,8 @@ fun rememberDragSelect(
     onRange = onRange,
     onEnd = onEnd,
     edgeSize = edgeSize,
-    scrollPerFrame = scrollPerFrame
+    scrollPerFrame = scrollPerFrame,
+    enabled = enabled
 )
 
 @Composable
@@ -66,6 +68,7 @@ fun rememberDragSelect(
     onRange: (IntRange) -> Unit,
     onEnd: () -> Unit,
     edgeSize: Dp = EDGE_SIZE,
+    enabled: Boolean = true,
     scrollPerFrame: Dp = SCROLL_PER_FRAME
 ): Modifier = dragSelect(
     scrollable = listState,
@@ -78,7 +81,8 @@ fun rememberDragSelect(
     onRange = onRange,
     onEnd = onEnd,
     edgeSize = edgeSize,
-    scrollPerFrame = scrollPerFrame
+    scrollPerFrame = scrollPerFrame,
+    enabled = enabled
 )
 
 @Composable
@@ -89,7 +93,8 @@ private fun dragSelect(
     onRange: (IntRange) -> Unit,
     onEnd: () -> Unit,
     edgeSize: Dp,
-    scrollPerFrame: Dp
+    scrollPerFrame: Dp,
+    enabled: Boolean
 ): Modifier {
     val density = LocalDensity.current
     val edgePx = with(density) { edgeSize.toPx() }
@@ -117,7 +122,8 @@ private fun dragSelect(
         }
     }
 
-    return Modifier.pointerInput(scrollable) {
+    return Modifier.pointerInput(scrollable,enabled) {
+        if(!enabled)return@pointerInput
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
             if (!awaitLongPress(down)) return@awaitEachGesture
@@ -127,6 +133,7 @@ private fun dragSelect(
             currentOnStart()
             try { while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
+                if(event.changes.count{it.pressed}>1)break
                 val change = event.changes.fastFirstOrNull { it.id == down.id } ?: break
                 change.consume()
                 if (!change.pressed) break

@@ -22,6 +22,10 @@ class ListPosition(private val state: SavedStateHandle,private val scope:String=
         get()=state["$scope:anchor"]
         set(value){state["$scope:anchor"]=value}
 
+    var neighborIds:List<String>
+        get()=state["$scope:neighbors"]?:emptyList()
+        set(value){state["$scope:neighbors"]=value}
+
     val index: Int get() = state["$scope:$KEY_INDEX"] ?: 0
     val offset: Int get() = state["$scope:$KEY_OFFSET"] ?: 0
 
@@ -30,7 +34,7 @@ class ListPosition(private val state: SavedStateHandle,private val scope:String=
         state["$scope:$KEY_OFFSET"] = offset
     }
 
-    fun discard(){state.remove<String>("$scope:anchor");state.remove<Int>("$scope:$KEY_INDEX");state.remove<Int>("$scope:$KEY_OFFSET")}
+    fun discard(){state.remove<String>("$scope:anchor");state.remove<List<String>>("$scope:neighbors");state.remove<Int>("$scope:$KEY_INDEX");state.remove<Int>("$scope:$KEY_OFFSET")}
 
     private companion object {
         const val KEY_INDEX = "list-index"

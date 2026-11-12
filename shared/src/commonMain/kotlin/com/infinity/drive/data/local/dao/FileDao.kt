@@ -410,7 +410,12 @@ interface FileDao {
                        AND c.category IN ('IMAGE', 'VIDEO')
                        AND (:showHidden = 1 OR c.isHidden = 0)
                        AND (:showArchived = 1 OR c.isArchived = 0)
-                     ORDER BY c.modifiedAt DESC, c.id ASC LIMIT 1) AS coverFileId
+                     ORDER BY c.modifiedAt DESC, c.id ASC LIMIT 1) AS coverFileId,
+                  (SELECT c.modifiedAt || ':' || COALESCE(c.localPath,'null') || ':' || COALESCE(c.remoteFileId,'null') || ':' || COALESCE(c.iconFileId,'null') || ':' || COALESCE(c.contentHash,'null')
+                     FROM files c WHERE c.folderId IS f.folderId AND c.chatId IS :chatId
+                       AND c.trashedAt IS NULL AND c.category IN ('IMAGE','VIDEO')
+                       AND (:showHidden = 1 OR c.isHidden = 0) AND (:showArchived = 1 OR c.isArchived = 0)
+                     ORDER BY c.modifiedAt DESC, c.id ASC LIMIT 1) AS coverRevision
            FROM files f
            LEFT JOIN folders fo ON fo.id = f.folderId
            WHERE f.trashedAt IS NULL AND f.chatId IS :chatId

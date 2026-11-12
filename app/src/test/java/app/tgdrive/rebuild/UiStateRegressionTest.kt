@@ -178,4 +178,55 @@ class UiStateRegressionTest {
         }finally{clear(vm);Dispatchers.resetMain()}
     }
 
+    @Test fun rapidGalleryDensityChangesCommitImmediatelyAndPersistOnlyTheLatestChoice()=runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val prefs=MutableStateFlow(UserPreferences())
+        val saved=mutableListOf<Int>()
+        val settings=fake<com.infinity.drive.domain.repository.SettingsRepository>{method,args->when(method){
+            "getPreferences"->prefs
+            "update"->{@Suppress("UNCHECKED_CAST") val transform=args[0] as (UserPreferences)->UserPreferences
+                prefs.value=transform(prefs.value);saved+=prefs.value.galleryGridSize;Unit}
+            else->error(method)
+        }}
+        val vm=com.infinity.drive.presentation.gallery.GalleryViewModel(SavedStateHandle(),fake{_,_->error("files")},
+            fake{_,_->error("trash")},fake{_,_->error("transfers")},settings,fake{_,_->error("sync")})
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)){vm.uiState.collect()}
+        try {
+            runCurrent();assertTrue(vm.uiState.value.loaded)
+            vm.zoomOut();vm.zoomOut();vm.zoomIn();vm.zoomIn();vm.zoomOut();runCurrent()
+            assertEquals(4,vm.uiState.value.gridSize);assertTrue(saved.isEmpty())
+            advanceTimeBy(321);runCurrent()
+            assertEquals(listOf(4),saved);assertEquals(4,vm.uiState.value.gridSize)
+            vm.zoomIn();runCurrent();assertEquals(3,vm.uiState.value.gridSize)
+            advanceTimeBy(321);runCurrent();assertEquals(listOf(4,3),saved)
+        }finally{clear(vm);Dispatchers.resetMain()}
+    }
+
+    @Test fun deletedGalleryAnchorFallsBackToItsSavedNeighborInTheCorrectQueryWindow()=runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val prefs=MutableStateFlow(UserPreferences())
+        val settings=fake<com.infinity.drive.domain.repository.SettingsRepository>{method,_->when(method){"getPreferences"->prefs;else->error(method)}}
+        val row=DriveFile("neighbor",null,"neighbor.jpg",10,"image/jpeg",FileCategory.IMAGE,null,null,null,null,null,null,
+            BackupState.NONE,false,false,false,false,null,null,null,null,createdAt=1,modifiedAt=1,addedAt=1)
+        var requested:FileQuerySpec?=null
+        val files=fake<FileRepository>{method,args->when(method){
+            "getFile"->if(args[0]=="neighbor")row else null
+            "indexOfFile"->44
+            "pagedFiles"->{requested=args[0] as FileQuerySpec;flowOf(androidx.paging.PagingData.empty<DriveFile>())}
+            else->error(method)
+        }}
+        val vm=com.infinity.drive.presentation.gallery.GalleryViewModel(SavedStateHandle(),files,fake{_,_->error("trash")},
+            fake{_,_->error("transfer")},settings,fake{_,_->error("sync")})
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)){vm.uiState.collect()}
+        try {
+            runCurrent()
+            val position=vm.positionFor(ViewMode.GRID)
+            position.anchorId="deleted";position.neighborIds=listOf("neighbor")
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)){vm.pagedMedia.collect()}
+            runCurrent()
+            assertEquals("neighbor",position.anchorId)
+            assertEquals(44,requested?.initialLoadIndex)
+        }finally{clear(vm);Dispatchers.resetMain()}
+    }
+
 }

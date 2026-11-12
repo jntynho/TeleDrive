@@ -466,6 +466,7 @@ private fun PreviewPage(
         Box(Modifier.fillMaxSize().background(Color.Black)){
             ZoomableImage(model=(content as? PreviewContent.Image)?.model,contentKey=file.id,
                 previewModel=com.infinity.drive.core.media.thumbnailModel(file),contentDescription=file.name,
+                knownImageSize=if((file.width?:0)>0&&(file.height?:0)>0)androidx.compose.ui.unit.IntSize(file.width!!,file.height!!)else androidx.compose.ui.unit.IntSize.Zero,
                 onTap=onToggleChrome,onZoomChanged=onImageZoomChanged)
         }
         return

@@ -8,6 +8,7 @@ import androidx.compose.animation.core.animateDecay
 import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -42,13 +43,13 @@ import kotlin.math.abs
 @kotlin.OptIn(kotlinx.coroutines.FlowPreview::class)
 @Composable
 fun ZoomableImage(model:Any?,contentDescription:String?,modifier:Modifier=Modifier,
-    onTap:()->Unit={},onZoomChanged:(Boolean)->Unit={},contentKey:Any?=model,previewModel:Any?=null
+    onTap:()->Unit={},onZoomChanged:(Boolean)->Unit={},contentKey:Any?=model,previewModel:Any?=null,knownImageSize:IntSize=IntSize.Zero
 ) {
     var failed by remember(model){mutableStateOf(false)}
     var scale by remember(contentKey){mutableFloatStateOf(1f)}
     var offset by remember(contentKey){mutableStateOf(Offset.Zero)}
     var viewport by remember(contentKey){mutableStateOf(IntSize.Zero)}
-    var imageSize by remember(contentKey){mutableStateOf(IntSize.Zero)}
+    var imageSize by remember(contentKey){mutableStateOf(knownImageSize)}
     var animation by remember(contentKey){mutableStateOf<Job?>(null)}
     val scope=rememberCoroutineScope()
     val decay=rememberSplineBasedDecay<Float>()
@@ -125,13 +126,18 @@ fun ZoomableImage(model:Any?,contentDescription:String?,modifier:Modifier=Modifi
     ) {
         val context=coil3.compose.LocalPlatformContext.current
         val imageRequest=remember(model,previewModel,context){coil3.request.ImageRequest.Builder(context).data(model?:previewModel).crossfade(160).build()}
-        AsyncImage(imageRequest,contentDescription,contentScale=ContentScale.Fit,onState={state->
+        val density=androidx.compose.ui.platform.LocalDensity.current
+        val fit=if(imageSize.width>0&&imageSize.height>0&&viewport.width>0&&viewport.height>0)
+            minOf(viewport.width.toFloat()/imageSize.width,viewport.height.toFloat()/imageSize.height)else 0f
+        val frame=if(fit>0f)Modifier.align(androidx.compose.ui.Alignment.Center).then(
+            Modifier.size(with(density){(imageSize.width*fit).toDp()},with(density){(imageSize.height*fit).toDp()}))else Modifier.fillMaxSize()
+        AsyncImage(imageRequest,contentDescription,contentScale=if(model==null&&knownImageSize!=IntSize.Zero)ContentScale.Crop else ContentScale.Fit,onState={state->
             when(state){
                 is AsyncImagePainter.State.Error->if(model!=null)failed=true
-                is AsyncImagePainter.State.Success->{imageSize=IntSize(state.result.image.width,state.result.image.height);offset=clamp(offset,scale)}
+                is AsyncImagePainter.State.Success->{if(model!=null||imageSize==IntSize.Zero){imageSize=IntSize(state.result.image.width,state.result.image.height);offset=clamp(offset,scale)}}
                 else->Unit
             }
-        },modifier=Modifier.fillMaxSize().graphicsLayer{scaleX=scale;scaleY=scale;translationX=offset.x;translationY=offset.y})
+        },modifier=frame.graphicsLayer{scaleX=scale;scaleY=scale;translationX=offset.x;translationY=offset.y})
         region?.let{tile->
             androidx.compose.foundation.Canvas(Modifier.fillMaxSize()){
                 val factor=minOf(size.width/tile.original.width,size.height/tile.original.height)*scale

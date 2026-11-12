@@ -5,5 +5,6 @@ data class MediaAlbum(
     val name: String?,
     val itemCount: Int,
     val coverFileId: String?,
-    val latestAt: Long
+    val latestAt: Long,
+    val coverRevision:String=""
 )

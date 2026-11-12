@@ -46,8 +46,18 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -105,6 +115,10 @@ import com.infinity.drive.presentation.components.rememberToolbarLift
 import com.infinity.drive.presentation.navigation.LocalBottomBarInset
 import com.infinity.drive.presentation.preview.PreviewSequence
 import com.infinity.drive.presentation.common.rememberPosition
+import com.infinity.drive.presentation.components.*
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.platform.LocalDensity
+import kotlinx.coroutines.flow.first
 
 @Composable
 private fun DayHeaderRow(dayStartMillis: Long, modifier: Modifier = Modifier) {
@@ -136,7 +150,9 @@ private fun AlbumGrid(
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
     loading:Boolean=false,
-    searching:Boolean=false
+    searching:Boolean=false,
+    position:com.infinity.drive.presentation.common.ListPosition?=null,
+    context:Any?=null
 ) {
     if (albums.isEmpty()) {
         EmptyState(
@@ -146,29 +162,78 @@ private fun AlbumGrid(
         )
         return
     }
-    var pinching by remember{mutableStateOf(false)}
+    val grid=rememberSaveable(context,saver=LazyGridState.Saver){LazyGridState()}
+    val motion=rememberGridDensityMotion(grid,context)
+    val latestColumns by rememberUpdatedState(columns)
+    var frozen by remember(context){mutableStateOf<List<MediaAlbum>?>(null)}
+    val rows=frozen?:albums
+    val density=LocalDensity.current
+    val spacing=with(density){10.dp.toPx()}
+    val inset=with(density){12.dp.toPx()}
+    var restored by remember(position){mutableStateOf(false)}
+    LaunchedEffect(motion.busy){if(!motion.busy)frozen=null}
+    LaunchedEffect(position,albums,loading){
+        if(!restored&&!loading&&albums.isNotEmpty()){
+            val index=position?.anchorId?.let{id->albums.indexOfFirst{(it.folderId?:UNFILED_ALBUM_KEY)==id}}?.takeIf{it>=0}?:position?.index?:0
+            grid.requestScrollToItem(index.coerceIn(0,albums.lastIndex),position?.offset?:0)
+            restored=true
+        }
+    }
+    LaunchedEffect(grid,position,restored,motion.busy){
+        if(restored&&!motion.busy&&position!=null)snapshotFlow{grid.firstVisibleItemIndex to grid.firstVisibleItemScrollOffset}.collect{(index,offset)->
+            position.anchorId=rows.getOrNull(index)?.folderId?:UNFILED_ALBUM_KEY;position.remember(index,offset)
+        }
+    }
+    Box(Modifier.fillMaxSize().clipToBounds()){
     LazyVerticalGrid(
-        elasticEnabled=!pinching,
-        columns = GridCells.Fixed(columns),
-        modifier = Modifier
-            .fillMaxSize().resultReveal(albums.map{it.folderId})
-            .pinchZoom(onZoomIn=onZoomIn,onZoomOut=onZoomOut,onGestureStarted={pinching=true},onGestureFinished={pinching=false},densityKey=columns),
-        contentPadding = PaddingValues(
-            start = 12.dp,
-            end = 12.dp,
-            top = 12.dp,
-            bottom = 12.dp + bottomPadding
-        ),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        state=grid,
+        elasticEnabled=!motion.busy,
+        userScrollEnabled=!motion.busy,
+        columns=GridCells.Fixed(columns),
+        modifier=Modifier.fillMaxSize().densityAccessibility(columns,onZoomIn,onZoomOut)
+            .pinchZoom(onZoomIn,onZoomOut,
+                onGestureStarted={point->frozen=albums.toList();motion.begin(grid,columns,rows.map{DensityItem(it.folderId?:UNFILED_ALBUM_KEY)},point,spacing,1f,inset)},
+                onGestureProgress=motion::preview,
+                onGestureFinished={committed->motion.finish(grid,committed){latestColumns};if(!motion.busy)frozen=null},
+                densityKey=context,columns=columns,enabled=!loading,
+                canZoomIn=columns>MIN_GRID_COLUMNS,canZoomOut=columns<MAX_GRID_COLUMNS,commitAllowed={motion.dragging}),
+        contentPadding=PaddingValues(start=12.dp,end=12.dp,top=12.dp,bottom=12.dp+bottomPadding),
+        horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)
     ) {
-        items(albums, key = { it.folderId ?: UNFILED_ALBUM_KEY }) { album ->
-            AlbumCard(
-                album = album,
-                loading=loading,
-                onClick = { onOpenAlbum(album) },
-                modifier = Modifier.animateItem()
-            )
+        items(rows,key={it.folderId?:UNFILED_ALBUM_KEY}){album->
+            AlbumCard(album,loading=loading,onClick={onOpenAlbum(album)},
+                modifier=(if(motion.busy)Modifier else Modifier.animateItem()).then(motion.cell(album.folderId?:UNFILED_ALBUM_KEY)))
+        }
+    }
+
+        EnteringAlbumCells(motion,rows,onOpenAlbum)
+    }
+
+}
+
+@Composable
+private fun EnteringAlbumCells(motion:GridDensityMotion,rows:List<MediaAlbum>,onOpen:(MediaAlbum)->Unit){
+    val density=LocalDensity.current
+    val byKey=remember(rows){rows.associateBy{it.folderId?:UNFILED_ALBUM_KEY}}
+    motion.enteringCells().forEach{(key,rect)->byKey[key]?.let{album->
+        AlbumCard(album,{onOpen(album)},modifier=Modifier.offset{IntOffset(rect.left.roundToInt(),rect.top.roundToInt())}
+            .width(with(density){rect.width.toDp()}).height(with(density){rect.height.toDp()}))
+    }}
+}
+
+@Composable
+private fun EnteringMediaCells(motion:GridDensityMotion,rows:List<GalleryListItem>?,selected:Set<String>,selectionMode:Boolean,
+    onOpen:(com.infinity.drive.domain.model.DriveFile)->Unit,onLongPress:(com.infinity.drive.domain.model.DriveFile)->Unit){
+    val density=LocalDensity.current
+    val byKey=remember(rows){rows?.associateBy{it.key}.orEmpty()}
+    motion.enteringCells().forEach{(key,rect)->
+        val placed=Modifier.offset{IntOffset(rect.left.roundToInt(),rect.top.roundToInt())}
+            .width(with(density){rect.width.toDp()}).height(with(density){rect.height.toDp()})
+        when(val item=byKey[key]){
+            is GalleryListItem.Media->FileGridItem(item.file,item.file.id in selected,{onOpen(item.file)},{onLongPress(item.file)},
+                modifier=placed,compact=true,galleryTile=true,selectionMode=selectionMode)
+            is GalleryListItem.DayHeader->DayHeaderRow(item.dayStartMillis,placed)
+            null->Unit
         }
     }
 }
@@ -237,61 +302,95 @@ fun GalleryScreen(
     val mediaGridState = rememberSaveable(state.tab,contextRevision,appliedQuery,state.sortField,state.sortDirection, saver = LazyGridState.Saver) {
         LazyGridState()
     }
-    var pinching by remember{mutableStateOf(false)}
-    var pinchAnchor by remember{mutableStateOf<Pair<String,Int>?>(null)}
+    val densityContext=listOf(state.tab,contextRevision,appliedQuery,state.sortField,state.sortDirection,state.viewMode)
+    val gridMotion=rememberGridDensityMotion(mediaGridState,densityContext)
+    val latestColumns by rememberUpdatedState(state.gridSize)
+    val density=LocalDensity.current
+    val gap=with(density){LibraryLayout.GalleryGutter.toPx()}
+    val headerHeight=with(density){42.dp.toPx()}
+    var pinching by remember(densityContext){mutableStateOf(false)}
+    var frozenMedia by remember(densityContext){mutableStateOf<List<GalleryListItem>?>(null)}
+    val shownCount=frozenMedia?.size?:media.itemCount
+    val shownAt:(Int)->GalleryListItem?={ index -> frozenMedia?.getOrNull(index) ?: if(index in 0 until media.itemCount)media.peek(index)else null }
+    var pinchAnchor by remember(state.tab,contextRevision,appliedQuery,state.sortField,state.sortDirection){mutableStateOf<DensityAnchor?>(null)}
+    LaunchedEffect(gridMotion.busy){if(!gridMotion.busy)frozenMedia=null}
     val capturePinchAnchor:(androidx.compose.ui.geometry.Offset)->Unit={point->
         pinching=true;viewModel.endRangeSelection()
-        val indexAndOffset=if(state.viewMode==ViewMode.LIST){
-            mediaListState.layoutInfo.visibleItemsInfo.filter{it.index in 0 until media.itemCount&&media.peek(it.index) is GalleryListItem.Media}
-                .minByOrNull{kotlin.math.abs(it.offset+it.size/2f-point.y)}?.let{it.index to it.offset}
+        if(state.viewMode==ViewMode.GRID){
+            val snapshot=media.itemSnapshotList.items.toList()
+            frozenMedia=snapshot
+            gridMotion.begin(mediaGridState,state.gridSize,snapshot.map{DensityItem(it.key,it is GalleryListItem.DayHeader)},point,gap,LibraryLayout.GalleryAspect,defaultHeaderHeight=headerHeight)
         }else{
-            mediaGridState.layoutInfo.visibleItemsInfo.filter{it.index in 0 until media.itemCount&&media.peek(it.index) is GalleryListItem.Media}
-                .minByOrNull{val dx=it.offset.x+it.size.width/2f-point.x;val dy=it.offset.y+it.size.height/2f-point.y;dx*dx+dy*dy}
-                ?.let{it.index to it.offset.y}
+            val item=mediaListState.layoutInfo.visibleItemsInfo.filter{shownAt(it.index) is GalleryListItem.Media}
+                .minByOrNull{kotlin.math.abs(it.offset+it.size/2f-point.y)}
+            val file=(item?.let{shownAt(it.index)} as? GalleryListItem.Media)?.file
+            pinchAnchor=if(file!=null&&item!=null)DensityAnchor(file.id,((point.y-item.offset)/item.size).coerceIn(0f,1f),point.y)else null
         }
-        val file=indexAndOffset?.first?.let{(media.peek(it) as? GalleryListItem.Media)?.file}
-        pinchAnchor=if(file!=null)file.id to indexAndOffset!!.second else null
     }
     LaunchedEffect(state.gridSize,state.viewMode){
         val anchor=pinchAnchor
         if(anchor!=null){
-            androidx.compose.runtime.withFrameNanos{}
-            val index=media.itemSnapshotList.items.indexOfFirst{it is GalleryListItem.Media&&it.file.id==anchor.first}
+            val index=media.itemSnapshotList.items.indexOfFirst{it is GalleryListItem.Media&&it.file.id==anchor.key}
             if(index>=0){
-                if(state.viewMode==ViewMode.GRID)mediaGridState.scrollToItem(index,-anchor.second)
-                else mediaListState.scrollToItem(index,-anchor.second)
+                if(state.viewMode==ViewMode.GRID){
+                    kotlinx.coroutines.withTimeoutOrNull(700){snapshotFlow{mediaGridState.layoutInfo.viewportSize.width}.first{it>0}}
+                    val width=(mediaGridState.layoutInfo.viewportSize.width-gap*(state.gridSize-1))/state.gridSize
+                    if(width>0){
+                        val offset=anchoredScrollOffset(anchor,width/LibraryLayout.GalleryAspect,mediaGridState.layoutInfo.beforeContentPadding.toFloat())
+                        viewModel.positionFor(ViewMode.GRID).apply{anchorId=anchor.key;remember(index,offset)}
+                        kotlinx.coroutines.withTimeoutOrNull(700){snapshotFlow{mediaGridState.layoutInfo}.first{layout->
+                            layout.visibleItemsInfo.any{item->shownAt(item.index) is GalleryListItem.Media&&kotlin.math.abs(item.size.width-width)<2f}
+                        }}
+                        mediaGridState.scrollToItem(index,offset)
+                    }
+                }else mediaListState.requestScrollToItem(index)
             }
             pinchAnchor=null
         }
     }
 
     val scrolled = if (state.viewMode == ViewMode.LIST) mediaListState else mediaGridState
-    val position=remember(viewModel,state.tab,appliedQuery,state.sortField,state.sortDirection,state.viewMode,contextRevision){viewModel.positionFor(state.viewMode)}
+    val position=remember(viewModel,state.tab,appliedQuery,state.sortField,state.sortDirection,state.viewMode,contextRevision,albumQuery){viewModel.positionFor(state.viewMode)}
     var anchorRestored by remember(position){mutableStateOf(false)}
-    LaunchedEffect(position,media.itemCount){
-        if(!anchorRestored&&media.itemCount>0&&pinchAnchor==null){
+    LaunchedEffect(position,media.itemCount,gridMotion.busy,pinching,pinchAnchor){
+        if(!anchorRestored&&media.itemCount>0&&pinchAnchor==null&&!gridMotion.busy&&!pinching&&state.tab!=GalleryTab.ALBUMS){
             val wanted=position.anchorId
             val index=if(wanted==null)0 else media.itemSnapshotList.items.indexOfFirst{(it as? GalleryListItem.Media)?.file?.id==wanted}
             if(index>=0){
                 if(state.viewMode==ViewMode.LIST)mediaListState.scrollToItem(index,position.offset)else mediaGridState.scrollToItem(index,position.offset)
                 anchorRestored=true
-            }else if(media.loadState.refresh !is androidx.paging.LoadState.Loading)anchorRestored=true
+            }else if(media.loadState.refresh is androidx.paging.LoadState.NotLoading){
+                // The pager has already loaded the saved file's ranked window. A missing
+                // anchor here was removed/filtered; settle on its nearest loaded survivor.
+                val fallback=media.itemSnapshotList.items.mapIndexedNotNull{ i,item->if(item is GalleryListItem.Media)i else null}
+                    .minByOrNull{kotlin.math.abs(it-position.index)}?:0
+                if(state.viewMode==ViewMode.LIST)mediaListState.scrollToItem(fallback,position.offset)else mediaGridState.scrollToItem(fallback,position.offset)
+                anchorRestored=true
+            }
         }
     }
-    LaunchedEffect(position,scrolled,anchorRestored){
-        if(anchorRestored)androidx.compose.runtime.snapshotFlow {
-            if(state.viewMode==ViewMode.LIST)mediaListState.firstVisibleItemIndex to mediaListState.firstVisibleItemScrollOffset
-            else mediaGridState.firstVisibleItemIndex to mediaGridState.firstVisibleItemScrollOffset
+    LaunchedEffect(position,scrolled,anchorRestored,gridMotion.busy,pinching){
+        if(anchorRestored&&!gridMotion.busy&&!pinching)androidx.compose.runtime.snapshotFlow {
+            if(state.viewMode==ViewMode.LIST){
+                val first=mediaListState.layoutInfo.visibleItemsInfo.firstOrNull{shownAt(it.index) is GalleryListItem.Media}
+                (first?.index?:mediaListState.firstVisibleItemIndex) to -(first?.offset?:-mediaListState.firstVisibleItemScrollOffset)
+            }else{
+                val first=mediaGridState.layoutInfo.visibleItemsInfo.firstOrNull{shownAt(it.index) is GalleryListItem.Media}
+                (first?.index?:mediaGridState.firstVisibleItemIndex) to -(first?.offset?.y?:-mediaGridState.firstVisibleItemScrollOffset)
+            }
         }.collect{(index,offset)->
-            (if(index in 0 until media.itemCount)media.peek(index) as? GalleryListItem.Media else null)?.file?.id?.let{position.anchorId=it;position.remember(index,offset)}
+            (shownAt(index) as? GalleryListItem.Media)?.file?.id?.let{position.anchorId=it;position.remember(index,offset)
+                position.neighborIds=listOf(index+1,index-1,index+2,index-2).mapNotNull{neighbor->(shownAt(neighbor) as? GalleryListItem.Media)?.file?.id}.distinct()}
         }
     }
     val lifted by rememberToolbarLift(scrolled)
-    val scopeKey=listOf(appliedQuery,state.tab.name,state.sortField.name,state.sortDirection.name).joinToString("\u0000")
-    var lastScope by rememberSaveable{mutableStateOf(scopeKey)}
-    LaunchedEffect(scopeKey){if(lastScope!=scopeKey){mediaListState.scrollToItem(0);mediaGridState.scrollToItem(0);lastScope=scopeKey}}
 
-    val filters=com.infinity.drive.presentation.components.rememberCollapsingFilters(query to state.tab){scrolled.canScrollBackward}
+    val filters=com.infinity.drive.presentation.components.rememberCollapsingFilters(query to state.tab,enabled=!gridMotion.busy&&!pinching){scrolled.canScrollBackward}
+    val networkRetryEpoch=LocalThumbnailRetryEpoch.current
+    var manualRetryEpoch by remember{mutableIntStateOf(0)}
+    var wasRefreshing by remember{mutableStateOf(false)}
+    LaunchedEffect(refreshing){if(wasRefreshing&&!refreshing)manualRetryEpoch++;wasRefreshing=refreshing}
+    CompositionLocalProvider(LocalThumbnailRetryEpoch provides (networkRetryEpoch+manualRetryEpoch)){
     Scaffold(
         snackbarHost={androidx.compose.material3.SnackbarHost(snack)},
         modifier=filters.scrollModifier,
@@ -431,12 +530,15 @@ fun GalleryScreen(
             }
 
             if (state.tab == GalleryTab.ALBUMS && !state.isAlbumView) {
-                if (!state.loaded) {
+                if (!state.loaded||(state.albumsLoading&&state.albums.isEmpty())) {
                     app.tgdrive.ui.SkeletonScene { AlbumGrid(List(state.albumGridSize*4){MediaAlbum("skeleton-$it","Album",0,null,0)},state.albumGridSize,padding.calculateBottomPadding()+LocalBottomBarInset.current,{},{},{},loading=true) }
                     return@Column
                 }
+                if(state.albumsError&&state.albums.isEmpty()){EmptyState(DriveIcons.Info,"Couldn't load albums",description="Check your connection and try again.",actionLabel="Retry",onAction=viewModel::retryAlbums);return@Column}
                 AlbumGrid(
                     albums = state.albums,
+                    position=position,
+                    context=densityContext to albumQuery,
                     columns = state.albumGridSize,
                     bottomPadding = padding.calculateBottomPadding() + LocalBottomBarInset.current,
                     onOpenAlbum = onOpenAlbum,
@@ -448,7 +550,7 @@ fun GalleryScreen(
             }
 
             val mediaIdAt: (Int) -> String? = { index ->
-                (if(index in 0 until media.itemCount)media.peek(index) as? GalleryListItem.Media else null)?.file?.id
+                (shownAt(index) as? GalleryListItem.Media)?.file?.id
             }
             val listDragSelect = rememberDragSelect(
                 listState = mediaListState,
@@ -456,7 +558,8 @@ fun GalleryScreen(
                 onRange = { range ->
                     viewModel.extendRangeSelection(range.mapNotNull(mediaIdAt))
                 },
-                onEnd = viewModel::endRangeSelection
+                onEnd = viewModel::endRangeSelection,
+                enabled=!gridMotion.busy&&!pinching&&!busy
             )
             val gridDragSelect = rememberDragSelect(
                 gridState = mediaGridState,
@@ -464,22 +567,24 @@ fun GalleryScreen(
                 onRange = { range ->
                     viewModel.extendRangeSelection(range.mapNotNull(mediaIdAt))
                 },
-                onEnd = viewModel::endRangeSelection
+                onEnd = viewModel::endRangeSelection,
+                enabled=!gridMotion.busy&&!pinching&&!busy
             )
             RefreshableContent(
                 isRefreshing = refreshing,
+                enabled=!gridMotion.busy&&!pinching&&!busy,
                 onRefresh = viewModel::refresh,
                 modifier = Modifier.fillMaxSize()
             ) {
                 when {
-                    media.isInitialLoad || !state.loaded -> com.infinity.drive.presentation.components.GallerySkeleton(state.gridSize,bottomPadding=padding.calculateBottomPadding()+LocalBottomBarInset.current,listMode=state.viewMode==ViewMode.LIST)
+                    (frozenMedia==null&&media.isInitialLoad) || !state.loaded -> com.infinity.drive.presentation.components.GallerySkeleton(state.gridSize,bottomPadding=padding.calculateBottomPadding()+LocalBottomBarInset.current,listMode=state.viewMode==ViewMode.LIST)
 
-                    media.loadState.refresh is androidx.paging.LoadState.Error && media.itemCount == 0 -> EmptyState(
+                    media.loadState.refresh is androidx.paging.LoadState.Error && shownCount == 0 -> EmptyState(
                         icon=DriveIcons.Info,title="Couldn't load your gallery",
                         description="Your files are still safe. Try loading the library again.",
                         actionLabel="Retry",onAction={media.retry()}
                     )
-                    media.itemCount == 0 -> EmptyState(
+                    shownCount == 0 -> EmptyState(
                         icon = DriveIcons.Photo,
                         title = if(query.isNotBlank())"No matching photos or videos"else stringResource(Res.string.gallery_no_media),
                         description = if(query.isNotBlank())"Try another filename or change the filter."else stringResource(Res.string.gallery_photos_videos_appear_here)
@@ -487,15 +592,16 @@ fun GalleryScreen(
 
                     state.viewMode == ViewMode.LIST -> LazyColumn(
                         state = mediaListState,
-                        elasticEnabled=!pinching&&!state.selectionMode,
+                        elasticEnabled=!pinching&&!gridMotion.busy&&!state.selectionMode,
+                        userScrollEnabled=!gridMotion.busy&&!pinching,
                         modifier = Modifier
-                            .fillMaxSize()
+                            .fillMaxSize().testTag("gallery-grid")
                             .pinchZoom(
                                 onZoomIn = viewModel::zoomIn,
                                 onZoomOut = viewModel::zoomOut,
                                 onGestureStarted=capturePinchAnchor,
                                 onGestureFinished={committed->pinching=false;if(!committed||!viewModel.flushZoom())pinchAnchor=null},
-                                densityKey=state.viewMode to state.gridSize
+                                densityKey=densityContext,enabled=!busy
                             )
                             .then(listDragSelect).resultReveal(media.itemSnapshotList.items.take(8).map{it.key}),
                         contentPadding = PaddingValues(
@@ -506,10 +612,11 @@ fun GalleryScreen(
                         )
                     ) {
                         items(
-                            count = media.itemCount,
-                            key = media.itemKey { it.key }
+                            count = shownCount,
+                            key = {index->shownAt(index)?.key?:"gallery-placeholder-$index"},
+                            contentType={index->if(shownAt(index) is GalleryListItem.DayHeader)"day"else"media"}
                         ) { index ->
-                            when (val item = media[index]) {
+                            when (val item = frozenMedia?.getOrNull(index) ?: media[index]) {
                                 is GalleryListItem.DayHeader -> DayHeaderRow(
                                     dayStartMillis = item.dayStartMillis,
                                     modifier = Modifier.animateItem()
@@ -539,20 +646,25 @@ fun GalleryScreen(
                         if(media.loadState.append is androidx.paging.LoadState.Error){item("gallery-load-retry"){PagingRetryRow{media.retry()}}}
                     }
 
-                    else -> LazyVerticalGrid(
+                    else -> Box(Modifier.fillMaxSize().clipToBounds()) {
+                    LazyVerticalGrid(
                         state = mediaGridState,
-                        elasticEnabled=!pinching&&!state.selectionMode,
+                        elasticEnabled=!pinching&&!gridMotion.busy&&!state.selectionMode,
+                        userScrollEnabled=!gridMotion.busy&&!pinching,
                         columns = GridCells.Fixed(state.gridSize),
                         modifier = Modifier
-                            .fillMaxSize()
+                            .fillMaxSize().testTag("gallery-grid")
                             .pinchZoom(
                                 onZoomIn = viewModel::zoomIn,
                                 onZoomOut = viewModel::zoomOut,
                                 onGestureStarted=capturePinchAnchor,
-                                onGestureFinished={committed->pinching=false;if(!committed||!viewModel.flushZoom())pinchAnchor=null},
-                                densityKey=state.viewMode to state.gridSize
+                                onGestureFinished={committed->pinching=false;gridMotion.finish(mediaGridState,committed){latestColumns};if(!gridMotion.busy)frozenMedia=null},
+                                onGestureProgress=gridMotion::preview,
+                                columns=state.gridSize,enabled=!busy,
+                                canZoomIn=state.gridSize>MIN_GRID_COLUMNS,canZoomOut=state.gridSize<MAX_GRID_COLUMNS,commitAllowed={gridMotion.dragging},
+                                densityKey=densityContext
                             )
-                            .then(gridDragSelect).resultReveal(media.itemSnapshotList.items.take(8).map{it.key}),
+                            .then(gridDragSelect).densityAccessibility(state.gridSize,viewModel::zoomIn,viewModel::zoomOut),
                         contentPadding = PaddingValues(
                             start = 0.dp,
                             end = 0.dp,
@@ -563,20 +675,21 @@ fun GalleryScreen(
                         verticalArrangement = Arrangement.spacedBy(LibraryLayout.GalleryGutter)
                     ) {
                         items(
-                            count = media.itemCount,
-                            key = media.itemKey { it.key },
+                            count = shownCount,
+                            key = {index->shownAt(index)?.key?:"gallery-placeholder-$index"},
+                            contentType={index->if(shownAt(index) is GalleryListItem.DayHeader)"day"else"media"},
                             span = { index ->
-                                if (media.peek(index) is GalleryListItem.DayHeader) {
+                                if (shownAt(index) is GalleryListItem.DayHeader) {
                                     GridItemSpan(maxLineSpan)
                                 } else {
                                     GridItemSpan(1)
                                 }
                             }
                         ) { index ->
-                            when (val item = media[index]) {
+                            when (val item = frozenMedia?.getOrNull(index) ?: media[index]) {
                                 is GalleryListItem.DayHeader -> DayHeaderRow(
                                     dayStartMillis = item.dayStartMillis,
-                                    modifier = Modifier.animateItem()
+                                    modifier = (if(gridMotion.busy)Modifier else Modifier.animateItem()).then(gridMotion.cell(item.key,true))
                                 )
 
                                 is GalleryListItem.Media -> {
@@ -586,6 +699,7 @@ fun GalleryScreen(
                                         selected = file.id in state.selection,
                                         compact = true,
                                         galleryTile=true,
+                                        selectionMode=state.selectionMode,
                                         onClick = {
                                             if (state.selectionMode) {
                                                 viewModel.toggleSelection(file.id)
@@ -594,7 +708,7 @@ fun GalleryScreen(
                                             }
                                         },
                                         onLongClick = { viewModel.toggleSelection(file.id) },
-                                        modifier = Modifier.animateItem()
+                                        modifier = (if(gridMotion.busy)Modifier else Modifier.animateItem()).then(gridMotion.cell(item.key)).testTag("gallery-file-${file.id}")
                                     )
                                 }
 
@@ -605,10 +719,16 @@ fun GalleryScreen(
                             item(key="gallery-load-retry",span={GridItemSpan(maxLineSpan)}){PagingRetryRow{media.retry()}}
                         }
                     }
+                    EnteringMediaCells(gridMotion,frozenMedia,state.selection,state.selectionMode,
+                        onOpen={file->if(state.selectionMode)viewModel.toggleSelection(file.id)else onOpenFile(file.id,previewSequence)},
+                        onLongPress={file->viewModel.toggleSelection(file.id)})
+                    }
+
                 }
             }
         }
     }
+}
 }
 
 private const val TAB_SCROLL_THRESHOLD = 6f
