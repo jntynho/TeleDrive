@@ -13,14 +13,13 @@ import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
-fun HiddenCollectionGate(onBack:()->Unit,onOpenFile:(String,PreviewSequence)->Unit){
-    val vm:HiddenLockViewModel=koinViewModel()
+fun HiddenCollectionGate(onBack:()->Unit,onOpenFile:(String,PreviewSequence)->Unit,onManageHidden:()->Unit){
+    val manager=koinInject<com.infinity.drive.core.security.HiddenLockManager>()
     val listState=androidx.compose.foundation.lazy.rememberLazyListState()
-    val lock by vm.manager.state.collectAsStateWithLifecycle()
-    val ui by vm.ui.collectAsStateWithLifecycle()
+    val lock by manager.state.collectAsStateWithLifecycle()
     SensitiveScreen()
-    if(lock.unlocked&&ui.stage==HiddenStage.UNLOCK&&!ui.working)CollectionScreen(onBack,onOpenFile,onManageHidden=vm::manage,listState=listState)
-    else HiddenLockScreen(onBack,vm)
+    if(lock.ready&&!lock.error&&(!lock.configured||lock.unlocked))CollectionScreen(onBack,onOpenFile,onManageHidden=onManageHidden,listState=listState)
+    else HiddenLockScreen(onBack,manager)
 }
 
 /** Keep public content mounted across unrelated lock epochs; private revocation stays synchronous. */

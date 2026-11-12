@@ -73,6 +73,9 @@ sealed interface Route {
     data object Settings : Route
 
     @Serializable
+    data object HiddenSettings : Route
+
+    @Serializable
     data class SettingsSection(val section: String,val focusTitle:String?=null) : Route
 
     @Serializable

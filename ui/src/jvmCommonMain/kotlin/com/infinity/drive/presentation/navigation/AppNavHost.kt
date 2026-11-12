@@ -57,6 +57,7 @@ fun AppNavHost(
     LaunchedEffect(entry?.id){
         val current=entry?:return@LaunchedEffect
         val inside=when {
+            current.destination.hasRoute<Route.HiddenSettings>()->true
             current.destination.hasRoute<Route.Collection>()->current.toRoute<Route.Collection>().type==com.infinity.drive.presentation.collection.CollectionType.HIDDEN.name
             current.destination.hasRoute<Route.Preview>()->rawFiles.getFile(current.toRoute<Route.Preview>().fileId)?.let{hidden.protectedFile(it)}==true
             current.destination.hasRoute<Route.NoteEditor>()->current.toRoute<Route.NoteEditor>().let{route->route.fileId?.let{rawFiles.getFile(it)?.let{file->hidden.protectedFile(file)}}?:hidden.protectedFolder(route.folderId)}
@@ -208,9 +209,10 @@ fun AppNavHost(
         stableComposable<Route.Collection>(navController) { entry ->
             val back:()->Unit={navController.popBackStackOnce()}
             val open:(String,com.infinity.drive.presentation.preview.PreviewSequence)->Unit={id,sequence->navController.navigateOnce(sequence.routeFor(id))}
-            if(entry.toRoute<Route.Collection>().type==com.infinity.drive.presentation.collection.CollectionType.HIDDEN.name)HiddenCollectionGate(back,open)
+            if(entry.toRoute<Route.Collection>().type==com.infinity.drive.presentation.collection.CollectionType.HIDDEN.name)HiddenCollectionGate(back,open){navController.navigateOnce(Route.HiddenSettings)}
             else CollectionScreen(onBack=back,onOpenFile=open)
         }
+        stableComposable<Route.HiddenSettings>(navController){HiddenSettingsScreen{navController.popBackStackOnce()}}
         stableComposable<Route.NoteEditor>(navController) { entry ->
             val route=entry.toRoute<Route.NoteEditor>()
             HiddenContentGuard(fileId=route.fileId,folderId=route.folderId,onBack={navController.popBackStackOnce()}){
@@ -294,7 +296,7 @@ private inline fun <reified T:Any> androidx.navigation.NavGraphBuilder.stableCom
     composable<T>(enterTransition=enterTransition,exitTransition=exitTransition,popEnterTransition=popEnterTransition,popExitTransition=popExitTransition){entry->
         com.infinity.drive.presentation.common.AppBackHandler(controller.previousBackStackEntry!=null){controller.popBackStackOnce()}
         val chrome = T::class !in setOf<kotlin.reflect.KClass<*>>(Route.Onboarding::class, Route.Preview::class, Route.NoteEditor::class, Route.Search::class)
-        val ownsBottomInset = T::class in setOf<kotlin.reflect.KClass<*>>(Route.Home::class, Route.Gallery::class, Route.Audio::class, Route.Settings::class, Route.SettingsSection::class, Route.Proxy::class, Route.Exclusions::class, Route.Channels::class, Route.Files::class)
+        val ownsBottomInset = T::class in setOf<kotlin.reflect.KClass<*>>(Route.Home::class, Route.Gallery::class, Route.Audio::class, Route.Settings::class, Route.SettingsSection::class, Route.HiddenSettings::class, Route.Proxy::class, Route.Exclusions::class, Route.Channels::class, Route.Files::class)
         Box(Modifier.fillMaxSize().padding(start = if(chrome) LocalNavigationRailWidth.current else 0.dp,
             bottom = if(chrome && !ownsBottomInset) LocalBottomBarHeight.current else 0.dp)) {
             content(entry)

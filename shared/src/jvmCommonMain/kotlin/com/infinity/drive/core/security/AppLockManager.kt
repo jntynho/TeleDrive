@@ -20,23 +20,36 @@ class AppLockManager(
 
     private var backgroundedAt: Long? = null
     private var initialized = false
+    private var authenticationSerial = 0L
+    private val deviceAuthentications = mutableSetOf<Long>()
+    private var deferredForegroundLock = false
+
+    /** Native credential screens may background the host; defer a second app-wide prompt. */
+    fun beginDeviceAuthentication():Long = (++authenticationSerial).also{deviceAuthentications.add(it)}
+    fun finishDeviceAuthentication(ticket:Long,authenticated:Boolean):Boolean {
+        if(!deviceAuthentications.remove(ticket))return false
+        if(authenticated){unlock()}
+        else if(deviceAuthentications.isEmpty()&&deferredForegroundLock){
+            deferredForegroundLock=false;_locked.value=true
+        }
+        return true
+    }
 
     suspend fun onAppStarted() {
         val prefs = settingsRepository.preferences.first()
         if (!prefs.appLockEnabled) {
+            deferredForegroundLock = false
             _locked.value = false
-            return
-        }
-        if (!initialized) {
-            initialized = true
-            _locked.value = true
             return
         }
         val elapsedMinutes = backgroundedAt?.let {
             (System.nanoTime() / 1_000_000 - it) / 60_000
         }
-        if (elapsedMinutes != null && elapsedMinutes >= prefs.autoLockTimeoutMinutes) {
-            _locked.value = true
+        val shouldLock = !initialized || (elapsedMinutes != null && elapsedMinutes >= prefs.autoLockTimeoutMinutes)
+        initialized = true
+        if (shouldLock) {
+            if(deviceAuthentications.isNotEmpty())deferredForegroundLock=true
+            else _locked.value=true
         }
     }
 
@@ -47,9 +60,11 @@ class AppLockManager(
     fun unlock() {
         _locked.value = false
         backgroundedAt = null
+        deferredForegroundLock = false
     }
 
     fun lockNow() {
+        deviceAuthentications.clear();deferredForegroundLock=false
         _locked.value = true
     }
 }

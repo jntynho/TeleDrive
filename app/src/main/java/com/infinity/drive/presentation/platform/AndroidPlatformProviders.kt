@@ -50,6 +50,7 @@ import java.io.File
 fun ProvidePlatformActions(content: @Composable () -> Unit) {
     val capabilities = koinInject<PlatformCapabilities>()
     val settingsRepository = koinInject<SettingsRepository>()
+    val appLock = koinInject<com.infinity.drive.core.security.AppLockManager>()
     val context = LocalContext.current
     val activity = LocalActivity.current
     val resolver=koinInject<com.infinity.drive.presentation.preview.PreviewContentResolver>()
@@ -209,6 +210,21 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
         }
     }
 
+    val hiddenAuthentications=remember(activity){mutableSetOf<Long>()}
+    androidx.compose.runtime.DisposableEffect(activity,appLock){onDispose{
+        hiddenAuthentications.toList().forEach{appLock.finishDeviceAuthentication(it,false)}
+        hiddenAuthentications.clear()
+    }}
+    val hiddenDeviceGate=remember(activity,appLock){DeviceOwnerGate{title,subtitle,onDenied,onConfirmed->
+        val ticket=appLock.beginDeviceAuthentication();hiddenAuthentications.add(ticket)
+        fun finish(success:Boolean,action:()->Unit){
+            if(hiddenAuthentications.remove(ticket)&&appLock.finishDeviceAuthentication(ticket,success))action()
+        }
+        try {requireDeviceOwner(activity as? FragmentActivity,title,subtitle,
+            onDenied={error->finish(false){onDenied(error)}},allowUnsecured=false,
+            onConfirmed={finish(true,onConfirmed)})}
+        catch(_:Exception){finish(false){onDenied("Couldn't open device authentication. Please try again.")}}
+    }}
     val sensitiveClipboard=remember(context){com.infinity.drive.core.security.AndroidSensitiveClipboard(context)}
     androidx.compose.runtime.DisposableEffect(sensitiveClipboard){onDispose{sensitiveClipboard.close()}}
     val hiddenBiometrics=remember(activity){(activity as? FragmentActivity)?.let{com.infinity.drive.core.security.AndroidHiddenBiometrics(it)}}
@@ -250,6 +266,7 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
         LocalPermissionRequester provides permissionRequester,
         LocalSystemScreens provides systemScreens,
         LocalDeviceOwnerGate provides deviceOwnerGate,
+        LocalHiddenDeviceOwnerGate provides hiddenDeviceGate,
         LocalHiddenBiometrics provides hiddenBiometrics,
         LocalSensitiveClipboard provides sensitiveClipboard,
         LocalHiddenContentAccess provides org.koin.compose.koinInject<com.infinity.drive.core.security.HiddenContentAccess>(),

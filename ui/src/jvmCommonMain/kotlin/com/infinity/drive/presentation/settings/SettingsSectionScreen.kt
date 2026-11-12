@@ -788,6 +788,9 @@ private fun SecuritySection(state: SettingsUiState, viewModel: SettingsViewModel
                 }
             )
         }
+        add(visible = capabilities.supportsAppLock) {
+            com.infinity.drive.presentation.hidden.HiddenLockSettingRow()
+        }
         add(visible = capabilities.supportsAppLock && prefs.appLockEnabled) {
             SettingsClickRow(
                 title = stringResource(Res.string.settings_auto_lock),

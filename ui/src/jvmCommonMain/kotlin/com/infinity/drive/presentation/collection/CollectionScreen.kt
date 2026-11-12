@@ -115,7 +115,7 @@ fun CollectionScreen(
                     }
                 },
                 actions = {
-                    if(viewModel.type==CollectionType.HIDDEN&&!selectionMode)IconButton(onManageHidden){Icon(DriveIcons.Lock,"Manage Hidden lock")}
+                    if(viewModel.type==CollectionType.HIDDEN&&!selectionMode)IconButton(onManageHidden){Icon(DriveIcons.MoreVert,"Hidden settings")}
                     if (selectionMode) {
                         IconButton(
                             onClick = {

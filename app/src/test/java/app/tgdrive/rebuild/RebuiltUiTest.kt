@@ -76,6 +76,16 @@ class RebuiltUiTest {
         if(::activity.isInitialized)activity.pause().stop().destroy()
         stopKoin()
     }
+    @Test fun hiddenHeaderOpensItsSettingsAndSecurityOffersTheSameLockSwitch(){
+        compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("Hidden",substring=false).performClick()
+        compose.onNodeWithContentDescription("Hidden settings").performClick()
+        compose.onNodeWithText("Hidden settings",substring=false).assertIsDisplayed()
+        compose.onNodeWithText("Lock Hidden",substring=false).assertIsDisplayed()
+        compose.onNodeWithTag("navigation-settings").performClick()
+        compose.onNodeWithText("Security",substring=false).performScrollTo().performClick()
+        compose.onNodeWithText("Lock Hidden",substring=false).performScrollTo().assertIsDisplayed()
+    }
     @Test fun realEmptyLibraryNavigatesAcrossAllFourTabs() {
         compose.waitUntil(15_000) { compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Your library").assertIsDisplayed()

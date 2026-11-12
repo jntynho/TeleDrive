@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicLong
 @Serializable
 data class HiddenLockRecord(
     val version:Int=1,
-    val pinSalt:String,val pinHash:String,val recoverySalt:String,val recoveryHash:String,
+    val pinSalt:String="",val pinHash:String="",val recoverySalt:String="",val recoveryHash:String="",
     val failures:Int=0,val retryAfter:Long=0,val lastAttemptAt:Long=0,
     val biometricIv:String?=null,val biometricCiphertext:String?=null,val biometricHash:String?=null
 )
@@ -25,7 +25,7 @@ interface HiddenLockStore {
     suspend fun clear()
 }
 data class HiddenLockState(val ready:Boolean=false,val configured:Boolean=false,val unlocked:Boolean=false,
-    val biometrics:Boolean=false,val error:Boolean=false,val epoch:Long=0) {
+    val biometrics:Boolean=false,val error:Boolean=false,val epoch:Long=0,val deviceLock:Boolean=false) {
     val restricted:Boolean get()=!ready||error||(configured&&!unlocked)
 }
 enum class HiddenVerification { SUCCESS, WRONG, WAIT, CANCELLED }
@@ -52,7 +52,7 @@ class HiddenLockManager(
     }}
     suspend fun awaitReady(){loaded.await()}
     private fun publish(unlocked:Boolean=false){
-        mutable.value=HiddenLockState(true,record!=null,unlocked,record?.biometricHash!=null,false,epoch.get())
+        mutable.value=HiddenLockState(true,record!=null,unlocked,record?.biometricHash!=null,false,epoch.get(),record?.version==2)
     }
     fun lock(){
         val next=epoch.incrementAndGet();resetPermit=null
@@ -98,6 +98,7 @@ class HiddenLockManager(
         try {awaitReady();return mutex.withLock {
             check(!state.value.error){"Hidden lock could not be read"}
             val current=record?:return@withLock HiddenVerification.WRONG
+            if(current.version==2)return@withLock HiddenVerification.WRONG
             if(delayFor(current)>0)return@withLock HiddenVerification.WAIT
             val ticket=epoch.get()
             val valid=withContext(Dispatchers.Default){
@@ -137,10 +138,60 @@ class HiddenLockManager(
         val next=checkNotNull(record).copy(biometricHash=null,biometricIv=null,biometricCiphertext=null)
         withContext(NonCancellable+Dispatchers.IO){store.write(next);record=next};publish(unlocked=state.value.unlocked)
     }}
+    /** Call only after the platform has authenticated the current device owner. */
+    suspend fun unlockWithDevice(ticket:Long):Boolean {
+        awaitReady()
+        return mutex.withLock {
+            if(ticket!=epoch.get()||state.value.error)return@withLock false
+            if(record==null)return@withLock true
+            try {
+                if(record?.version!=2)withContext(NonCancellable+Dispatchers.IO){
+                    val next=HiddenLockRecord(version=2)
+                    store.write(next);record=next;resetPermit=null
+                }
+                val current=ticket==epoch.get()
+                publish(unlocked=current)
+                current
+            }catch(cancel:CancellationException){lock();throw cancel}
+            catch(error:Exception){failClosed();throw error}
+        }
+    }
+    /** Both enabling and disabling are authenticated; an expired completion cannot disable a lock. */
+    suspend fun setDeviceLock(enabled:Boolean,ticket:Long):Boolean {
+        awaitReady()
+        return mutex.withLock {
+            if(ticket!=epoch.get()||state.value.error)return@withLock false
+            val previous=record
+            try {withContext(NonCancellable+Dispatchers.IO){
+                if(enabled){
+                    val next=HiddenLockRecord(version=2)
+                    store.write(next);record=next;resetPermit=null
+                    val current=ticket==epoch.get()
+                    lock();publish()
+                    current
+                }else{
+                    store.clear()
+                    if(ticket!=epoch.get()){
+                        if(previous!=null)store.write(previous)
+                        record=previous;publish();false
+                    }else{
+                        record=null;lock();publish();true
+                    }
+                }
+            }}catch(cancel:CancellationException){lock();throw cancel}
+            catch(error:Exception){failClosed();throw error}
+        }
+    }
+    private fun failClosed(){lock();mutable.update{it.copy(configured=true,error=true,unlocked=false)}}
     suspend fun clear(){awaitReady();lock();mutex.withLock{
         withContext(NonCancellable+Dispatchers.IO){store.clear();record=null;publish()}
     }}
     private fun validate(value:HiddenLockRecord){
+        if(value.version==2){
+            require(value.pinSalt.isEmpty()&&value.pinHash.isEmpty()&&value.recoverySalt.isEmpty()&&value.recoveryHash.isEmpty())
+            require(value.biometricIv==null&&value.biometricCiphertext==null&&value.biometricHash==null)
+            return
+        }
         require(value.version==1&&decode(value.pinSalt).size==16&&decode(value.recoverySalt).size==16)
         require(decode(value.pinHash).size==32&&decode(value.recoveryHash).size==32)
         require(value.failures>=0)
