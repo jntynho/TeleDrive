@@ -52,7 +52,7 @@ class LiquidNavigationTest {
         }
     }
 
-    @androidx.annotation.RequiresApi(33)
+    @androidx.test.filters.SdkSuppress(minSdkVersion=33)
     @Test fun externalSelectionThenDraggingBackCommitsTheActualPage() {
         scene()
         compose.onNodeWithTag("tab-3").performClick()
@@ -68,7 +68,7 @@ class LiquidNavigationTest {
         assertTrue(bar.captureToImage().width>0)
     }
 
-    @androidx.annotation.RequiresApi(33)
+    @androidx.test.filters.SdkSuppress(minSdkVersion=33)
     @Test fun rapidTapsLabelsAndRtlKeepExactlyOneSelectedDestination() {
         scene()
         for(i in listOf(1,3,0,2,1))compose.onNodeWithTag("tab-$i").performClick()

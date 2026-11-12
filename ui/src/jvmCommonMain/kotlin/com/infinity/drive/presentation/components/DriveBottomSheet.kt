@@ -80,7 +80,7 @@ fun DriveBottomSheet(
         // Default ListItems must blend into the modal rather than painting rectangular patches.
         MaterialTheme(colorScheme = colors.copy(surface = surface, surfaceContainer = surface,
             surfaceContainerLow = surface, surfaceContainerHigh = surface)) {
-            CompositionLocalProvider(LocalSheetHost provides SheetHost(dismiss),LocalSheetCloseThen provides closeThen,LocalSheetClosing provides closing){content(scope,dismiss)}
+            CompositionLocalProvider(app.tgdrive.ui.LocalElasticTopReserved provides true,LocalSheetHost provides SheetHost(dismiss),LocalSheetCloseThen provides closeThen,LocalSheetClosing provides closing){content(scope,dismiss)}
         }
     }
     }

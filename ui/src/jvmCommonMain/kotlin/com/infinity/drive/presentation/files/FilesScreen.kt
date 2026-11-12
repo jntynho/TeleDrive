@@ -800,6 +800,7 @@ private fun FilesContent(
     )
     LazyVerticalGrid(
         state = gridState,
+        elasticEnabled = !state.selectionMode,
         columns = GridCells.Fixed(columns),
         modifier = Modifier
             .fillMaxSize().resultReveal(state.folderId to (state.sortField to state.sortDirection))

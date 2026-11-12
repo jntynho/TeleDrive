@@ -73,7 +73,8 @@ class MediaSurfaceRegressionTest {
             val density=LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density,if(largeText)2f else 1f)){
                 Box(if(largeText)Modifier.size(320.dp,640.dp)else Modifier.fillMaxSize()){
-                    FullscreenAudioPlayer(playback.value.file!!,true,Modifier.fillMaxSize())
+                    val current by playback.collectAsState()
+                    FullscreenAudioPlayer(current.file!!,true,Modifier.fillMaxSize())
                 }
             }
         }

@@ -25,7 +25,7 @@ fun RefreshableContent(
             onRefresh = onRefresh,
             modifier = modifier
         ) {
-            content()
+            androidx.compose.runtime.CompositionLocalProvider(app.tgdrive.ui.LocalElasticTopReserved provides true) { content() }
         }
     } else {
         Box(modifier = modifier) {

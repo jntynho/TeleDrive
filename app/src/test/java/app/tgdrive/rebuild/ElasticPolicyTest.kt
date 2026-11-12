@@ -6,14 +6,18 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ElasticPolicyTest {
-    @Test fun aLongHeldPullDoesNotPulseWhenFingerSamplesReverseOrReachZero(){
-        var approach=1f
-        repeat(100){
-            approach=app.tgdrive.ui.stableElasticApproach(120f,if(it%2==0).1f else -.1f,approach,if(it%2==0)1f else 0f)
-            assertEquals(1f,approach,0f)
-        }
-        assertEquals(.75f,app.tgdrive.ui.stableElasticApproach(0f,0f,.75f,0f),0f)
-        assertEquals(app.tgdrive.ui.elasticEdgeProximity(12f,Float.POSITIVE_INFINITY,48f,1f),app.tgdrive.ui.elasticEdgeProximity(12f,Float.POSITIVE_INFINITY,48f,-1f),0f)
+    @Test fun anticipationOnlyFollowsMovementTowardsTheBoundary(){
+        assertTrue(app.tgdrive.ui.elasticEdgeProximity(12f,Float.POSITIVE_INFINITY,48f,1f)>0f)
+        assertEquals(0f,app.tgdrive.ui.elasticEdgeProximity(12f,Float.POSITIVE_INFINITY,48f,-1f),0f)
+        assertTrue(app.tgdrive.ui.elasticEdgeProximity(Float.POSITIVE_INFINITY,12f,48f,-1f)<0f)
+        assertEquals(0f,app.tgdrive.ui.elasticEdgeProximity(0f,0f,48f,0f),0f)
+    }
+    @Test fun reversalUnwindsVisibleDistanceWithoutAHiddenDebt(){
+        val pulled=app.tgdrive.ui.advanceElasticPull(0f,200f,96f)
+        assertTrue(pulled in 0f..96f)
+        assertEquals(0f,app.tgdrive.ui.advanceElasticPull(pulled,-pulled,96f),.001f)
+        assertEquals(pulled,app.tgdrive.ui.advanceElasticPull(pulled,.1f,96f),0f)
+        assertEquals(0f,app.tgdrive.ui.advanceElasticPull(Float.NaN,1f,96f),0f)
     }
 
     @Test fun proximityIsLocalContinuousAndIndependentOfContentLength(){

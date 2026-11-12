@@ -57,6 +57,8 @@ class LiquidNavigationHostTest {
         }
     }
 
+    // Robolectric enforces API 35 through @Config; instrumentation filters do not run here.
+    @android.annotation.SuppressLint("UseSdkSuppress")
     @androidx.annotation.RequiresApi(33)
     @Test fun externalSelectionThenDraggingBackCommitsTheActualPage() {
         scene()
@@ -73,6 +75,8 @@ class LiquidNavigationHostTest {
         assertTrue(bar.captureToImage().width>0)
     }
 
+    // Robolectric enforces API 35 through @Config; instrumentation filters do not run here.
+    @android.annotation.SuppressLint("UseSdkSuppress")
     @androidx.annotation.RequiresApi(33)
     @Test fun rapidTapsLabelsAndRtlKeepExactlyOneSelectedDestination() {
         scene()

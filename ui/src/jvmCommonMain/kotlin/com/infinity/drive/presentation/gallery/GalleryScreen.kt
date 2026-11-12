@@ -487,7 +487,7 @@ fun GalleryScreen(
 
                     state.viewMode == ViewMode.LIST -> LazyColumn(
                         state = mediaListState,
-                        elasticEnabled=!pinching,
+                        elasticEnabled=!pinching&&!state.selectionMode,
                         modifier = Modifier
                             .fillMaxSize()
                             .pinchZoom(
@@ -541,7 +541,7 @@ fun GalleryScreen(
 
                     else -> LazyVerticalGrid(
                         state = mediaGridState,
-                        elasticEnabled=!pinching,
+                        elasticEnabled=!pinching&&!state.selectionMode,
                         columns = GridCells.Fixed(state.gridSize),
                         modifier = Modifier
                             .fillMaxSize()

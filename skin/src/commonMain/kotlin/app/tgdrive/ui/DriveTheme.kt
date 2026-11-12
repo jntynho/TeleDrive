@@ -92,7 +92,7 @@ private val DriveTypography = Typography(
 @Composable
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 fun DriveTheme(colorScheme:ColorScheme=DriveColors,content: @Composable () -> Unit) {
-    CompositionLocalProvider(LocalOverscrollFactory provides ElasticOverscrollFactory) {
+    CompositionLocalProvider(LocalOverscrollFactory provides null) {
     MaterialExpressiveTheme(
         colorScheme = colorScheme, typography = DriveTypography, motionScheme = MotionScheme.standard(),
         shapes = Shapes(
