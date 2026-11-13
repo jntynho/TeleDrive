@@ -87,11 +87,44 @@ fun HiddenLockSettingRow(manager:HiddenLockManager=koinInject(),title:String="Hi
     Column {
         SettingsSwitchRow(title=if(title=="Hidden")stringResource(Res.string.settings_hidden_lock)else"Lock $title",checked=lock.configured||lock.error,
             onChange={action.request(it)},subtitle="Require fingerprint or screen lock",
-            enabled=lock.ready&&!lock.error&&!action.working,icon=DriveIcons.Lock)
+            enabled=lock.ready&&!lock.error&&!action.working)
         val message=if(lock.error)"Hidden lock couldn't be read. Your files remain protected."else action.message
         if(action.working)LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal=16.dp))
         message?.let{Text(it,Modifier.padding(horizontal=16.dp,vertical=10.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
     }
+}
+
+@Composable
+private fun CollectionRelockSetting(manager:HiddenLockManager,title:String) {
+    val lock by manager.state.collectAsStateWithLifecycle()
+    var choosing by remember{mutableStateOf(false)}
+    var saving by remember{mutableStateOf(false)}
+    var error by remember{mutableStateOf<String?>(null)}
+    val scope=rememberCoroutineScope()
+    val action=rememberHiddenAction(manager,title,onUnlocked={choosing=true})
+    if(lock.configured&&!lock.error) {
+        com.infinity.drive.presentation.settings.SettingsClickRow(
+            title="Automatically relock",
+            subtitle=com.infinity.drive.domain.model.CollectionRelock.fromMinutes(lock.autoLockMinutes).label,
+            enabled=!action.working&&!saving,
+            onClick={if(lock.unlocked)choosing=true else action.request(null)})
+    }
+    if(choosing&&!lock.restricted)com.infinity.drive.presentation.components.ChoiceDialog(
+        title="Automatically relock",
+        options=com.infinity.drive.domain.model.CollectionRelock.entries.map{it.minutes to it.label},
+        selected=lock.autoLockMinutes,
+        onSelect={minutes->
+            choosing=false;saving=true;error=null
+            val ticket=lock.epoch
+            scope.launch {
+                try{if(!manager.setAutoLockMinutes(minutes,ticket))error="Unlock the collection and try again."}
+                catch(cancel:CancellationException){throw cancel}
+                catch(_:Exception){error="Couldn't save the relock time. Please try again."}
+                finally{saving=false}
+            }
+        },onDismiss={choosing=false})
+    LaunchedEffect(lock.restricted){if(lock.restricted)choosing=false}
+    (error?:action.message)?.let{Text(it,Modifier.padding(16.dp),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
 }
 
 @Composable
@@ -100,8 +133,10 @@ fun HiddenSettingsScreen(onBack:()->Unit) {
     Scaffold(topBar={PageHeader(title={Text("Hidden settings")},navigationIcon={IconButton(onBack){Icon(DriveIcons.ArrowBack,"Back")}})}){padding->
         Column(Modifier.fillMaxSize().padding(top=padding.calculateTopPadding()).verticalScroll(rememberScrollState())){
             Text("Protect your private collection",Modifier.padding(horizontal=24.dp,vertical=20.dp),style=MaterialTheme.typography.titleMedium)
-            SettingsGroup{add{HiddenLockSettingRow()}}
-            Text("Uses the screen lock already set on your phone. Hidden locks again when you leave it or put TeleDrive in the background.",
+            val manager=koinInject<HiddenLockManager>()
+            val lock by manager.state.collectAsStateWithLifecycle()
+            SettingsGroup{add{HiddenLockSettingRow(manager)};add(visible=lock.configured&&!lock.error){CollectionRelockSetting(manager,"Hidden")}}
+            Text("Uses your phone’s screen lock. The selected delay starts when you leave TeleDrive. Never keeps the collection unlocked for this app session; restarting the app always locks it.",
                 Modifier.padding(24.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(24.dp+padding.calculateBottomPadding()+com.infinity.drive.presentation.navigation.LocalBottomBarHeight.current))
         }
@@ -144,11 +179,13 @@ fun rememberCollectionEntry(manager:HiddenLockManager,title:String,onOpen:()->Un
 fun CollectionSettingsScreen(type:String,onBack:()->Unit){
     val locks=koinInject<com.infinity.drive.core.security.CollectionLocks>()
     val title=when(type){"FAVORITES"->"Favorites";"ARCHIVED"->"Archived";else->"Trash"}
+    val manager=locks.manager(type)
+    val lock by manager.state.collectAsStateWithLifecycle()
     Scaffold(topBar={PageHeader(title={Text("$title settings")},navigationIcon={IconButton(onBack){Icon(DriveIcons.ArrowBack,"Back")}})}){padding->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(bottom=com.infinity.drive.presentation.navigation.LocalBottomBarInset.current)){
             Spacer(Modifier.height(20.dp))
-            SettingsGroup{add{HiddenLockSettingRow(locks.manager(type),title)}}
-            Text("Uses your phone's fingerprint or screen lock. Disabled by default. Locks again when you leave this collection or put TeleDrive in the background.",Modifier.padding(24.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            SettingsGroup{add{HiddenLockSettingRow(manager,title)};add(visible=lock.configured&&!lock.error){CollectionRelockSetting(manager,title)}}
+            Text("Uses your phone’s screen lock. The delay starts when you leave TeleDrive. Never keeps this collection unlocked for the current app session. Restarting the app always locks it.",Modifier.padding(24.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

@@ -126,7 +126,7 @@ class NativeSignInUiTest {
         compose.mainClock.advanceTimeBy(1000)
         compose.waitForIdle()
         val root=compose.onRoot().fetchSemanticsNode().boundsInRoot
-        val button=compose.onNodeWithContentDescription("Verify",substring=false).fetchSemanticsNode().boundsInRoot
+        val button=compose.onNodeWithText("Verify",substring=false).fetchSemanticsNode().boundsInRoot
         assertTrue("Verify button outside viewport: $button / $root",button.bottom<=root.bottom)
         capture("code")
         compose.onNodeWithContentDescription("Verification code").performTextInput("٤٥")
@@ -195,11 +195,11 @@ class NativeSignInUiTest {
     fun compactScreenKeepsWelcomeActionAndNativeFormNavigationReachable(){
         compose.onNodeWithText("Get started").assertIsDisplayed().performClick()
         compose.waitUntil(5000){compose.onAllNodesWithText("United Kingdom").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithContentDescription("Continue",substring=false).assertIsDisplayed()
+        compose.onNodeWithText("Continue",substring=false).assertIsDisplayed()
         compose.onNode(hasSetTextAction()).performTextInput("7700900123")
-        compose.onNodeWithContentDescription("Continue",substring=false).performClick()
+        compose.onNodeWithText("Continue",substring=false).performClick()
         compose.waitUntil(5000){compose.onNodeWithContentDescription("Verification code").isDisplayed()}
-        compose.onNodeWithContentDescription("Verify",substring=false).assertIsDisplayed()
+        compose.onNodeWithText("Verify",substring=false).assertIsDisplayed()
     }
 
 }

@@ -169,10 +169,12 @@ fun DriveInfinityApp(
     DriveInfinityTheme(
         darkTheme = darkTheme,
         dynamicColor = state.dynamicColor,
+        accentColour = state.accentColour,
         amoled = state.theme == AppTheme.AMOLED
     ) {
         CompositionLocalProvider(
             (LocalLocaleList as ProvidableCompositionLocal<LocaleList>) provides targetLocaleList,
+            app.tgdrive.ui.LocalDashboardStyle provides state.dashboardStyle.name,
             LocalCompactLayout provides state.compactLayout
         ) {
             val startupFiles=org.koin.compose.koinInject<com.infinity.drive.domain.repository.FileRepository>()

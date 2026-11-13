@@ -114,6 +114,14 @@ class BackupRepositoryImpl(
         val reasons = mutableMapOf<BackupDecision, Int>()
         val toBackup = mutableListOf<File>()
         for (candidate in candidates) {
+            val size=candidate.length()
+            val sizeSkip=when {
+                prefs.backupMinFileSizeMb>0&&size<prefs.backupMinFileSizeMb.toLong()*1024*1024->BackupDecision.SKIP_TOO_SMALL
+                maxSizeBytes>0&&size>maxSizeBytes->BackupDecision.SKIP_TOO_LARGE
+                else->null
+            }
+            if(sizeSkip!=null){skipped++;reasons[sizeSkip]=(reasons[sizeSkip]?:0)+1;continue}
+
             if (backupDao.recordByPath(candidate.absolutePath) == null &&
                 (adoptLinkedUpload(candidate) ||
                         reviveTrashedUpload(candidate) ||
@@ -139,6 +147,7 @@ class BackupRepositoryImpl(
                 },
                 exclusions = exclusions,
                 maxFileSizeBytes = maxSizeBytes,
+                minFileSizeBytes = prefs.backupMinFileSizeMb.toLong() * 1024 * 1024,
                 contentHashProvider = { Hashing.sha256(candidate) }
             )
             if (decision == BackupDecision.BACKUP) {

@@ -920,4 +920,7 @@
     <string name="nav_audio">Audio</string>
     <string name="settings_floating_navigation_bar">Floating navigation bar</string>
     <string name="settings_hidden_lock">Lock Hidden</string>
+    <string name="settings_accent_colour">Accent colour</string>
+    <string name="settings_dashboard_style">Dashboard Style</string>
+    <string name="settings_skip_files_smaller_than">Skip files smaller than</string>
 </resources>

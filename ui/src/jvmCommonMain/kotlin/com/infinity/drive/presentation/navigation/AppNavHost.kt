@@ -59,35 +59,6 @@ fun AppNavHost(
     val hiddenState by hidden.lock.state.collectAsStateWithLifecycle()
     if(hiddenState.unlocked)SensitiveScreen()
     val collectionLocks=org.koin.compose.koinInject<com.infinity.drive.core.security.CollectionLocks>()
-    val owner=androidx.lifecycle.compose.LocalLifecycleOwner.current
-    androidx.compose.runtime.DisposableEffect(owner,collectionLocks){
-        val observer=androidx.lifecycle.LifecycleEventObserver{_,event->if(event==androidx.lifecycle.Lifecycle.Event.ON_STOP)collectionLocks.lockAll()}
-        owner.lifecycle.addObserver(observer)
-        onDispose{owner.lifecycle.removeObserver(observer)}
-    }
-    val rawFiles=org.koin.compose.koinInject<com.infinity.drive.domain.repository.FileRepository>()
-    LaunchedEffect(entry?.id){
-        val current=entry?:return@LaunchedEffect
-        val inside=when {
-            current.destination.hasRoute<Route.HiddenSettings>()->true
-            current.destination.hasRoute<Route.Collection>()->current.toRoute<Route.Collection>().type==com.infinity.drive.presentation.collection.CollectionType.HIDDEN.name
-            current.destination.hasRoute<Route.Preview>()->rawFiles.getFile(current.toRoute<Route.Preview>().fileId)?.let{hidden.protectedFile(it)}==true
-            current.destination.hasRoute<Route.NoteEditor>()->current.toRoute<Route.NoteEditor>().let{route->route.fileId?.let{rawFiles.getFile(it)?.let{file->hidden.protectedFile(file)}}?:hidden.protectedFolder(route.folderId)}
-            current.destination.hasRoute<Route.Files>()->current.toRoute<Route.Files>().let{route->hidden.protectedFolder(route.folderId)||route.focusFileId?.let{rawFiles.getFile(it)?.let{file->hidden.protectedFile(file)}}==true}
-            else->false
-        }
-        // Also invalidate verification started inside Trash or a guard after a policy mutation.
-        // Public content stays mounted: guards and thumbnails no longer reset on this epoch.
-        if(!inside)hidden.lock.lock()
-        val collection=when {
-            current.destination.hasRoute<Route.Collection>()->current.toRoute<Route.Collection>().type
-            current.destination.hasRoute<Route.Trash>()->"TRASH"
-            current.destination.hasRoute<Route.CollectionSettings>()->current.toRoute<Route.CollectionSettings>().type
-            current.destination.hasRoute<Route.Preview>()->return@LaunchedEffect
-            else->null
-        }
-        collectionLocks.leaveExcept(collection)
-    }
     NavHost(
         navController = navController,
         startDestination = startDestination,
@@ -275,6 +246,7 @@ fun AppNavHost(
             CompositionLocalProvider(com.infinity.drive.presentation.settings.LocalSettingsSearchTarget provides route.focusTitle) {
             SettingsSectionScreen(
                 section = section,
+                onDashboardStyles={navController.navigateOnce(Route.DashboardStyles)},
                 onOpenHidden={navController.navigateOnce(Route.Collection(com.infinity.drive.presentation.collection.CollectionType.HIDDEN.name))},
                 onOpenChannels = { navController.navigateOnce(Route.Channels) },
                 onOpenPreviousLibrary = { navController.navigateOnce(Route.PreviousLibrary) },
@@ -288,6 +260,9 @@ fun AppNavHost(
                 }
             )
             }
+        }
+        stableComposable<Route.DashboardStyles>(navController) {
+            com.infinity.drive.presentation.settings.DashboardStylesScreen(onBack={navController.popBackStackOnce()})
         }
         stableComposable<Route.PreviousLibrary>(navController) {
             LocalPlatformScreens.current.PreviousLibrary(onBack = { navController.popBackStackOnce() })

@@ -68,6 +68,11 @@ open class DriveInfinityApplication : Application(), SingletonImageLoader.Factor
             workManagerFactory()
             modules(appModules)
         }
+        val hidden=org.koin.core.context.GlobalContext.get().get<com.infinity.drive.core.security.HiddenLockManager>()
+        val collections=org.koin.core.context.GlobalContext.get().get<com.infinity.drive.core.security.CollectionLocks>()
+        registerActivityLifecycleCallbacks(com.infinity.drive.core.security.CollectionLockLifecycle(
+            onForeground={hidden.onAppStarted();collections.onAppStarted()},
+            onBackground={hidden.onAppStopped();collections.onAppStopped()}))
         appNotifications.createChannels()
         applicationScope.launch {
             val access=org.koin.core.context.GlobalContext.get().get<com.infinity.drive.core.security.HiddenContentAccess>()

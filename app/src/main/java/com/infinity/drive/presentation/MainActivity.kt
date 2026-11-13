@@ -39,7 +39,6 @@ import org.koin.android.ext.android.inject
 open class MainActivity : FragmentActivity() {
 
     private val settingsRepository: SettingsRepository by inject()
-    private val hiddenLock:com.infinity.drive.core.security.HiddenLockManager by inject()
     private val sensitiveScreens:com.infinity.drive.core.security.SensitiveScreens by inject()
 
 
@@ -74,8 +73,6 @@ open class MainActivity : FragmentActivity() {
     private val pendingShare: PendingShare by inject()
 
     private val destination = MutableStateFlow<String?>(null)
-
-    override fun onStop(){hiddenLock.lock();super.onStop()}
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

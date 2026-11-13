@@ -132,7 +132,7 @@ class RebuiltUiTest {
         compose.onNodeWithText("Get started").performClick()
         compose.onNodeWithText("API access").assertIsDisplayed()
         capture("api-setup")
-        compose.onNodeWithContentDescription("Continue",substring=false).assertIsNotEnabled()
+        compose.onNodeWithText("Continue",substring=false).assertIsNotEnabled()
     }
     @Test fun floatingNavigationPreferencesPersistAndTabsRemainUsable(){
         compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
@@ -294,7 +294,7 @@ class RebuiltUiTest {
         runBlocking { GlobalContext.get().get<SettingsRepository>().update { it.copy(onboardingComplete=false) } }
         compose.waitUntil(10_000){compose.onAllNodesWithText("Get started").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("Get started").performScrollTo().performClick()
-        compose.onNodeWithContentDescription("Continue",substring=false).assertIsDisplayed().assertIsNotEnabled()
+        compose.onNodeWithText("Continue",substring=false).assertIsDisplayed().assertIsNotEnabled()
         capture("api-large-text")
     }
 
@@ -673,6 +673,42 @@ class RebuiltUiTest {
         org.junit.Assert.assertEquals(file.id,player.state.value.file?.id)
         runBlocking{kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default){player.updateLibraryContext(99L,true)}}
         compose.waitUntil(5_000){compose.waitForIdle();player.state.value.file==null}
+    }
+
+
+    @Test fun appearancePersistsAccentAndAllDashboardStylesAcrossNavigation(){
+        val settings=GlobalContext.get().get<SettingsRepository>()
+        compose.waitUntil(15000){compose.onNodeWithText("Your library",substring=false).isDisplayed()}
+        compose.onNodeWithTag("navigation-settings").performClick()
+        compose.onNodeWithText("Appearance",substring=false).performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Teal accent").performScrollTo()
+        compose.onNodeWithContentDescription("Teal accent").performClick()
+        compose.waitUntil(5000){compose.waitForIdle();runBlocking{settings.preferences.first().accentColour==com.infinity.drive.domain.model.AccentColour.TEAL}}
+        org.junit.Assert.assertFalse(runBlocking{settings.preferences.first().dynamicColor})
+        compose.onNodeWithText("Dashboard Style",substring=false).performScrollTo().performClick()
+        compose.waitUntil(5000){compose.onNodeWithText("Classic · Default",substring=false).isDisplayed()}
+        com.infinity.drive.domain.model.DashboardStyle.entries.forEach{style->
+            compose.onNodeWithText(if(style==com.infinity.drive.domain.model.DashboardStyle.CLASSIC)"Classic · Default"else style.label,substring=false).performScrollTo().performClick()
+            compose.waitUntil(5000){compose.waitForIdle();runBlocking{settings.preferences.first().dashboardStyle==style}}
+        }
+        capture("dashboard-style-selected")
+        compose.onNodeWithContentDescription("Back",substring=false).performClick()
+        compose.onNodeWithTag("navigation-home").performClick()
+        compose.onNodeWithTag("library-card").assertIsDisplayed()
+        capture("home-compact-dashboard")
+    }
+
+    @Test fun leavingHiddenForHomeKeepsItsSessionUntilTheAppIsBackgrounded(){
+        val hidden=GlobalContext.get().get<com.infinity.drive.core.security.HiddenLockManager>()
+        runBlocking{hidden.awaitReady();hidden.setDeviceLock(true,hidden.state.value.epoch);hidden.unlockWithDevice(hidden.state.value.epoch)}
+        compose.waitUntil(15000){compose.onNodeWithText("Your library",substring=false).isDisplayed()}
+        compose.onNodeWithText("Hidden",substring=false).performClick()
+        compose.waitUntil(5000){compose.onNodeWithContentDescription("Hidden settings").isDisplayed()}
+        compose.onNodeWithContentDescription("Back",substring=false).performClick()
+        compose.waitUntil(5000){compose.onNodeWithText("Your library",substring=false).isDisplayed()}
+        org.junit.Assert.assertTrue(hidden.state.value.unlocked)
+        compose.runOnIdle{hidden.onAppStopped()}
+        org.junit.Assert.assertTrue(hidden.state.value.restricted)
     }
 
     private fun capture(name:String) {

@@ -127,4 +127,24 @@ class HiddenDeviceLockUiTest {
         compose.runOnIdle{stale()};compose.waitForIdle()
         assertTrue(manager.state.value.restricted)
     }
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun relockOptionsPersistAndRequireAuthenticationWhenTheCollectionIsLocked(){
+        runBlocking{manager.setDeviceLock(true,manager.state.value.epoch);manager.unlockWithDevice(manager.state.value.epoch)}
+        show{HiddenSettingsScreen({})}
+        compose.onNodeWithText("After leaving the app",substring=false).assertIsDisplayed()
+        compose.onNodeWithText("Automatically relock",substring=false).performClick()
+        await{compose.onAllNodesWithText("Never",substring=false).fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("Never",substring=false).performClick()
+        await{manager.state.value.autoLockMinutes==-1}
+        compose.runOnIdle{manager.lock()}
+        compose.onNodeWithText("Automatically relock",substring=false).performClick()
+        compose.waitForIdle();assertEquals(1,requests)
+        compose.onNodeWithText("After 3 minutes",substring=false).assertDoesNotExist()
+        compose.runOnIdle{confirmed!!()}
+        await{manager.state.value.unlocked}
+        await{compose.onAllNodesWithText("After 3 minutes",substring=false).fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("After 3 minutes",substring=false).performClick()
+        await{manager.state.value.autoLockMinutes==3}
+    }
+
 }

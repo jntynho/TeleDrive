@@ -41,7 +41,9 @@ data class AppUiState(
     val onboardingComplete: Boolean = false,
     val theme: AppTheme = AppTheme.DARK,
     val language: AppLanguage = AppLanguage.ENGLISH,
+    val dashboardStyle:com.infinity.drive.domain.model.DashboardStyle=com.infinity.drive.domain.model.DashboardStyle.CLASSIC,
     val dynamicColor: Boolean = false,
+    val accentColour:com.infinity.drive.domain.model.AccentColour=com.infinity.drive.domain.model.AccentColour.BLUE,
     val compactLayout: Boolean = false,
     val locked: Boolean = false,
     val warmupGlass:Boolean=false
@@ -85,7 +87,9 @@ class AppViewModel(
             onboardingComplete = prefs.onboardingComplete,
             theme = prefs.theme,
             language = prefs.language,
+            dashboardStyle = prefs.dashboardStyle,
             dynamicColor = prefs.dynamicColor,
+            accentColour = prefs.accentColour,
             compactLayout = prefs.layoutDensity == LayoutDensity.COMPACT,
             locked = locked,
             warmupGlass=prefs.floatingNavigationBar&&prefs.navigationBarBlur&&prefs.navigationBarStyle==com.infinity.drive.domain.model.NavigationBarStyle.FLOATING

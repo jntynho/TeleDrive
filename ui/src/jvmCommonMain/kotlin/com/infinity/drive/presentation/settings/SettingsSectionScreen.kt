@@ -196,6 +196,7 @@ fun SettingsSectionScreen(
     onOpenProxy: () -> Unit,
     onLoggedOut: () -> Unit,
     onOpenHidden:()->Unit={},
+    onDashboardStyles:()->Unit={},
     viewModel: SettingsViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -271,7 +272,7 @@ fun SettingsSectionScreen(
 
                 SettingsSectionType.SECURITY -> SecuritySection(state, viewModel,onOpenHidden)
                 SettingsSectionType.APPEARANCE -> androidx.compose.animation.Crossfade(navigationOptions,animationSpec=androidx.compose.animation.core.tween(240),label="navigationPreferencesPage"){open->
-                    if(open)NavigationBarSection(state,viewModel)else AppearanceSection(state,viewModel){navigationOptions=true}
+                    if(open)NavigationBarSection(state,viewModel)else AppearanceSection(state,viewModel,onDashboardStyles){navigationOptions=true}
                 }
                 SettingsSectionType.PLAYBACK -> PlaybackSection(state, viewModel)
                 SettingsSectionType.NOTIFICATIONS -> NotificationsSection(state, viewModel)
@@ -398,6 +399,7 @@ private fun BackupSection(
     }
     var showIntervalDialog by remember { mutableStateOf(false) }
     var showSizeLimitDialog by remember { mutableStateOf(false) }
+    var showMinimumDialog by remember { mutableStateOf(false) }
 
     if (showIntervalDialog) {
         ChoiceDialog(
@@ -411,18 +413,10 @@ private fun BackupSection(
             onDismiss = { showIntervalDialog = false }
         )
     }
-    if (showSizeLimitDialog) {
-        ChoiceDialog(
-            title = stringResource(Res.string.settings_skip_files_larger_than),
-            options = sizeLimitOptions.map { it to sizeLimitLabel(it) },
-            selected = prefs.backupMaxFileSizeMb,
-            onSelect = { limit ->
-                showSizeLimitDialog = false
-                viewModel.update { it.copy(backupMaxFileSizeMb = limit) }
-            },
-            onDismiss = { showSizeLimitDialog = false }
-        )
-    }
+    if (showSizeLimitDialog) BackupSizeDialog(false,prefs.backupMaxFileSizeMb,prefs.backupMinFileSizeMb,
+        onSelect={limit->showSizeLimitDialog=false;viewModel.update{it.copy(backupMaxFileSizeMb=limit)}},onDismiss={showSizeLimitDialog=false})
+    if (showMinimumDialog) BackupSizeDialog(true,prefs.backupMinFileSizeMb,prefs.backupMaxFileSizeMb,
+        onSelect={limit->showMinimumDialog=false;viewModel.update{it.copy(backupMinFileSizeMb=limit)}},onDismiss={showMinimumDialog=false})
 
     folderToRemove?.let { folder ->
         ConfirmDialog(
@@ -495,6 +489,9 @@ private fun BackupSection(
                 subtitle = sizeLimitLabel(prefs.backupMaxFileSizeMb),
                 onClick = { showSizeLimitDialog = true }
             )
+        }
+        add {
+            SettingsClickRow("Skip files smaller than",{showMinimumDialog=true},subtitle=if(prefs.backupMinFileSizeMb==0)"No limit"else"${prefs.backupMinFileSizeMb} MB")
         }
         add {
             SettingsClickRow(
@@ -908,7 +905,7 @@ private fun KeyBackupWarning(onSetPassphrase: () -> Unit) {
 }
 
 @Composable
-private fun AppearanceSection(state: SettingsUiState, viewModel: SettingsViewModel,onNavigation:()->Unit) {
+private fun AppearanceSection(state: SettingsUiState, viewModel: SettingsViewModel,onDashboardStyles:()->Unit,onNavigation:()->Unit) {
     val prefs = state.preferences
     val capabilities = LocalPlatformCapabilities.current
     var showThemeDialog by remember { mutableStateOf(false) }
@@ -941,6 +938,9 @@ private fun AppearanceSection(state: SettingsUiState, viewModel: SettingsViewMod
     }
 
     SettingsGroup {
+        add{SettingsClickRow("Dashboard Style",onDashboardStyles,subtitle=prefs.dashboardStyle.label)}
+        add{AccentColourPicker(prefs.accentColour,prefs.dynamicColor){colour->viewModel.update{it.copy(accentColour=colour,dynamicColor=false)}}}
+
         add{SettingsClickRow("Floating navigation bar",onNavigation,subtitle="Style and appearance of your bottom navigation")}
         add {
             SettingsClickRow(

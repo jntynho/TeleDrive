@@ -17,7 +17,8 @@ data class HiddenLockRecord(
     val version:Int=1,
     val pinSalt:String="",val pinHash:String="",val recoverySalt:String="",val recoveryHash:String="",
     val failures:Int=0,val retryAfter:Long=0,val lastAttemptAt:Long=0,
-    val biometricIv:String?=null,val biometricCiphertext:String?=null,val biometricHash:String?=null
+    val biometricIv:String?=null,val biometricCiphertext:String?=null,val biometricHash:String?=null,
+    val autoLockMinutes:Int=0
 )
 interface HiddenLockStore {
     suspend fun read():HiddenLockRecord?
@@ -25,7 +26,7 @@ interface HiddenLockStore {
     suspend fun clear()
 }
 data class HiddenLockState(val ready:Boolean=false,val configured:Boolean=false,val unlocked:Boolean=false,
-    val biometrics:Boolean=false,val error:Boolean=false,val epoch:Long=0,val deviceLock:Boolean=false) {
+    val biometrics:Boolean=false,val error:Boolean=false,val epoch:Long=0,val deviceLock:Boolean=false,val autoLockMinutes:Int=0) {
     val restricted:Boolean get()=!ready||error||(configured&&!unlocked)
 }
 enum class HiddenVerification { SUCCESS, WRONG, WAIT, CANCELLED }
@@ -34,7 +35,8 @@ class HiddenLockManager(
     private val store:HiddenLockStore,
     private val iterations:Int=PassphraseKdf.ITERATIONS,
     private val clock:()->Long=System::currentTimeMillis,
-    ownerScope:CoroutineScope?=null
+    ownerScope:CoroutineScope?=null,
+    private val elapsedClock:()->Long={System.nanoTime()/1_000_000}
 ) {
     private val scope=ownerScope?:CoroutineScope(SupervisorJob()+Dispatchers.IO)
     private val mutable=MutableStateFlow(HiddenLockState())
@@ -43,6 +45,9 @@ class HiddenLockManager(
     private val epoch=AtomicLong()
     private var record:HiddenLockRecord?=null
     @Volatile private var resetPermit:Long?=null
+    private val autoLockMonitor=Any()
+    private var backgroundedAt:Long?=null
+    private var autoLockJob:Job?=null
     private val loaded=CompletableDeferred<Unit>()
     init { scope.launch {
         try { record=store.read();record?.let(::validate);publish() }
@@ -51,12 +56,61 @@ class HiddenLockManager(
         finally { loaded.complete(Unit) }
     }}
     suspend fun awaitReady(){loaded.await()}
-    private fun publish(unlocked:Boolean=false){
-        mutable.value=HiddenLockState(true,record!=null,unlocked,record?.biometricHash!=null,false,epoch.get(),record?.version==2)
+    private fun publish(unlocked:Boolean=false,expectedEpoch:Long?=null) = synchronized(autoLockMonitor) {
+        val current=epoch.get()
+        mutable.value=HiddenLockState(true,record!=null,unlocked&&expectedEpoch==current,record?.biometricHash!=null,false,current,record?.version==2,record?.autoLockMinutes?:0)
     }
-    fun lock(){
+    fun lock() = synchronized(autoLockMonitor) {
+        autoLockJob?.cancel();autoLockJob=null
         val next=epoch.incrementAndGet();resetPermit=null
         mutable.update{it.copy(unlocked=false,epoch=next)}
+    }
+    /** Deadlines use elapsed time, so changing the phone clock cannot extend access. */
+    fun onAppStopped() = synchronized(autoLockMonitor) {
+        if(backgroundedAt!=null)return@synchronized
+        backgroundedAt=elapsedClock()
+        scheduleAutoLock()
+    }
+    fun onAppStarted() = synchronized(autoLockMonitor) {
+        val away=backgroundedAt?.let{(elapsedClock()-it).coerceAtLeast(0)}
+        val minutes=state.value.autoLockMinutes
+        if(away!=null&&minutes>0&&away>=minutes*60_000L)lock()
+        autoLockJob?.cancel();autoLockJob=null;backgroundedAt=null
+    }
+    private fun scheduleAutoLock() {
+        autoLockJob?.cancel();autoLockJob=null
+        val stamp=backgroundedAt?:return
+        val minutes=state.value.autoLockMinutes
+        if(minutes==0){lock();return}
+        if(minutes<0||!state.value.unlocked)return
+        val remaining=minutes*60_000L-(elapsedClock()-stamp).coerceAtLeast(0)
+        if(remaining<=0){lock();return}
+        autoLockJob=scope.launch {
+            delay(remaining)
+            synchronized(autoLockMonitor){
+                if(backgroundedAt==stamp&&state.value.autoLockMinutes==minutes)lock()
+            }
+        }
+    }
+    suspend fun setAutoLockMinutes(minutes:Int,ticket:Long):Boolean {
+        require(com.infinity.drive.domain.model.CollectionRelock.entries.any{it.minutes==minutes})
+        awaitReady()
+        return mutex.withLock {
+            if(ticket!=epoch.get()||!state.value.unlocked||state.value.error)return@withLock false
+            val previous=checkNotNull(record)
+            val next=previous.copy(autoLockMinutes=minutes)
+            try {
+                withContext(NonCancellable+Dispatchers.IO){store.write(next);record=next}
+                val accepted=synchronized(autoLockMonitor){
+                    if(ticket!=epoch.get())false else {
+                        publish(unlocked=true,expectedEpoch=ticket);scheduleAutoLock();true
+                    }
+                }
+                if(!accepted)withContext(NonCancellable+Dispatchers.IO){store.write(previous);record=previous;publish()}
+                accepted
+            } catch(cancel:CancellationException){lock();throw cancel}
+            catch(error:Exception){failClosed();throw error}
+        }
     }
     fun newRecoveryKey():String = ByteArray(16).also(SecureRandom()::nextBytes).joinToString(""){"%02X".format(it)}
     fun beginPinChange():Boolean {
@@ -80,7 +134,7 @@ class HiddenLockManager(
             }
             check(ticket==epoch.get()){"Hidden was locked; start again"}
             withContext(NonCancellable+Dispatchers.IO){
-                store.write(next);record=next;resetPermit=null;publish(unlocked=ticket==epoch.get())
+                store.write(next);record=next;resetPermit=null;publish(unlocked=ticket==epoch.get(),expectedEpoch=ticket)
             }
         }}finally{pin.fill('\u0000')}
     }
@@ -110,16 +164,17 @@ class HiddenLockManager(
             val next=current.copy(failures=failures,retryAfter=if(valid)0 else now+delay,lastAttemptAt=now)
             withContext(NonCancellable+Dispatchers.IO){store.write(next);record=next}
             if(ticket!=epoch.get())return@withLock HiddenVerification.CANCELLED
-            if(valid){if(recovery)resetPermit=ticket else publish(unlocked=true);HiddenVerification.SUCCESS}
+            if(valid){if(recovery)resetPermit=ticket else publish(unlocked=true,expectedEpoch=ticket);HiddenVerification.SUCCESS}
             else HiddenVerification.WRONG
         }}finally{candidate.fill('\u0000')}
     }
     suspend fun enrollBiometric(iv:ByteArray,ciphertext:ByteArray,secret:ByteArray){
         try{awaitReady();mutex.withLock{
-            check(state.value.unlocked)
+            val previousState=state.value
+            check(previousState.unlocked)
             val next=checkNotNull(record).copy(biometricIv=encode(iv),biometricCiphertext=encode(ciphertext),
                 biometricHash=encode(MessageDigest.getInstance("SHA-256").digest(secret)))
-            withContext(NonCancellable+Dispatchers.IO){store.write(next);record=next};publish(unlocked=state.value.unlocked)
+            withContext(NonCancellable+Dispatchers.IO){store.write(next);record=next};publish(unlocked=previousState.unlocked,expectedEpoch=previousState.epoch)
         }}finally{secret.fill(0)}
     }
     suspend fun biometricPayload():Pair<ByteArray,ByteArray>?{awaitReady();return mutex.withLock{
@@ -129,14 +184,15 @@ class HiddenLockManager(
         try{awaitReady();return mutex.withLock{
             val hash=record?.biometricHash?:return@withLock false
             if(ticket!=epoch.get()||!MessageDigest.isEqual(MessageDigest.getInstance("SHA-256").digest(secret),decode(hash)))return@withLock false
-            if(forReset)resetPermit=ticket else publish(unlocked=true)
+            if(forReset)resetPermit=ticket else publish(unlocked=true,expectedEpoch=ticket)
             true
         }}finally{secret.fill(0)}
     }
     suspend fun disableBiometric(){awaitReady();mutex.withLock{
-        check(state.value.unlocked)
+        val previousState=state.value
+        check(previousState.unlocked)
         val next=checkNotNull(record).copy(biometricHash=null,biometricIv=null,biometricCiphertext=null)
-        withContext(NonCancellable+Dispatchers.IO){store.write(next);record=next};publish(unlocked=state.value.unlocked)
+        withContext(NonCancellable+Dispatchers.IO){store.write(next);record=next};publish(unlocked=previousState.unlocked,expectedEpoch=previousState.epoch)
     }}
     /** Call only after the platform has authenticated the current device owner. */
     suspend fun unlockWithDevice(ticket:Long):Boolean {
@@ -146,11 +202,11 @@ class HiddenLockManager(
             if(record==null)return@withLock true
             try {
                 if(record?.version!=2)withContext(NonCancellable+Dispatchers.IO){
-                    val next=HiddenLockRecord(version=2)
+                    val next=HiddenLockRecord(version=2,autoLockMinutes=record?.autoLockMinutes?:0)
                     store.write(next);record=next;resetPermit=null
                 }
                 val current=ticket==epoch.get()
-                publish(unlocked=current)
+                publish(unlocked=current,expectedEpoch=ticket)
                 current
             }catch(cancel:CancellationException){lock();throw cancel}
             catch(error:Exception){failClosed();throw error}
@@ -187,6 +243,7 @@ class HiddenLockManager(
         withContext(NonCancellable+Dispatchers.IO){store.clear();record=null;publish()}
     }}
     private fun validate(value:HiddenLockRecord){
+        require(com.infinity.drive.domain.model.CollectionRelock.entries.any{it.minutes==value.autoLockMinutes})
         if(value.version==2){
             require(value.pinSalt.isEmpty()&&value.pinHash.isEmpty()&&value.recoverySalt.isEmpty()&&value.recoveryHash.isEmpty())
             require(value.biometricIv==null&&value.biometricCiphertext==null&&value.biometricHash==null)

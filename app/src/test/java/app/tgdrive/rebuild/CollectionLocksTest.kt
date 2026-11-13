@@ -20,7 +20,7 @@ class CollectionLocksTest {
         assertTrue(favorites.unlockWithDevice(favorites.state.value.epoch))
         assertTrue(favorites.state.value.unlocked)
         assertFalse(locks.manager("ARCHIVED").state.value.configured)
-        locks.leaveExcept("ARCHIVED")
+        locks.onAppStopped()
         assertTrue(favorites.state.value.restricted)
         locks.clearAll()
         names.forEach{assertFalse(locks.manager(it).state.value.configured)}

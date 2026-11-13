@@ -77,6 +77,9 @@ sealed interface Route {
     data object HiddenSettings : Route
 
     @Serializable
+    data object DashboardStyles : Route
+
+    @Serializable
     data class CollectionSettings(val type:String):Route
 
     @Serializable

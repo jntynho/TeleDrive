@@ -20,6 +20,9 @@ object PreferenceKeys {
     val DOWNLOAD_DIRECTORY = stringPreferencesKey("download_directory")
     val BACKUP_CHARGING_ONLY = booleanPreferencesKey("backup_charging_only")
     val BACKUP_INTERVAL_HOURS = intPreferencesKey("backup_interval_hours")
+    val BACKUP_MIN_FILE_SIZE_MB = intPreferencesKey("backup_min_file_size_mb")
+    val ACCENT_COLOUR = stringPreferencesKey("accent_colour")
+    val DASHBOARD_STYLE = stringPreferencesKey("dashboard_style")
     val BACKUP_MAX_FILE_SIZE_MB = intPreferencesKey("backup_max_file_size_mb")
 
     val MAX_CACHE_SIZE_MB = intPreferencesKey("max_cache_size_mb")

@@ -5,5 +5,6 @@ enum class BackupDecision {
     SKIP_UNCHANGED,
     SKIP_EXCLUDED,
     SKIP_TOO_LARGE,
+    SKIP_TOO_SMALL,
     SKIP_DUPLICATE
 }

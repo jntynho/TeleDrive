@@ -24,6 +24,7 @@ class SettingsRepositoryImpl(
     override suspend fun update(transform: (UserPreferences) -> UserPreferences) {
         dataStore.edit { mutable ->
             val updated = transform(mutable.toUserPreferences())
+            require(updated.backupMinFileSizeMb>=0&&updated.backupMaxFileSizeMb>=0&&(updated.backupMaxFileSizeMb==0||updated.backupMinFileSizeMb<=updated.backupMaxFileSizeMb)){"Minimum backup size must not exceed the maximum"}
             mutable.write(updated)
         }
     }
@@ -66,6 +67,8 @@ class SettingsRepositoryImpl(
 
     private fun Preferences.toUserPreferences(): UserPreferences {
         val defaults = UserPreferences()
+        val maximum=(this[PreferenceKeys.BACKUP_MAX_FILE_SIZE_MB]?:0).coerceAtLeast(0)
+        val minimum=(this[PreferenceKeys.BACKUP_MIN_FILE_SIZE_MB]?:0).coerceIn(0,if(maximum==0)Int.MAX_VALUE else maximum)
         return UserPreferences(
             onboardingComplete = this[PreferenceKeys.ONBOARDING_COMPLETE]
                 ?: defaults.onboardingComplete,
@@ -81,8 +84,10 @@ class SettingsRepositoryImpl(
                 ?: defaults.backupChargingOnly,
             backupIntervalHours = this[PreferenceKeys.BACKUP_INTERVAL_HOURS]
                 ?: defaults.backupIntervalHours,
-            backupMaxFileSizeMb = this[PreferenceKeys.BACKUP_MAX_FILE_SIZE_MB]
-                ?: defaults.backupMaxFileSizeMb,
+            backupMinFileSizeMb = minimum,
+            accentColour = enumOrDefault(this[PreferenceKeys.ACCENT_COLOUR], defaults.accentColour),
+            dashboardStyle = enumOrDefault(this[PreferenceKeys.DASHBOARD_STYLE], defaults.dashboardStyle),
+            backupMaxFileSizeMb = maximum,
             maxCacheSizeMb = this[PreferenceKeys.MAX_CACHE_SIZE_MB] ?: defaults.maxCacheSizeMb,
             trashAutoClearDays = this[PreferenceKeys.TRASH_AUTO_CLEAR_DAYS]
                 ?: defaults.trashAutoClearDays,
@@ -179,6 +184,9 @@ class SettingsRepositoryImpl(
             ?: remove(PreferenceKeys.DOWNLOAD_DIRECTORY)
         this[PreferenceKeys.BACKUP_CHARGING_ONLY] = prefs.backupChargingOnly
         this[PreferenceKeys.BACKUP_INTERVAL_HOURS] = prefs.backupIntervalHours
+        this[PreferenceKeys.BACKUP_MIN_FILE_SIZE_MB] = prefs.backupMinFileSizeMb.coerceAtLeast(0)
+        this[PreferenceKeys.ACCENT_COLOUR] = prefs.accentColour.name
+        this[PreferenceKeys.DASHBOARD_STYLE] = prefs.dashboardStyle.name
         this[PreferenceKeys.BACKUP_MAX_FILE_SIZE_MB] = prefs.backupMaxFileSizeMb
         this[PreferenceKeys.MAX_CACHE_SIZE_MB] = prefs.maxCacheSizeMb
         this[PreferenceKeys.TRASH_AUTO_CLEAR_DAYS] = prefs.trashAutoClearDays

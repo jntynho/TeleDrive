@@ -291,6 +291,7 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
                 DriveInfinityTheme(
                     darkTheme = darkTheme,
                     dynamicColor = prefs.dynamicColor,
+                    accentColour = prefs.accentColour,
                     amoled = prefs.theme == AppTheme.AMOLED
                 ) {
                 FileSystemFolderPickerDialog(

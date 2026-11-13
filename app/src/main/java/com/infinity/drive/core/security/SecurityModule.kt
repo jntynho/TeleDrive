@@ -9,8 +9,8 @@ val securityModule = module {
     singleOf(::AppLockManager)
     singleOf(::SensitiveScreens)
     single<HiddenLockStore>{AndroidHiddenLockStore(androidContext(),get())}
-    single {HiddenLockManager(get())}
+    single {HiddenLockManager(get(),elapsedClock=android.os.SystemClock::elapsedRealtime)}
     single<CollectionLockStores>{CollectionLockStores { name->AndroidHiddenLockStore(androidContext(),get(),"collection-$name-lock.bin") }}
-    singleOf(::CollectionLocks)
+    single {CollectionLocks(stores=get(),elapsedClock=android.os.SystemClock::elapsedRealtime)}
     singleOf(::HiddenContentAccess).onClose{it?.close()}
 }

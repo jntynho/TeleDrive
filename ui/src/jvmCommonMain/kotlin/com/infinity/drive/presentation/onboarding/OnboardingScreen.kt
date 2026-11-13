@@ -243,23 +243,19 @@ fun OnboardingScreen(
         return
     }
 
-    // Sign-in has one calm dark appearance, independent of the signed-in app preference.
-    val canvas=Color(0xFF1D2935)
-    val colors=app.tgdrive.ui.DriveColors.copy(background=canvas,surface=canvas,
-        surfaceContainerHigh=Color(0xFF2B3947),primary=Color(0xFF2AABEE),onPrimary=Color.White,
-        onSurface=Color(0xFFF5F5F5),onSurfaceVariant=Color(0xFFAAB5C0),
-        outline=Color(0xFF647381),outlineVariant=Color(0xFF455361))
+    // Follow the app palette and selected accent; fresh installations default to dark.
+    val colors=MaterialTheme.colorScheme
     val inputs=remember{mutableMapOf<OnboardingStep,InlineInputController>()}
     val input=inputs.getOrPut(state.step){InlineInputController()}
     val formStates=androidx.compose.runtime.saveable.rememberSaveableStateHolder()
     val canBack=state.step in setOf(OnboardingStep.API_CREDENTIALS,OnboardingStep.PHONE,OnboardingStep.CODE,OnboardingStep.EMAIL_ADDRESS,OnboardingStep.EMAIL_CODE,OnboardingStep.PASSWORD)
     com.infinity.drive.presentation.common.AppBackHandler(canBack){if(!state.working)viewModel.backFromSignIn()}
-    com.infinity.drive.presentation.theme.PlatformThemeSideEffects(true)
     MaterialTheme(colorScheme=colors){
         Scaffold(containerColor=colors.background){padding->
             Column(Modifier.fillMaxSize().padding(top=padding.calculateTopPadding()).navigationBarsPadding().imePadding()){
                 if(canBack) Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal=8.dp),verticalAlignment=Alignment.CenterVertically){
                     IconButton(viewModel::backFromSignIn,enabled=!state.working){Icon(DriveIcons.ArrowBack,"Back")}
+                    Text("TeleDrive",style=MaterialTheme.typography.titleMedium)
                 }
                 BoxWithConstraints(Modifier.weight(1f)){
                     val body:@Composable (Modifier)->Unit={modifier->
@@ -268,13 +264,13 @@ fun OnboardingScreen(
                         BoxWithConstraints(modifier){
                         val viewportHeight=maxHeight
                         Column(Modifier.fillMaxWidth().verticalScroll(scroll).heightIn(min=viewportHeight)){
-                            AnimatedContent(state.step,modifier=Modifier.fillMaxWidth().heightIn(min=viewportHeight),contentAlignment=Alignment.Center,transitionSpec={
+                            AnimatedContent(state.step,modifier=Modifier.fillMaxWidth().heightIn(min=viewportHeight),contentAlignment=Alignment.BottomStart,transitionSpec={
                                 (com.infinity.drive.presentation.navigation.NavigationTransitions.enter(targetState.ordinal>=initialState.ordinal)
                                     togetherWith com.infinity.drive.presentation.navigation.NavigationTransitions.exit(targetState.ordinal>=initialState.ordinal))
                                     .using(SizeTransform(clip=true){_,_->snap()})
                             },label="sign-in-step"){step->
                                 val pageInput=inputs.getOrPut(step){InlineInputController()}
-                                Box(Modifier.fillMaxWidth().heightIn(min=viewportHeight),contentAlignment=Alignment.Center){
+                                Box(Modifier.fillMaxWidth().heightIn(min=viewportHeight),contentAlignment=Alignment.BottomStart){
                                 CompositionLocalProvider(LocalInlineInput provides pageInput,com.infinity.drive.presentation.input.LocalInlineDrafts provides viewModel.inputDrafts){
                                     formStates.SaveableStateProvider(step.name){
                         when (step) {
@@ -376,15 +372,10 @@ fun OnboardingScreen(
                     val entryForm=state.step in setOf(OnboardingStep.API_CREDENTIALS,OnboardingStep.PHONE,OnboardingStep.CODE,OnboardingStep.EMAIL_ADDRESS,OnboardingStep.EMAIL_CODE,OnboardingStep.PASSWORD)&&!(state.step==OnboardingStep.PHONE&&state.qrMode)
                     val controls:@Composable (Modifier)->Unit={modifier->
                         if(entryForm){
-                            Box(modifier.padding(horizontal=24.dp).padding(top=8.dp,bottom=16.dp),contentAlignment=Alignment.CenterEnd){
+                            Column(modifier.padding(horizontal=24.dp).padding(top=8.dp,bottom=16.dp)){
                                 val action=input.action
                                 val label=action?.label?:when(state.step){OnboardingStep.CODE,OnboardingStep.EMAIL_CODE->"Verify";OnboardingStep.PASSWORD->"Sign in";else->"Continue"}
-                                FilledIconButton(onClick={action?.invoke?.invoke()},enabled=action?.enabled==true&&!state.working,
-                                    modifier=Modifier.size(56.dp),shape=CircleShape,
-                                    colors=IconButtonDefaults.filledIconButtonColors(containerColor=colors.primary,contentColor=colors.onPrimary)){
-                                    if(action?.working==true)CircularProgressIndicator(Modifier.size(24.dp).semantics{contentDescription=label},color=colors.onPrimary,strokeWidth=2.dp)
-                                    else Icon(DriveIcons.ArrowUpward,label,Modifier.size(26.dp).rotate(90f))
-                                }
+                                BigButton(label,onClick={action?.invoke?.invoke()},enabled=action?.enabled==true&&!state.working,loading=action?.working==true)
                             }
                         }
                     }
@@ -518,13 +509,13 @@ private fun OnboardingPage(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = PAGE_PADDING, vertical = PAGE_VERTICAL_PADDING),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.Start
     ) {
         if(icon!=null&&icon != DriveIcons.PhoneAndroid){
             Icon(icon,null,Modifier.size(iconSize),tint=MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(20.dp))
         }
-        StepTitle(title=title,description=description,centered=true)
+        StepTitle(title=title,description=description,centered=false)
         Spacer(Modifier.height(28.dp))
         content()
     }
@@ -565,7 +556,7 @@ private fun StepTitle(title: String, description: String,centered:Boolean=false)
         Text(
             text = title,
             textAlign=if(centered)TextAlign.Center else TextAlign.Start,
-            style = MaterialTheme.typography.titleMedium.copy(fontSize=18.sp,fontWeight=FontWeight.Medium),
+            style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(Modifier.height(12.dp))
@@ -578,47 +569,35 @@ private fun StepTitle(title: String, description: String,centered:Boolean=false)
     }
 }
 
-/** A light Compose implementation of the introductory pager; no Telegram renderer or messaging client is embedded. */
+/** A native welcome with the same surfaces, spacing and typography as the signed-in library. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun WelcomeStep(availableHeight:androidx.compose.ui.unit.Dp,onContinue:()->Unit){
-    val pager=rememberPagerState(pageCount={6})
-    val compact=availableHeight<600.dp||androidx.compose.ui.platform.LocalDensity.current.fontScale>=1.3f
-    val pagerHeight=if(compact)(availableHeight-200.dp).coerceIn(220.dp,340.dp)else 340.dp
-    val titles=listOf("TeleDrive","Original quality","Your own storage","Everything together","Listen anywhere","Made for you")
-    val descriptions=listOf(
-        "Your personal cloud, powered by Telegram.",
-        "Keep photos and videos just as you captured them.",
-        "Your files live in your Telegram storage channels.",
-        "Photos, videos, music and documents in one place.",
-        "Your audio library, ready when you are.",
-        "A simple, private space for the things you keep."
-    )
-    val icons=listOf(DriveIcons.CloudUpload,DriveIcons.Photo,DriveIcons.Folder,DriveIcons.Description,DriveIcons.MusicNote,DriveIcons.Lock)
-    Column(Modifier.fillMaxWidth().heightIn(min=availableHeight).padding(horizontal=24.dp).padding(top=24.dp,bottom=32.dp),
-        horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.SpaceBetween){
-        Column(Modifier.fillMaxWidth().padding(top=if(compact)8.dp else (availableHeight*.10f).coerceIn(0.dp,64.dp)),horizontalAlignment=Alignment.CenterHorizontally){
-            HorizontalPager(state=pager,modifier=Modifier.fillMaxWidth().height(pagerHeight),verticalAlignment=Alignment.CenterVertically){page->
-                Column(Modifier.fillMaxWidth().padding(horizontal=8.dp),horizontalAlignment=Alignment.CenterHorizontally){
-                    if(page==0) {
-                        com.infinity.drive.presentation.platform.LocalAppIcon.current(
-                            Modifier.size(if(compact)96.dp else 144.dp).semantics{contentDescription="TeleDrive app icon"})
-                    } else Box(Modifier.size(if(compact)96.dp else 144.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),contentAlignment=Alignment.Center){
-                        Icon(icons[page],null,Modifier.size(if(compact)48.dp else 72.dp),tint=Color.White)
+    val compact=availableHeight<650.dp||androidx.compose.ui.platform.LocalDensity.current.fontScale>=1.3f
+    Column(Modifier.fillMaxWidth().heightIn(min=availableHeight).padding(horizontal=24.dp,vertical=24.dp),
+        verticalArrangement=Arrangement.SpaceBetween){
+        Text("TeleDrive",style=MaterialTheme.typography.titleLarge)
+        Column(Modifier.fillMaxWidth().padding(vertical=if(compact)16.dp else 32.dp),verticalArrangement=Arrangement.spacedBy(if(compact)12.dp else 20.dp)){
+            com.infinity.drive.presentation.platform.LocalAppIcon.current(Modifier.size(if(compact)56.dp else 96.dp).semantics{contentDescription="TeleDrive app icon"})
+            Text("Your cloud.\nYour space.",style=if(compact)MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineLarge)
+            Text("Your files, together. Powered by Telegram.",style=MaterialTheme.typography.bodyLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            if(!compact)androidx.compose.foundation.layout.FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+                listOf("Original quality","Your own storage").forEach{label->
+                    Surface(shape=RoundedCornerShape(50),color=MaterialTheme.colorScheme.surfaceContainerHigh){
+                        Row(Modifier.padding(horizontal=12.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                            Icon(DriveIcons.Check,null,Modifier.size(16.dp),tint=MaterialTheme.colorScheme.primary)
+                            Text(label,style=MaterialTheme.typography.labelMedium)
+                        }
                     }
-                    Spacer(Modifier.height(28.dp))
-                    Text(titles[page],style=MaterialTheme.typography.headlineMedium.copy(fontSize=26.sp,fontWeight=FontWeight.Medium),textAlign=TextAlign.Center)
-                    Spacer(Modifier.height(12.dp))
-                    Text(descriptions[page],style=MaterialTheme.typography.bodyLarge.copy(fontSize=15.sp,lineHeight=21.sp),textAlign=TextAlign.Center)
                 }
             }
-            Row(Modifier.semantics{contentDescription="Introduction page ${pager.currentPage+1} of 6"},horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                repeat(6){index->Box(Modifier.size(6.dp).clip(CircleShape).background(if(index==pager.currentPage)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.55f)))}
-            }
         }
-        Column(Modifier.fillMaxWidth().padding(top=32.dp),horizontalAlignment=Alignment.CenterHorizontally){
-            BigButton("Get started",onContinue)
-            Spacer(Modifier.height(12.dp))
-            Text("Sign in with your Telegram account.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,textAlign=TextAlign.Center)
+        Surface(shape=RoundedCornerShape(28.dp),color=MaterialTheme.colorScheme.surfaceContainerLow){
+            Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+                Text("Start with your Telegram account",style=MaterialTheme.typography.titleSmall)
+                BigButton("Get started",onContinue)
+                Text("Your files stay in your storage channels.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
@@ -1022,7 +1001,7 @@ private fun PhoneStep(
 
 @Composable
 private fun CountryField(country:Country?,loading:Boolean,enabled:Boolean,onClick:()->Unit){
-    Surface(onClick=onClick,enabled=enabled,shape=RoundedCornerShape(10.dp),color=Color.Transparent,
+    Surface(onClick=onClick,enabled=enabled,shape=RoundedCornerShape(22.dp),color=MaterialTheme.colorScheme.surfaceContainerLow,
         border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),modifier=Modifier.fillMaxWidth().heightIn(min=58.dp)){
         Row(Modifier.padding(horizontal=16.dp,vertical=16.dp),verticalAlignment=Alignment.CenterVertically){
             Text(country?.name?:if(loading)"Loading countries…"else"Country",Modifier.weight(1f),style=MaterialTheme.typography.bodyLarge,
@@ -1416,7 +1395,7 @@ private fun OnboardingField(value:String,onChange:(String)->Unit,label:String,su
             KeyboardType.Phone->normalizeSignInDigits(next,allowPlus=true)
             else->next
         })
-    },label={Text(label)},singleLine=true,enabled=enabled,shape=RoundedCornerShape(10.dp),
+    },label={Text(label)},singleLine=true,enabled=enabled,shape=RoundedCornerShape(22.dp),
         modifier=Modifier.fillMaxWidth().focusRequester(focus),
         prefix=prefix?.let{{Text(it)}},
         supportingText=supportingText?.let{{Text(it)}},
@@ -1424,8 +1403,8 @@ private fun OnboardingField(value:String,onChange:(String)->Unit,label:String,su
         trailingIcon=if(password){{IconButton({reveal=!reveal}){Icon(if(reveal)DriveIcons.VisibilityOff else DriveIcons.Visibility,if(reveal)"Hide password"else"Show password")}}}else null,
         keyboardOptions=KeyboardOptions(keyboardType=if(password&&keyboardType==KeyboardType.Text)KeyboardType.Password else keyboardType,imeAction=if(next)ImeAction.Next else ImeAction.Done,autoCorrectEnabled=false),
         keyboardActions=KeyboardActions(onNext={focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Next)},onDone={if(action==null)keyboard?.hide()else action.action?.takeIf{it.enabled&&!it.working}?.invoke?.invoke()}),
-        colors=OutlinedTextFieldDefaults.colors(focusedContainerColor=Color.Transparent,
-            unfocusedContainerColor=Color.Transparent,unfocusedBorderColor=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.7f)))
+        colors=OutlinedTextFieldDefaults.colors(focusedContainerColor=MaterialTheme.colorScheme.surfaceContainerLow,
+            unfocusedContainerColor=MaterialTheme.colorScheme.surfaceContainerLow,unfocusedBorderColor=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.7f)))
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)

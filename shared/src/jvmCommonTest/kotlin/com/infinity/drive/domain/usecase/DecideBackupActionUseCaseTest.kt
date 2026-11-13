@@ -128,4 +128,13 @@ class DecideBackupActionUseCaseTest {
         )
         assertEquals(BackupDecision.BACKUP, decision)
     }
+
+    @Test fun `minimum size skips before hashing and includes the exact boundaries`() {
+        fun decide(size:Long)=useCase(candidate(size),0,null,emptyList(),2000,minFileSizeBytes=1000,contentHashProvider={error("size checks must run before hashing")})
+        assertEquals(BackupDecision.SKIP_TOO_SMALL,decide(999))
+        assertEquals(BackupDecision.BACKUP,decide(1000))
+        assertEquals(BackupDecision.BACKUP,decide(2000))
+        assertEquals(BackupDecision.SKIP_TOO_LARGE,decide(2001))
+        assertEquals(BackupDecision.BACKUP,useCase(candidate(1),0,null,emptyList(),0,minFileSizeBytes=0,contentHashProvider={null}))
+    }
 }

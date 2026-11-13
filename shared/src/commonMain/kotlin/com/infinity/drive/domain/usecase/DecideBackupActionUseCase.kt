@@ -24,9 +24,11 @@ class DecideBackupActionUseCase(
         existingRecord: ExistingRecord?,
         exclusions: List<Exclusion>,
         maxFileSizeBytes: Long,
+        minFileSizeBytes: Long = 0,
         contentHashProvider: () -> String?
     ): BackupDecision {
         if (evaluateExclusions(candidate, exclusions)) return BackupDecision.SKIP_EXCLUDED
+        if (minFileSizeBytes > 0 && candidate.sizeBytes < minFileSizeBytes) return BackupDecision.SKIP_TOO_SMALL
         if (maxFileSizeBytes in 1..<candidate.sizeBytes) return BackupDecision.SKIP_TOO_LARGE
 
         if (existingRecord != null) {

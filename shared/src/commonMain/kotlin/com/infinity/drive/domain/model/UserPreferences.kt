@@ -13,6 +13,7 @@ data class UserPreferences(
     val backupChargingOnly: Boolean = false,
     val backupIntervalHours: Int = 24,
     val backupMaxFileSizeMb: Int = 0,
+    val backupMinFileSizeMb: Int = 0,
 
     val maxCacheSizeMb: Int = 1024,
     val trashAutoClearDays: Int = 30,
@@ -32,6 +33,8 @@ data class UserPreferences(
     val navigationBarBlur:Boolean=true,
     val navigationBarLabels:Boolean=true,
     val dynamicColor: Boolean = false,
+    val accentColour: AccentColour = AccentColour.BLUE,
+    val dashboardStyle: DashboardStyle = DashboardStyle.CLASSIC,
     val viewMode: ViewMode = ViewMode.LIST,
     val gridSize: Int = 3,
     val galleryViewMode: ViewMode = ViewMode.GRID,

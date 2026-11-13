@@ -39,8 +39,14 @@ fun LibraryDashboard(
     onAdd: () -> Unit,
     showAddAction: Boolean = true,
     loading: Boolean = false,
-    updatedLabel: String = "No uploads yet"
+    updatedLabel: String = "No uploads yet",
+    style:String=LocalDashboardStyle.current
 ) {
+    if(style in setOf("ORBIT","MOSAIC","RIBBON","AURORA","COMPACT")) {
+        AlternativeLibraryDashboard(style,usage,loading,updatedLabel)
+        if(showAddAction)Button(onAdd,Modifier.fillMaxWidth().padding(top=8.dp).heightIn(min=52.dp),shape=CircleShape){Icon(DriveIcons.Add,null);Spacer(Modifier.width(8.dp));Text("Add files")}
+        return
+    }
     CompositionLocalProvider(LocalContentColor provides SandInk) {
         Column(
             Modifier.fillMaxWidth().testTag("library-card")
@@ -63,7 +69,7 @@ fun LibraryDashboard(
                 Icon(DriveIcons.Folder, null, Modifier.size(24.dp).skeleton(loading))
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(if (loading) "24.8 GB" else formatBytes(usage.bytes), Modifier.skeleton(loading),
+                Text(if (loading) "24.8 GB" else formatLibraryBytes(usage.bytes), Modifier.skeleton(loading),
                     style = if (LocalDensity.current.fontScale > 1.3f) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displayMedium,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("Stored in Telegram", Modifier.skeleton(loading), style = MaterialTheme.typography.bodyMedium,
@@ -115,7 +121,7 @@ fun LibraryBrowse(shortcuts: List<LibraryShortcut>, loading: Boolean = false) {
     }
 }
 
-private fun formatBytes(bytes:Long):String {
+internal fun formatLibraryBytes(bytes:Long):String {
     val units=listOf("B","KB","MB","GB","TB")
     var amount=bytes.coerceAtLeast(0).toDouble();var index=0
     while(amount>=1024&&index<units.lastIndex){amount/=1024;index++}
