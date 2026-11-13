@@ -195,7 +195,7 @@ fun CollectionScreen(
                 start = 16.dp,
                 end = 16.dp,
                 top = 8.dp,
-                bottom = 8.dp + padding.calculateBottomPadding()
+                bottom = 8.dp + padding.calculateBottomPadding() + com.infinity.drive.presentation.navigation.LocalBottomBarInset.current
             )
         ) {
             item("collection-summary"){

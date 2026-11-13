@@ -2,7 +2,6 @@
 package com.infinity.drive.presentation.files
 
 import app.tgdrive.ui.ElasticLazyVerticalGrid as LazyVerticalGrid
-import com.infinity.drive.presentation.components.folderContentReveal
 import com.infinity.drive.presentation.components.fileRevealHighlight
 import app.tgdrive.ui.DriveIcons
 import androidx.compose.animation.AnimatedVisibility
@@ -10,6 +9,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -185,6 +185,7 @@ fun FilesScreen(
     onBack: (() -> Unit)?,
     audioOnly:Boolean=false,
     requestUpload:Boolean=false,
+    contentMotion:Modifier=Modifier,
     viewModel: FilesViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -281,6 +282,7 @@ fun FilesScreen(
     FileDropArea(onDropped = { references -> viewModel.importAndUpload(references) }) {
         Box(modifier = Modifier.fillMaxSize()) {
             Scaffold(
+                containerColor=androidx.compose.ui.graphics.Color.Transparent,
                 snackbarHost = {},
                 topBar = {
                     Column {
@@ -529,7 +531,7 @@ fun FilesScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(top = padding.calculateTopPadding())
-                        .nestedScroll(fabScrollConnection)
+                        .nestedScroll(fabScrollConnection).then(contentMotion).background(MaterialTheme.colorScheme.background)
                 ) {
                     if(state.folderId!=null&&state.breadcrumbs.any{it.id!=null})Breadcrumbs(crumbs=state.breadcrumbs.filter{it.id!=null},onOpen=onOpenCrumb)
                     RefreshableContent(
@@ -816,7 +818,7 @@ private fun FilesContent(
         elasticEnabled = !state.selectionMode,
         columns = GridCells.Fixed(columns),
         modifier = Modifier
-            .fillMaxSize().folderContentReveal(state.folderId to (state.sortField to state.sortDirection))
+            .fillMaxSize()
 
             .then(dragSelect),
         contentPadding = padding.add(horizontal = 12.dp, top = 12.dp, bottom = 100.dp),

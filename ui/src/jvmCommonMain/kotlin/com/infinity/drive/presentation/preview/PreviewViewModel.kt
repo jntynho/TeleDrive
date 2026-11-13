@@ -69,6 +69,10 @@ class PreviewViewModel(
 ) : ViewModel() {
 
     private val route: Route.Preview = savedStateHandle.toRoute()
+    val fromTrash:Boolean get()=route.fromTrash
+    private var releaseTrashPlayback:(()->Unit)?=null
+    fun bindTrashPlayback(release:()->Unit){if(fromTrash)releaseTrashPlayback=release}
+    override fun onCleared(){releaseTrashPlayback?.invoke();super.onCleared()}
 
     private val _uiState = MutableStateFlow(PreviewUiState())
     val uiState: StateFlow<PreviewUiState> = _uiState.asStateFlow()
@@ -88,6 +92,10 @@ class PreviewViewModel(
             val target = fileRepository.getFile(route.fileId)
             if (target == null) {
                 _uiState.update { it.copy(closed = true) }
+                return@launch
+            }
+            if(fromTrash){
+                _uiState.value=PreviewUiState(files=listOf(target),ready=true)
                 return@launch
             }
             val prefs = settingsRepository.preferences.first()

@@ -16,6 +16,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.luminance
@@ -54,6 +55,12 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.alpha
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -94,7 +101,6 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.Color
@@ -107,6 +113,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.Lifecycle
@@ -235,43 +243,42 @@ fun OnboardingScreen(
         return
     }
 
-    val initialDark=MaterialTheme.colorScheme.background.luminance()<.5f
-    var dark by rememberSaveable{mutableStateOf(initialDark)}
-    val canvas=if(MaterialTheme.colorScheme.background==Color.Black)Color.Black else Color(0xFF101216)
-    val colors=if(dark)app.tgdrive.ui.DriveColors.copy(background=canvas,surface=canvas,surfaceContainerHigh=Color(0xFF20242A),primary=Color(0xFF87B8FF),onPrimary=Color(0xFF091625))
-        else lightColorScheme(primary=Color(0xFF1765B9),background=Color(0xFFF7F8FA),surface=Color(0xFFF7F8FA),surfaceContainerHigh=Color(0xFFEAEDF2))
+    // Sign-in has one calm dark appearance, independent of the signed-in app preference.
+    val canvas=Color(0xFF1D2935)
+    val colors=app.tgdrive.ui.DriveColors.copy(background=canvas,surface=canvas,
+        surfaceContainerHigh=Color(0xFF2B3947),primary=Color(0xFF2AABEE),onPrimary=Color.White,
+        onSurface=Color(0xFFF5F5F5),onSurfaceVariant=Color(0xFFAAB5C0),
+        outline=Color(0xFF647381),outlineVariant=Color(0xFF455361))
     val inputs=remember{mutableMapOf<OnboardingStep,InlineInputController>()}
     val input=inputs.getOrPut(state.step){InlineInputController()}
     val formStates=androidx.compose.runtime.saveable.rememberSaveableStateHolder()
     val canBack=state.step in setOf(OnboardingStep.API_CREDENTIALS,OnboardingStep.PHONE,OnboardingStep.CODE,OnboardingStep.EMAIL_ADDRESS,OnboardingStep.EMAIL_CODE,OnboardingStep.PASSWORD)
     com.infinity.drive.presentation.common.AppBackHandler(canBack){if(!state.working)viewModel.backFromSignIn()}
-    com.infinity.drive.presentation.theme.PlatformThemeSideEffects(dark)
+    com.infinity.drive.presentation.theme.PlatformThemeSideEffects(true)
     MaterialTheme(colorScheme=colors){
         Scaffold(containerColor=colors.background){padding->
-            Column(Modifier.fillMaxSize().padding(top=padding.calculateTopPadding()).navigationBarsPadding()){
-                Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal=12.dp),verticalAlignment=Alignment.CenterVertically){
-                    if(canBack)IconButton(viewModel::backFromSignIn,enabled=!state.working){Icon(DriveIcons.ArrowBack,"Back")}
-                    else Icon(DriveIcons.CloudQueue,null,Modifier.padding(start=12.dp,end=10.dp).size(24.dp),tint=colors.primary)
-                    Text(when(state.step){OnboardingStep.WELCOME->"TeleDrive";OnboardingStep.PHONE->"Sign in";OnboardingStep.CODE,OnboardingStep.EMAIL_CODE->"Verification";OnboardingStep.PASSWORD->"Two-step verification";else->"Set up TeleDrive"},
-                        Modifier.weight(1f),style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=TextOverflow.Ellipsis)
-                    IconButton({dark=!dark;viewModel.setSignInTheme(dark)}){Icon(DriveIcons.AutoAwesome,if(dark)"Use light theme"else"Use dark theme")}
+            Column(Modifier.fillMaxSize().padding(top=padding.calculateTopPadding()).navigationBarsPadding().imePadding()){
+                if(canBack) Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal=8.dp),verticalAlignment=Alignment.CenterVertically){
+                    IconButton(viewModel::backFromSignIn,enabled=!state.working){Icon(DriveIcons.ArrowBack,"Back")}
                 }
                 BoxWithConstraints(Modifier.weight(1f)){
-                    val compact=maxHeight<600.dp
                     val body:@Composable (Modifier)->Unit={modifier->
                         val scroll=rememberScrollState()
                         LaunchedEffect(state.step){scroll.scrollTo(0)}
-                        Column(modifier.verticalScroll(scroll)){
-                            AnimatedContent(state.step,transitionSpec={
+                        BoxWithConstraints(modifier){
+                        val viewportHeight=maxHeight
+                        Column(Modifier.fillMaxWidth().verticalScroll(scroll).heightIn(min=viewportHeight)){
+                            AnimatedContent(state.step,modifier=Modifier.fillMaxWidth().heightIn(min=viewportHeight),contentAlignment=Alignment.Center,transitionSpec={
                                 (com.infinity.drive.presentation.navigation.NavigationTransitions.enter(targetState.ordinal>=initialState.ordinal)
                                     togetherWith com.infinity.drive.presentation.navigation.NavigationTransitions.exit(targetState.ordinal>=initialState.ordinal))
                                     .using(SizeTransform(clip=true){_,_->snap()})
                             },label="sign-in-step"){step->
                                 val pageInput=inputs.getOrPut(step){InlineInputController()}
+                                Box(Modifier.fillMaxWidth().heightIn(min=viewportHeight),contentAlignment=Alignment.Center){
                                 CompositionLocalProvider(LocalInlineInput provides pageInput,com.infinity.drive.presentation.input.LocalInlineDrafts provides viewModel.inputDrafts){
                                     formStates.SaveableStateProvider(step.name){
                         when (step) {
-                            OnboardingStep.WELCOME -> WelcomeStep(onContinue = viewModel::start)
+                            OnboardingStep.WELCOME -> WelcomeStep(availableHeight=viewportHeight,onContinue = viewModel::start)
                             OnboardingStep.API_CREDENTIALS -> CredentialsStep(
                                 working = state.working,
                                 error = state.error,
@@ -361,21 +368,27 @@ fun OnboardingScreen(
                         }
                                     }
                                 }
+                                }
                             }
                         }
+                        }
                     }
-                    val customEntry=state.step in setOf(OnboardingStep.API_CREDENTIALS,OnboardingStep.PHONE,OnboardingStep.CODE,OnboardingStep.EMAIL_ADDRESS,OnboardingStep.EMAIL_CODE,OnboardingStep.PASSWORD)&&!(state.step==OnboardingStep.PHONE&&state.qrMode)
+                    val entryForm=state.step in setOf(OnboardingStep.API_CREDENTIALS,OnboardingStep.PHONE,OnboardingStep.CODE,OnboardingStep.EMAIL_ADDRESS,OnboardingStep.EMAIL_CODE,OnboardingStep.PASSWORD)&&!(state.step==OnboardingStep.PHONE&&state.qrMode)
                     val controls:@Composable (Modifier)->Unit={modifier->
-                        if(customEntry){
-                            Column(modifier.padding(horizontal=24.dp).padding(bottom=12.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){
-                                InlineActionButton(input,when(state.step){OnboardingStep.CODE,OnboardingStep.EMAIL_CODE->"Verify";OnboardingStep.PASSWORD->"Sign in";else->"Continue"})
-                                Box(Modifier.fillMaxWidth().height(if(compact)220.dp else 256.dp),contentAlignment=Alignment.BottomCenter){InlineKeyboard(input,compact=compact)}
+                        if(entryForm){
+                            Box(modifier.padding(horizontal=24.dp).padding(top=8.dp,bottom=16.dp),contentAlignment=Alignment.CenterEnd){
+                                val action=input.action
+                                val label=action?.label?:when(state.step){OnboardingStep.CODE,OnboardingStep.EMAIL_CODE->"Verify";OnboardingStep.PASSWORD->"Sign in";else->"Continue"}
+                                FilledIconButton(onClick={action?.invoke?.invoke()},enabled=action?.enabled==true&&!state.working,
+                                    modifier=Modifier.size(56.dp),shape=CircleShape,
+                                    colors=IconButtonDefaults.filledIconButtonColors(containerColor=colors.primary,contentColor=colors.onPrimary)){
+                                    if(action?.working==true)CircularProgressIndicator(Modifier.size(24.dp).semantics{contentDescription=label},color=colors.onPrimary,strokeWidth=2.dp)
+                                    else Icon(DriveIcons.ArrowUpward,label,Modifier.size(26.dp).rotate(90f))
+                                }
                             }
                         }
                     }
-                    if(maxWidth>600.dp&&maxWidth>maxHeight){
-                        Row(Modifier.fillMaxSize(),verticalAlignment=Alignment.CenterVertically){body(Modifier.weight(1f).fillMaxHeight());controls(Modifier.weight(1f))}
-                    }else Column(Modifier.fillMaxSize()) {body(Modifier.weight(1f).fillMaxWidth());controls(Modifier.fillMaxWidth())}
+                    Column(Modifier.fillMaxSize()) {body(Modifier.weight(1f).fillMaxWidth());controls(Modifier.fillMaxWidth())}
                 }
             }
         }
@@ -498,20 +511,20 @@ private fun OnboardingPage(
     iconPainter: Painter? = null,
     title: String,
     description: String,
+    iconSize: androidx.compose.ui.unit.Dp = 28.dp,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = PAGE_PADDING, vertical = PAGE_VERTICAL_PADDING),
-        horizontalAlignment = Alignment.Start
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if(icon!=DriveIcons.PhoneAndroid) {
-            if(icon in setOf(DriveIcons.Sms,DriveIcons.Email,DriveIcons.Lock))Box(Modifier.fillMaxWidth(),contentAlignment=Alignment.Center){HeroShape(icon,iconPainter)}
-            else HeroShape(icon=icon,iconPainter=iconPainter)
-            Spacer(Modifier.height(24.dp))
+        if(icon!=null&&icon != DriveIcons.PhoneAndroid){
+            Icon(icon,null,Modifier.size(iconSize),tint=MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(20.dp))
         }
-        StepTitle(title=title,description=description,centered=icon in setOf(DriveIcons.Sms,DriveIcons.Email,DriveIcons.Lock))
+        StepTitle(title=title,description=description,centered=true)
         Spacer(Modifier.height(28.dp))
         content()
     }
@@ -552,31 +565,61 @@ private fun StepTitle(title: String, description: String,centered:Boolean=false)
         Text(
             text = title,
             textAlign=if(centered)TextAlign.Center else TextAlign.Start,
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.titleMedium.copy(fontSize=18.sp,fontWeight=FontWeight.Medium),
             color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(Modifier.height(12.dp))
         Text(
             text = description,
             textAlign=if(centered)TextAlign.Center else TextAlign.Start,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize=14.sp,lineHeight=20.sp),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
 
+/** A light Compose implementation of the introductory pager; no Telegram renderer or messaging client is embedded. */
 @Composable
-private fun WelcomeStep(onContinue:()->Unit){
-    Column(Modifier.fillMaxWidth().padding(horizontal=24.dp,vertical=24.dp),verticalArrangement=Arrangement.spacedBy(24.dp)){
-        com.infinity.drive.presentation.platform.LocalAppIcon.current(Modifier.size(112.dp))
-        Text("Your files.\nAlways with you.",style=MaterialTheme.typography.headlineLarge)
-        Text("Your own space, powered by Telegram.",style=MaterialTheme.typography.bodyLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)
-        listOf(DriveIcons.Description to "Keep original files",DriveIcons.PhotoLibrary to "Browse photos and music",DriveIcons.History to "Pick up where you left off").forEach{(icon,text)->
-            Row(Modifier.fillMaxWidth().padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically){Icon(icon,null,Modifier.size(25.dp));Spacer(Modifier.width(16.dp));Text(text,style=MaterialTheme.typography.bodyLarge)}
+private fun WelcomeStep(availableHeight:androidx.compose.ui.unit.Dp,onContinue:()->Unit){
+    val pager=rememberPagerState(pageCount={6})
+    val compact=availableHeight<600.dp||androidx.compose.ui.platform.LocalDensity.current.fontScale>=1.3f
+    val pagerHeight=if(compact)(availableHeight-200.dp).coerceIn(220.dp,340.dp)else 340.dp
+    val titles=listOf("TeleDrive","Original quality","Your own storage","Everything together","Listen anywhere","Made for you")
+    val descriptions=listOf(
+        "Your personal cloud, powered by Telegram.",
+        "Keep photos and videos just as you captured them.",
+        "Your files live in your Telegram storage channels.",
+        "Photos, videos, music and documents in one place.",
+        "Your audio library, ready when you are.",
+        "A simple, private space for the things you keep."
+    )
+    val icons=listOf(DriveIcons.CloudUpload,DriveIcons.Photo,DriveIcons.Folder,DriveIcons.Description,DriveIcons.MusicNote,DriveIcons.Lock)
+    Column(Modifier.fillMaxWidth().heightIn(min=availableHeight).padding(horizontal=24.dp).padding(top=24.dp,bottom=32.dp),
+        horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.SpaceBetween){
+        Column(Modifier.fillMaxWidth().padding(top=if(compact)8.dp else (availableHeight*.10f).coerceIn(0.dp,64.dp)),horizontalAlignment=Alignment.CenterHorizontally){
+            HorizontalPager(state=pager,modifier=Modifier.fillMaxWidth().height(pagerHeight),verticalAlignment=Alignment.CenterVertically){page->
+                Column(Modifier.fillMaxWidth().padding(horizontal=8.dp),horizontalAlignment=Alignment.CenterHorizontally){
+                    if(page==0) {
+                        com.infinity.drive.presentation.platform.LocalAppIcon.current(
+                            Modifier.size(if(compact)96.dp else 144.dp).semantics{contentDescription="TeleDrive app icon"})
+                    } else Box(Modifier.size(if(compact)96.dp else 144.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),contentAlignment=Alignment.Center){
+                        Icon(icons[page],null,Modifier.size(if(compact)48.dp else 72.dp),tint=Color.White)
+                    }
+                    Spacer(Modifier.height(28.dp))
+                    Text(titles[page],style=MaterialTheme.typography.headlineMedium.copy(fontSize=26.sp,fontWeight=FontWeight.Medium),textAlign=TextAlign.Center)
+                    Spacer(Modifier.height(12.dp))
+                    Text(descriptions[page],style=MaterialTheme.typography.bodyLarge.copy(fontSize=15.sp,lineHeight=21.sp),textAlign=TextAlign.Center)
+                }
+            }
+            Row(Modifier.semantics{contentDescription="Introduction page ${pager.currentPage+1} of 6"},horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                repeat(6){index->Box(Modifier.size(6.dp).clip(CircleShape).background(if(index==pager.currentPage)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.55f)))}
+            }
         }
-        Spacer(Modifier.height(12.dp))
-        BigButton("Get started",onContinue)
-        Text("Sign in with your Telegram account.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.fillMaxWidth().padding(top=32.dp),horizontalAlignment=Alignment.CenterHorizontally){
+            BigButton("Get started",onContinue)
+            Spacer(Modifier.height(12.dp))
+            Text("Sign in with your Telegram account.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,textAlign=TextAlign.Center)
+        }
     }
 }
 
@@ -613,6 +656,7 @@ private fun CredentialsStep(
             onChange = { apiId = it.filter(Char::isDigit) },
             label = stringResource(Res.string.onboarding_api_id),
             keyboardType = KeyboardType.Number,
+            autoFocus=true,next=true,
             enabled = !working
         )
         Spacer(Modifier.height(12.dp))
@@ -910,7 +954,7 @@ private fun PhoneStep(
     OnboardingPage(
         icon = DriveIcons.PhoneAndroid,
         title = "Your phone number",
-        description = stringResource(Res.string.onboarding_phone_number_telegram_account)
+        description = "Please confirm your country code\nand enter your phone number."
     ) {
         if (!manual) {
             CountryField(
@@ -934,6 +978,7 @@ private fun PhoneStep(
                 null
             },
             keyboardType = KeyboardType.Phone,
+            autoFocus=true,
             enabled = !working,
             prefix = "+$callingCode",
             onPaste={raw->
@@ -977,11 +1022,12 @@ private fun PhoneStep(
 
 @Composable
 private fun CountryField(country:Country?,loading:Boolean,enabled:Boolean,onClick:()->Unit){
-    Surface(onClick=onClick,enabled=enabled,shape=RoundedCornerShape(18.dp),color=MaterialTheme.colorScheme.surfaceContainerHigh,modifier=Modifier.fillMaxWidth()){
+    Surface(onClick=onClick,enabled=enabled,shape=RoundedCornerShape(10.dp),color=Color.Transparent,
+        border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),modifier=Modifier.fillMaxWidth().heightIn(min=58.dp)){
         Row(Modifier.padding(horizontal=16.dp,vertical=16.dp),verticalAlignment=Alignment.CenterVertically){
-            Icon(DriveIcons.Language,null,Modifier.size(22.dp));Spacer(Modifier.width(12.dp))
-            Text(country?.name?:if(loading)"Loading countries…"else"Choose country",Modifier.weight(1f),style=MaterialTheme.typography.bodyLarge)
-            if(loading)CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp)else Icon(DriveIcons.ArrowDropDown,null)
+            Text(country?.name?:if(loading)"Loading countries…"else"Country",Modifier.weight(1f),style=MaterialTheme.typography.bodyLarge,
+                color=if(country==null)MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+            if(loading)CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp)else Icon(DriveIcons.ChevronRight,null,Modifier.size(24.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -990,17 +1036,16 @@ private fun CountryField(country:Country?,loading:Boolean,enabled:Boolean,onClic
 @Composable
 private fun CountryPickerSheet(countries:List<Country>,onDismiss:()->Unit,onSelect:(Country)->Unit){
     var query by remember{mutableStateOf("")}
-    val input=remember{InlineInputController()}
     val matches=remember(countries,query){countries.filter{query.isBlank()||it.name.contains(query,true)||it.callingCode.contains(query)||it.isoCode.equals(query,true)}}
     val density=androidx.compose.ui.platform.LocalDensity.current
     val limit=with(density){androidx.compose.ui.platform.LocalWindowInfo.current.containerSize.height.toDp()*.85f}
     com.infinity.drive.presentation.components.DriveBottomSheet(onDismissRequest=onDismiss){
         val closeThen=com.infinity.drive.presentation.components.LocalSheetCloseThen.current
-        CompositionLocalProvider(LocalInlineInput provides input){
-            Column(Modifier.fillMaxWidth().height(limit).padding(horizontal=20.dp)){
+        CompositionLocalProvider(LocalInlineInput provides null){
+            Column(Modifier.fillMaxWidth().heightIn(max=limit).padding(horizontal=20.dp)){
                 Text("Choose country",style=MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.height(12.dp))
-                InlineInputField(query,{query=it},"Search countries",Modifier.fillMaxWidth())
+                OnboardingField(query,{query=it},"Search countries",autoFocus=true)
                 LazyColumn(Modifier.weight(1f).fillMaxWidth()){
                     items(matches,key={"${it.isoCode}_${it.callingCode}"}){country->
                         Row(Modifier.fillMaxWidth().clickable{closeThen{onSelect(country)}}.padding(vertical=14.dp),verticalAlignment=Alignment.CenterVertically){
@@ -1008,7 +1053,6 @@ private fun CountryPickerSheet(countries:List<Country>,onDismiss:()->Unit,onSele
                         }
                     }
                 }
-                InlineKeyboard(input,compact=true)
                 Spacer(Modifier.height(12.dp))
             }
         }
@@ -1062,6 +1106,7 @@ private fun EmailAddressStep(
             onChange = { email = it },
             label = stringResource(Res.string.onboarding_email_label),
             keyboardType = KeyboardType.Email,
+            autoFocus=true,
             enabled = !working
         )
         ErrorAndAction(
@@ -1112,6 +1157,7 @@ private fun CodeStep(
     var code by com.infinity.drive.presentation.input.inlineDraft("phone-code")
     OnboardingPage(
         icon = DriveIcons.Sms,
+        iconSize = 64.dp,
         title = if(channel==CodeDeliveryChannel.TELEGRAM_APP)"Check Telegram"else"Enter your code",
         description = codeDeliveryText(channel, phoneNumber)
     ) {
@@ -1132,32 +1178,35 @@ private fun CodeStep(
     }
 }
 
-/** Accessible visual slots backed by the in-app keypad; no platform IME connection. */
+/** One real text editor supports the phone IME, paste and accessibility; slots only decorate it. */
 @Composable
 private fun VerificationInput(value:String,onChange:(String)->Unit,length:Int?,enabled:Boolean,numeric:Boolean=true){
     val slots=length?.takeIf{numeric&&it in 1..8}
     if(slots==null){
-        InlineInputField(value,{onChange(if(length!=null)it.take(length.coerceAtLeast(0))else it)},"Verification code",mode=if(numeric)InlineInputMode.NUMBER else InlineInputMode.TEXT,enabled=enabled)
+        OnboardingField(value,{onChange(if(length!=null)it.take(length.coerceAtLeast(0))else it)},"Verification code",
+            keyboardType=if(numeric)KeyboardType.Number else KeyboardType.Text,enabled=enabled,autoFocus=true)
         return
     }
-    val input=checkNotNull(LocalInlineInput.current)
-    val current by rememberUpdatedState(value)
-    val change by rememberUpdatedState(onChange)
-    val available by rememberUpdatedState(enabled)
-    val id=remember{java.util.UUID.randomUUID().toString()}
-    val target=remember(id,slots){InlineTarget(id,InlineInputMode.NUMBER,{TextFieldValue(current,TextRange(current.length))},
-        {change(it.text.filter{ch->ch in '0'..'9'}.take(slots))},{available})}
-    val bring=remember{androidx.compose.foundation.relocation.BringIntoViewRequester()}
-    LaunchedEffect(id){input.target=target;androidx.compose.runtime.withFrameNanos{};bring.bringIntoView()}
-    DisposableEffect(id){onDispose{if(input.target?.id==id)input.target=null}}
-    Row(Modifier.fillMaxWidth().bringIntoViewRequester(bring).semantics{contentDescription="Verification code";setText{if(enabled){change(it.text.filter{ch->ch in '0'..'9'}.take(slots));true}else false}},horizontalArrangement=Arrangement.spacedBy(8.dp)){
-        repeat(slots){index->
-            val active=index==value.length
-            Box(Modifier.weight(1f).height(56.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .border(if(active)1.5.dp else 1.dp,if(active)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,RoundedCornerShape(14.dp))
-                .clickable(enabled){input.target=target},contentAlignment=Alignment.Center){Text(value.getOrNull(index)?.toString().orEmpty(),style=MaterialTheme.typography.headlineSmall)}
-        }
-    }
+    val focus=remember{FocusRequester()}
+    val action=LocalInlineInput.current
+    LaunchedEffect(Unit){androidx.compose.runtime.withFrameNanos{};focus.requestFocus()}
+    BasicTextField(value=value,onValueChange={onChange(normalizeSignInDigits(it).take(slots))},enabled=enabled,singleLine=true,
+        keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.NumberPassword,imeAction=ImeAction.Done,autoCorrectEnabled=false),
+        keyboardActions=KeyboardActions(onDone={action?.action?.takeIf{it.enabled&&!it.working}?.invoke?.invoke()}),
+        cursorBrush=SolidColor(MaterialTheme.colorScheme.primary),
+        modifier=Modifier.fillMaxWidth().height(60.dp).focusRequester(focus).semantics{contentDescription="Verification code"},
+        decorationBox={editor->Box{
+            Row(Modifier.fillMaxSize(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                repeat(slots){index->
+                    val active=index==value.length.coerceAtMost(slots-1)
+                    Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .border(if(active)1.5.dp else 1.dp,if(active)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,RoundedCornerShape(18.dp)),contentAlignment=Alignment.Center){
+                        Text(value.getOrNull(index)?.toString().orEmpty(),style=MaterialTheme.typography.headlineSmall)
+                    }
+                }
+            }
+            Box(Modifier.matchParentSize().alpha(0f)){editor()}
+        }})
 }
 
 @Composable
@@ -1178,6 +1227,7 @@ private fun PasswordStep(
             onChange = { password = it },
             label = stringResource(Res.string.onboarding_password),
             keyboardType = KeyboardType.Password,
+            autoFocus=true,
             password = true,
             enabled = !working
         )
@@ -1194,72 +1244,68 @@ private fun PasswordStep(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun PermissionsStep(working: Boolean, onResolved: () -> Unit) {
-    var mediaRequested by rememberSaveable { mutableStateOf(false) }
-    val mediaPermissions = listOf(
-        AppPermission.MEDIA_IMAGES,
-        AppPermission.MEDIA_VIDEO,
-        AppPermission.NOTIFICATIONS
-    )
     val permissionChecker = koinInject<PermissionChecker>()
     val permissionRequester = LocalPermissionRequester.current
     val systemScreens = LocalSystemScreens.current
-
-    fun mediaAccess(): Boolean = mediaPermissions.all { permissionChecker.isGranted(it) }
-
-    var mediaGranted by remember { mutableStateOf(mediaAccess()) }
-
+    val mediaPermissions = listOf(AppPermission.MEDIA_IMAGES, AppPermission.MEDIA_VIDEO)
+    var statuses by remember { mutableStateOf(permissionChecker.statuses()) }
     var allFilesGranted by remember { mutableStateOf(permissionChecker.hasAllFilesAccess()) }
+    var requesting by remember { mutableStateOf(false) }
+    fun refresh() {
+        statuses = permissionChecker.statuses()
+        allFilesGranted = permissionChecker.hasAllFilesAccess()
+    }
+    fun request(permissions: List<AppPermission>) {
+        if (requesting || working) return
+        val missing = permissions.filterNot { permissionChecker.isGranted(it) }
+        if (missing.isEmpty()) { refresh(); return }
+        if (missing.any { !permissionChecker.isRequestable(it) }) {
+            systemScreens.openAppSettings()
+        } else {
+            requesting = true
+            permissionRequester.request(missing) { requesting = false; refresh() }
+        }
+    }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                mediaGranted = mediaAccess()
-                allFilesGranted = permissionChecker.hasAllFilesAccess()
-            }
+            if (event == Lifecycle.Event.ON_RESUME) refresh()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    OnboardingPage(
-        icon = DriveIcons.Photo,
-        title = stringResource(Res.string.onboarding_storage_access),
-        description = stringResource(Res.string.onboarding_driveinfinity_needs_media_files)
-    ) {
-        val askForMedia = !mediaGranted && !mediaRequested
-        BigButton(
-            label = when {
-                working -> stringResource(Res.string.onboarding_looking_for_drives)
-                askForMedia -> stringResource(Res.string.onboarding_allow_media)
-                !allFilesGranted -> stringResource(Res.string.onboarding_allow_all_files)
-                else -> stringResource(Res.string.onboarding_continue)
-            },
-            enabled = !working,
-            loading = working,
-            onClick = {
-                when {
-                    askForMedia -> permissionRequester.request(mediaPermissions) { mediaRequested = true }
-                    !allFilesGranted -> systemScreens.openAllFilesAccess()
-                    else -> onResolved()
-                }
+    OnboardingPage(icon=DriveIcons.Lock,title="Permissions",
+        description="Choose what TeleDrive can access.\nYou can change these later in Settings.") {
+        PermissionAccessRow(DriveIcons.Photo,"Photos and videos","Browse and back up your media",
+            mediaPermissions.all { statuses[it] == true },!working&&!requesting) { request(mediaPermissions) }
+        Spacer(Modifier.height(12.dp))
+        PermissionAccessRow(DriveIcons.Notifications,"Notifications","See transfer progress and completed uploads",
+            statuses[AppPermission.NOTIFICATIONS]==true,!working&&!requesting) { request(listOf(AppPermission.NOTIFICATIONS)) }
+        Spacer(Modifier.height(12.dp))
+        PermissionAccessRow(DriveIcons.Folder,"File access","Optional, for browsing and backing up folders",
+            allFilesGranted,!working&&!requesting) { systemScreens.openAllFilesAccess() }
+        Spacer(Modifier.height(24.dp))
+        BigButton(if(working)"Looking for your drive…"else"Continue",onResolved,enabled=!working&&!requesting,loading=working)
+        Spacer(Modifier.height(12.dp))
+        Text("You can continue without granting access.",style=MaterialTheme.typography.bodySmall,
+            color=MaterialTheme.colorScheme.onSurfaceVariant,textAlign=TextAlign.Center,modifier=Modifier.fillMaxWidth())
+    }
+}
+
+@Composable
+private fun PermissionAccessRow(icon:ImageVector,title:String,description:String,granted:Boolean,enabled:Boolean,onClick:()->Unit) {
+    Surface(onClick=onClick,enabled=enabled&&!granted,shape=RoundedCornerShape(22.dp),
+        color=MaterialTheme.colorScheme.surfaceContainerHigh,modifier=Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            Icon(icon,null,Modifier.size(24.dp),tint=MaterialTheme.colorScheme.primary)
+            Column(Modifier.weight(1f)) {
+                Text(title,style=MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.height(4.dp))
+                Text(description,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
-        )
-        if ((mediaRequested || mediaGranted) && !allFilesGranted) {
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = stringResource(Res.string.onboarding_files_access_covers_documents),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(4.dp))
-            OutlinedButton(
-                onClick = onResolved,
-                shape = RoundedCornerShape(18.dp),
-                enabled = !working,
-                modifier = Modifier.fillMaxWidth()
-            ) { Text(stringResource(Res.string.onboarding_continue_without)) }
+            Text(if(granted)"Allowed"else"Allow",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -1346,13 +1392,40 @@ private fun ToggleCard(label: String, checked: Boolean, onChange: (Boolean) -> U
     }
 }
 
+/** System keyboards may emit local decimal digits; Telegram receives ASCII E.164/code digits. */
+internal fun normalizeSignInDigits(value:String,allowPlus:Boolean=false):String = buildString{
+    value.forEach{ch->
+        val digit=Character.digit(ch,10)
+        if(digit>=0)append('0'+digit)else if(allowPlus&&ch=='+'&&isEmpty())append('+')
+    }
+}
+
 @Composable
 private fun OnboardingField(value:String,onChange:(String)->Unit,label:String,supportingText:String?=null,
-    keyboardType:KeyboardType=KeyboardType.Text,password:Boolean=false,enabled:Boolean=true,prefix:String?=null,onPaste:((String)->Unit)?=null){
-    InlineInputField(value,onChange,label,Modifier.fillMaxWidth(),
-        mode=if(keyboardType in listOf(KeyboardType.Number,KeyboardType.NumberPassword))InlineInputMode.NUMBER
-            else if(keyboardType==KeyboardType.Phone)InlineInputMode.PHONE else InlineInputMode.TEXT,
-        password=password,enabled=enabled,prefix=prefix,supportingText=supportingText,onPaste=onPaste)
+    keyboardType:KeyboardType=KeyboardType.Text,password:Boolean=false,enabled:Boolean=true,prefix:String?=null,onPaste:((String)->Unit)?=null,autoFocus:Boolean=false,next:Boolean=false){
+    val focus=remember{FocusRequester()}
+    val action=LocalInlineInput.current
+    val keyboard=androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val focusManager=androidx.compose.ui.platform.LocalFocusManager.current
+    var reveal by remember{mutableStateOf(false)}
+    LaunchedEffect(autoFocus){if(autoFocus){androidx.compose.runtime.withFrameNanos{};focus.requestFocus()}}
+    OutlinedTextField(value=value,onValueChange={next->
+        if(onPaste!=null&&next.trimStart().startsWith("+")&&next.length>value.length+1)onPaste(normalizeSignInDigits(next,allowPlus=true))
+        else onChange(when(keyboardType){
+            KeyboardType.Number,KeyboardType.NumberPassword->normalizeSignInDigits(next)
+            KeyboardType.Phone->normalizeSignInDigits(next,allowPlus=true)
+            else->next
+        })
+    },label={Text(label)},singleLine=true,enabled=enabled,shape=RoundedCornerShape(10.dp),
+        modifier=Modifier.fillMaxWidth().focusRequester(focus),
+        prefix=prefix?.let{{Text(it)}},
+        supportingText=supportingText?.let{{Text(it)}},
+        visualTransformation=if(password&&!reveal)PasswordVisualTransformation()else VisualTransformation.None,
+        trailingIcon=if(password){{IconButton({reveal=!reveal}){Icon(if(reveal)DriveIcons.VisibilityOff else DriveIcons.Visibility,if(reveal)"Hide password"else"Show password")}}}else null,
+        keyboardOptions=KeyboardOptions(keyboardType=if(password&&keyboardType==KeyboardType.Text)KeyboardType.Password else keyboardType,imeAction=if(next)ImeAction.Next else ImeAction.Done,autoCorrectEnabled=false),
+        keyboardActions=KeyboardActions(onNext={focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Next)},onDone={if(action==null)keyboard?.hide()else action.action?.takeIf{it.enabled&&!it.working}?.invoke?.invoke()}),
+        colors=OutlinedTextFieldDefaults.colors(focusedContainerColor=Color.Transparent,
+            unfocusedContainerColor=Color.Transparent,unfocusedBorderColor=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.7f)))
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)

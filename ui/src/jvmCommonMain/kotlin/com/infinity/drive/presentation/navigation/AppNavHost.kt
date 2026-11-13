@@ -50,6 +50,11 @@ fun AppNavHost(
 ) {
     NavigationCoordinator(navController)
     val entry by navController.currentBackStackEntryAsState()
+    val folderHistory=androidx.compose.runtime.saveable.rememberSaveable(saver=androidx.compose.runtime.saveable.listSaver(
+        save={it:com.infinity.drive.presentation.components.FolderNavigationHistory->it.snapshot()},
+        restore={com.infinity.drive.presentation.components.FolderNavigationHistory(it)}
+    )){com.infinity.drive.presentation.components.FolderNavigationHistory()}
+    val folderMotion=androidx.compose.runtime.remember(entry?.id){folderHistory.visit(entry?.id,entry?.destination?.hasRoute<Route.Files>()==true)}
     val hidden=org.koin.compose.koinInject<com.infinity.drive.core.security.HiddenContentAccess>()
     val hiddenState by hidden.lock.state.collectAsStateWithLifecycle()
     if(hiddenState.unlocked)SensitiveScreen()
@@ -139,11 +144,16 @@ fun AppNavHost(
             enterTransition={if(initialState.destination.hasRoute<Route.Files>())androidx.compose.animation.EnterTransition.None else null},
             exitTransition={if(targetState.destination.hasRoute<Route.Files>())androidx.compose.animation.ExitTransition.None else null}
         ) { entry ->
+            val bodyMotion=if(folderMotion.enabled)Modifier.animateEnterExit(
+                enter=com.infinity.drive.presentation.components.FolderContentTransitions.enter(folderMotion.forward),
+                exit=com.infinity.drive.presentation.components.FolderContentTransitions.exit(folderMotion.forward)
+            )else Modifier
             UnderBottomBar {
                 val isRoot = entry.toRoute<Route.Files>().folderId == null
                 HiddenContentGuard(folderId=entry.toRoute<Route.Files>().folderId,onBack={navController.popBackStackOnce()}){
                 FilesScreen(
                     requestUpload=entry.toRoute<Route.Files>().upload,
+                    contentMotion=bodyMotion,
                 onOpenFolder = { navController.navigateOnce(Route.Files(it)) },
                     onOpenCrumb = { folderId ->
                         val route = Route.Files(folderId)
@@ -243,7 +253,7 @@ fun AppNavHost(
             ChannelsScreen(onBack = { navController.popBackStackOnce() })
         }
         stableComposable<Route.Trash>(navController) {
-            CollectionAccessGate("TRASH",{navController.popBackStackOnce()}){TrashScreen(onBack={navController.popBackStackOnce()},onManageLock={navController.navigateOnce(Route.CollectionSettings("TRASH"))})}
+            CollectionAccessGate("TRASH",{navController.popBackStackOnce()}){TrashScreen(onBack={navController.popBackStackOnce()},onManageLock={navController.navigateOnce(Route.CollectionSettings("TRASH"))},onOpenFile={id->navController.navigateOnce(Route.Preview(fileId=id,fromTrash=true))})}
         }
         stableComposable<Route.Settings>(navController) {
             UnderBottomBar {
@@ -316,10 +326,11 @@ private inline fun <reified T:Any> androidx.navigation.NavGraphBuilder.stableCom
     composable<T>(enterTransition=enterTransition,exitTransition=exitTransition,popEnterTransition=popEnterTransition,popExitTransition=popExitTransition){entry->
         com.infinity.drive.presentation.common.AppBackHandler(controller.previousBackStackEntry!=null){controller.popBackStackOnce()}
         val chrome = T::class !in setOf<kotlin.reflect.KClass<*>>(Route.Onboarding::class, Route.Preview::class, Route.NoteEditor::class, Route.Search::class)
-        val ownsBottomInset = T::class in setOf<kotlin.reflect.KClass<*>>(Route.Home::class, Route.Gallery::class, Route.Audio::class, Route.Settings::class, Route.SettingsSection::class, Route.HiddenSettings::class, Route.Proxy::class, Route.Exclusions::class, Route.Channels::class, Route.Files::class)
-        Box(Modifier.fillMaxSize().padding(start = if(chrome) LocalNavigationRailWidth.current else 0.dp,
-            bottom = if(chrome && !ownsBottomInset) LocalBottomBarHeight.current else 0.dp)) {
-            content(entry)
+        // Every page draws behind overlay chrome; reserve occlusion in scroll padding, never the viewport.
+        CompositionLocalProvider(LocalBottomBarInset provides if(chrome)LocalBottomBarHeight.current else 0.dp){
+            Box(Modifier.fillMaxSize().padding(start=if(chrome)LocalNavigationRailWidth.current else 0.dp)){
+                content(entry)
+            }
         }
     }
 }

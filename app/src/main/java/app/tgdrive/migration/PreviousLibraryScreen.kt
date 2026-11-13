@@ -65,7 +65,7 @@ fun PreviousLibraryScreen(onBack:()->Unit) {
         }
     }
     Scaffold(topBar={com.infinity.drive.presentation.components.PageHeader(title={Text("Previous library")},navigationIcon={IconButton(onBack){Icon(DriveIcons.ArrowBack,"Back")}})}) { padding ->
-        LazyColumn(modifier=Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+        LazyColumn(modifier=Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(start=16.dp,end=16.dp,top=16.dp,bottom=16.dp+com.infinity.drive.presentation.navigation.LocalBottomBarInset.current),verticalArrangement=Arrangement.spacedBy(10.dp)) {
             item { Text("Your previous Saved Messages files stay untouched. Save a copy here, then add it to a private-channel drive when you are ready.",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant) }
             if(loading)item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
             if(loadFailure!=null)item { Column{Text(loadFailure!!);TextButton({generation++}){Text("Retry")}} }

@@ -52,6 +52,8 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
     private var desiredIndex=-1
     private var requestedPlay=false
     private var playbackEpoch=0L
+    private var trashPreviewId:String?=null
+    private var trashPreviewGeneration=0L
     private var contextJob:Job?=null
     private var restorationChecked=false
     private var libraryContext:Pair<Long?,Boolean>?=null
@@ -170,7 +172,7 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
         scope.launch {
             state.map{it.file?.id}.distinctUntilChanged().collectLatest { id ->
                 if(id!=null)files.observeFile(id).collect { latest ->
-                    if(latest==null||latest.isTrashed)stop()
+                    if(latest==null||latest.isTrashed&&latest.id!=trashPreviewId)stop()
                     else mutable.update{if(it.file?.id==id)it.copy(file=latest)else it}
                 }
             }
@@ -207,10 +209,21 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
             if(libraryContext==next)restorationChecked=true
         }
     }
-    override fun play(file:DriveFile){queueJob?.cancel();start(file,true)}
+    override fun play(file:DriveFile){
+        if(file.isTrashed&&file.id!=trashPreviewId)return
+        if(!file.isTrashed)trashPreviewId=null
+        queueJob?.cancel();start(file,true)
+    }
+    override fun previewTrash(file:DriveFile){
+        trashPreviewGeneration++;trashPreviewId=file.id;queue=listOf(file.id);queueJob?.cancel();start(file,true)
+    }
+    override fun endTrashPreview(fileId:String){
+        if(trashPreviewId==fileId){trashPreviewGeneration++;trashPreviewId=null;if(mutable.value.file?.id==fileId)stop()}
+    }
     private fun start(file:DriveFile,autoplay:Boolean,initialPosition:Long=0){
         if(hiddenAccess?.lock?.state?.value?.restricted==true){
-            scope.launch{if(hiddenAccess.canRead(file.id))startAuthorized(file,autoplay,initialPosition)}
+            val trashLease=trashPreviewGeneration.takeIf{trashPreviewId==file.id}
+            scope.launch{if(hiddenAccess.canRead(file.id)&&(trashLease==null||trashPreviewId==file.id&&trashPreviewGeneration==trashLease))startAuthorized(file,autoplay,initialPosition)}
             return
         }
         startAuthorized(file,autoplay,initialPosition)
@@ -358,7 +371,7 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
             catch(_:Exception){mutable.update{it.copy(queueError="Couldn't load the next track. Try Next again.")}}
         }
     }
-    override fun stop(){playbackEpoch++;preloadJob?.cancel();preparedNext=null;sleepJob?.cancel();sleepJob=null;resolveJob?.cancel();metadataJob?.cancel();queueJob?.cancel();requestedPlay=false;if(playerDelegate.isInitialized()){player.stop();player.clearMediaItems()};queue=emptyList();desiredIndex=-1;mutable.value=AudioPlaybackState()}
+    override fun stop(){trashPreviewGeneration++;trashPreviewId=null;playbackEpoch++;preloadJob?.cancel();preparedNext=null;sleepJob?.cancel();sleepJob=null;resolveJob?.cancel();metadataJob?.cancel();queueJob?.cancel();requestedPlay=false;if(playerDelegate.isInitialized()){player.stop();player.clearMediaItems()};queue=emptyList();desiredIndex=-1;mutable.value=AudioPlaybackState()}
     override fun seek(positionMs:Long){val target=positionMs.coerceIn(0,knownDuration());player.seekTo(target);mutable.update{it.copy(positionMs=target)}}
     override fun cycleRepeat(){mutable.update{it.copy(repeatMode=AudioRepeatMode.entries[(it.repeatMode.ordinal+1)%AudioRepeatMode.entries.size])};if(playerDelegate.isInitialized())player.repeatMode=if(mutable.value.repeatMode==AudioRepeatMode.ONE)Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF;refreshQueueState();prepareNext()}
     override fun setSleepTimer(minutes:Int?){
@@ -458,7 +471,7 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
         val chat=snapshot.file?.chatId?:chatId
         val track=snapshot.file
         withContext(ioDispatcher){
-            if(track==null)sessionPrefs.edit().remove("session:$chat").apply()
+            if(track==null||track.isTrashed||track.id==trashPreviewId)sessionPrefs.edit().remove("session:$chat").apply()
             else {
                 val index=ids.indexOf(track.id).coerceAtLeast(0)
                 val nearby=ids.subList((index-500).coerceAtLeast(0),(index+1500).coerceAtMost(ids.size))

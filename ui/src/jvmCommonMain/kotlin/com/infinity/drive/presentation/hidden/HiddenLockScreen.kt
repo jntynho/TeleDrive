@@ -145,7 +145,7 @@ fun CollectionSettingsScreen(type:String,onBack:()->Unit){
     val locks=koinInject<com.infinity.drive.core.security.CollectionLocks>()
     val title=when(type){"FAVORITES"->"Favorites";"ARCHIVED"->"Archived";else->"Trash"}
     Scaffold(topBar={PageHeader(title={Text("$title settings")},navigationIcon={IconButton(onBack){Icon(DriveIcons.ArrowBack,"Back")}})}){padding->
-        Column(Modifier.fillMaxSize().padding(padding)){
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(bottom=com.infinity.drive.presentation.navigation.LocalBottomBarInset.current)){
             Spacer(Modifier.height(20.dp))
             SettingsGroup{add{HiddenLockSettingRow(locks.manager(type),title)}}
             Text("Uses your phone's fingerprint or screen lock. Disabled by default. Locks again when you leave this collection or put TeleDrive in the background.",Modifier.padding(24.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)

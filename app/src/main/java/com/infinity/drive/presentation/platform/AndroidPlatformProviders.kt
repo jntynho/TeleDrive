@@ -231,12 +231,14 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
     val standardFolders = remember {
         StandardBackupFolder.entries.map { StandardFolderOption(it.labelRes, it.path) }
     }
-    val aboutIcon by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null,context) {
-        value=withContext(Dispatchers.IO){runCatching { context.packageManager.getApplicationIcon(context.packageName).toBitmap(256,256).asImageBitmap() }.getOrNull()}
+    // Load the packaged launcher resource directly. PackageManager can return a host/default
+    // icon in previews, and the old asynchronous fallback briefly showed an unrelated glyph.
+    val appIconBitmap = remember(context) {
+        requireNotNull(androidx.core.content.ContextCompat.getDrawable(context, R.mipmap.ic_launcher))
+            .toBitmap(256, 256).asImageBitmap()
     }
     val appIcon: @Composable (Modifier) -> Unit = { modifier ->
-        if(aboutIcon!=null) Image(bitmap=aboutIcon!!,contentDescription=null,modifier=modifier)
-        else androidx.compose.material3.Icon(app.tgdrive.ui.DriveIcons.CloudUpload,contentDescription=null,modifier=modifier)
+        Image(bitmap=appIconBitmap,contentDescription=null,modifier=modifier)
     }
 
     val externalStorageRoot = remember {

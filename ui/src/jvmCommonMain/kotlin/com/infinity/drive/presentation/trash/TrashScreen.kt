@@ -77,7 +77,8 @@ import com.infinity.drive.presentation.components.rememberToolbarLift
 fun TrashScreen(
     onBack: () -> Unit,
     viewModel: TrashViewModel = koinViewModel(),
-    onManageLock:()->Unit={}
+    onManageLock:()->Unit={},
+    onOpenFile:(String)->Unit={}
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -94,7 +95,7 @@ fun TrashScreen(
             pendingAction=null
         }
     }
-    androidx.compose.runtime.LaunchedEffect(lock.epoch){confirmEmpty=false;confirmDeleteSelected=false;viewModel.clearSelection()}
+    androidx.compose.runtime.LaunchedEffect(lock.epoch){confirmEmpty=false;confirmDeleteSelected=false}
     if(unlocking){
         com.infinity.drive.presentation.hidden.HiddenLockScreen(onBack={unlocking=false;pendingAction=null})
         return
@@ -168,7 +169,7 @@ fun TrashScreen(
                                 contentDescription = stringResource(Res.string.common_restore)
                             )
                         }
-                        IconButton(onClick = { if(lock.configured&&!lock.unlocked){pendingAction="delete";unlocking=true}else confirmDeleteSelected=true }) {
+                        IconButton(onClick = { confirmDeleteSelected=true }) {
                             Icon(
                                 DriveIcons.DeleteForever,
                                 contentDescription = stringResource(Res.string.common_delete_forever)
@@ -189,7 +190,6 @@ fun TrashScreen(
                         }
                     },
                     actions = {
-                        IconButton(onManageLock){Icon(DriveIcons.MoreVert,"Trash settings")}
                         if(lock.configured)IconButton(onClick={if(lock.unlocked)hidden.lock()else{pendingAction=null;unlocking=true}}){Icon(DriveIcons.Lock,if(lock.unlocked)"Lock Hidden"else"Unlock hidden items")}
                         if (state.items.isNotEmpty()) {
                             IconButton(onClick = { if(lock.configured&&!lock.unlocked){pendingAction="empty";unlocking=true}else confirmEmpty=true }) {
@@ -199,6 +199,7 @@ fun TrashScreen(
                                 )
                             }
                         }
+                        IconButton(onManageLock){Icon(DriveIcons.MoreVert,"Trash settings")}
                     }
                 )
             }
@@ -222,7 +223,7 @@ fun TrashScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .then(dragSelect),
-            contentPadding = padding.add(horizontal = 16.dp, top = 12.dp, bottom = 12.dp)
+            contentPadding = padding.add(horizontal = 16.dp, top = 12.dp, bottom = 12.dp + com.infinity.drive.presentation.navigation.LocalBottomBarInset.current)
         ) {
             item("trash-summary"){
                 Text(if(state.autoClearDays>0)"Restore items before they are removed after ${state.autoClearDays} days."else"Restore items, or remove them permanently when you are ready.",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(horizontal=12.dp,vertical=16.dp))
@@ -236,9 +237,9 @@ fun TrashScreen(
                         else stringResource(Res.string.trash_restores_with_folder),
                     first = index == 0, last = index == state.rows.lastIndex, selected = selected,
                     onClick = {
-                        if (state.selectionMode && row.selectable) viewModel.toggleSelection(item.id)
-                        else if (row.expandable) viewModel.toggleExpanded(item.id)
-                        else if (row.selectable) viewModel.toggleSelection(item.id)
+                        if(state.selectionMode){if(row.selectable)viewModel.toggleSelection(item.id)}
+                        else if(item is TrashItem.File)onOpenFile(item.file.id)
+                        else if(row.expandable)viewModel.toggleExpanded(item.id)
                     },
                     onLongClick = { if (row.selectable) viewModel.toggleSelection(item.id) },
                     indent = row.depth,

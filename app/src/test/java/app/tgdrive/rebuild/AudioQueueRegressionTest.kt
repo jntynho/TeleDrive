@@ -58,6 +58,24 @@ class AudioQueueRegressionTest {
         val resolver=PreviewContentResolver(paths,telegram,StreamCrypto(),keys,fake<CacheDao>{_,_->Unit},fake<FilePartDao>{_,_->emptyList<Any>()},settings(),dispatchers,openHiddenAccess())
         return AndroidAudioPlayback(context,resolver,TelegramDataSourceFactory(telegram,StreamCrypto(),keys),files,dispatcher,CoroutineScope(SupervisorJob()+dispatcher))
     }
+    @Test fun `trash audio requires a viewer lease and stops when that viewer closes`()=runTest {
+        val trashed=file("trashed").copy(trashedAt=1)
+        val files=fake<FileRepository>{name,_->when(name){
+            "observeFile"->flowOf(trashed)
+            "getFile"->trashed
+            "audioTags"->null
+            else->error(name)
+        }}
+        val player=player(files)
+        player.play(trashed);runCurrent()
+        assertNull(player.state.value.file)
+        player.previewTrash(trashed);runCurrent()
+        assertEquals(trashed.id,player.state.value.file?.id)
+        assertTrue(player.state.value.file!!.isTrashed)
+        player.endTrashPreview(trashed.id);runCurrent()
+        assertNull(player.state.value.file)
+    }
+
     @Test fun `rapid Next presses reserve each destination and stale lookups cannot restart an intermediate track`()=runTest {
         val tracks=listOf("a","b","c","d").associateWith(::file)
         val pending=linkedMapOf<String,Continuation<DriveFile?>>()

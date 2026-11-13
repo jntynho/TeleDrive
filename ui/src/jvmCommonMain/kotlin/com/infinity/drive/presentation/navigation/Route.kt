@@ -43,7 +43,8 @@ sealed interface Route {
         val notBackedUpOnly: Boolean = false,
         val minSizeBytes: Long? = null,
         val sortField: String? = null,
-        val sortDescending: Boolean = false
+        val sortDescending: Boolean = false,
+        val fromTrash:Boolean=false
     ) : Route
 
     @Serializable

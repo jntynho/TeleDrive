@@ -238,7 +238,7 @@ fun TransfersScreen(
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = padding.add(horizontal = 16.dp, top = 16.dp, bottom = 16.dp),
+            contentPadding = padding.add(horizontal = 16.dp, top = 16.dp, bottom = 16.dp + com.infinity.drive.presentation.navigation.LocalBottomBarInset.current),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             // Independent database flows can briefly report the same task in two sections.
@@ -246,8 +246,8 @@ fun TransfersScreen(
             item(key="filter") {
                 Row(Modifier.fillMaxWidth().padding(bottom=14.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
                     Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                        listOf("All transfers","Active","Done","Failed").forEach{label->
-                            FilterChip(selected=filter==label,onClick={filter=label},label={Text(label)})
+                        listOf("All transfers" to "All","Active" to "Active","Done" to "Finished","Failed" to "Failed").forEach{(key,label)->
+                            FilterChip(selected=filter==key,onClick={filter=key},label={Text(label)})
                         }
                     }
 
@@ -260,7 +260,7 @@ fun TransfersScreen(
                 else->false
             }
             if(filteredEmpty)item("empty-filter"){
-                Text("No ${filter.lowercase()} transfers",style=MaterialTheme.typography.bodyLarge,
+                Text("No ${if(filter=="Done")"finished"else filter.lowercase()} transfers",style=MaterialTheme.typography.bodyLarge,
                     color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.fillMaxWidth().padding(vertical=32.dp),textAlign=TextAlign.Center)
             }
             if(filter=="All transfers"||filter=="Active") section("active", activeTitle, state.active, state.activeTotal,visibleTaskIds) { transfer ->

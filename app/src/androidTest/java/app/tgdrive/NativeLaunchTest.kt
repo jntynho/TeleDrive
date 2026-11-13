@@ -13,18 +13,24 @@ class NativeLaunchTest {
     @Test fun actualActivityStartsWithPrivateChannelOnboarding() {
         compose.waitUntil(15_000) { compose.onAllNodesWithText("Get started").fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodesWithText("TeleDrive").onFirst().assertIsDisplayed()
-        compose.onNodeWithText("Your files.\nAlways with you.").assertIsDisplayed()
+        compose.onNodeWithContentDescription("TeleDrive app icon").assertIsDisplayed()
+        compose.onNodeWithText("Your personal cloud, powered by Telegram.").assertIsDisplayed()
         compose.onNodeWithText("Get started").performScrollTo().performClick()
         compose.onNodeWithText("API access").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("API ID").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("API hash").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Continue").assertIsNotEnabled()
-        compose.onNodeWithContentDescription("API ID").performScrollTo().performClick()
-        compose.onNodeWithText("1").performClick()
-        compose.onNodeWithContentDescription("API ID").assertTextContains("1")
-        compose.runOnIdle {
-            val insets=androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
-            org.junit.Assert.assertFalse(insets?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())==true)
+        compose.onNodeWithContentDescription("Continue",substring=false).assertIsNotEnabled()
+        val apiInput=compose.onNode(hasSetTextAction() and hasText("API ID"))
+        apiInput.performScrollTo().performClick().performTextInput("1")
+        apiInput.assertTextContains("1")
+        compose.onNodeWithContentDescription("paste",ignoreCase=true).assertDoesNotExist()
+        compose.waitUntil(15_000) {
+            var visible=false
+            compose.runOnIdle {
+                val insets=androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
+                visible=insets?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())==true
+            }
+            visible
         }
     }
 }

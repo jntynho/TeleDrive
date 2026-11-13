@@ -122,6 +122,8 @@ class OnboardingViewModel(
                             OnboardingStep.PHONE,
                             OnboardingStep.CODE,
                             OnboardingStep.PASSWORD,
+                            OnboardingStep.EMAIL_ADDRESS,
+                            OnboardingStep.EMAIL_CODE,
                             OnboardingStep.API_CREDENTIALS
                         )
                     ) {

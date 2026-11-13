@@ -2,6 +2,8 @@
 # Keep emulator failures reviewable in public Actions annotations and the run summary.
 set -uo pipefail
 logfile="${RUNNER_TEMP:-/tmp}/tgdrive-device-checks.log"
+# The CI emulator has a simulated hardware keyboard; still exercise the native phone IME.
+adb shell settings put secure show_ime_with_hard_keyboard 1
 ./gradlew --no-daemon --max-workers=2 connectedDebugAndroidTest 2>&1 | tee "$logfile"
 gradle_status=${PIPESTATUS[0]}
 python3 - "$logfile" "$gradle_status" <<'PY'

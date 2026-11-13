@@ -15,11 +15,32 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 
-/** One existing grid animates; headers, hit testing and paging ownership stay unchanged. */
-fun Modifier.folderContentReveal(key:Any?):Modifier=composed {
-    val progress=remember(key){Animatable(0f)}
-    LaunchedEffect(key){progress.animateTo(1f,tween(260,easing=FastOutSlowInEasing))}
-    graphicsLayer{alpha=.7f+.3f*progress.value;translationX=10.dp.toPx()*(1f-progress.value)}
+/** A folder push and its reverse animate only the body, on the navigation transition clock. */
+object FolderContentTransitions {
+    private val easing=androidx.compose.animation.core.CubicBezierEasing(.2f,0f,0f,1f)
+    const val DurationMillis=360
+    fun enter(forward:Boolean)=androidx.compose.animation.slideInHorizontally(tween(DurationMillis,easing=easing)){
+        if(forward)it/7 else -it/12
+    }+androidx.compose.animation.fadeIn(tween(DurationMillis,easing=easing),initialAlpha=if(forward).35f else .7f)
+    fun exit(forward:Boolean)=androidx.compose.animation.slideOutHorizontally(tween(DurationMillis,easing=easing)){
+        if(forward)-it/12 else it/7
+    }+androidx.compose.animation.fadeOut(tween(DurationMillis,easing=easing),targetAlpha=0f)
+}
+
+/** Remember committed entries, so returning to an ancestor reverses the same motion. */
+class FolderNavigationHistory(saved:List<String> = emptyList()) {
+    data class Motion(val enabled:Boolean=false,val forward:Boolean=true)
+    private val entries=saved.map{it.substringAfter(':') to it.startsWith("1:")}.toMutableList()
+    fun snapshot():List<String> = entries.map{(id,folder)->"${if(folder)1 else 0}:$id"}
+    fun visit(id:String?,folder:Boolean):Motion {
+        if(id==null)return Motion()
+        if(entries.lastOrNull()?.first==id)return Motion()
+        val previous=entries.lastOrNull()?.second==true
+        val index=entries.indexOfFirst{it.first==id}
+        val forward=index<0
+        if(forward)entries.add(id to folder)else entries.subList(index+1,entries.size).clear()
+        return Motion(previous&&folder,forward)
+    }
 }
 
 fun Modifier.fileRevealHighlight(active:Boolean):Modifier=composed {

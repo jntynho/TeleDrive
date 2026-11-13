@@ -13,6 +13,8 @@ data class AudioPlaybackState(val file:DriveFile?=null,val playing:Boolean=false
 interface AudioPlayback {
     val state:StateFlow<AudioPlaybackState>
     fun play(file:DriveFile)
+    fun previewTrash(file:DriveFile){play(file)}
+    fun endTrashPreview(fileId:String){}
     fun containsQueuedFile(id:String):Boolean = false
     fun setQueue(ids:List<String>)
     fun toggle()

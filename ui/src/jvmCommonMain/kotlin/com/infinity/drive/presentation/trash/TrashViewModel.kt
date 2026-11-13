@@ -24,6 +24,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -82,8 +84,17 @@ class TrashViewModel(
         )
     }.combine(hidden.lock.state){state,_->
         suspend fun readable(item:TrashItem)=when(item){is TrashItem.File->hidden.canRead(item.file.id);is TrashItem.Folder->hidden.canReadFolder(item.folder.id)}
-        state.copy(items=state.items.filter{readable(it)},rows=state.rows.filter{readable(it.item)})
+        val items=state.items.filter{readable(it)}
+        val rows=state.rows.filter{readable(it.item)}
+        state.copy(items=items,rows=rows,selection=state.selection.intersect(rows.filter{it.selectable}.map{it.item.id}.toSet()))
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TrashUiState())
+
+    init {
+        viewModelScope.launch {
+            uiState.map{state->if(state.loading)null else state.rows.filter{it.selectable}.map{it.item.id}.toSet()}
+                .distinctUntilChanged().collect{ids->if(ids!=null)selection.update{it.intersect(ids)}}
+        }
+    }
 
     fun toggleExpanded(folderId: String) {
         val opening = folderId !in expanded.value
@@ -160,11 +171,12 @@ class TrashViewModel(
         }
     }
 
-    fun toggleSelection(id: String) = selection.update {
-        if (id in it) it - id else it + id
+    fun toggleSelection(id:String) {
+        if(uiState.value.rows.none{it.selectable&&it.item.id==id})return
+        selection.update{if(id in it)it-id else it+id}
     }
 
-    fun clearSelection() = selection.update { emptySet() }
+    fun clearSelection(){rangeBase=null;selection.value=emptySet()}
 
     /** Selects every row currently in the tree, including expanded children. */
     fun selectAll() = selection.update {
@@ -177,7 +189,8 @@ class TrashViewModel(
 
     fun extendRangeSelection(ids: List<String>) {
         val base = rangeBase ?: return
-        selection.update { base + ids }
+        val allowed=uiState.value.rows.filter{it.selectable}.map{it.item.id}.toSet()
+        selection.update { (base + ids).intersect(allowed) }
     }
 
     fun endRangeSelection() {
@@ -260,7 +273,7 @@ class TrashViewModel(
     }
 
     private fun partitionSelection(): Pair<List<String>, List<String>> {
-        val selected = selection.value
+        val selected = uiState.value.selection
         val items = uiState.value.items
         val fileIds = items.filterIsInstance<TrashItem.File>()
             .map { it.file.id }

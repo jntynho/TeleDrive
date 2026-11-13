@@ -219,7 +219,7 @@ fun PreviewScreen(
     val observedFile by remember(pagedFile.id){viewModel.observeFile(pagedFile.id).map{pagedFile.id to it}}
         .collectAsStateWithLifecycle(initialValue = pagedFile.id to pagedFile)
     val liveFile=if(observedFile.first==pagedFile.id)observedFile.second else pagedFile
-    LaunchedEffect(pagedFile.id,observedFile){if(observedFile.first==pagedFile.id&&(liveFile==null||liveFile?.isTrashed==true))viewModel.removeUnavailable(pagedFile.id)}
+    LaunchedEffect(pagedFile.id,observedFile){if(observedFile.first==pagedFile.id&&(liveFile==null||(!viewModel.fromTrash&&liveFile?.isTrashed==true)))viewModel.removeUnavailable(pagedFile.id)}
     val backgroundAudio=com.infinity.drive.presentation.platform.LocalAudioPlayback.current
     val audioState by remember(backgroundAudio){backgroundAudio.state.map{it.copy(positionMs=0)}.distinctUntilChanged()}.collectAsStateWithLifecycle(remember(backgroundAudio){backgroundAudio.state.value.copy(positionMs=0)})
     var audioSessionOpened by remember{mutableStateOf(false)}
@@ -227,13 +227,14 @@ fun PreviewScreen(
         if(audioState.file!=null)audioSessionOpened=true
         else if(audioSessionOpened&&pagedFile.category==FileCategory.AUDIO)onBack()
     }
-    val currentFile = if(pagedFile.category==FileCategory.AUDIO) audioState.file?.takeIf{it.category==FileCategory.AUDIO} ?: liveFile ?: pagedFile else liveFile ?: pagedFile
+    val currentFile = if(pagedFile.category==FileCategory.AUDIO&&!viewModel.fromTrash) audioState.file?.takeIf{it.category==FileCategory.AUDIO} ?: liveFile ?: pagedFile else liveFile ?: pagedFile
+    androidx.compose.runtime.SideEffect{viewModel.bindTrashPlayback{backgroundAudio.endTrashPreview(pagedFile.id)}}
     val mediaScope=rememberCoroutineScope()
     LaunchedEffect(pagerState.settledPage){
         val settled=state.files.getOrNull(pagerState.settledPage)?:return@LaunchedEffect
         if(settled.category==FileCategory.AUDIO){
             if(!backgroundAudio.containsQueuedFile(settled.id)) backgroundAudio.setQueue(state.files.filter{it.category==FileCategory.AUDIO}.map{it.id})
-            if(backgroundAudio.state.value.file?.id!=settled.id)backgroundAudio.play(settled)
+            if(backgroundAudio.state.value.file?.id!=settled.id){if(viewModel.fromTrash)backgroundAudio.previewTrash(settled)else backgroundAudio.play(settled)}
         }
     }
     LaunchedEffect(audioState.file?.id){
@@ -349,7 +350,8 @@ fun PreviewScreen(
                         }
                     },
                     actions = {
-                        if (currentFile.category != FileCategory.AUDIO) {
+                        if(viewModel.fromTrash){IconButton({viewModel.showInfo(currentFile)}){Icon(DriveIcons.Info,"File details")}}
+                        else if (currentFile.category != FileCategory.AUDIO) {
                         // Only text has anything the note editor can open.
                         if (MimeTypes.isText(currentFile.mimeType)) {
                             IconButton(

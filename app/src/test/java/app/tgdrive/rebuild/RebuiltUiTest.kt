@@ -132,7 +132,7 @@ class RebuiltUiTest {
         compose.onNodeWithText("Get started").performClick()
         compose.onNodeWithText("API access").assertIsDisplayed()
         capture("api-setup")
-        compose.onNodeWithText("Continue").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Continue",substring=false).assertIsNotEnabled()
     }
     @Test fun floatingNavigationPreferencesPersistAndTabsRemainUsable(){
         compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
@@ -199,8 +199,8 @@ class RebuiltUiTest {
                 state=com.infinity.drive.domain.model.TransferState.COMPLETED,createdAt=1,updatedAt=1,completedAt=1))}
         compose.waitUntil(15000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("Activity",substring=false).performScrollTo().performClick()
-        compose.onNodeWithText("All transfers",substring=false).assertIsDisplayed()
-        compose.onNodeWithText("Done",substring=false).performScrollTo().performClick()
+        compose.onNodeWithText("All",substring=false).assertIsDisplayed()
+        compose.onNode(hasText("Finished",substring=false) and hasClickAction()).performScrollTo().performClick()
         compose.waitUntil(5000){compose.onAllNodesWithContentDescription("Transfer options").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("Transfer options").performClick()
         compose.waitUntil(10000){compose.onNodeWithText("Open",substring=false).isDisplayed()}
@@ -294,7 +294,7 @@ class RebuiltUiTest {
         runBlocking { GlobalContext.get().get<SettingsRepository>().update { it.copy(onboardingComplete=false) } }
         compose.waitUntil(10_000){compose.onAllNodesWithText("Get started").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("Get started").performScrollTo().performClick()
-        compose.onNodeWithText("Continue",substring=false).assertIsDisplayed().assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Continue",substring=false).assertIsDisplayed().assertIsNotEnabled()
         capture("api-large-text")
     }
 
@@ -517,6 +517,56 @@ class RebuiltUiTest {
             compose.onNodeWithTag("navigation-home").performClick()
             compose.onNodeWithText("Your library").assertIsDisplayed()
         }
+    }
+
+    @Test fun trashTapPreviewsWithoutRestoringAndLongPressSelects(){
+        val dao=GlobalContext.get().get<FileDao>()
+        runBlocking{dao.upsert(dao.byId("Report.pdf")!!.copy(trashedAt=System.currentTimeMillis()))}
+        compose.waitUntil(15000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("Trash",substring=false).performClick()
+        compose.waitUntil(5000){compose.onNodeWithText("Report.pdf",substring=false).isDisplayed()}
+        val more=compose.onNodeWithContentDescription("Trash settings").fetchSemanticsNode().boundsInRoot
+        val empty=compose.onNodeWithContentDescription("Empty trash").fetchSemanticsNode().boundsInRoot
+        assertTrue(more.left>=empty.right)
+        compose.onNodeWithText("Report.pdf",substring=false).performClick()
+        compose.waitUntil(5000){compose.onAllNodesWithContentDescription("File details").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithContentDescription("Clear selection").assertDoesNotExist()
+        assertTrue(runBlocking{dao.byId("Report.pdf")!!.trashedAt!=null})
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.waitUntil(5000){compose.onNodeWithContentDescription("Trash settings").isDisplayed()}
+        compose.onNodeWithText("Report.pdf",substring=false).performTouchInput{longClick()}
+        compose.onNodeWithContentDescription("Clear selection").assertIsDisplayed()
+        runBlocking{dao.upsert(dao.byId("Report.pdf")!!.copy(trashedAt=null))}
+        compose.waitUntil(5000){compose.onAllNodesWithContentDescription("Clear selection").fetchSemanticsNodes().isEmpty()}
+        compose.onNodeWithContentDescription("Trash settings").assertIsDisplayed()
+    }
+
+    @Test fun floatingBarKeepsTheActivityViewportFullHeight(){
+        val settings=GlobalContext.get().get<SettingsRepository>()
+        runBlocking{settings.update{it.copy(floatingNavigationBar=true,navigationBarStyle=com.infinity.drive.domain.model.NavigationBarStyle.FLOATING)}}
+        runBlocking{GlobalContext.get().get<com.infinity.drive.data.local.dao.TransferDao>().upsert(
+            com.infinity.drive.data.local.entity.TransferEntity(id="viewport-task",type=com.infinity.drive.domain.model.TransferType.UPLOAD,fileId="Report.pdf",displayName="Report.pdf",localPath=null,chatId=null,messageId=null,remoteFileId=null,sizeBytes=123,state=com.infinity.drive.domain.model.TransferState.COMPLETED,createdAt=1,updatedAt=1,completedAt=1))}
+        compose.waitUntil(15000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("Activity",substring=false).performScrollTo().performClick()
+        compose.waitUntil(5000){compose.onNode(hasText("Finished",substring=false) and hasClickAction()).isDisplayed()}
+        val viewport=compose.onNodeWithTag("navigation-host").fetchSemanticsNode().boundsInRoot
+        val list=compose.onNode(hasScrollToIndexAction()).fetchSemanticsNode().boundsInRoot
+        assertTrue("Activity viewport was shortened: $list / $viewport",kotlin.math.abs(list.bottom-viewport.bottom)<2f)
+    }
+
+    @Test fun folderPushAndPopKeepTheHeaderStationary(){
+        runBlocking{GlobalContext.get().get<com.infinity.drive.data.local.dao.FolderDao>().upsert(
+            com.infinity.drive.data.local.entity.FolderEntity("motion-folder",null,null,"Motion folder",createdAt=1,modifiedAt=1))}
+        compose.waitUntil(15000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("All files",substring=false).performClick()
+        compose.waitUntil(5000){compose.onNodeWithContentDescription("Open Motion folder").isDisplayed()}
+        val before=compose.onNodeWithContentDescription("Search all files").fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithContentDescription("Open Motion folder").performClick()
+        compose.waitUntil(5000){compose.onAllNodesWithText("Motion folder",substring=false).fetchSemanticsNodes().isNotEmpty()}
+        compose.onAllNodesWithContentDescription("Search all files").fetchSemanticsNodes().forEach{org.junit.Assert.assertEquals(before,it.boundsInRoot)}
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.waitUntil(5000){compose.onNodeWithContentDescription("Open Motion folder").isDisplayed()}
+        org.junit.Assert.assertEquals(before,compose.onNodeWithContentDescription("Search all files").fetchSemanticsNode().boundsInRoot)
     }
 
     @Test fun collectionsKeepSelectionAndTrashRestoreWithActivityRows() {
