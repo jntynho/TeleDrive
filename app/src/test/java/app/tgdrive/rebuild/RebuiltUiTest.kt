@@ -41,7 +41,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.annotation.LooperMode
 
-/** Real modules, database, view models and navigation; only device key wrapping is faked. */
+/** Real modules, database, view models and navigation, with device key wrapping faked. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[28],application=Application::class,qualifiers="w393dp-h852dp-xhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -55,6 +55,12 @@ class RebuiltUiTest {
             androidContext(context)
             workManagerFactory()
             modules(appModules+module {
+                // Keep the manual-credentials fallback deterministic on release CI too.
+                // NativeSignInUiTest covers phone-first sign-in with credentials present.
+                // Tests must never start a live TDLib session using build-time secrets.
+                single<com.infinity.drive.core.telegram.TelegramAppCredentials> {
+                    com.infinity.drive.core.telegram.TelegramAppCredentials { null }
+                }
                 single<CredentialCipher> { object:CredentialCipher {
                     override fun encrypt(plaintext:ByteArray)=plaintext.copyOf()
                     override fun decrypt(ciphertext:ByteArray)=ciphertext.copyOf()
