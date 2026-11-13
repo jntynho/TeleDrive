@@ -177,9 +177,50 @@ class RebuiltUiTest {
         }}}
         compose.onNodeWithText("Open",substring=false).assertDoesNotExist()
         compose.onNodeWithText("Make available offline",substring=false).assertDoesNotExist()
-        compose.onNodeWithText("Download",substring=false).assertIsDisplayed()
+        compose.onNodeWithText("Download",substring=false).performScrollTo().assertIsDisplayed()
         compose.onNodeWithContentDescription("File details").assertIsDisplayed().performClick()
         compose.onNodeWithContentDescription("Back to file actions").assertIsDisplayed()
+    }
+
+    @Test fun fileFavoriteActionUpdatesItsVisibleStateWithoutClosingTheSheet(){
+        val file=runBlocking{GlobalContext.get().get<com.infinity.drive.domain.repository.FileRepository>().getFile("Report.pdf")}!!
+        compose.runOnUiThread{activity.get().setContent{ProvidePlatformActions{
+            com.infinity.drive.presentation.theme.DriveInfinityTheme{com.infinity.drive.presentation.components.FileActionsSheet(file,onDismiss={},onOpen={})}
+        }}}
+        compose.onNodeWithText("Add To Favourite",substring=false).performScrollTo().performClick()
+        compose.waitUntil(5000){compose.onAllNodesWithText("Remove from Favourite",substring=false).fetchSemanticsNodes().isNotEmpty()}
+        assertTrue(runBlocking{GlobalContext.get().get<FileDao>().byId("Report.pdf")!!.isFavorite})
+    }
+
+    @Test fun activityUsesInlineFiltersAndTheSharedFileActionSheet(){
+        runBlocking{GlobalContext.get().get<com.infinity.drive.data.local.dao.TransferDao>().upsert(
+            com.infinity.drive.data.local.entity.TransferEntity(id="done-task",type=com.infinity.drive.domain.model.TransferType.UPLOAD,
+                fileId="Report.pdf",displayName="Report.pdf",localPath=null,chatId=null,messageId=null,remoteFileId=null,sizeBytes=123,
+                state=com.infinity.drive.domain.model.TransferState.COMPLETED,createdAt=1,updatedAt=1,completedAt=1))}
+        compose.waitUntil(15000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("Activity",substring=false).performScrollTo().performClick()
+        compose.onNodeWithText("All transfers",substring=false).assertIsDisplayed()
+        compose.onNodeWithText("Done",substring=false).performScrollTo().performClick()
+        compose.waitUntil(5000){compose.onAllNodesWithContentDescription("Transfer options").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithContentDescription("Transfer options").performClick()
+        compose.waitUntil(10000){compose.onNodeWithText("Open",substring=false).isDisplayed()}
+        compose.onNodeWithText("Open",substring=false).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Download",substring=false).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Send in Telegram",substring=false).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test fun showInFolderRevealsTheRequestedFileBeyondTheFirstPage(){
+        val dao=GlobalContext.get().get<FileDao>()
+        runBlocking{
+            val template=dao.byId("Report.pdf")!!
+            (0 until 85).forEach{dao.upsert(template.copy(id="page-file-$it",name="Document %03d.pdf".format(it),addedAt=2))}
+            dao.upsert(template.copy(id="deep-target",name="Z target.pdf",addedAt=System.currentTimeMillis()))
+        }
+        compose.waitUntil(15000){compose.onAllNodesWithContentDescription("Options for Z target.pdf").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithContentDescription("Options for Z target.pdf").performClick()
+        compose.onNodeWithText("Show in folder",substring=false).performScrollTo().performClick()
+        compose.waitUntil(10000){compose.onAllNodes(hasStateDescription("Located file")).fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("Z target.pdf",substring=false).assertIsDisplayed()
     }
 
     @Test fun allFilesKeepsACleanHeaderAndAnchorsSortingToItsButton(){

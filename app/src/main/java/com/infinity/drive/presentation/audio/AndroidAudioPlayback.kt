@@ -9,6 +9,10 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.infinity.drive.core.media.TelegramDataSourceFactory
 import com.infinity.drive.domain.model.DriveFile
+import com.infinity.drive.domain.model.AudioTags
+import com.infinity.drive.domain.model.audioRevision
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import com.infinity.drive.domain.repository.FileRepository
 import com.infinity.drive.presentation.platform.*
 import com.infinity.drive.presentation.preview.PreviewContent
@@ -40,6 +44,8 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
     private var preparedNext:DriveFile?=null
     private var resolveJob:Job?=null
     private var metadataJob:Job?=null
+    private var publishedMetadata:Pair<String,MediaMetadata>?=null
+    private var artworkPending:String?=null
     private var queueJob:Job?=null
     private var sleepJob:Job?=null
     private var queue=emptyList<String>()
@@ -50,6 +56,17 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
     private var restorationChecked=false
     private var libraryContext:Pair<Long?,Boolean>?=null
     private val metadataSlots=Semaphore(2)
+    private val metadataLocks=Array(32){Mutex()}
+    private val metadataRetries=object:LinkedHashMap<String,Long>(128,.75f,true){
+        override fun removeEldestEntry(eldest:MutableMap.MutableEntry<String,Long>?)=size>128
+    }
+    private data class MetadataWrite(val file:DriveFile,val value:AudioMetadata,val detailed:Boolean,val inspected:Boolean)
+    private val metadataWrites=kotlinx.coroutines.channels.Channel<MetadataWrite>(64)
+    private fun persistMetadata(file:DriveFile,value:AudioMetadata,detailed:Boolean,inspected:Boolean=true){
+        val request=MetadataWrite(file,value,detailed,inspected)
+        if(metadataWrites.trySend(request).isFailure)scope.launch{metadataWrites.send(request)}
+    }
+
     private val metadataCache=object:LinkedHashMap<String,AudioMetadata>(128,.75f,true){
         override fun removeEldestEntry(eldest:MutableMap.MutableEntry<String,AudioMetadata>?)=size>128
     }
@@ -63,9 +80,10 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
                 desiredIndex=queue.indexOf(next.id)
                 val old=mutable.value
                 mutable.value=AudioPlaybackState(file=next,playing=player.isPlaying,playRequested=requestedPlay,loading=player.playbackState==Player.STATE_BUFFERING,
+                    metadata=synchronized(metadataCache){metadataCache[metadataKey(next)]?:metadataCache[metadataKey(next)+":basic"]}?:AudioMetadata(),
                     durationMs=next.durationMs?:0,repeatMode=old.repeatMode,queueRevision=old.queueRevision)
                 refreshQueueState()
-                metadataJob=scope.launch{val info=metadata(next);if(epoch==playbackEpoch){mutable.update{it.copy(metadata=info)};publishMetadata()}}
+                metadataJob=scope.launch{val basic=basicMetadata(next);if(epoch==playbackEpoch)mutable.update{it.copy(metadata=mergeMetadata(it.metadata,basic))};val info=metadata(next);if(epoch==playbackEpoch){mutable.update{it.copy(metadata=mergeMetadata(it.metadata,info))};publishMetadata()}}
                 scope.launch{if(epoch==playbackEpoch&&player.currentMediaItemIndex>0)player.removeMediaItems(0,player.currentMediaItemIndex);prepareNext()}
             }
             override fun onIsPlayingChanged(isPlaying:Boolean){if(player.currentMediaItem?.mediaId==mutable.value.file?.id)mutable.update{it.copy(playing=isPlaying)}}
@@ -87,20 +105,32 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
             override fun onMediaMetadataChanged(metadata:MediaMetadata){
                 val track=mutable.value.file?:return
                 if(player.currentMediaItem?.mediaId!=track.id)return
+                if(publishedMetadata==(track.id to metadata))return
                 val epoch=playbackEpoch
+                // Text is available now; palette extraction and disk writes must not hold it back.
+                mutable.update{it.copy(metadata=it.metadata.copy(
+                    title=metadata.title?.toString()?.takeIf(String::isNotBlank)?:it.metadata.title,
+                    artist=metadata.artist?.toString()?.takeIf(String::isNotBlank)?:it.metadata.artist))}
+                val text=mutable.value.metadata
+                synchronized(metadataCache){metadataCache[metadataKey(track)+":basic"]=text}
+                persistMetadata(track,text,false,inspected=!text.title.isNullOrBlank()&&!text.artist.isNullOrBlank())
+                publishMetadata()
+                if(text.artworkPath!=null||artworkPending==metadataKey(track))return
+                val bytes=metadata.artworkData?.takeIf{it.size<=5*1024*1024}?:return
+                artworkPending=metadataKey(track)
                 scope.launch {
-                    val artwork=metadata.artworkData?.takeIf{it.size<=5*1024*1024}?.let { bytes ->
-                        withContext(ioDispatcher){artworkColors(bytes) to saveArtwork(track,bytes)}
-                    }
-                    if(playbackEpoch==epoch&&mutable.value.file?.id==track.id){
-                        mutable.update{it.copy(metadata=it.metadata.copy(
-                            title=metadata.title?.toString()?.takeIf(String::isNotBlank)?:it.metadata.title,
-                            artist=metadata.artist?.toString()?.takeIf(String::isNotBlank)?:it.metadata.artist,
-                            artworkColors=artwork?.first?.takeIf{it.isNotEmpty()}?:it.metadata.artworkColors,
-                            artworkPath=artwork?.second?:it.metadata.artworkPath))}
-                        synchronized(metadataCache){metadataCache[metadataKey(track)]=mutable.value.metadata}
-                        publishMetadata()
-                    }
+                    try {
+                        val artwork=withContext(ioDispatcher){artworkColors(bytes) to saveArtwork(track,bytes)}
+                        if(playbackEpoch==epoch&&mutable.value.file?.id==track.id){
+                            mutable.update{it.copy(metadata=it.metadata.copy(
+                                artworkColors=artwork.first.takeIf{it.isNotEmpty()}?:it.metadata.artworkColors,
+                                artworkPath=artwork.second?:it.metadata.artworkPath))}
+                            synchronized(metadataCache){metadataCache[metadataKey(track)]=mutable.value.metadata}
+                            publishMetadata()
+                        }
+                    }catch(cancel:CancellationException){throw cancel}
+                    catch(_:Exception){ /* Artwork is optional; text and playback are already available. */ }
+                    finally{if(artworkPending==metadataKey(track))artworkPending=null}
                 }
             }
             override fun onTracksChanged(tracks:Tracks){
@@ -114,6 +144,14 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
         })
     }
     init {
+        scope.launch(ioDispatcher){
+            for(write in metadataWrites){
+                try {
+                    files.storeAudioMetadata(write.file,AudioTags(write.value.title,write.value.artist,write.value.durationMs,write.inspected))
+                    if(write.inspected)writeMetadataCache(metadataKey(write.file)+(if(write.detailed)""else":basic"),write.value)
+                }catch(cancel:CancellationException){throw cancel}catch(_:Exception){ /* Optional index writes never delay playback or the visible row. */ }
+            }
+        }
         observeCurrentFile()
         hiddenAccess?.let{access->scope.launch{
             access.lock.state.collect{lock->
@@ -139,7 +177,7 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
         }
     }
     private fun knownDuration()=player.duration.takeIf{it>0}?:mutable.value.metadata.durationMs?:mutable.value.file?.durationMs?:0L
-    private fun metadataKey(file:DriveFile)="${file.id}:${file.modifiedAt}:${file.localPath}"
+    private fun metadataKey(file:DriveFile)=file.audioRevision()
     private fun acceptLyricsMetadata(metadata:Metadata){
         val track=mutable.value.file?:return
         if(player.currentMediaItem?.mediaId!=track.id)return
@@ -185,13 +223,15 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
         // Listener callbacks from stop belong to the old item; install the new intent afterwards.
         player.stop();player.clearMediaItems();requestedPlay=autoplay
         val previous=mutable.value
-        val cached=synchronized(metadataCache){metadataCache[metadataKey(file)]}
+        val cached=synchronized(metadataCache){metadataCache[metadataKey(file)]?:metadataCache[metadataKey(file)+":basic"]}
         mutable.value=AudioPlaybackState(file=file,loading=true,playRequested=autoplay,metadata=cached?:AudioMetadata(durationMs=file.durationMs),durationMs=cached?.durationMs?:file.durationMs?:0,
             repeatMode=previous.repeatMode,sleepTimerMinutes=previous.sleepTimerMinutes,queueRevision=previous.queueRevision)
         refreshQueueState()
         runCatching { appContext.startService(android.content.Intent(appContext,TeleDriveAudioService::class.java)) }
             .onFailure{mutable.update{it.copy(queueError="Background controls are unavailable. Keep the app open to continue playback.")}}
         metadataJob=scope.launch {
+            val basic=basicMetadata(file)
+            if(playbackEpoch==epoch&&mutable.value.file?.id==file.id)mutable.update{it.copy(metadata=mergeMetadata(it.metadata,basic))}
             val info=metadata(file)
             if(playbackEpoch==epoch&&mutable.value.file?.id==file.id){mutable.update{it.copy(metadata=mergeMetadata(it.metadata,info),durationMs=knownDuration())};publishMetadata()}
         }
@@ -259,7 +299,7 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
         val meta=state.metadata
         val value=MediaMetadata.Builder().setTitle(meta.title?:state.file?.name?.substringBeforeLast('.'))
             .setArtist(meta.artist).setArtworkUri(meta.artworkPath?.let{Uri.fromFile(File(it))}).build()
-        if(item.mediaMetadata!=value)player.replaceMediaItem(player.currentMediaItemIndex,item.buildUpon().setMediaMetadata(value).build())
+        if(item.mediaMetadata!=value){publishedMetadata=item.mediaId to value;player.replaceMediaItem(player.currentMediaItemIndex,item.buildUpon().setMediaMetadata(value).build())}
     }
     private fun mergeMetadata(current:AudioMetadata,next:AudioMetadata)=AudioMetadata(
         next.title?.takeIf(String::isNotBlank)?:current.title,next.artist?.takeIf(String::isNotBlank)?:current.artist,
@@ -332,42 +372,67 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
     }
     override suspend fun basicMetadata(file:DriveFile):AudioMetadata = readMetadata(file,false)
     override suspend fun metadata(file:DriveFile):AudioMetadata = readMetadata(file,true)
-    private suspend fun readMetadata(file:DriveFile,detailed:Boolean):AudioMetadata {
-        val key=metadataKey(file)+(if(detailed)""else":basic")
-        synchronized(metadataCache){metadataCache[key]}?.let{return it}
-        val cachedDisk=withContext(ioDispatcher){readMetadataCache(key)}
-        if(cachedDisk!=null){synchronized(metadataCache){metadataCache[key]=cachedDisk};return cachedDisk}
-        val path=withContext(ioDispatcher){file.localPath?.takeIf{File(it).exists()}}
-        val remote=file.remoteFileId?.takeIf{path==null&&!file.isEncrypted&&file.hasRemoteCopy}
-        if(path==null&&(remote==null||mutable.value.file?.id==file.id))return AudioMetadata(durationMs=file.durationMs)
-        suspend fun inspect():AudioMetadata=metadataSlots.withPermit {
-            val retriever=MediaMetadataRetriever()
-            var source:android.media.MediaDataSource?=null
-            try {
-                if(path!=null)retriever.setDataSource(path)
-                else {
-                    val owner=currentCoroutineContext()[Job]
-                    source=sources.metadataSource(remote!!){owner?.isActive==false||mutable.value.file?.id==file.id}
-                    retriever.setDataSource(source)
-                }
-                val picture=if(!detailed||path==null)null else retriever.embeddedPicture?.takeIf{it.size<=5*1024*1024}
-                AudioMetadata(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)?.takeIf(String::isNotBlank),
-                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)?.takeIf(String::isNotBlank)
-                        ?:retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST)?.takeIf(String::isNotBlank),
-                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?:file.durationMs,
-                    picture?.let(::artworkColors).orEmpty(),if(detailed)path?.let{readEmbeddedLyrics(File(it))}else null,picture?.let{saveArtwork(file,it)})
-            } finally {runCatching{retriever.release()};runCatching{source?.close()}}
-        }
-        return try {
-            // Optional remote inspection belongs to the visible row: leaving it cancels queued work.
-            val result=withContext(ioDispatcher){inspect().copy(resolved=true)}
-            withContext(ioDispatcher){
-                try{files.storeAudioTags(file,result.title,result.artist)}catch(cancel:CancellationException){throw cancel}catch(_:Exception){ /* Playback metadata survives an optional index write failure. */ }
-                writeMetadataCache(key,result)
+    private suspend fun readMetadata(file:DriveFile,detailed:Boolean):AudioMetadata = withContext(ioDispatcher) {
+        if(hiddenAccess!=null&&!hiddenAccess.canRead(file.id))return@withContext AudioMetadata()
+        val base=metadataKey(file)
+        val key=base+(if(detailed)""else":basic")
+        synchronized(metadataCache){metadataCache[key]}?.takeIf{it.resolved&&!it.failed}?.let{return@withContext it}
+        val lock=metadataLocks[(base.hashCode() and Int.MAX_VALUE)%metadataLocks.size]
+        lock.withLock {
+            synchronized(metadataCache){metadataCache[key]}?.takeIf{it.resolved&&!it.failed}?.let{return@withLock it}
+            val stored=try{files.audioTags(file)}catch(cancel:CancellationException){throw cancel}catch(_:Exception){null}
+            val indexed=stored?.let{AudioMetadata(it.title,it.artist,it.durationMs,resolved=it.inspected)}
+            if(!detailed&&indexed?.resolved==true){
+                synchronized(metadataCache){metadataCache[key]=indexed}
+                return@withLock indexed
             }
-            result.also{synchronized(metadataCache){metadataCache[key]=it}}
-        }catch(cancel:CancellationException){throw cancel}
-        catch(_:Exception){AudioMetadata(durationMs=file.durationMs,resolved=true,failed=true)}
+            val disk=readMetadataCache(key)
+            if(disk!=null){
+                synchronized(metadataCache){metadataCache[key]=disk}
+                if(indexed==null||!indexed.resolved)persistMetadata(file,disk,detailed)
+                return@withLock disk
+            }
+            val fallback=indexed?:synchronized(metadataCache){metadataCache[base+":basic"]}?:AudioMetadata(durationMs=file.durationMs)
+            val path=file.localPath?.takeIf{File(it).isFile}
+            val remote=file.remoteFileId?.takeIf{path==null&&!file.isEncrypted&&file.hasRemoteCopy}
+            if(path==null&&(remote==null||mutable.value.file?.id==file.id))return@withLock fallback
+            val retryKey="$base:$path"
+            if(synchronized(metadataRetries){metadataRetries[retryKey]}?.let{android.os.SystemClock.elapsedRealtime()<it}==true)return@withLock fallback
+            try {
+                val result=metadataSlots.withPermit {
+                    val retriever=MediaMetadataRetriever()
+                    var source:android.media.MediaDataSource?=null
+                    try {
+                        if(path!=null)retriever.setDataSource(path)
+                        else {
+                            val owner=currentCoroutineContext()[Job]
+                            source=sources.metadataSource(remote!!){owner?.isActive==false||mutable.value.file?.id==file.id}
+                            retriever.setDataSource(source)
+                        }
+                        val picture=if(!detailed||path==null)null else retriever.embeddedPicture?.takeIf{it.size<=5*1024*1024}
+                        AudioMetadata(
+                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)?.takeIf(String::isNotBlank)?:fallback.title,
+                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)?.takeIf(String::isNotBlank)
+                                ?:retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST)?.takeIf(String::isNotBlank)?:fallback.artist,
+                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?:fallback.durationMs,
+                            picture?.let(::artworkColors).orEmpty(),if(detailed)path?.let{readEmbeddedLyrics(File(it))}else null,picture?.let{saveArtwork(file,it)},resolved=true)
+                    }finally{runCatching{retriever.release()};runCatching{source?.close()}}
+                }
+                ensureActive()
+                synchronized(metadataCache){
+                    metadataCache[key]=result
+                    metadataCache[base+":basic"]=result.copy(artworkColors=emptyList(),lyrics=null,artworkPath=null)
+                }
+                synchronized(metadataRetries){metadataRetries.remove(retryKey)}
+                persistMetadata(file,result,detailed)
+                result
+            }catch(cancel:CancellationException){throw cancel}
+            catch(_:Exception){
+                // A transient failure is not "no tags" and must not poison the durable index.
+                synchronized(metadataRetries){metadataRetries[retryKey]=android.os.SystemClock.elapsedRealtime()+60_000}
+                fallback.copy(failed=true)
+            }
+        }
     }
 
     private val sessionPrefs by lazy { appContext.getSharedPreferences("audio-playback-session",Context.MODE_PRIVATE) }
@@ -384,10 +449,10 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
         queue=if(values==null)listOf(file.id)else (0 until minOf(values.length(),2000)).map{values.getString(it)}.distinct()
         if(file.id !in queue)queue=listOf(file.id)
         desiredIndex=queue.indexOf(file.id)
-        mutable.value=AudioPlaybackState(file=file,positionMs=saved.optLong("position").coerceAtLeast(0),durationMs=file.durationMs?:0)
+        mutable.value=AudioPlaybackState(file=file,metadata=synchronized(metadataCache){metadataCache[metadataKey(file)]?:metadataCache[metadataKey(file)+":basic"]}?:AudioMetadata(),positionMs=saved.optLong("position").coerceAtLeast(0),durationMs=file.durationMs?:0)
         refreshQueueState()
         val epoch=playbackEpoch
-        metadataJob=scope.launch{val info=metadata(file);if(epoch==playbackEpoch&&mutable.value.file?.id==file.id)mutable.update{it.copy(metadata=info,durationMs=info.durationMs?:it.durationMs)}}
+        metadataJob=scope.launch{val basic=basicMetadata(file);if(epoch==playbackEpoch&&mutable.value.file?.id==file.id)mutable.update{it.copy(metadata=mergeMetadata(it.metadata,basic))};val info=metadata(file);if(epoch==playbackEpoch&&mutable.value.file?.id==file.id)mutable.update{it.copy(metadata=info,durationMs=info.durationMs?:it.durationMs)}}
     }
     private suspend fun saveSession(snapshot:AudioPlaybackState,chatId:Long?=libraryContext?.first,ids:List<String> = queue.toList()){
         val chat=snapshot.file?.chatId?:chatId

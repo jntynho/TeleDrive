@@ -37,6 +37,8 @@ interface FileRepository {
 
     suspend fun getFiles(ids: List<String>): List<DriveFile>
     suspend fun storeAudioTags(file:DriveFile,title:String?,artist:String?) {}
+    suspend fun audioTags(file:DriveFile):com.infinity.drive.domain.model.AudioTags? = null
+    suspend fun storeAudioMetadata(file:DriveFile,tags:com.infinity.drive.domain.model.AudioTags) { storeAudioTags(file,tags.title,tags.artist) }
 
     suspend fun warmLibrary() {}
     suspend fun preparedStartupFiles():List<DriveFile> = emptyList()

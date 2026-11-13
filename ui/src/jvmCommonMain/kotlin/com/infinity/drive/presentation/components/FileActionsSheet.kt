@@ -29,12 +29,13 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.koin.compose.koinInject
 
+val LocalRevealFileNavigation=staticCompositionLocalOf<((DriveFile)->Unit)?>{null}
 val LocalFileFolderNavigation=staticCompositionLocalOf<(String?)->Unit>{{}}
 
 /** A single action surface used in lists, search, Recent, audio and the full-screen viewer. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Boolean=false) {
+fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Boolean=false,extraActions:@Composable ()->Unit={}) {
     val privacy=com.infinity.drive.presentation.platform.LocalHiddenContentAccess.current
     val privacyState=privacy?.lock?.state?.collectAsStateWithLifecycle()?.value
     var readable by remember(file.id,privacyState?.epoch,privacyState?.restricted){mutableStateOf(privacy==null||privacyState?.restricted==false)}
@@ -50,6 +51,7 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Bo
     val sharer=LocalFileSharer.current
     val linkOpener=LocalTelegramLinkOpener.current
     val navigateFolder=LocalFileFolderNavigation.current
+    val revealFile=LocalRevealFileNavigation.current
     val scope=rememberCoroutineScope()
     val live by repository.observeFile(file.id).collectAsStateWithLifecycle(file)
     val current=live?:file
@@ -181,10 +183,10 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Bo
                         run(false){page=if(telegramActions.needsOriginal(current))"send-original"else"send"}
                     }
                     SheetActionRow("Share",DriveIcons.Share,enabled=!working){run{val path=obtain();sharer.share(listOf(path),current.mimeType,"Share ${current.name}")}}
-                    SheetActionRow(if(current.isFavorite)"Remove from Starred"else"Add to Starred",DriveIcons.Star,enabled=!working){run{repository.setFilesFavorite(listOf(current.id),!current.isFavorite)}}
+                    SheetActionRow(if(current.isFavorite)"Remove from Favourite"else"Add To Favourite",if(current.isFavorite)DriveIcons.StarFilled else DriveIcons.Star,enabled=!working){run(close=false){repository.setFilesFavorite(listOf(current.id),!current.isFavorite)}}
                     SheetActionRow("Rename",DriveIcons.Edit,enabled=!working){page="rename"}
                     SheetActionRow("Move",DriveIcons.DriveFileMove,enabled=!working){page="move"}
-                    SheetActionRow("Show in folder",DriveIcons.FolderOpen,enabled=!working){closeThen{navigateFolder(current.folderId)}}
+                    SheetActionRow("Show in folder",DriveIcons.FolderOpen,enabled=!working){closeThen{if(revealFile!=null)revealFile(current)else navigateFolder(current.folderId)}}
                     SheetActionRow("Show in Telegram",DriveIcons.OpenInNew,enabled=!working){
                         run(false){
                             val latest=repository.getFile(current.id)?:error("This file is no longer available")
@@ -196,6 +198,7 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Bo
                         }
                     }
                     SheetActionRow(if(current.isArchived)"Unarchive"else"Archive",app.tgdrive.ui.LibraryIcons.Archive,enabled=!working){run{repository.setFilesArchived(listOf(current.id),!current.isArchived)}}
+                    extraActions()
                     SheetActionRow("Move to Trash",DriveIcons.DeleteOutline,enabled=!working){page="trash"}
                 }
             }

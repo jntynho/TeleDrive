@@ -7,8 +7,8 @@ import kotlinx.serialization.json.Json
 import java.io.File
 
 /** Outside backup; the atomic record (including retry counters) is authenticated with Keystore AES-GCM. */
-class AndroidHiddenLockStore(context:Context,private val cipher:CredentialCipher):HiddenLockStore {
-    private val file=AtomicFile(File(context.noBackupFilesDir,"hidden-lock.bin"))
+class AndroidHiddenLockStore(context:Context,private val cipher:CredentialCipher,recordName:String="hidden-lock.bin"):HiddenLockStore {
+    private val file=AtomicFile(File(context.noBackupFilesDir,recordName))
     override suspend fun read():HiddenLockRecord? {
         val candidates=listOf(file.baseFile,File(file.baseFile.path+".bak"),File(file.baseFile.path+".new")).filter{it.exists()}
         if(candidates.isEmpty())return null

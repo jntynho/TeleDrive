@@ -12,7 +12,7 @@ sealed interface Route {
     data object Home : Route
 
     @Serializable
-    data class Files(val folderId: String? = null,val upload:Boolean=false) : Route
+    data class Files(val folderId: String? = null,val upload:Boolean=false,val focusFileId:String?=null) : Route
 
     @Serializable
     data class Gallery(val initialTab: String? = null) : Route
@@ -74,6 +74,9 @@ sealed interface Route {
 
     @Serializable
     data object HiddenSettings : Route
+
+    @Serializable
+    data class CollectionSettings(val type:String):Route
 
     @Serializable
     data class SettingsSection(val section: String,val focusTitle:String?=null) : Route

@@ -115,7 +115,7 @@ fun CollectionScreen(
                     }
                 },
                 actions = {
-                    if(viewModel.type==CollectionType.HIDDEN&&!selectionMode)IconButton(onManageHidden){Icon(DriveIcons.MoreVert,"Hidden settings")}
+                    if(!selectionMode)IconButton(onManageHidden){Icon(DriveIcons.MoreVert,"${viewModel.type.name.lowercase().replaceFirstChar(Char::uppercase)} settings")}
                     if (selectionMode) {
                         IconButton(
                             onClick = {

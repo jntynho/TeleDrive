@@ -43,7 +43,7 @@ import com.infinity.drive.data.local.entity.TransferEntity
         FilePartEntity::class,
         ProxyEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = true
 )
 @ConstructedBy(DriveInfinityDatabaseConstructor::class)

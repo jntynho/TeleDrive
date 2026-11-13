@@ -30,11 +30,16 @@ class HiddenLockDeviceTest {
         runBlocking{lock.awaitReady();lock.setDeviceLock(true,lock.state.value.epoch)}
         var requests=0;var confirm:(()->Unit)?=null;var deny:((String?)->Unit)?=null
         val gate=DeviceOwnerGate{_,_,no,yes->requests++;confirm=yes;deny=no}
-        compose.setContent{CompositionLocalProvider(LocalHiddenDeviceOwnerGate provides gate){MaterialTheme{HiddenLockScreen({},lock)}}}
+        var backedOut=false
+        val open=androidx.compose.runtime.mutableStateOf(true)
+        compose.setContent{CompositionLocalProvider(LocalHiddenDeviceOwnerGate provides gate){MaterialTheme{if(open.value)HiddenLockScreen({backedOut=true},lock)}}}
         compose.waitUntil(10_000){requests==1}
         assertTrue(lock.state.value.restricted)
         compose.runOnIdle{deny!!(null)}
-        compose.onNodeWithText("Unlock",substring=false).performScrollTo().performClick()
+        compose.waitUntil(10_000){backedOut}
+        compose.onNodeWithText("Hidden is locked").assertDoesNotExist()
+        compose.runOnIdle{open.value=false};compose.waitForIdle()
+        compose.runOnIdle{open.value=true}
         compose.waitUntil(10_000){requests==2}
         compose.runOnIdle{confirm!!()}
         compose.waitUntil(10_000){lock.state.value.unlocked}

@@ -169,3 +169,13 @@ val MIGRATION_12_13 = object : Migration(12,13) {
         connection.execSQL("CREATE INDEX IF NOT EXISTS index_files_gallery ON files(chatId,trashedAt,modifiedAt DESC,id ASC,category)")
     }
 }
+
+/** Retain existing tags while separating content identity from a disposable local path. */
+val MIGRATION_13_14 = object : Migration(13,14) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE audio_tags ADD COLUMN sizeBytes INTEGER NOT NULL DEFAULT -1")
+        connection.execSQL("ALTER TABLE audio_tags ADD COLUMN contentHash TEXT")
+        connection.execSQL("ALTER TABLE audio_tags ADD COLUMN durationMs INTEGER")
+        connection.execSQL("ALTER TABLE audio_tags ADD COLUMN inspected INTEGER NOT NULL DEFAULT 1")
+    }
+}

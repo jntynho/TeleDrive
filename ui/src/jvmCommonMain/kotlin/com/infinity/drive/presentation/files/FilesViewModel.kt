@@ -129,6 +129,7 @@ class FilesViewModel(
     fun setAudioQuery(value:String){audioQuery.value=value}
     private val folderId: String? = runCatching{savedStateHandle.toRoute<Route.Files>().folderId}.getOrNull()
 
+    val focusFileId=runCatching{savedStateHandle.toRoute<Route.Files>().focusFileId}.getOrNull()
     val listPosition = ListPosition(savedStateHandle)
 
     private val selection = MutableStateFlow<Set<String>>(emptySet())
@@ -196,8 +197,8 @@ class FilesViewModel(
                 filterByFolder = !audioOnly,
                 categories = if(audioOnly)listOf(com.infinity.drive.domain.model.FileCategory.AUDIO)else emptyList(),
                 nameQuery = if(audioOnly)query.takeIf{it.isNotBlank()}else null,
-                showHidden = false,
-                showArchived = false,
+                showHidden = focusFileId!=null,
+                showArchived = focusFileId!=null,
                 sortField = prefs.sortField,
                 sortDirection = prefs.sortDirection
             )
@@ -205,7 +206,10 @@ class FilesViewModel(
         .distinctUntilChanged()
 
     val pagedFiles: Flow<PagingData<DriveFile>> = querySpec
-        .flatMapLatest { fileRepository.pagedFiles(it) }
+        .flatMapLatest { spec -> flow {
+            val initial=focusFileId?.let{fileRepository.indexOfFile(spec,it)}
+            emitAll(fileRepository.pagedFiles(spec.copy(initialLoadIndex=initial)))
+        } }
         .cachedIn(viewModelScope)
 
     /**
@@ -236,8 +240,8 @@ class FilesViewModel(
         settingsRepository.preferences.flatMapLatest { prefs ->
             if(audioOnly)flowOf(emptyList<DriveFolder>())else fileRepository.observeFolders(
                 parentId = folderId,
-                showHidden = false,
-                showArchived = false,
+                showHidden = focusFileId!=null,
+                showArchived = focusFileId!=null,
                 sortField = prefs.sortField,
                 sortDirection = prefs.sortDirection
             )

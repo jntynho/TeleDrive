@@ -53,6 +53,13 @@ fun AppNavHost(
     val hidden=org.koin.compose.koinInject<com.infinity.drive.core.security.HiddenContentAccess>()
     val hiddenState by hidden.lock.state.collectAsStateWithLifecycle()
     if(hiddenState.unlocked)SensitiveScreen()
+    val collectionLocks=org.koin.compose.koinInject<com.infinity.drive.core.security.CollectionLocks>()
+    val owner=androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(owner,collectionLocks){
+        val observer=androidx.lifecycle.LifecycleEventObserver{_,event->if(event==androidx.lifecycle.Lifecycle.Event.ON_STOP)collectionLocks.lockAll()}
+        owner.lifecycle.addObserver(observer)
+        onDispose{owner.lifecycle.removeObserver(observer)}
+    }
     val rawFiles=org.koin.compose.koinInject<com.infinity.drive.domain.repository.FileRepository>()
     LaunchedEffect(entry?.id){
         val current=entry?:return@LaunchedEffect
@@ -61,12 +68,20 @@ fun AppNavHost(
             current.destination.hasRoute<Route.Collection>()->current.toRoute<Route.Collection>().type==com.infinity.drive.presentation.collection.CollectionType.HIDDEN.name
             current.destination.hasRoute<Route.Preview>()->rawFiles.getFile(current.toRoute<Route.Preview>().fileId)?.let{hidden.protectedFile(it)}==true
             current.destination.hasRoute<Route.NoteEditor>()->current.toRoute<Route.NoteEditor>().let{route->route.fileId?.let{rawFiles.getFile(it)?.let{file->hidden.protectedFile(file)}}?:hidden.protectedFolder(route.folderId)}
-            current.destination.hasRoute<Route.Files>()->hidden.protectedFolder(current.toRoute<Route.Files>().folderId)
+            current.destination.hasRoute<Route.Files>()->current.toRoute<Route.Files>().let{route->hidden.protectedFolder(route.folderId)||route.focusFileId?.let{rawFiles.getFile(it)?.let{file->hidden.protectedFile(file)}}==true}
             else->false
         }
         // Also invalidate verification started inside Trash or a guard after a policy mutation.
         // Public content stays mounted: guards and thumbnails no longer reset on this epoch.
         if(!inside)hidden.lock.lock()
+        val collection=when {
+            current.destination.hasRoute<Route.Collection>()->current.toRoute<Route.Collection>().type
+            current.destination.hasRoute<Route.Trash>()->"TRASH"
+            current.destination.hasRoute<Route.CollectionSettings>()->current.toRoute<Route.CollectionSettings>().type
+            current.destination.hasRoute<Route.Preview>()->return@LaunchedEffect
+            else->null
+        }
+        collectionLocks.leaveExcept(collection)
     }
     NavHost(
         navController = navController,
@@ -89,6 +104,10 @@ fun AppNavHost(
             )
         }
         stableComposable<Route.Home>(navController) {
+            val openHidden=rememberCollectionEntry(hidden.lock,"Hidden"){navController.navigateOnce(Route.Collection("HIDDEN"))}
+            val openFavorites=rememberCollectionEntry(collectionLocks.manager("FAVORITES"),"Favorites"){navController.navigateOnce(Route.Collection("FAVORITES"))}
+            val openArchived=rememberCollectionEntry(collectionLocks.manager("ARCHIVED"),"Archived"){navController.navigateOnce(Route.Collection("ARCHIVED"))}
+            val openTrash=rememberCollectionEntry(collectionLocks.manager("TRASH"),"Trash"){navController.navigateOnce(Route.Trash)}
             UnderBottomBar {
                 HomeScreen(
                     onOpenFile = { id, sequence ->
@@ -105,9 +124,9 @@ fun AppNavHost(
                         }
                     },
                     onOpenTransfers = { navController.navigateOnce(Route.Transfers) },
-                    onOpenTrash = { navController.navigateOnce(Route.Trash) },
+                    onOpenTrash = openTrash,
                     onOpenChannels = { navController.navigateOnce(Route.Channels) },
-                    onOpenCollection = { navController.navigateOnce(Route.Collection(it.name)) },
+                    onOpenCollection = { when(it.name){"HIDDEN"->openHidden();"ARCHIVED"->openArchived();else->openFavorites()} },
                     onOpenBackupSettings = {
                         navController.navigateOnce(
                             Route.SettingsSection(SettingsSectionType.BACKUP.name)
@@ -195,7 +214,7 @@ fun AppNavHost(
             }
         }
         stableComposable<Route.Transfers>(navController) {
-            TransfersScreen(onBack = { navController.popBackStackOnce() })
+            TransfersScreen(onBack={navController.popBackStackOnce()},onOpenFile={id,sequence->navController.navigateOnce(sequence.routeFor(id))})
         }
         stableComposable<Route.Search>(navController) {
             SearchScreen(
@@ -210,8 +229,9 @@ fun AppNavHost(
             val back:()->Unit={navController.popBackStackOnce()}
             val open:(String,com.infinity.drive.presentation.preview.PreviewSequence)->Unit={id,sequence->navController.navigateOnce(sequence.routeFor(id))}
             if(entry.toRoute<Route.Collection>().type==com.infinity.drive.presentation.collection.CollectionType.HIDDEN.name)HiddenCollectionGate(back,open){navController.navigateOnce(Route.HiddenSettings)}
-            else CollectionScreen(onBack=back,onOpenFile=open)
+            else CollectionAccessGate(entry.toRoute<Route.Collection>().type,back){CollectionScreen(onBack=back,onOpenFile=open,onManageHidden={navController.navigateOnce(Route.CollectionSettings(entry.toRoute<Route.Collection>().type))})}
         }
+        stableComposable<Route.CollectionSettings>(navController){entry->CollectionSettingsScreen(entry.toRoute<Route.CollectionSettings>().type){navController.popBackStackOnce()}}
         stableComposable<Route.HiddenSettings>(navController){HiddenSettingsScreen{navController.popBackStackOnce()}}
         stableComposable<Route.NoteEditor>(navController) { entry ->
             val route=entry.toRoute<Route.NoteEditor>()
@@ -223,7 +243,7 @@ fun AppNavHost(
             ChannelsScreen(onBack = { navController.popBackStackOnce() })
         }
         stableComposable<Route.Trash>(navController) {
-            TrashScreen(onBack = { navController.popBackStackOnce() })
+            CollectionAccessGate("TRASH",{navController.popBackStackOnce()}){TrashScreen(onBack={navController.popBackStackOnce()},onManageLock={navController.navigateOnce(Route.CollectionSettings("TRASH"))})}
         }
         stableComposable<Route.Settings>(navController) {
             UnderBottomBar {

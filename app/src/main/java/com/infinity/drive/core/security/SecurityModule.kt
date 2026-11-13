@@ -10,5 +10,7 @@ val securityModule = module {
     singleOf(::SensitiveScreens)
     single<HiddenLockStore>{AndroidHiddenLockStore(androidContext(),get())}
     single {HiddenLockManager(get())}
+    single<CollectionLockStores>{CollectionLockStores { name->AndroidHiddenLockStore(androidContext(),get(),"collection-$name-lock.bin") }}
+    singleOf(::CollectionLocks)
     singleOf(::HiddenContentAccess).onClose{it?.close()}
 }

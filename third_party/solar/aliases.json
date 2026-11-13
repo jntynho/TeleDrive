@@ -150,5 +150,6 @@
   "PhotoCamera": "camera-linear",
   "Backspace": "backspace-linear",
   "Visibility": "eye-linear",
-  "Language": "global-linear"
+  "Language": "global-linear",
+  "StarFilled": "star-solid"
 }

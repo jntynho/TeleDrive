@@ -95,7 +95,12 @@ fun AudioLibraryRow(file:DriveFile?,playing:Boolean=false,currentMetadata:AudioM
     val loading=file==null
     val player=LocalAudioPlayback.current
     val probe=com.infinity.drive.presentation.platform.LocalStartupProbe.current
-    val storedMetadata by produceState(AudioMetadata(),file?.id,file?.modifiedAt,file?.localPath,probe){if(file!=null&&!probe)value=player.basicMetadata(file)}
+    val storedMetadata by produceState(AudioMetadata(),file?.id,file?.modifiedAt,file?.localPath,file?.contentHash,file?.remoteFileId,probe){
+        if(file!=null&&!probe){
+            value=player.basicMetadata(file)
+            if(value.failed){kotlinx.coroutines.delay(60_000);value=player.basicMetadata(file)}
+        }
+    }
     val meta=if(currentMetadata!=null)AudioMetadata(currentMetadata.title?.takeIf(String::isNotBlank)?:storedMetadata.title,currentMetadata.artist?.takeIf(String::isNotBlank)?:storedMetadata.artist,currentMetadata.durationMs?:storedMetadata.durationMs)else storedMetadata
     var menu by remember(file?.id){mutableStateOf(false)}
     if(menu&&file!=null)com.infinity.drive.presentation.components.FileActionsSheet(file,onDismiss={menu=false},onOpen=onPlay)

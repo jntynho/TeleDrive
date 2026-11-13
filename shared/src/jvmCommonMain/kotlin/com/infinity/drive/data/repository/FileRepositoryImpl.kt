@@ -112,7 +112,8 @@ class FileRepositoryImpl(
                     enablePlaceholders = false
                 ),
                 pagingSourceFactory = {
-                    fileDao.pagingSource(FileQueryBuilder.build(hiddenAccess.query(spec.copy(chatId = chatId,scopeToChat=true))))
+                    val query=FileQueryBuilder.build(hiddenAccess.query(spec.copy(chatId=chatId,scopeToChat=true)))
+                    if(spec.nameQuery.isNullOrBlank())fileDao.contentPagingSource(query)else fileDao.pagingSource(query)
                 }
             ).flow.map { paging -> paging.map { it.toDomain() } }
                 .onStart{if(seed!=null)emit(PagingData.from(seed))}
@@ -159,11 +160,19 @@ class FileRepositoryImpl(
 
     override suspend fun getFile(id: String): DriveFile? = fileDao.byId(id)?.toDomain()
 
-    override suspend fun storeAudioTags(file:DriveFile,title:String?,artist:String?) {
-        val current=fileDao.byId(file.id)?:return
-        if(current.modifiedAt!=file.modifiedAt||current.localPath!=file.localPath)return
-        val tag=com.infinity.drive.data.local.entity.AudioTagEntity(file.id,file.modifiedAt,file.localPath,title,artist)
-        if(fileDao.audioTagsById(file.id)!=tag)fileDao.storeAudioTags(tag)
+    override suspend fun audioTags(file:DriveFile):com.infinity.drive.domain.model.AudioTags? {
+        if(!hiddenAccess.canRead(file.id))return null
+        val tag=fileDao.audioTagsById(file.id)?:return null
+        if(tag.modifiedAt!=file.modifiedAt||tag.sizeBytes>=0&&(tag.sizeBytes!=file.sizeBytes||tag.contentHash!=file.contentHash))return null
+        return com.infinity.drive.domain.model.AudioTags(tag.title,tag.artist,tag.durationMs?:file.durationMs,tag.inspected)
+    }
+
+    override suspend fun storeAudioTags(file:DriveFile,title:String?,artist:String?) =
+        storeAudioMetadata(file,com.infinity.drive.domain.model.AudioTags(title,artist))
+
+    override suspend fun storeAudioMetadata(file:DriveFile,tags:com.infinity.drive.domain.model.AudioTags) {
+        fileDao.mergeAudioTags(com.infinity.drive.data.local.entity.AudioTagEntity(file.id,file.modifiedAt,file.localPath,
+            tags.title,tags.artist,file.sizeBytes,file.contentHash,tags.durationMs,tags.inspected))
     }
 
     override suspend fun getFiles(ids: List<String>): List<DriveFile> =

@@ -97,7 +97,7 @@ fun FileListItem(
                 if (file.isFavorite) {
                     Spacer(Modifier.width(6.dp))
                     Icon(
-                        imageVector = DriveIcons.Star,
+                        imageVector = DriveIcons.StarFilled,
                         contentDescription = stringResource(Res.string.common_content_description_favorite),
                         modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.tertiary

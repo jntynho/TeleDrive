@@ -19,11 +19,13 @@ class AndroidLocalDataWiper(
     private val database: DriveInfinityDatabase,
     private val cacheRepository: CacheRepository,
     private val files:com.infinity.drive.domain.repository.FileRepository,
-    private val hiddenLock:com.infinity.drive.core.security.HiddenLockManager
+    private val hiddenLock:com.infinity.drive.core.security.HiddenLockManager,
+    private val collectionLocks:com.infinity.drive.core.security.CollectionLocks
 ) : LocalDataWiper {
 
     override suspend fun wipe() {
         hiddenLock.clear()
+        collectionLocks.clearAll()
         files.clearStartupCache()
         runCatching { cacheRepository.clearAll() }
             .onFailure { SafeLog.w(TAG, "Cache clear failed during wipe", it) }

@@ -87,6 +87,10 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
         unitTests.all { test ->
+            // JDK 21 C2 can crash compiling Robolectric's rewritten SQLiteCursor methods.
+            // Exclude only this host-test shim; application/ART compilation is unchanged.
+            test.jvmArgs("-XX:CompileCommand=exclude,android.database.sqlite.SQLiteCursor::*")
+
             test.systemProperty("robolectric.dependency.repo.url", "https://repo.maven.apache.org/maven2")
             // Respect the build machine's supported HTTPS proxy/trust configuration in test JVMs.
             listOf("https.proxyHost", "https.proxyPort", "http.proxyHost", "http.proxyPort", "http.nonProxyHosts", "javax.net.ssl.trustStore").forEach { name ->

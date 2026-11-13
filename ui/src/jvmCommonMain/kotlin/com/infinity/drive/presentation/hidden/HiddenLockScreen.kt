@@ -36,7 +36,9 @@ private data class HiddenAction(val working:Boolean,val message:String?,val requ
 
 /** A native result belongs to this visible screen, never an outgoing or disposed destination. */
 @Composable
-private fun rememberHiddenAction(manager:HiddenLockManager):HiddenAction {
+private fun rememberHiddenAction(manager:HiddenLockManager,title:String="Hidden",onUnlocked:()->Unit={},onCancelled:()->Unit={}):HiddenAction {
+    val unlockedCallback by rememberUpdatedState(onUnlocked)
+    val cancelledCallback by rememberUpdatedState(onCancelled)
     val gate=LocalHiddenDeviceOwnerGate.current
     val owner=LocalLifecycleOwner.current
     val scope=rememberCoroutineScope()
@@ -53,9 +55,9 @@ private fun rememberHiddenAction(manager:HiddenLockManager):HiddenAction {
             val request=++generation
             fun current()=request==generation&&!navigating
             try {gate.require(
-                title=when(enabled){true->"Enable Hidden lock";false->"Turn off Hidden lock";null->"Unlock Hidden"},
+                title=when(enabled){true->"Enable $title lock";false->"Turn off $title lock";null->"Unlock $title"},
                 subtitle="Confirm with your fingerprint or screen lock",
-                onDenied={error->if(current()){generation++;working=false;message=error?:"Authentication cancelled. No changes were made."}}
+                onDenied={error->if(current()){generation++;working=false;message=error?:"Authentication cancelled. No changes were made.";if(enabled==null)cancelledCallback()}}
             ){
                 scope.launch {
                     try {
@@ -63,15 +65,15 @@ private fun rememberHiddenAction(manager:HiddenLockManager):HiddenAction {
                         // after this same destination resumes; ordinary navigation invalidates it.
                         val resumed=withTimeoutOrNull(5000){owner.lifecycle.currentStateFlow.first{it.isAtLeast(Lifecycle.State.RESUMED)}}
                         if(!current())return@launch
-                        if(resumed==null){message="Please unlock Hidden again.";return@launch}
+                        if(resumed==null){message="Please authenticate again.";if(enabled==null)cancelledCallback();return@launch}
                         val ticket=manager.state.value.epoch
                         val success=if(enabled==null)manager.unlockWithDevice(ticket)else manager.setDeviceLock(enabled,ticket)
-                        if(current()&&!success)message="Hidden was locked. Please try again."
+                        if(current()){if(!success){message="Authentication expired. Please try again.";if(enabled==null)cancelledCallback()} else if(enabled==null)unlockedCallback()}
                     }catch(cancel:CancellationException){throw cancel}
-                    catch(_:Exception){if(current())message="Couldn't update Hidden lock. Please try again."}
+                    catch(_:Exception){if(current()){message="Couldn't update lock. Please try again.";if(enabled==null)cancelledCallback()}}
                     finally{if(current()){working=false;generation++}}
                 }
-            }}catch(_:Exception){if(current()){working=false;message="Couldn't open device authentication. Please try again."}}
+            }}catch(_:Exception){if(current()){working=false;message="Couldn't open device authentication. Please try again.";if(enabled==null)cancelledCallback()}}
         }
     }
     return HiddenAction(working,message,request)
@@ -79,11 +81,11 @@ private fun rememberHiddenAction(manager:HiddenLockManager):HiddenAction {
 
 /** Shared setting: exactly the same state and authentication policy in Security and Hidden. */
 @Composable
-fun HiddenLockSettingRow(manager:HiddenLockManager=koinInject()) {
+fun HiddenLockSettingRow(manager:HiddenLockManager=koinInject(),title:String="Hidden") {
     val lock by manager.state.collectAsStateWithLifecycle()
-    val action=rememberHiddenAction(manager)
+    val action=rememberHiddenAction(manager,title)
     Column {
-        SettingsSwitchRow(title=stringResource(Res.string.settings_hidden_lock),checked=lock.configured||lock.error,
+        SettingsSwitchRow(title=if(title=="Hidden")stringResource(Res.string.settings_hidden_lock)else"Lock $title",checked=lock.configured||lock.error,
             onChange={action.request(it)},subtitle="Require fingerprint or screen lock",
             enabled=lock.ready&&!lock.error&&!action.working,icon=DriveIcons.Lock)
         val message=if(lock.error)"Hidden lock couldn't be read. Your files remain protected."else action.message
@@ -106,34 +108,56 @@ fun HiddenSettingsScreen(onBack:()->Unit) {
     }
 }
 
-/** The OS owns the credential UI. This surface is only a retry/back state after cancellation. */
+/** No intermediary locked page. Denial returns to the source without mounting private content. */
 @Composable
-fun HiddenLockScreen(onBack:()->Unit,manager:HiddenLockManager=koinInject()) {
+fun HiddenLockScreen(onBack:()->Unit,manager:HiddenLockManager=koinInject(),title:String="Hidden") {
     SensitiveScreen()
     val lock by manager.state.collectAsStateWithLifecycle()
-    val action=rememberHiddenAction(manager)
+    val action=rememberHiddenAction(manager,title,onCancelled=onBack)
     val navigating=LocalNavigationInProgress.current
-    LaunchedEffect(lock.ready,lock.configured,lock.unlocked,navigating){
-        if(lock.ready&&lock.configured&&!lock.unlocked&&!lock.error&&!navigating)action.request(null)
-    }
-    com.infinity.drive.presentation.common.AppBackHandler{onBack()}
-    Scaffold(topBar={PageHeader(title={Text("Hidden")},navigationIcon={IconButton(onBack){Icon(DriveIcons.ArrowBack,"Back")}})}){padding->
-        if(!lock.ready){LoadingState(Modifier.padding(padding));return@Scaffold}
-        BoxWithConstraints(Modifier.fillMaxSize().padding(padding)){
-            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min=maxHeight).padding(32.dp),
-                horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center){
-                Icon(DriveIcons.Lock,null,Modifier.size(44.dp),tint=MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.height(20.dp))
-                Text("Hidden is locked",style=MaterialTheme.typography.headlineSmall)
-                Spacer(Modifier.height(10.dp))
-                Text(if(lock.error)"Hidden lock couldn't be read. Your files remain protected."else"Use your phone's fingerprint, PIN, pattern or password.",
-                    style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                action.message?.let{Text(it,Modifier.padding(top=12.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-                Spacer(Modifier.height(24.dp))
-                if(!lock.error)Button({action.request(null)},enabled=!action.working){
-                    Icon(DriveIcons.Fingerprint,null,Modifier.size(20.dp));Spacer(Modifier.width(8.dp));Text(if(action.working)"Waiting for confirmation…"else"Unlock")
-                }
-            }
+    LaunchedEffect(lock.ready,lock.configured,lock.unlocked,lock.error,navigating){
+        if(lock.ready&&!lock.unlocked&&!navigating){
+            if(lock.error)onBack()else if(lock.configured)action.request(null)
         }
     }
+    com.infinity.drive.presentation.common.AppBackHandler{onBack()}
+    Box(Modifier.fillMaxSize())
+}
+
+/** Entry authentication is hosted by Home: cancel never navigates away from Home. */
+@Composable
+fun rememberCollectionEntry(manager:HiddenLockManager,title:String,onOpen:()->Unit):()->Unit {
+    val lock by manager.state.collectAsStateWithLifecycle()
+    val open by rememberUpdatedState(onOpen)
+    var requested by remember{mutableStateOf(false)}
+    val action=rememberHiddenAction(manager,title,onUnlocked={requested=false;open()},onCancelled={requested=false})
+    LaunchedEffect(requested,lock.ready){
+        if(requested&&lock.ready){
+            requested=false
+            if(!lock.error){if(!lock.configured||lock.unlocked)open()else action.request(null)}
+        }
+    }
+    return {if(!action.working)requested=true}
+}
+
+@Composable
+fun CollectionSettingsScreen(type:String,onBack:()->Unit){
+    val locks=koinInject<com.infinity.drive.core.security.CollectionLocks>()
+    val title=when(type){"FAVORITES"->"Favorites";"ARCHIVED"->"Archived";else->"Trash"}
+    Scaffold(topBar={PageHeader(title={Text("$title settings")},navigationIcon={IconButton(onBack){Icon(DriveIcons.ArrowBack,"Back")}})}){padding->
+        Column(Modifier.fillMaxSize().padding(padding)){
+            Spacer(Modifier.height(20.dp))
+            SettingsGroup{add{HiddenLockSettingRow(locks.manager(type),title)}}
+            Text("Uses your phone's fingerprint or screen lock. Disabled by default. Locks again when you leave this collection or put TeleDrive in the background.",Modifier.padding(24.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+fun CollectionAccessGate(type:String,onBack:()->Unit,content:@Composable ()->Unit){
+    val locks=koinInject<com.infinity.drive.core.security.CollectionLocks>()
+    val manager=locks.manager(type)
+    val lock by manager.state.collectAsStateWithLifecycle()
+    if(lock.ready&&!lock.error&&(!lock.configured||lock.unlocked))content()
+    else HiddenLockScreen(onBack,manager,when(type){"FAVORITES"->"Favorites";"ARCHIVED"->"Archived";else->"Trash"})
 }

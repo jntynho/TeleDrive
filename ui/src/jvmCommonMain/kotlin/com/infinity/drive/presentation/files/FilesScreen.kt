@@ -2,7 +2,8 @@
 package com.infinity.drive.presentation.files
 
 import app.tgdrive.ui.ElasticLazyVerticalGrid as LazyVerticalGrid
-import com.infinity.drive.presentation.components.resultReveal
+import com.infinity.drive.presentation.components.folderContentReveal
+import com.infinity.drive.presentation.components.fileRevealHighlight
 import app.tgdrive.ui.DriveIcons
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -242,6 +243,16 @@ fun FilesScreen(
     AppBackHandler(enabled = state.selectionMode) { viewModel.clearSelection() }
 
     val gridState = rememberLazyGridState()
+    var revealHandled by androidx.compose.runtime.saveable.rememberSaveable{mutableStateOf(false)}
+    var highlightedFile by remember{mutableStateOf<String?>(null)}
+    LaunchedEffect(viewModel.focusFileId,files.itemSnapshotList,state.folders.size,state.loaded){
+        val focus=viewModel.focusFileId?:return@LaunchedEffect
+        if(!revealHandled&&state.loaded){
+            val index=files.itemSnapshotList.items.indexOfFirst{it.id==focus}
+            if(index>=0){gridState.scrollToItem(state.folders.size+index);highlightedFile=focus;revealHandled=true}
+        }
+    }
+    LaunchedEffect(highlightedFile){if(highlightedFile!=null){kotlinx.coroutines.delay(2600);highlightedFile=null}}
     gridState.rememberPosition(viewModel.listPosition, state.folders.size + files.itemCount)
     var fabVisible by remember { mutableStateOf(true) }
     val listScrolls by remember {
@@ -547,7 +558,8 @@ fun FilesScreen(
                                 ),
                                 onOpenFolder = onOpenFolder,
                                 onOpenFile = { id,sequence -> onOpenFile(id,if(audioOnly)sequence.copy(filterByFolder=false,categories=listOf(com.infinity.drive.domain.model.FileCategory.AUDIO),nameQuery=audioQuery.trim().takeIf{it.isNotBlank()})else sequence) },
-                                viewModel = viewModel
+                                viewModel = viewModel,
+                                highlightedFile=highlightedFile
                             )
                         }
                     }
@@ -778,7 +790,8 @@ private fun FilesContent(
     padding: PaddingValues,
     onOpenFolder: (String) -> Unit,
     onOpenFile: (String, PreviewSequence) -> Unit,
-    viewModel: FilesViewModel
+    viewModel: FilesViewModel,
+    highlightedFile:String?=null
 ) {
     val columns = if (state.viewMode == ViewMode.GRID) state.gridSize else 1
     val dragSelect = rememberDragSelect(
@@ -803,7 +816,7 @@ private fun FilesContent(
         elasticEnabled = !state.selectionMode,
         columns = GridCells.Fixed(columns),
         modifier = Modifier
-            .fillMaxSize().resultReveal(state.folderId to (state.sortField to state.sortDirection))
+            .fillMaxSize().folderContentReveal(state.folderId to (state.sortField to state.sortDirection))
 
             .then(dragSelect),
         contentPadding = padding.add(horizontal = 12.dp, top = 12.dp, bottom = 100.dp),
@@ -868,7 +881,7 @@ private fun FilesContent(
                         )
                     },
                     onLongClick = { viewModel.toggleSelection(file.id) },
-                    modifier = Modifier.animateItem(placementSpec=null)
+                    modifier = Modifier.animateItem(placementSpec=null).fileRevealHighlight(file.id==highlightedFile)
                 )
             } else {
                 FileListItem(
@@ -888,7 +901,7 @@ private fun FilesContent(
                         )
                     },
                     onLongClick = { viewModel.toggleSelection(file.id) },
-                    modifier = Modifier.animateItem(placementSpec=null)
+                    modifier = Modifier.animateItem(placementSpec=null).fileRevealHighlight(file.id==highlightedFile)
                 )
             }
         }

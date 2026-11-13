@@ -64,13 +64,31 @@ class HiddenDeviceLockUiTest {
         assertEquals(2,record!!.version);assertTrue(record!!.pinHash.isEmpty())
     }
     @Test fun cancellationDoesNotUnlockAndLateSuccessFromTheCancelledPromptIsIgnored(){
-        legacy();show{HiddenLockScreen({},manager)};compose.waitForIdle()
+        var backedOut=false
+        legacy();show{HiddenLockScreen({backedOut=true},manager)};compose.waitForIdle()
         val stale=confirmed!!
         compose.runOnIdle{denied!!(null);stale()}
-        compose.waitForIdle();assertTrue(manager.state.value.restricted)
-        compose.onNodeWithText("Unlock",substring=false).performScrollTo().performClick()
-        assertEquals(2,requests)
-        compose.runOnIdle{confirmed!!()};await{manager.state.value.unlocked}
+        compose.waitForIdle();assertTrue(manager.state.value.restricted);assertTrue(backedOut)
+        compose.onNodeWithText("Hidden is locked").assertDoesNotExist()
+        compose.onNodeWithText("Unlock",substring=false).assertDoesNotExist()
+    }
+
+    @Test fun entryStaysOnTheSourceUntilNativeAuthenticationSucceeds(){
+        legacy();var opened by mutableStateOf(false)
+        show{
+            val enter=rememberCollectionEntry(manager,"Hidden"){opened=true}
+            if(opened)Text("Private collection")else androidx.compose.material3.Button(enter){Text("Open Hidden")}
+        }
+        compose.onNodeWithText("Open Hidden").performClick()
+        compose.waitForIdle();assertEquals(1,requests)
+        compose.onNodeWithText("Private collection").assertDoesNotExist()
+        compose.runOnIdle{denied!!(null)}
+        compose.onNodeWithText("Open Hidden").assertIsDisplayed()
+        compose.onNodeWithText("Open Hidden").performClick()
+        compose.waitForIdle();assertEquals(2,requests)
+        compose.runOnIdle{confirmed!!()}
+        await{opened}
+        compose.onNodeWithText("Private collection").assertIsDisplayed()
     }
     @Test fun securityAndHiddenSettingsShareTheSameAuthenticatedToggle(){
         show{Column{HiddenLockSettingRow(manager);HiddenLockSettingRow(manager)}}

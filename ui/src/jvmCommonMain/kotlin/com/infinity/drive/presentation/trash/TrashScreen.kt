@@ -76,7 +76,8 @@ import com.infinity.drive.presentation.components.rememberToolbarLift
 @Composable
 fun TrashScreen(
     onBack: () -> Unit,
-    viewModel: TrashViewModel = koinViewModel()
+    viewModel: TrashViewModel = koinViewModel(),
+    onManageLock:()->Unit={}
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -188,6 +189,7 @@ fun TrashScreen(
                         }
                     },
                     actions = {
+                        IconButton(onManageLock){Icon(DriveIcons.MoreVert,"Trash settings")}
                         if(lock.configured)IconButton(onClick={if(lock.unlocked)hidden.lock()else{pendingAction=null;unlocking=true}}){Icon(DriveIcons.Lock,if(lock.unlocked)"Lock Hidden"else"Unlock hidden items")}
                         if (state.items.isNotEmpty()) {
                             IconButton(onClick = { if(lock.configured&&!lock.unlocked){pendingAction="empty";unlocking=true}else confirmEmpty=true }) {

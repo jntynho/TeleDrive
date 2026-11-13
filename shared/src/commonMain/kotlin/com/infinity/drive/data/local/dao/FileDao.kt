@@ -28,6 +28,21 @@ interface FileDao {
     @androidx.room.Upsert
     suspend fun storeAudioTags(tags:com.infinity.drive.data.local.entity.AudioTagEntity)
 
+    /** Read, revision check and merge are one transaction across thumbnail and player writers. */
+    @androidx.room.Transaction
+    suspend fun mergeAudioTags(tags:com.infinity.drive.data.local.entity.AudioTagEntity) {
+        val current=byId(tags.fileId)?:return
+        if(current.modifiedAt!=tags.modifiedAt||current.sizeBytes!=tags.sizeBytes||current.contentHash!=tags.contentHash)return
+        val previous=audioTagsById(tags.fileId)?.takeIf{it.modifiedAt==tags.modifiedAt&&(it.sizeBytes<0||it.sizeBytes==tags.sizeBytes&&it.contentHash==tags.contentHash)}
+        val next=tags.copy(localPath=current.localPath,
+            title=tags.title?.takeIf(String::isNotBlank)?:previous?.title,
+            artist=tags.artist?.takeIf(String::isNotBlank)?:previous?.artist,
+            durationMs=tags.durationMs?:previous?.durationMs?:current.durationMs,
+            inspected=tags.inspected||previous?.inspected==true)
+        if(previous?.copy(localPath=next.localPath)!=next)storeAudioTags(next)
+    }
+
+
 
     @Query("SELECT * FROM files WHERE chatId IS :chatId AND folderId IS :folderId AND name = :name COLLATE NOCASE AND trashedAt IS NULL LIMIT 1")
     suspend fun nameClash(name:String,folderId:String?,chatId:Long?):FileEntity?
@@ -120,6 +135,10 @@ interface FileDao {
 
     @RawQuery(observedEntities = [FileEntity::class, com.infinity.drive.data.local.entity.AudioTagEntity::class, FolderEntity::class])
     fun pagingSource(query: RoomRawQuery): PagingSource<Int, FileEntity>
+
+    /** Non-search pages need not reload for each optional tag discovered in a visible row. */
+    @RawQuery(observedEntities = [FileEntity::class, FolderEntity::class])
+    fun contentPagingSource(query:RoomRawQuery):PagingSource<Int,FileEntity>
 
     @RawQuery(observedEntities = [FileEntity::class, com.infinity.drive.data.local.entity.AudioTagEntity::class, FolderEntity::class])
     fun observeList(query: RoomRawQuery): Flow<List<FileEntity>>

@@ -122,17 +122,23 @@ class AndroidThumbnailStore(
     private suspend fun isNote(fileId: String): Boolean =
         fileDao.byId(fileId)?.let { MimeTypes.isText(it.mimeType) } == true
 
-    private fun audioArtwork(file:File):Bitmap? = runCatching {
+    private suspend fun audioArtwork(file:File,entity:FileEntity):Bitmap? = runCatching {
         val retriever=MediaMetadataRetriever()
         try {
             retriever.setDataSource(file.absolutePath)
+            val title=retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)?.takeIf(String::isNotBlank)
+            val artist=retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)?.takeIf(String::isNotBlank)
+                ?:retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST)?.takeIf(String::isNotBlank)
+            val duration=retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?:entity.durationMs
+            try{fileDao.mergeAudioTags(com.infinity.drive.data.local.entity.AudioTagEntity(entity.id,entity.modifiedAt,entity.localPath,
+                title,artist,entity.sizeBytes,entity.contentHash,duration,true))}catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}catch(_:Exception){ /* Optional indexing cannot break artwork. */ }
             val data=retriever.embeddedPicture?:return@runCatching null
             val bounds=BitmapFactory.Options().apply{inJustDecodeBounds=true}
             BitmapFactory.decodeByteArray(data,0,data.size,bounds)
             val sample=generateSequence(1){it*2}.first{bounds.outWidth/it<=MAX_DIMENSION*2&&bounds.outHeight/it<=MAX_DIMENSION*2}
             BitmapFactory.decodeByteArray(data,0,data.size,BitmapFactory.Options().apply{inSampleSize=sample})
         } finally { retriever.release() }
-    }.getOrNull()
+    }.getOrElse{if(it is kotlinx.coroutines.CancellationException)throw it;null}
 
     private suspend fun generate(fileId: String): ByteArray? {
         val entity = fileDao.byId(fileId) ?: return null
@@ -140,7 +146,7 @@ class AndroidThumbnailStore(
             val file = File(path)
             when {
                 !file.exists() -> null
-                entity.mimeType.startsWith("audio/")->audioArtwork(file)
+                entity.mimeType.startsWith("audio/")->audioArtwork(file,entity)
                 MimeTypes.isText(entity.mimeType) -> linkThumbnail(file)
                 else -> decodeThumbnail(file, entity.mimeType)
             }

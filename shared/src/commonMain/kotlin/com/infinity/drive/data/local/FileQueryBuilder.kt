@@ -60,7 +60,7 @@ object FileQueryBuilder {
             args.addAll(spec.categories.map { it.name })
         }
         spec.nameQuery?.takeIf { it.isNotBlank() }?.let {
-            where.append(" AND (name LIKE ? ESCAPE '\\' OR EXISTS (SELECT 1 FROM audio_tags a WHERE a.fileId = files.id AND a.modifiedAt = files.modifiedAt AND a.localPath IS files.localPath AND (a.title LIKE ? ESCAPE '\\' OR a.artist LIKE ? ESCAPE '\\')))")
+            where.append(" AND (name LIKE ? ESCAPE '\\' OR EXISTS (SELECT 1 FROM audio_tags a WHERE a.fileId = files.id AND a.modifiedAt = files.modifiedAt AND (a.sizeBytes < 0 OR (a.sizeBytes = files.sizeBytes AND a.contentHash IS files.contentHash)) AND (a.title LIKE ? ESCAPE '\\' OR a.artist LIKE ? ESCAPE '\\')))")
             repeat(3){_->args.add("%${escapeLike(it)}%") }
         }
         spec.extension?.takeIf { it.isNotBlank() }?.let {

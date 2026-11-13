@@ -4,6 +4,12 @@ package com.infinity.drive.presentation.transfers
 import app.tgdrive.ui.ElasticLazyColumn as LazyColumn
 import app.tgdrive.ui.DriveIcons
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.FilterChip
+import androidx.compose.runtime.LaunchedEffect
+import com.infinity.drive.presentation.components.FileActionsSheet
+import com.infinity.drive.presentation.preview.PreviewSequence
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -103,14 +109,37 @@ import com.infinity.drive.presentation.components.rememberToolbarLift
 @Composable
 fun TransfersScreen(
     onBack: () -> Unit,
-    viewModel: TransfersViewModel = koinViewModel()
+    viewModel: TransfersViewModel = koinViewModel(),
+    onOpenFile:(String,PreviewSequence)->Unit={_,_->}
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var confirmClearFinished by remember { mutableStateOf(false) }
     var confirmCancelAll by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var filter by rememberSaveable { mutableStateOf("All transfers") }
-    var filterMenu by remember { mutableStateOf(false) }
+    var selectedTransfer by remember{mutableStateOf<TransferTask?>(null)}
+    var selectedFile by remember{mutableStateOf<Pair<String,com.infinity.drive.domain.model.DriveFile>?>(null)}
+    var actionError by remember{mutableStateOf<String?>(null)}
+    val repository=org.koin.compose.koinInject<com.infinity.drive.domain.repository.FileRepository>()
+    LaunchedEffect(selectedTransfer?.fileId,selectedTransfer?.id){
+        selectedFile=null
+        val task=selectedTransfer?:return@LaunchedEffect
+        val file=try{task.fileId?.let{repository.getFile(it)}}catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}catch(_:Exception){
+            selectedTransfer=null;actionError="Couldn't load this file. Please try again.";return@LaunchedEffect
+        }
+        if(file==null){selectedTransfer=null;actionError="This transfer no longer has a file in your library."}else selectedFile=task.id to file
+    }
+    val actionFile=selectedFile?.takeIf{it.first==selectedTransfer?.id}?.second
+    val actionTransfer=selectedTransfer
+    if(actionFile!=null&&actionTransfer!=null)FileActionsSheet(actionFile,onDismiss={selectedTransfer=null;selectedFile=null},
+        onOpen={onOpenFile(actionFile.id,PreviewSequence())},extraActions={
+            val closeThen=com.infinity.drive.presentation.components.LocalSheetCloseThen.current
+            if(actionTransfer.state!=TransferState.COMPLETED)com.infinity.drive.presentation.components.SheetActionRow(
+                if(actionTransfer.state.isTerminal)"Dismiss transfer"else"Cancel transfer",DriveIcons.Close){closeThen{viewModel.cancel(actionTransfer.id)}}
+        })
+    if(actionError!=null)androidx.compose.material3.AlertDialog(onDismissRequest={actionError=null},title={Text("File unavailable")},text={Text(actionError!!)},confirmButton={androidx.compose.material3.TextButton({actionError=null}){Text("Close")}})
+
+
 
     if (confirmClearFinished) {
         ConfirmDialog(
@@ -216,19 +245,12 @@ fun TransfersScreen(
             val visibleTaskIds=mutableSetOf<String>()
             item(key="filter") {
                 Row(Modifier.fillMaxWidth().padding(bottom=14.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
-                    Box {
-                        Row(Modifier.clip(RoundedCornerShape(12.dp)).clickable { filterMenu=true }.padding(vertical=10.dp,horizontal=4.dp),verticalAlignment=Alignment.CenterVertically) {
-                            Text(filter,style=MaterialTheme.typography.titleMedium)
-                            Icon(DriveIcons.ExpandMore,null,Modifier.padding(start=6.dp).size(20.dp))
-                        }
-                        DropdownMenu(expanded=filterMenu,onDismissRequest={filterMenu=false}) {
-                            listOf("All transfers","Active","Done","Failed").forEach { label ->
-                                DropdownMenuItem(text={Text(label)},onClick={filter=label;filterMenu=false},trailingIcon={if(filter==label)Icon(DriveIcons.Check,null)})
-                            }
+                    Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                        listOf("All transfers","Active","Done","Failed").forEach{label->
+                            FilterChip(selected=filter==label,onClick={filter=label},label={Text(label)})
                         }
                     }
-                    val active=state.activeTotal
-                    if(active>0||state.pausedTotal>0)Text(listOfNotNull(if(active>0)"$active active"else null,if(state.pausedTotal>0)"${state.pausedTotal} paused"else null).joinToString(" · "),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+
                 }
             }
             val filteredEmpty=when(filter){
@@ -244,32 +266,32 @@ fun TransfersScreen(
             if(filter=="All transfers"||filter=="Active") section("active", activeTitle, state.active, state.activeTotal,visibleTaskIds) { transfer ->
                 TransferRow(
                     transfer = transfer,
+                    onMore={selectedTransfer=transfer},
                     primaryIcon = DriveIcons.Pause,
                     primaryLabel = stringResource(Res.string.common_pause),
                     onPrimary = { viewModel.pause(transfer.id) },
-                    onCancel = { viewModel.cancel(transfer.id) }
                 )
             }
             if(filter=="All transfers"||filter=="Active") section("paused", pausedTitle, state.paused, state.pausedTotal,visibleTaskIds) { transfer ->
                 TransferRow(
                     transfer = transfer,
+                    onMore={selectedTransfer=transfer},
                     primaryIcon = DriveIcons.PlayArrow,
                     primaryLabel = stringResource(Res.string.common_resume),
                     onPrimary = { viewModel.resume(transfer.id) },
-                    onCancel = { viewModel.cancel(transfer.id) }
                 )
             }
             if(filter=="All transfers"||filter=="Failed") section("failed", failedTitle, state.failed, state.failedTotal,visibleTaskIds) { transfer ->
                 TransferRow(
                     transfer = transfer,
+                    onMore={selectedTransfer=transfer},
                     primaryIcon = DriveIcons.Refresh,
                     primaryLabel = stringResource(Res.string.common_retry),
                     onPrimary = { viewModel.retry(transfer.id) },
-                    onCancel = { viewModel.cancel(transfer.id) }
                 )
             }
             if(filter=="All transfers"||filter=="Done") section("finished", finishedTitle, state.completed, state.completedTotal,visibleTaskIds) { transfer ->
-                TransferRow(transfer = transfer)
+                TransferRow(transfer = transfer,onMore={selectedTransfer=transfer})
             }
         }
     }
@@ -358,11 +380,8 @@ private fun TransferRow(
     primaryIcon: ImageVector? = null,
     primaryLabel: String? = null,
     onPrimary: (() -> Unit)? = null,
-    onCancel: (() -> Unit)? = null
+    onMore:()->Unit={}
 ) {
-    var rowMenu by remember { mutableStateOf(false) }
-    var showDetails by remember { mutableStateOf(false) }
-    if(showDetails) androidx.compose.material3.AlertDialog(onDismissRequest={showDetails=false},title={Text(transfer.displayName)},text={Text(transfer.errorMessage ?: "${Formatters.bytes(transfer.transferredBytes)} / ${Formatters.bytes(transfer.sizeBytes)} · ${transfer.state.name.lowercase()}")},confirmButton={androidx.compose.material3.TextButton({showDetails=false}){Text("Close")}})
     Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TransferThumbnail(transfer = transfer)
@@ -404,13 +423,8 @@ private fun TransferRow(
                 if(primaryIcon!=null&&onPrimary!=null)IconButton(onClick=onPrimary) {
                     Icon(primaryIcon,contentDescription=primaryLabel)
                 }
-                Box {
-                    IconButton(onClick={rowMenu=true}) { Icon(DriveIcons.MoreVert,"Transfer options") }
-                    DropdownMenu(expanded=rowMenu,onDismissRequest={rowMenu=false}) {
-                        DropdownMenuItem(text={Text("Details")},onClick={rowMenu=false;showDetails=true})
-                        if(onCancel!=null)DropdownMenuItem(text={Text(if(transfer.state.isTerminal)"Dismiss" else "Cancel transfer")},onClick={rowMenu=false;onCancel()})
-                    }
-                }
+                IconButton(onClick=onMore) { Icon(DriveIcons.MoreVert,"Transfer options") }
+
             }
             if (transfer.state == TransferState.RUNNING ||
                 transfer.state == TransferState.PAUSED

@@ -334,6 +334,7 @@ private fun MainScaffold(
             app.tgdrive.ui.LocalNavigationInProgress provides navigating,
             com.infinity.drive.presentation.components.LocalNavigationScene provides navigationScene,
             LocalBottomBarHeight provides if(onboardingComplete)bottomChromeHeight else 0.dp,
+            com.infinity.drive.presentation.components.LocalRevealFileNavigation provides { file:com.infinity.drive.domain.model.DriveFile -> navController.navigateOnce(Route.Files(file.folderId,focusFileId=file.id)) },
             com.infinity.drive.presentation.components.LocalFileFolderNavigation provides { id:String? -> navController.navigateOnce(Route.Files(id)) },
             com.infinity.drive.presentation.navigation.LocalNavigationRailWidth provides railWidth
         ) {
