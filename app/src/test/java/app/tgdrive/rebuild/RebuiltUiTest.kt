@@ -451,12 +451,13 @@ class RebuiltUiTest {
         try {compose.waitUntil(10_000){runCatching{compose.onNodeWithContentDescription("Back",useUnmergedTree=false).assertIsDisplayed();true}.getOrDefault(false)}}
         catch(error:Throwable){capture("audio-route-failure");throw error}
         capture("now-playing")
-        compose.onNodeWithContentDescription("Open lyrics").performClick()
-        compose.onNodeWithContentDescription("Back to player").assertIsDisplayed()
-        compose.onAllNodesWithText("Third lyric").onLast().performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Open lyrics").assertDoesNotExist()
+        compose.onNodeWithText("First lyric",substring=true).assertDoesNotExist()
+        compose.onNodeWithText("Third lyric",substring=true).assertDoesNotExist()
+        compose.onNodeWithContentDescription("Seek audio").performSemanticsAction(
+            androidx.compose.ui.semantics.SemanticsActions.SetProgress
+        ){change->assertTrue(change(90_000f))}
         org.junit.Assert.assertEquals(90_000L,playback.value.positionMs)
-        capture("synchronized-lyrics")
-        compose.onNodeWithContentDescription("Back to player").performClick()
         compose.onNodeWithContentDescription("Previous audio").performClick()
         compose.onAllNodesWithContentDescription("Next audio").onLast().performClick()
         org.junit.Assert.assertEquals(1,previous)

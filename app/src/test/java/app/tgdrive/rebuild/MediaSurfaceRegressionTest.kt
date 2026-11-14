@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -34,6 +35,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.android.controller.ActivityController
 import org.robolectric.annotation.*
 import java.lang.reflect.Proxy
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[28],application=Application::class,qualifiers="w393dp-h852dp-xhdpi")
@@ -79,7 +81,7 @@ class MediaSurfaceRegressionTest {
             }
         }
     }}}
-    @Test fun audioControlsAndArtworkKeepTheirBoundsAcrossLyricsLoadingErrorsAndTrackChanges(){
+    @Test fun audioControlsAndArtworkKeepTheirBoundsAndEmbeddedLyricsStayAbsent(){
         install()
         val controls=compose.onNodeWithTag("audio-controls").fetchSemanticsNode().boundsInRoot
         val cover=compose.onNodeWithTag("audio-cover").fetchSemanticsNode().boundsInRoot
@@ -98,6 +100,11 @@ class MediaSurfaceRegressionTest {
         compose.onNodeWithContentDescription("Sleep timer").assertDoesNotExist()
         compose.onNodeWithContentDescription("Playback options").assertDoesNotExist()
         compose.onNodeWithContentDescription("Show lyrics").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Open lyrics").assertDoesNotExist()
+        compose.onNodeWithText("No embedded lyrics available").assertDoesNotExist()
+        compose.onNodeWithTag("audio-lyrics-slot").assertDoesNotExist()
+        compose.onNodeWithText("A long plain lyric",substring=true).assertDoesNotExist()
+        capture("audio-player-portrait")
     }
     @Test fun favoriteButtonPersistsTheCurrentTrackWithoutMovingPlaybackControls(){
         install()
@@ -107,12 +114,40 @@ class MediaSurfaceRegressionTest {
         assertEquals(listOf("first" to true),favorites)
         assertEquals(before,compose.onNodeWithTag("audio-play").fetchSemanticsNode().boundsInRoot)
     }
-    @Test fun largeTextKeepsTheTransportAndLyricsSeparated(){
+    @Test fun largeTextKeepsTheArtworkLabelsAndTransportSeparated(){
         install(largeText=true)
-        val lyrics=compose.onNodeWithTag("audio-lyrics-slot").fetchSemanticsNode().boundsInRoot
+        val labels=compose.onNodeWithTag("audio-track-labels").fetchSemanticsNode().boundsInRoot
+        val cover=compose.onNodeWithTag("audio-cover").fetchSemanticsNode().boundsInRoot
         val controls=compose.onNodeWithTag("audio-controls").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        assertTrue(lyrics.bottom<=controls.top)
+        assertTrue(cover.bottom<=labels.top)
+        assertTrue(labels.bottom<=controls.top)
         compose.onNodeWithContentDescription("Next audio").assertIsDisplayed()
+    }
+    @Test @Config(qualifiers="w844dp-h390dp-xhdpi")
+    fun landscapeUsesSeparateArtworkAndControlsColumnsWithComfortableTargets(){
+        install()
+        val cover=compose.onNodeWithTag("audio-cover").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val labels=compose.onNodeWithTag("audio-track-labels").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val controls=compose.onNodeWithTag("audio-controls").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertTrue(cover.right<labels.left)
+        assertTrue(labels.bottom<=controls.top)
+        compose.onNodeWithTag("audio-play").assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
+        compose.onNodeWithContentDescription("Next audio").assertIsDisplayed()
+        capture("audio-player-landscape")
+    }
+    @Test fun changingTracksDuringAScrubDoesNotSeekTheNewTrack(){
+        install()
+        val seek=compose.onNodeWithContentDescription("Seek audio")
+        seek.performTouchInput{down(centerLeft);moveTo(center)}
+        compose.runOnUiThread{playback.value=playback.value.copy(file=file("second"),positionMs=0)}
+        compose.waitForIdle()
+        seek.performTouchInput{up()}
+        assertEquals("second",playback.value.file?.id)
+        assertEquals(0L,playback.value.positionMs)
+    }
+    private fun capture(name:String){
+        val out=File("build/design-previews/$name.png").apply{parentFile?.mkdirs()}
+        out.outputStream().use{compose.onRoot().captureToImage().asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}
     }
     @Test fun audioRowShowsArtistOrFormatAlongsideTheActualLibraryDate(){
         val row=file("voice").copy(addedAt=1_700_000_000_000)

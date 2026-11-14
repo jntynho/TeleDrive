@@ -57,6 +57,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.flow.map
@@ -329,12 +330,17 @@ fun PreviewScreen(
                 exit = fadeOut(tween(160)),
                 modifier = Modifier.align(Alignment.TopCenter).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(if(immersive)androidx.compose.ui.graphics.Color.Black.copy(alpha=.65f)else androidx.compose.ui.graphics.Color.Transparent,androidx.compose.ui.graphics.Color.Transparent)))
             ) {
-                TopAppBar(
-                    expandedHeight=if(currentFile.category==FileCategory.AUDIO)com.infinity.drive.presentation.audio.audioHeaderHeight() else maxOf(52.dp,(28*androidx.compose.ui.platform.LocalDensity.current.fontScale).dp),
+                if(currentFile.category==FileCategory.AUDIO)CenterAlignedTopAppBar(
+                    expandedHeight=com.infinity.drive.presentation.audio.audioHeaderHeight(),
+                    title={com.infinity.drive.presentation.audio.AudioNowPlayingTitle(currentFile)},
+                    navigationIcon={IconButton(onBack){Icon(DriveIcons.ArrowBack,stringResource(Res.string.common_back))}},
+                    actions={if(viewModel.fromTrash)IconButton({viewModel.showInfo(currentFile)}){Icon(DriveIcons.Info,"File details")}},
+                    colors=TopAppBarDefaults.topAppBarColors(containerColor=Color.Transparent,scrolledContainerColor=Color.Transparent,
+                        titleContentColor=Color.White,navigationIconContentColor=Color.White,actionIconContentColor=Color.White)
+                )else TopAppBar(
+                    expandedHeight=maxOf(52.dp,(28*androidx.compose.ui.platform.LocalDensity.current.fontScale).dp),
                     title = {
-                        if(currentFile.category==FileCategory.AUDIO){
-                            com.infinity.drive.presentation.audio.AudioNowPlayingTitle(currentFile)
-                        }else Text(
+                        Text(
                             currentFile.name,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
