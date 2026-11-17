@@ -23,6 +23,7 @@ object PreferenceKeys {
     val BACKUP_MIN_FILE_SIZE_MB = intPreferencesKey("backup_min_file_size_mb")
     val ACCENT_COLOUR = stringPreferencesKey("accent_colour")
     val DASHBOARD_STYLE = stringPreferencesKey("dashboard_style")
+    val DASHBOARD_DARK_STYLES = stringSetPreferencesKey("dashboard_dark_styles")
     val BACKUP_MAX_FILE_SIZE_MB = intPreferencesKey("backup_max_file_size_mb")
 
     val MAX_CACHE_SIZE_MB = intPreferencesKey("max_cache_size_mb")

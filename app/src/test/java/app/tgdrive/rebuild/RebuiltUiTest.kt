@@ -695,14 +695,16 @@ class RebuiltUiTest {
         compose.onNodeWithText("Dashboard Style",substring=false).performScrollTo().performClick()
         compose.waitUntil(5000){compose.onNodeWithText("Classic · Default",substring=false).isDisplayed()}
         com.infinity.drive.domain.model.DashboardStyle.entries.forEach{style->
-            compose.onNodeWithText(if(style==com.infinity.drive.domain.model.DashboardStyle.CLASSIC)"Classic · Default"else style.label,substring=false).performScrollTo().performClick()
-            compose.waitUntil(5000){compose.waitForIdle();runBlocking{settings.preferences.first().dashboardStyle==style}}
+            compose.onNodeWithTag("dashboard-tone-${style.name}-Dark").performScrollTo().performClick()
+            capture("dashboard-preview-${style.name.lowercase()}")
+            compose.onNodeWithTag("apply-dashboard-${style.name}").performScrollTo().performClick()
+            compose.waitUntil(5000){compose.waitForIdle();runBlocking{settings.preferences.first().let{it.dashboardStyle==style&&style.name in it.dashboardDarkStyles}}}
         }
         capture("dashboard-style-selected")
         compose.onNodeWithContentDescription("Back",substring=false).performClick()
         compose.onNodeWithTag("navigation-home").performClick()
         compose.onNodeWithTag("library-card").assertIsDisplayed()
-        capture("home-compact-dashboard")
+        capture("home-strata-dashboard")
     }
 
     @Test fun leavingHiddenForHomeKeepsItsSessionUntilTheAppIsBackgrounded(){

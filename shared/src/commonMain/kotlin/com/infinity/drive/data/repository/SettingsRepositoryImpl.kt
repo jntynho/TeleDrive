@@ -9,6 +9,7 @@ import com.infinity.drive.core.telegram.TelegramCredentials
 import com.infinity.drive.data.local.preferences.PreferenceKeys
 import com.infinity.drive.domain.model.AppLanguage
 import com.infinity.drive.domain.model.UserPreferences
+import com.infinity.drive.domain.model.DashboardStyle
 import com.infinity.drive.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -86,7 +87,9 @@ class SettingsRepositoryImpl(
                 ?: defaults.backupIntervalHours,
             backupMinFileSizeMb = minimum,
             accentColour = enumOrDefault(this[PreferenceKeys.ACCENT_COLOUR], defaults.accentColour),
-            dashboardStyle = enumOrDefault(this[PreferenceKeys.DASHBOARD_STYLE], defaults.dashboardStyle),
+            dashboardStyle = DashboardStyle.fromStored(this[PreferenceKeys.DASHBOARD_STYLE]),
+            dashboardDarkStyles = (this[PreferenceKeys.DASHBOARD_DARK_STYLES] ?: defaults.dashboardDarkStyles)
+                .filterTo(mutableSetOf()){name->DashboardStyle.entries.any{it.name==name}},
             backupMaxFileSizeMb = maximum,
             maxCacheSizeMb = this[PreferenceKeys.MAX_CACHE_SIZE_MB] ?: defaults.maxCacheSizeMb,
             trashAutoClearDays = this[PreferenceKeys.TRASH_AUTO_CLEAR_DAYS]
@@ -187,6 +190,8 @@ class SettingsRepositoryImpl(
         this[PreferenceKeys.BACKUP_MIN_FILE_SIZE_MB] = prefs.backupMinFileSizeMb.coerceAtLeast(0)
         this[PreferenceKeys.ACCENT_COLOUR] = prefs.accentColour.name
         this[PreferenceKeys.DASHBOARD_STYLE] = prefs.dashboardStyle.name
+        this[PreferenceKeys.DASHBOARD_DARK_STYLES] = prefs.dashboardDarkStyles
+            .filterTo(mutableSetOf()){name->DashboardStyle.entries.any{it.name==name}}
         this[PreferenceKeys.BACKUP_MAX_FILE_SIZE_MB] = prefs.backupMaxFileSizeMb
         this[PreferenceKeys.MAX_CACHE_SIZE_MB] = prefs.maxCacheSizeMb
         this[PreferenceKeys.TRASH_AUTO_CLEAR_DAYS] = prefs.trashAutoClearDays

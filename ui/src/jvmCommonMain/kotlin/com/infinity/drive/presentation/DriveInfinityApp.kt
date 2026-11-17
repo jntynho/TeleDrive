@@ -175,6 +175,7 @@ fun DriveInfinityApp(
         CompositionLocalProvider(
             (LocalLocaleList as ProvidableCompositionLocal<LocaleList>) provides targetLocaleList,
             app.tgdrive.ui.LocalDashboardStyle provides state.dashboardStyle.name,
+            app.tgdrive.ui.LocalDashboardDark provides state.dashboardDark,
             LocalCompactLayout provides state.compactLayout
         ) {
             val startupFiles=org.koin.compose.koinInject<com.infinity.drive.domain.repository.FileRepository>()

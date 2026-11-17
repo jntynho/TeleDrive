@@ -35,6 +35,7 @@ data class UserPreferences(
     val dynamicColor: Boolean = false,
     val accentColour: AccentColour = AccentColour.BLUE,
     val dashboardStyle: DashboardStyle = DashboardStyle.CLASSIC,
+    val dashboardDarkStyles: Set<String> = setOf("ORBIT", "RIBBON"),
     val viewMode: ViewMode = ViewMode.LIST,
     val gridSize: Int = 3,
     val galleryViewMode: ViewMode = ViewMode.GRID,

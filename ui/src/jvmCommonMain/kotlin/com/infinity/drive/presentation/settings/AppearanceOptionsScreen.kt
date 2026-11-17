@@ -9,13 +9,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.tgdrive.ui.DriveIcons
@@ -55,24 +60,48 @@ fun DashboardStylesScreen(onBack:()->Unit,viewModel:SettingsViewModel=koinViewMo
     com.infinity.drive.presentation.common.AppBackHandler{onBack()}
     val demo=remember{LibraryOverview(1284,26_628_797_235,listOf(9_450_000_000,11_350_000_000,3_200_000_000,2_628_797_235))}
     Scaffold(topBar={PageHeader(title={Text("Dashboard Style")},navigationIcon={IconButton(onBack){Icon(DriveIcons.ArrowBack,"Back")}})}){padding->
-        Column(Modifier.fillMaxSize().padding(top=padding.calculateTopPadding()).verticalScroll(rememberScrollState()).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){
-            Text("Choose how Your library appears. Preview data is for illustration.",Modifier.padding(top=12.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.fillMaxSize().padding(top=padding.calculateTopPadding(),bottom=padding.calculateBottomPadding()+com.infinity.drive.presentation.navigation.LocalBottomBarInset.current)
+            .verticalScroll(rememberScrollState()).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){
+            Text("Preview each style in Light or Dark, then choose Use this style. Preview data is for illustration.",Modifier.padding(top=12.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
             DashboardStyle.entries.forEach{style->
-                val selected=state.preferences.dashboardStyle==style
-                Surface(shape=RoundedCornerShape(28.dp),color=Color.Transparent,border=androidx.compose.foundation.BorderStroke(if(selected)2.dp else 1.dp,if(selected)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)){
-                    Column(Modifier.fillMaxWidth().selectable(selected,role=Role.RadioButton,onClick={viewModel.update{it.copy(dashboardStyle=style)}}).padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
-                        Row(verticalAlignment=Alignment.CenterVertically){
-                            Column(Modifier.weight(1f).padding(start=4.dp)){
-                                Text(if(style==DashboardStyle.CLASSIC)"Classic · Default"else style.label,style=MaterialTheme.typography.titleMedium)
-                                Text(style.description,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            RadioButton(selected,onClick=null)
-                        }
-                        LibraryDashboard(demo,{},showAddAction=false,updatedLabel="Updated just now",style=style.name)
-                    }
+                DashboardStyleOption(style,demo,state.preferences.dashboardStyle==style,style.name in state.preferences.dashboardDarkStyles){dark->
+                    viewModel.update{prefs->prefs.copy(dashboardStyle=style,dashboardDarkStyles=
+                        if(dark)prefs.dashboardDarkStyles+style.name else prefs.dashboardDarkStyles-style.name)}
                 }
             }
-            Spacer(Modifier.height(24.dp+padding.calculateBottomPadding()+com.infinity.drive.presentation.navigation.LocalBottomBarInset.current))
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+/** Preview controls never apply a style accidentally; an explicit button saves style and tone together. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DashboardStyleOption(style:DashboardStyle,usage:LibraryOverview,selectedStyle:Boolean,initialDark:Boolean,onApply:(Boolean)->Unit){
+    var dark by rememberSaveable(style.name,initialDark){mutableStateOf(initialDark)}
+    val applied=selectedStyle&&dark==initialDark
+    val fontScale=LocalDensity.current.fontScale.coerceAtLeast(1f)
+    Surface(modifier=Modifier.fillMaxWidth().testTag("dashboard-option-${style.name}"),shape=RoundedCornerShape(28.dp),
+        color=MaterialTheme.colorScheme.surfaceContainerLow,
+        border=androidx.compose.foundation.BorderStroke(2.dp,if(applied)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)){
+        Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+            Column(Modifier.fillMaxWidth().height((56*fontScale).dp),verticalArrangement=Arrangement.spacedBy(4.dp)){
+                Text(if(style==DashboardStyle.CLASSIC)"Classic · Default"else style.label,style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=TextOverflow.Ellipsis)
+                Text(style.description,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2,overflow=TextOverflow.Ellipsis)
+            }
+            LibraryDashboard(usage,{},showAddAction=false,updatedLabel="Updated just now",style=style.name,dark=dark)
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().height(maxOf(48.dp,(24*fontScale).dp))){
+                listOf(false to "Light",true to "Dark").forEachIndexed{index,(value,label)->
+                    SegmentedButton(selected=dark==value,onClick={dark=value},shape=SegmentedButtonDefaults.itemShape(index,2),
+                        modifier=Modifier.weight(1f).testTag("dashboard-tone-${style.name}-$label")
+                            .semantics{contentDescription="Preview ${style.label} in $label"}){Text(label,maxLines=1)}
+                }
+            }
+            Button(onClick={onApply(dark)},enabled=!applied,modifier=Modifier.fillMaxWidth().height(maxOf(48.dp,(28*fontScale).dp))
+                .testTag("apply-dashboard-${style.name}").semantics{selected=applied;contentDescription="Use ${style.label} dashboard"}){
+                if(applied){Icon(DriveIcons.Check,null,Modifier.size(20.dp));Spacer(Modifier.width(8.dp))}
+                Text(if(applied)"Applied"else"Use this style",maxLines=1)
+            }
         }
     }
 }

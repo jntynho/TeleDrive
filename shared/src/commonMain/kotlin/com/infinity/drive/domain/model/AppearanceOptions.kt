@@ -18,8 +18,16 @@ enum class DashboardStyle(val label:String,val description:String) {
     ORBIT("Orbit","A balanced ring with your library at its centre"),
     MOSAIC("Mosaic","A clear breakdown of photos, videos, audio and files"),
     RIBBON("Ribbon","A flowing storage ribbon and compact totals"),
-    AURORA("Aurora","Soft colour, calm contrast and a spacious summary"),
-    COMPACT("Compact","A refined horizontal card with the essentials")
+    HORIZON("Horizon","An airy summary with a sculpted file-type chart"),
+    STRATA("Strata","A refined summary with softly layered file categories");
+
+    companion object {
+        fun fromStored(value:String?):DashboardStyle=when(value){
+            "AURORA"->HORIZON
+            "COMPACT"->STRATA
+            else->entries.firstOrNull{it.name==value}?:CLASSIC
+        }
+    }
 }
 enum class CollectionRelock(val minutes:Int,val label:String) {
     AFTER_APP_EXIT(0,"After leaving the app"),

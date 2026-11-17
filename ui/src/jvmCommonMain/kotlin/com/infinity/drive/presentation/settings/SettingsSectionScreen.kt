@@ -938,7 +938,7 @@ private fun AppearanceSection(state: SettingsUiState, viewModel: SettingsViewMod
     }
 
     SettingsGroup {
-        add{SettingsClickRow("Dashboard Style",onDashboardStyles,subtitle=prefs.dashboardStyle.label)}
+        add{SettingsClickRow("Dashboard Style",onDashboardStyles,subtitle=prefs.dashboardStyle.label+" · "+(if(prefs.dashboardStyle.name in prefs.dashboardDarkStyles)"Dark"else"Light"))}
         add{AccentColourPicker(prefs.accentColour,prefs.dynamicColor){colour->viewModel.update{it.copy(accentColour=colour,dynamicColor=false)}}}
 
         add{SettingsClickRow("Floating navigation bar",onNavigation,subtitle="Style and appearance of your bottom navigation")}

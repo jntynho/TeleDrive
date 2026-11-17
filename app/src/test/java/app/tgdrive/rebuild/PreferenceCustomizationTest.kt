@@ -23,10 +23,12 @@ class PreferenceCustomizationTest {
     @Test fun newPreferencesHaveCompatibleDefaultsAndSurviveRepositoryRecreation()=runBlocking{
         val store=Store();val repository=SettingsRepositoryImpl(store,cipher)
         assertEquals(DashboardStyle.CLASSIC,repository.preferences.first().dashboardStyle)
+        assertEquals(setOf("ORBIT","RIBBON"),repository.preferences.first().dashboardDarkStyles)
         assertEquals(0,repository.preferences.first().backupMinFileSizeMb)
-        repository.update{it.copy(accentColour=AccentColour.TEAL,dashboardStyle=DashboardStyle.ORBIT,backupMinFileSizeMb=16,backupMaxFileSizeMb=2048)}
+        repository.update{it.copy(accentColour=AccentColour.TEAL,dashboardStyle=DashboardStyle.ORBIT,dashboardDarkStyles=setOf("CLASSIC","ORBIT"),backupMinFileSizeMb=16,backupMaxFileSizeMb=2048)}
         val read=SettingsRepositoryImpl(store,cipher).preferences.first()
         assertEquals(AccentColour.TEAL,read.accentColour);assertEquals(DashboardStyle.ORBIT,read.dashboardStyle)
+        assertEquals(setOf("CLASSIC","ORBIT"),read.dashboardDarkStyles)
         assertEquals(16,read.backupMinFileSizeMb);assertEquals(2048,read.backupMaxFileSizeMb)
     }
     @Test fun invertedBoundsAreRejectedAtomicallyAndUnknownStyleValuesFallBack()=runBlocking{
@@ -37,5 +39,16 @@ class PreferenceCustomizationTest {
         store.edit{it[PreferenceKeys.DASHBOARD_STYLE]="future-style";it[PreferenceKeys.ACCENT_COLOUR]="future-colour"}
         assertEquals(DashboardStyle.CLASSIC,repository.preferences.first().dashboardStyle)
         assertEquals(AccentColour.BLUE,repository.preferences.first().accentColour)
+    }
+    @Test fun replacedDashboardStylesMigrateWithoutResettingOtherPreferences()=runBlocking{
+        val store=Store();val repository=SettingsRepositoryImpl(store,cipher)
+        repository.update{it.copy(accentColour=AccentColour.TEAL)}
+        listOf("AURORA" to DashboardStyle.HORIZON,"COMPACT" to DashboardStyle.STRATA).forEach{(old,new)->
+            store.edit{it[PreferenceKeys.DASHBOARD_STYLE]=old}
+            assertEquals(new,repository.preferences.first().dashboardStyle)
+            assertEquals(AccentColour.TEAL,repository.preferences.first().accentColour)
+        }
+        store.edit{it[PreferenceKeys.DASHBOARD_DARK_STYLES]=setOf("STRATA","unknown-style")}
+        assertEquals(setOf("STRATA"),repository.preferences.first().dashboardDarkStyles)
     }
 }
