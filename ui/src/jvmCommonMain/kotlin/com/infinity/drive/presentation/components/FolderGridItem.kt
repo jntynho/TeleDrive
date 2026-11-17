@@ -64,6 +64,7 @@ fun FolderGridItem(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = folder.name,
+                    color = if(selected)MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

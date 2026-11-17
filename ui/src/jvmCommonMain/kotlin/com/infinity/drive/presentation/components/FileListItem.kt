@@ -1,6 +1,7 @@
 // Modified for TG Drive: Android integration, safety fixes and visual adaptation; see third_party/driveinfinity/SOURCE.md.
 package com.infinity.drive.presentation.components
 
+import app.tgdrive.ui.LibraryLayout
 import app.tgdrive.ui.DriveIcons
 import app.tgdrive.ui.skeleton
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -49,7 +50,6 @@ fun FileListItem(
 ) {
     var menu by remember(file.id) { mutableStateOf(false) }
     if(menu)FileActionsSheet(file,onDismiss={menu=false},onOpen=onClick)
-    val compact = LocalCompactLayout.current
     val background = if (selected) {
         MaterialTheme.colorScheme.secondaryContainer
     } else {
@@ -62,15 +62,15 @@ fun FileListItem(
             .clip(RoundedCornerShape(8.dp))
             .background(background)
             .combinedClickable(enabled = !loading, onClick = onClick, onLongClick = onLongClick)
-            .heightIn(min=if(compact)56.dp else 72.dp)
-            .padding(horizontal = 4.dp, vertical = 8.dp),
+            .heightIn(min=LibraryLayout.HomeCover+LibraryLayout.HomeRowPadding*2)
+            .padding(vertical = LibraryLayout.HomeRowPadding),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box {
             FileThumbnail(
                 file = file,
                 modifier = Modifier
-                    .size(if (compact) 38.dp else 48.dp)
+                    .size(LibraryLayout.HomeCover)
                     .clip(RoundedCornerShape(12.dp)).skeleton(loading)
             )
             if (selected) {
@@ -84,12 +84,13 @@ fun FileListItem(
                 )
             }
         }
-        Spacer(Modifier.width(if (compact) 10.dp else 14.dp))
-        Column(modifier = Modifier.weight(1f)) {
+        Spacer(Modifier.width(LibraryLayout.HomeRowGap))
+        Column(modifier = Modifier.weight(1f),verticalArrangement=androidx.compose.foundation.layout.Arrangement.spacedBy(3.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = file.name,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if(selected)MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false).skeleton(loading)
@@ -104,7 +105,6 @@ fun FileListItem(
                     )
                 }
             }
-            if (!compact) {
                 Text(
                     text = stringResource(
                         Res.string.common_file_size_and_date,
@@ -112,15 +112,16 @@ fun FileListItem(
                         Formatters.date(file.modifiedAt)
                     ),
                     style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.skeleton(loading)
                 )
-            }
         }
         Spacer(Modifier.width(8.dp))
         if(selectionMode)BackupStateBadge(file = file, modifier = Modifier.skeleton(loading))
-        else IconButton(onClick={menu=true},enabled=!loading) {Icon(DriveIcons.MoreVert,"Options for ${file.name}",Modifier.size(20.dp))}
+        else IconButton(onClick={menu=true},enabled=!loading) {Icon(DriveIcons.MoreVert,"Options for ${file.name}",Modifier.size(20.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)}
     }
-    HorizontalDivider(Modifier.padding(start=if(compact)52.dp else 66.dp),color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.35f))
+    HorizontalDivider(Modifier.padding(start=LibraryLayout.HomeCover+LibraryLayout.HomeRowGap),color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.35f))
     }
 }

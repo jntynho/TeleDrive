@@ -1,6 +1,7 @@
 // Modified for TG Drive: Android integration, safety fixes and visual adaptation; see third_party/driveinfinity/SOURCE.md.
 package com.infinity.drive.presentation.components
 
+import app.tgdrive.ui.LibraryLayout
 import app.tgdrive.ui.DriveIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -48,10 +49,10 @@ fun FolderRow(
                 else Color.Transparent
             )
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .heightIn(min=if(LocalCompactLayout.current)56.dp else 72.dp).padding(horizontal = 4.dp, vertical = 8.dp),
+            .heightIn(min=LibraryLayout.HomeCover+LibraryLayout.HomeRowPadding*2).padding(vertical = LibraryLayout.HomeRowPadding),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(Modifier.size(if(LocalCompactLayout.current)38.dp else 48.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),contentAlignment=Alignment.Center) {
+        Box(Modifier.size(LibraryLayout.HomeCover).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),contentAlignment=Alignment.Center) {
         Icon(
             imageVector = DriveIcons.Folder,
             modifier = Modifier.size(28.dp),
@@ -59,11 +60,12 @@ fun FolderRow(
             tint = MaterialTheme.colorScheme.primary
         )
         }
-        Spacer(Modifier.width(if(LocalCompactLayout.current)10.dp else 14.dp))
-        Column(modifier = Modifier.weight(1f)) {
+        Spacer(Modifier.width(LibraryLayout.HomeRowGap))
+        Column(modifier = Modifier.weight(1f),verticalArrangement=androidx.compose.foundation.layout.Arrangement.spacedBy(3.dp)) {
             Text(
                 text = folder.name,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.titleSmall,
+                    color = if(selected)MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -85,6 +87,6 @@ fun FolderRow(
         }
         androidx.compose.material3.IconButton(onClick){Icon(DriveIcons.ChevronRight,"Open ${folder.name}",Modifier.size(20.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)}
     }
-    HorizontalDivider(Modifier.padding(start=if(LocalCompactLayout.current)52.dp else 66.dp),color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.35f))
+    HorizontalDivider(Modifier.padding(start=LibraryLayout.HomeCover+LibraryLayout.HomeRowGap),color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.35f))
     }
 }

@@ -96,6 +96,7 @@ fun FileGridItem(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = file.name,
+                    color = if(selected)MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

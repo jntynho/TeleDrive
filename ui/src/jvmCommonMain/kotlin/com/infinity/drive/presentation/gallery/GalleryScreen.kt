@@ -577,7 +577,7 @@ fun GalleryScreen(
                             key = {index->shownAt(index)?.key?:"gallery-placeholder-$index"},
                             contentType={index->if(shownAt(index) is GalleryListItem.DayHeader)"day"else"media"}
                         ) { index ->
-                            when (val item = frozenMedia?.getOrNull(index) ?: media[index]) {
+                            when (val item = if(frozenMedia!=null)frozenMedia?.getOrNull(index) else if(index in 0 until media.itemCount)media[index] else null) {
                                 is GalleryListItem.DayHeader -> DayHeaderRow(
                                     dayStartMillis = item.dayStartMillis,
                                     modifier = Modifier.animateItem()
@@ -646,7 +646,7 @@ fun GalleryScreen(
                                 }
                             }
                         ) { index ->
-                            when (val item = frozenMedia?.getOrNull(index) ?: media[index]) {
+                            when (val item = if(frozenMedia!=null)frozenMedia?.getOrNull(index) else if(index in 0 until media.itemCount)media[index] else null) {
                                 is GalleryListItem.DayHeader -> DayHeaderRow(
                                     dayStartMillis = item.dayStartMillis,
                                     modifier = (if(gridMotion.busy)Modifier else Modifier.animateItem())

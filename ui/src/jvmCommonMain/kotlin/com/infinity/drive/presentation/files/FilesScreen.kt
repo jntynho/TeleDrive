@@ -283,6 +283,7 @@ fun FilesScreen(
         Box(modifier = Modifier.fillMaxSize()) {
             Scaffold(
                 containerColor=androidx.compose.ui.graphics.Color.Transparent,
+                contentColor=MaterialTheme.colorScheme.onSurface,
                 snackbarHost = {},
                 topBar = {
                     Column {
@@ -821,7 +822,7 @@ private fun FilesContent(
             .fillMaxSize()
 
             .then(dragSelect),
-        contentPadding = padding.add(horizontal = 12.dp, top = 12.dp, bottom = 100.dp),
+        contentPadding = padding.add(horizontal = if(state.viewMode==ViewMode.LIST)app.tgdrive.ui.LibraryLayout.PageInset else 12.dp, top = 12.dp, bottom = 100.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
@@ -864,6 +865,7 @@ private fun FilesContent(
             count = files.itemCount,
             key = files.itemKey { "file-${it.id}" }
         ) { index ->
+            if(index !in 0 until files.itemCount)return@items
             val file = files[index] ?: return@items
             val selected = file.id in state.selection
             if (state.viewMode == ViewMode.GRID) {

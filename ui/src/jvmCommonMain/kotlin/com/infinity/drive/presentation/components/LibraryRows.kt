@@ -30,7 +30,7 @@ fun LibraryRecentRow(file:DriveFile?,modifier:Modifier=Modifier,onClick:()->Unit
         if(file!=null)FileThumbnail(file,Modifier.size(LibraryLayout.HomeCover).clip(RoundedCornerShape(LibraryLayout.CoverCorner)))
         else SkeletonBlock(Modifier.size(LibraryLayout.HomeCover),LibraryLayout.CoverCorner)
         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)) {
-            Text(file?.name?:"Weekend photograph.jpg",Modifier.skeleton(loading),style=MaterialTheme.typography.titleSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
+            Text(file?.name?:"Weekend photograph.jpg",Modifier.skeleton(loading),style=MaterialTheme.typography.titleSmall,color=MaterialTheme.colorScheme.onSurface,maxLines=1,overflow=TextOverflow.Ellipsis)
             Text(file?.let{"${it.category.name.lowercase().replaceFirstChar(Char::uppercase)} · ${Formatters.bytes(it.sizeBytes)}"}?:"Photos · 3.8 MB",Modifier.skeleton(loading),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1)
         }
         if(file!=null)Text(java.text.SimpleDateFormat("MMM d, HH:mm",java.util.Locale.getDefault()).format(java.util.Date(file.addedAt)),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1)
