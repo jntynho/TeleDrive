@@ -18,7 +18,7 @@ enum class DashboardStyle(val label:String,val description:String) {
     ORBIT("Orbit","A balanced ring with your library at its centre"),
     MOSAIC("Mosaic","A clear breakdown of photos, videos, audio and files"),
     RIBBON("Ribbon","A flowing storage ribbon and compact totals"),
-    HORIZON("Horizon","An airy summary with a sculpted file-type chart"),
+    HORIZON("Horizon","A quiet cloud summary with a softly layered folder"),
     STRATA("Strata","A refined summary with softly layered file categories");
 
     companion object {

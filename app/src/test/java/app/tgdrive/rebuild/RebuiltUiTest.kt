@@ -136,6 +136,7 @@ class RebuiltUiTest {
         runBlocking { GlobalContext.get().get<SettingsRepository>().update { it.copy(onboardingComplete=false) } }
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Get started").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Get started").performClick()
+        compose.waitUntil(10_000){compose.onNodeWithText("API access").isDisplayed()}
         compose.onNodeWithText("API access").assertIsDisplayed()
         capture("api-setup")
         compose.onNodeWithText("Continue",substring=false).assertIsNotEnabled()

@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -45,6 +46,45 @@ class DashboardStylesUiTest {
     private fun capture(name:String){
         val file=File("build/design-previews/$name.png").apply{parentFile?.mkdirs()}
         file.outputStream().use{compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG,100,it)}
+    }
+    @Test @OptIn(ExperimentalLayoutApi::class)
+    fun allStylesMatchTheOriginalClassicBeforeTheHeightIncrease(){
+        var scale by mutableStateOf(1f)
+        var choice by mutableStateOf(DashboardStyle.CLASSIC)
+        show{
+            val density=LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density,scale)){
+                Column(Modifier.padding(16.dp).verticalScroll(rememberScrollState())){
+                    // Layout snapshot of Classic at bd017e6, before the shared frame was introduced.
+                    Column(Modifier.fillMaxWidth().testTag("original-classic").padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){
+                        Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
+                            Text("Your library",Modifier.weight(1f),style=MaterialTheme.typography.titleMedium)
+                            Icon(DriveIcons.Folder,null,Modifier.size(24.dp))
+                        }
+                        Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
+                            Text("24.8 GB",style=if(scale>1.3f)MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displayMedium,maxLines=1)
+                            Text("Stored in Telegram",style=MaterialTheme.typography.bodyMedium)
+                        }
+                        FlowRow(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=10.dp),horizontalArrangement=Arrangement.spacedBy(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+                            Text("1284 files",style=MaterialTheme.typography.labelLarge)
+                            Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                                Icon(DriveIcons.History,null,Modifier.size(16.dp));Text("Updated just now",style=MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                    }
+                    LibraryDashboard(LibraryOverview(1284,26_628_797_235,listOf(9_450_000_000,11_350_000_000,3_200_000_000,2_628_797_235)),{},showAddAction=false,updatedLabel="Updated just now",style=choice.name)
+                }
+            }
+        }
+        listOf(1f,2f).forEach{fontScale->
+            compose.runOnIdle{scale=fontScale}
+            val reference=compose.onNodeWithTag("original-classic").fetchSemanticsNode().size.height
+            DashboardStyle.entries.forEach{style->
+                compose.runOnIdle{choice=style}
+                val height=compose.onNodeWithTag("library-card").fetchSemanticsNode().size.height
+                assertEquals("Original height for $style at font scale $fontScale",reference,height)
+            }
+        }
     }
     @Test fun everyDashboardShowsTheSameRealTotalsAndDoesNotImplyACapacityQuota(){
         var style by mutableStateOf(DashboardStyle.CLASSIC)

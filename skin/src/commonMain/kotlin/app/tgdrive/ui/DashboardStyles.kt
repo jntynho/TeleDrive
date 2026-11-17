@@ -25,6 +25,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.text.rememberTextMeasurer
 
 val LocalDashboardStyle=staticCompositionLocalOf{"CLASSIC"}
 val LocalDashboardDark=staticCompositionLocalOf<Boolean?>{null}
@@ -35,7 +38,7 @@ private fun palette(style:String,dark:Boolean):DashboardPalette {
         "ORBIT"->if(dark)0xFF1B3048L to 0xFF294D68L else 0xFFDFECF9L to 0xFFC7DEEDL
         "MOSAIC"->if(dark)0xFF183C33L to 0xFF214D41L else 0xFFE0F1E9L to 0xFFC9E7DBL
         "RIBBON"->if(dark)0xFF282339L to 0xFF40334DL else 0xFFF1E6F7L to 0xFFE2D5EFL
-        "HORIZON"->if(dark)0xFF352C31L to 0xFF4A3639L else 0xFFF9EDE3L to 0xFFEFD6C9L
+        "HORIZON"->if(dark)0xFF233347L to 0xFF344C63L else 0xFFE8EFF8L to 0xFFCEDFEBL
         "STRATA"->if(dark)0xFF273236L to 0xFF354347L else 0xFFE6EEEBL to 0xFFD2E2DDL
         else->if(dark)0xFF37302AL to 0xFF4A3B2FL else 0xFFF2E2CEL to 0xFFE8D0B6L
     }
@@ -44,7 +47,7 @@ private fun palette(style:String,dark:Boolean):DashboardPalette {
 private fun categoryColours(dark:Boolean)=if(dark)listOf(Color(0xFF7EBCFF),Color(0xFFC4A5F6),Color(0xFFFFC57A),Color(0xFF88D7B1))
     else listOf(Color(0xFF3973AD),Color(0xFF8663AE),Color(0xFFB97632),Color(0xFF368468))
 
-/** Height depends on width and accessibility text size, never the style, loading state or data. */
+/** Every style uses the measured height of the original Classic layout. */
 @Composable
 internal fun StyledLibraryDashboard(style:String,usage:LibraryOverview,loading:Boolean,updated:String,dark:Boolean){
     val canonical=when(style){"AURORA"->"HORIZON";"COMPACT"->"STRATA";else->style}
@@ -52,11 +55,10 @@ internal fun StyledLibraryDashboard(style:String,usage:LibraryOverview,loading:B
     val top by animateColorAsState(palette.top,tween(240),label="dashboardTop")
     val bottom by animateColorAsState(palette.bottom,tween(240),label="dashboardBottom")
     val ink by animateColorAsState(palette.ink,tween(240),label="dashboardInk")
-    val fontScale=LocalDensity.current.fontScale.coerceAtLeast(1f)
     val colours=categoryColours(dark)
     CompositionLocalProvider(LocalContentColor provides ink){
         BoxWithConstraints(Modifier.fillMaxWidth()){
-            val frameHeight=(320+220*(fontScale-1f)).dp+if(maxWidth<280.dp)24.dp else 0.dp
+            val frameHeight=originalClassicHeight(maxWidth,usage,loading,updated)
             Column(Modifier.fillMaxWidth().height(frameHeight).testTag("library-card")
                 .clip(RoundedCornerShape(24.dp)).background(Brush.linearGradient(listOf(top,bottom)))
                 .drawBehind{
@@ -85,16 +87,16 @@ internal fun StyledLibraryDashboard(style:String,usage:LibraryOverview,loading:B
     }
 }
 @Composable
-private fun StorageValue(usage:LibraryOverview,loading:Boolean,large:Boolean=false){
+private fun StorageValue(usage:LibraryOverview,loading:Boolean,large:Boolean=false,caption:Boolean=true,compact:Boolean=false){
     Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
         Text(if(loading)"24.8 GB"else formatLibraryBytes(usage.bytes),Modifier.skeleton(loading),
             style=when{
-                LocalDensity.current.fontScale>1.3f->MaterialTheme.typography.headlineSmall
+                LocalDensity.current.fontScale>1.3f||compact->MaterialTheme.typography.headlineSmall
                 large->MaterialTheme.typography.displayMedium
                 else->MaterialTheme.typography.headlineMedium
             },
             maxLines=1,overflow=TextOverflow.Ellipsis)
-        Text("Stored in Telegram",Modifier.skeleton(loading),style=MaterialTheme.typography.bodySmall,color=LocalContentColor.current.copy(alpha=.8f),maxLines=1,overflow=TextOverflow.Ellipsis)
+        if(caption)Text("Stored in Telegram",Modifier.skeleton(loading),style=MaterialTheme.typography.bodySmall,color=LocalContentColor.current.copy(alpha=.8f),maxLines=1,overflow=TextOverflow.Ellipsis)
     }
 }
 @Composable
@@ -118,7 +120,7 @@ private fun CategoryLegend(loading:Boolean,colours:List<Color>){
 private fun OrbitBody(usage:LibraryOverview,loading:Boolean,colours:List<Color>){
     val ring:@Composable ()->Unit={CategoryRing(usage,loading,colours)}
     if(LocalDensity.current.fontScale>1.3f){
-        StorageValue(usage,loading);Spacer(Modifier.height(12.dp))
+        StorageValue(usage,loading,caption=false);Spacer(Modifier.height(8.dp))
         Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
             ring();Box(Modifier.weight(1f)){CategoryLegend(loading,colours)}
         }
@@ -128,12 +130,12 @@ private fun OrbitBody(usage:LibraryOverview,loading:Boolean,colours:List<Color>)
         Box(Modifier.weight(1f)){StorageValue(usage,loading)}
         ring()
     }
-    Spacer(Modifier.height(12.dp));CategoryLegend(loading,colours)
+    Spacer(Modifier.height(6.dp));CategoryLegend(loading,colours)
 }
 @Composable
 private fun CategoryRing(usage:LibraryOverview,loading:Boolean,colours:List<Color>){
-    Canvas(Modifier.size(72.dp).skeleton(loading)){
-            val stroke=8.dp.toPx();val inset=stroke/2;val bounds=Size(size.width-stroke,size.height-stroke)
+    Canvas(Modifier.size(if(LocalDensity.current.fontScale>1.3f)64.dp else 56.dp).skeleton(loading)){
+            val stroke=6.dp.toPx();val inset=stroke/2;val bounds=Size(size.width-stroke,size.height-stroke)
             drawArc(colours.first().copy(alpha=.15f),0f,360f,false,Offset(inset,inset),bounds,style=Stroke(stroke))
             var start=-90f
             libraryArcShares(usage.groups).take(4).forEachIndexed{index,halfSweep->
@@ -145,56 +147,91 @@ private fun CategoryRing(usage:LibraryOverview,loading:Boolean,colours:List<Colo
 }
 @Composable
 private fun MosaicBody(usage:LibraryOverview,loading:Boolean){
-    StorageValue(usage,loading);Spacer(Modifier.height(10.dp))
-    repeat(2){row->
-        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
-            repeat(2){column->val index=row*2+column
-                Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(LocalContentColor.current.copy(alpha=.065f)).padding(8.dp),verticalArrangement=Arrangement.spacedBy(2.dp)){
-                    Text(categoryNames[index],Modifier.skeleton(loading),style=MaterialTheme.typography.labelSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
-                    Text(formatLibraryBytes(usage.groups.getOrElse(index){0}),Modifier.skeleton(loading),style=MaterialTheme.typography.labelLarge,maxLines=1,overflow=TextOverflow.Ellipsis)
+    val large=LocalDensity.current.fontScale>1.3f
+    val icons=listOf(DriveIcons.Photo,DriveIcons.PlayArrow,DriveIcons.MusicNote,DriveIcons.Description)
+    val tiles:@Composable ()->Unit={
+        Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
+            repeat(2){row->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){
+                repeat(2){column->val index=row*2+column
+                    Column(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(LocalContentColor.current.copy(alpha=.065f)).padding(4.dp),
+                        horizontalAlignment=Alignment.CenterHorizontally){
+                        Icon(icons[index],categoryNames[index],Modifier.size(14.dp).skeleton(loading))
+                        Text(formatLibraryBytes(usage.groups.getOrElse(index){0}),Modifier.skeleton(loading),style=MaterialTheme.typography.labelSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
+                    }
                 }
-            }
+            }}
         }
-        if(row==0)Spacer(Modifier.height(6.dp))
+    }
+    if(large){StorageValue(usage,loading,caption=false);Spacer(Modifier.height(8.dp));tiles()}
+    else Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
+        Column(Modifier.weight(1f)){StorageValue(usage,loading,caption=false,compact=true);Text("Total",style=MaterialTheme.typography.bodySmall)}
+        Box(Modifier.weight(1f)){tiles()}
     }
 }
 @Composable
 private fun RibbonBody(usage:LibraryOverview,loading:Boolean,colours:List<Color>){
-    StorageValue(usage,loading);Spacer(Modifier.height(20.dp))
-    Row(Modifier.fillMaxWidth().height(12.dp).clip(CircleShape).background(LocalContentColor.current.copy(alpha=.12f)).skeleton(loading),horizontalArrangement=Arrangement.spacedBy(3.dp)){
+    StorageValue(usage,loading,caption=false);Spacer(Modifier.height(10.dp))
+    Row(Modifier.fillMaxWidth().height(8.dp).clip(CircleShape).background(LocalContentColor.current.copy(alpha=.12f)).skeleton(loading),horizontalArrangement=Arrangement.spacedBy(3.dp)){
         usage.groups.take(4).forEachIndexed{index,value->if(value>0)Box(Modifier.weight(value.toFloat()).fillMaxHeight().background(colours[index]))}
     }
-    Spacer(Modifier.height(12.dp));CategoryLegend(loading,colours)
+    Spacer(Modifier.height(6.dp));CategoryLegend(loading,colours)
 }
 @Composable
 private fun HorizonBody(usage:LibraryOverview,loading:Boolean,colours:List<Color>){
-    val largeText=LocalDensity.current.fontScale>1.3f
-    StorageValue(usage,loading);Spacer(Modifier.height(12.dp))
-    val values=(0..3).map{usage.groups.getOrElse(it){0}.coerceAtLeast(0)}
-    val peak=values.maxOrNull()?.coerceAtLeast(1)?:1
-    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalAlignment=Alignment.Bottom){
-        values.forEachIndexed{index,bytes->
-            Column(Modifier.weight(1f),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)){
-                Box(Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(topStart=12.dp,topEnd=12.dp,bottomStart=4.dp,bottomEnd=4.dp))
-                    .background(colours[index].copy(alpha=.12f)).skeleton(loading),contentAlignment=Alignment.BottomCenter){
-                    Box(Modifier.fillMaxWidth().fillMaxHeight((bytes.toDouble()/peak).toFloat()).background(Brush.verticalGradient(listOf(colours[index].copy(alpha=.45f),colours[index]))))
+    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
+        Box(Modifier.weight(1f)){StorageValue(usage,loading,large=true)}
+        if(LocalDensity.current.fontScale<=1.3f){
+            Box(Modifier.size(64.dp).skeleton(loading),contentAlignment=Alignment.Center){
+                Box(Modifier.size(54.dp).clip(RoundedCornerShape(16.dp)).background(LocalContentColor.current.copy(alpha=.06f)))
+                Icon(DriveIcons.Folder,null,Modifier.size(42.dp))
+                Box(Modifier.align(Alignment.TopEnd).size(26.dp).clip(CircleShape).background(colours.first()),contentAlignment=Alignment.Center){
+                    Icon(DriveIcons.CloudQueue,null,Modifier.size(18.dp),tint=Color.White)
                 }
-                if(!largeText)Text(categoryNames[index],Modifier.skeleton(loading),style=MaterialTheme.typography.labelSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
             }
         }
     }
-    if(largeText){Spacer(Modifier.height(8.dp));CategoryLegend(loading,colours)}
 }
 @Composable
 private fun StrataBody(usage:LibraryOverview,loading:Boolean,colours:List<Color>){
-    StorageValue(usage,loading);Spacer(Modifier.height(10.dp))
-    categoryNames.forEachIndexed{index,label->
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(colours[index].copy(alpha=.10f)).padding(horizontal=8.dp,vertical=4.dp),
-            verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)){
-            Box(Modifier.size(7.dp).clip(CircleShape).background(colours[index]))
-            Text(label,Modifier.weight(1f).skeleton(loading),style=MaterialTheme.typography.labelSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
-            Text(formatLibraryBytes(usage.groups.getOrElse(index){0}),Modifier.skeleton(loading),style=MaterialTheme.typography.labelSmall,maxLines=1)
+    val large=LocalDensity.current.fontScale>1.3f
+    val rows:@Composable ()->Unit={
+        Column(verticalArrangement=Arrangement.spacedBy(2.dp)){
+            categoryNames.forEachIndexed{index,label->
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(colours[index].copy(alpha=.10f)).padding(horizontal=5.dp,vertical=1.dp),
+                    verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)){
+                    Box(Modifier.size(5.dp).clip(CircleShape).background(colours[index]))
+                    Text(label,Modifier.weight(1f).skeleton(loading),style=MaterialTheme.typography.labelSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
+                    Text(formatLibraryBytes(usage.groups.getOrElse(index){0}),Modifier.skeleton(loading),style=MaterialTheme.typography.labelSmall,maxLines=1)
+                }
+            }
         }
-        if(index<3)Spacer(Modifier.height(4.dp))
     }
+    if(large){StorageValue(usage,loading,caption=false);Spacer(Modifier.height(8.dp));rows()}
+    else Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
+        Column(Modifier.weight(.9f)){StorageValue(usage,loading,caption=false,compact=true);Text("Total",style=MaterialTheme.typography.bodySmall)}
+        Box(Modifier.weight(1.1f)){rows()}
+    }
+}
+
+/** Measure the original Classic's typography and wrapping, instead of inventing a taller frame. */
+@Composable
+private fun originalClassicHeight(width:Dp,usage:LibraryOverview,loading:Boolean,updated:String):Dp {
+    val density=LocalDensity.current
+    val measure=rememberTextMeasurer()
+    val type=MaterialTheme.typography
+    fun size(text:String,style:androidx.compose.ui.text.TextStyle,available:Dp,lines:Int=Int.MAX_VALUE)=measure.measure(text,style,maxLines=lines,
+        constraints=Constraints(maxWidth=with(density){available.coerceAtLeast(1.dp).roundToPx()})).size
+    fun height(px:Int)=with(density){px.toDp()}
+    val inside=width-40.dp
+    val title=maxOf(24.dp,height(size("Your library",type.titleMedium,inside-24.dp).height))
+    val number=height(size(if(loading)"24.8 GB"else formatLibraryBytes(usage.bytes),
+        if(density.fontScale>1.3f)type.headlineLarge else type.displayMedium,inside,1).height)
+    val caption=height(size("Stored in Telegram",type.bodyMedium,inside).height)
+    val footerWidth=inside-24.dp
+    val count=size(if(loading)"1,284 files"else"${usage.count} ${if(usage.count==1)"file"else"files"}",type.labelLarge,footerWidth)
+    val time=size(updated,type.labelMedium,footerWidth-22.dp)
+    val timeHeight=maxOf(16.dp,height(time.height))
+    val footer=if(height(count.width)+16.dp+22.dp+height(time.width)<=footerWidth)maxOf(height(count.height),timeHeight)
+        else height(count.height)+8.dp+timeHeight
+    return 40.dp+32.dp+title+number+4.dp+caption+footer+20.dp
 }
