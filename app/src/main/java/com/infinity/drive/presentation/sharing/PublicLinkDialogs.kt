@@ -58,6 +58,7 @@ private fun PublicLinksDialog(dismiss: () -> Unit) {
     var pending by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     var revoke by remember { mutableStateOf<PublicLink?>(null) }
+    var manageRequests by remember { mutableStateOf(false) }
     var copied by remember { mutableStateOf<String?>(null) }
 
     suspend fun reload() {
@@ -126,6 +127,9 @@ private fun PublicLinksDialog(dismiss: () -> Unit) {
                             }
                         }
                     }
+                    TextButton(onClick = { manageRequests = true }, enabled = !pending) {
+                        Text(stringResource(R.string.upload_requests_title))
+                    }
                     Row {
                         TextButton(onClick = { run { reload() } }, enabled = !pending) {
                             Text(stringResource(R.string.live_links_refresh))
@@ -139,6 +143,8 @@ private fun PublicLinksDialog(dismiss: () -> Unit) {
         },
         confirmButton = { TextButton(onClick = dismiss) { Text(stringResource(android.R.string.ok)) } }
     )
+
+    if (manageRequests) UploadRequestsDialog(client) { manageRequests = false }
 
     revoke?.let { link ->
         AlertDialog(

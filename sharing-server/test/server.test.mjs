@@ -49,3 +49,45 @@ test('retrying an acknowledged upload returns the same public copy',async t=>{
   assert.equal((await f.upload({uploadId:'same-task',data:'changed'})).status,409);
   const list=await (await fetch(f.base+'/api/shares',{headers:{Authorization:`Bearer ${token}`}})).json();assert.equal(list.length,1);
 });
+
+test('a request accepts one file and permits only an owner to read it',async t=>{
+  const f = await fixture(t, 64);
+  const authorize = { Authorization: `Bearer ${token}` };
+  const collection = f.base + '/api/requests';
+  const create = await fetch(collection, {
+    method: 'POST', headers: authorize, body: JSON.stringify({ expiresIn: 300, maxUploadBytes: 40 })
+  });
+  assert.equal(create.status, 201);
+  const request = await create.json();
+  assert.equal(request.url, `https://share.example/u/${request.id}`);
+  const incomingUrl = f.base + '/u/' + request.id;
+  assert.equal((await fetch(incomingUrl)).status, 200);
+  const data = 'incoming contents';
+  const headers = { 'X-File-Name': Buffer.from('received.txt').toString('base64url') };
+  assert.equal((await fetch(incomingUrl, { method: 'POST', headers, body: 'a'.repeat(41) })).status, 413);
+  assert.equal((await fetch(incomingUrl, { method: 'POST', headers, body: data })).status, 201);
+  assert.equal((await fetch(incomingUrl, { method: 'POST', headers, body: data })).status, 404);
+  const fileUrl = collection + '/' + request.id + '/file';
+  assert.equal((await fetch(fileUrl)).status, 401);
+  const list = await (await fetch(collection, { headers: authorize })).json();
+  assert.equal(list[0].incoming.sha256, createHash('sha256').update(data).digest('hex'));
+  assert.equal(await (await fetch(fileUrl, { headers: authorize })).text(), data);
+  assert.equal((await fetch(collection + '/' + request.id, { method: 'DELETE', headers: authorize })).status, 200);
+  assert.equal((await fetch(fileUrl, { headers: authorize })).status, 404);
+});
+
+test('upload requests expire and cannot submit via a different browser origin', async t=>{
+  const f = await fixture(t);
+  const authorize = { Authorization: `Bearer ${token}` };
+  const collection = f.base + '/api/requests';
+  const request = await (await fetch(collection, {
+    method: 'POST', headers: authorize, body: JSON.stringify({ expiresIn: 300, maxUploadBytes: 100 })
+  })).json();
+  const url = f.base + '/u/' + request.id;
+  assert.equal((await fetch(url, {
+    method: 'POST', headers: { Origin: 'https://another.example', 'X-File-Name': 'dGVzdA' }, body: 'value'
+  })).status, 403);
+  f.advance(300_001);
+  assert.equal((await fetch(url)).status, 404);
+  assert.deepEqual(await (await fetch(collection, { headers: authorize })).json(), []);
+});

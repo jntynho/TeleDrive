@@ -27,3 +27,9 @@ Android exports a decrypted copy when sharing a vault item, only after explicit 
 POST `/api/shares` requires owner authorization and bounded content length, verifies SHA-256, and atomically commits a private file. GET `/api/shares` lists active links for the authenticated owner. DELETE `/api/shares/:id` revokes access. Public landing pages escape filenames and downloads use attachment disposition. There is no URL-fetch endpoint or access to arbitrary server paths. Use deployment-level abuse controls, monitoring and storage quotas before public production exposure.
 
 Local tests use loopback HTTP to exercise the server. They do not establish deployment, DNS, a real TLS certificate, scalability or availability. No public endpoint has been deployed by the development task.
+
+## Incoming file requests
+
+Open Public links → File requests to make a single-use upload link. The recipient can open the link in a browser and submit one file. Only the authenticated owner can list or download the incoming copy. Use Save to drive to verify its SHA-256 and queue it for the current Telegram drive.
+
+The owner controls the size limit and expiry. The service reserves at most 100 requests and at most 2 GiB in total (or four times the configured server file limit, whichever is smaller). Expiry or revocation removes the server copy. Use Save to drive before expiry. The recipient can submit arbitrary data, so use the normal file preview safeguards when opening the received file.

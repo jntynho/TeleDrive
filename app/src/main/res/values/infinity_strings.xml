@@ -88,4 +88,12 @@
     <string name="live_links_copy_notice">This sends a readable copy to %1$s. Anyone with the link can download it until it expires or you revoke it. A password is optional.</string>
     <string name="live_links_duration">Expiry in hours (1–168)</string>
     <string name="live_links_password">Link password (optional)</string>
+    <string name="upload_requests_title">File requests</string>
+    <string name="upload_requests_explainer">Each link accepts one file. Save received files to the drive before the link expires.</string>
+    <string name="upload_requests_maximum">Maximum file size in MiB</string>
+    <string name="upload_requests_create">Create request</string>
+    <string name="upload_requests_waiting">Waiting for a file</string>
+    <string name="upload_requests_save">Save to drive</string>
+    <string name="upload_requests_saved">Added to drive</string>
+    <string name="upload_requests_revoke">Close the request and remove its server copy?</string>
 </resources>

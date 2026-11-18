@@ -22,6 +22,8 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.HttpUrl
@@ -29,6 +31,8 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Response
 import okio.BufferedSink
 import okio.source
@@ -49,6 +53,12 @@ internal data class PublicLink(
 )
 
 @Serializable
+internal data class UploadRequest(val id: String, val url: String, val expiresAt: Long, val incoming: ReceivedFile? = null)
+
+@Serializable
+internal data class ReceivedFile(val name: String, val size: Long, val sha256: String)
+
+@Serializable
 private data class CreatedPublicLink(val id: String, val url: String, val expiresAt: Long)
 
 internal class AndroidPublicLinks(
@@ -58,7 +68,8 @@ internal class AndroidPublicLinks(
     private val reader: DriveContentReader,
     private val access: HiddenContentAccess,
     private val lock: AppLockManager,
-    private val telegram: TelegramClient
+    private val telegram: TelegramClient,
+    private val received: ReceivedRequestIntake
 ) {
     private val json = Json { ignoreUnknownKeys = true }
     private val http = OkHttpClient.Builder()
@@ -103,6 +114,69 @@ internal class AndroidPublicLinks(
         val connection = requireNotNull(settings.publicLinkConnection(drive))
         require(linkId.matches(id))
         http.request(ownerRequest(connection, id).delete().build())
+    }
+
+    suspend fun requests(): List<UploadRequest> {
+        val drive = activeDrive()
+        val connection = requireNotNull(settings.publicLinkConnection(drive))
+        val entries = json.decodeFromString<List<UploadRequest>>(
+            http.request(ownerRequest(connection, collection = "requests").get().build())
+        ).filter { it.validFor(connection) }
+        check(activeDrive() == drive)
+        return entries.sortedBy(UploadRequest::expiresAt)
+    }
+
+    suspend fun newRequest(hours: Int, megabytes: Int) {
+        require(hours in 1..168 && megabytes in 1..512)
+        val connection = requireNotNull(connection())
+        val value = buildJsonObject {
+            put("expiresIn", hours * 3600)
+            put("maxUploadBytes", megabytes * 1024L * 1024)
+        }.toString().toRequestBody("application/json".toMediaType())
+        val response = http.request(ownerRequest(connection, collection = "requests").post(value).build())
+        check(json.decodeFromString<UploadRequest>(response).validFor(connection))
+    }
+
+    suspend fun closeRequest(id: String) {
+        require(linkId.matches(id))
+        val connection = requireNotNull(connection())
+        http.request(ownerRequest(connection, id, collection = "requests").delete().build())
+    }
+
+    suspend fun accept(request: UploadRequest) = withContext(Dispatchers.IO) {
+        val drive = activeDrive()
+        val connection = requireNotNull(settings.publicLinkConnection(drive))
+        check(request.validFor(connection))
+        val file = requireNotNull(request.incoming)
+        val call = ownerRequest(connection, request.id, collection = "requests", receivedFile = true).get().build()
+        suspend fun verify() {
+            ensureActive()
+            check(activeDrive() == drive && settings.publicLinkConnection(drive) == connection)
+        }
+        received.save(request, drive, ::verify) { output ->
+            http.exchange(call) { reply ->
+                val body = requireNotNull(reply.body)
+                check(body.contentLength() == file.size)
+                body.byteStream().use { input ->
+                    val buffer = ByteArray(128 * 1024)
+                    var copied = 0L
+                    while (true) {
+                        val size = input.read(buffer)
+                        if (size < 0) break
+                        copied += size
+                        check(copied <= file.size)
+                        output.write(buffer, 0, size)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun UploadRequest.validFor(connection: PublicLinkConnection): Boolean {
+        if (!linkId.matches(id)) return false
+        val exact = publicLinkOrigin(connection.origin).newBuilder().addPathSegment("u").addPathSegment(id).build()
+        return url == exact.toString() &&
+            (incoming == null || incoming.size in 1..MAX_SHARE_BYTES && incoming.sha256.matches(hashPattern))
     }
 
     suspend fun create(file: DriveFile, seconds: Int, password: String, attempt: String): String =
@@ -167,16 +241,29 @@ internal class AndroidPublicLinks(
         json.decodeFromString<List<PublicLink>>(http.request(ownerRequest(connection).get().build()))
             .filter { linkId.matches(it.id) }
 
-    private fun ownerRequest(connection: PublicLinkConnection, id: String? = null): Request.Builder {
-        val path = publicLinkOrigin(connection.origin).newBuilder().addPathSegment("api").addPathSegment("shares")
+    private fun ownerRequest(
+        connection: PublicLinkConnection,
+        id: String? = null,
+        collection: String = "shares",
+        receivedFile: Boolean = false
+    ): Request.Builder {
+        val path = publicLinkOrigin(connection.origin).newBuilder().addPathSegment("api").addPathSegment(collection)
         if (id != null) path.addPathSegment(id)
+        if (receivedFile) path.addPathSegment("file")
         return Request.Builder().url(path.build()).header("Authorization", "Bearer ${connection.ownerToken}")
     }
 
     private fun encode(value: String): String =
         Base64.getUrlEncoder().withoutPadding().encodeToString(value.toByteArray())
 
-    private suspend fun OkHttpClient.request(request: Request): String = suspendCancellableCoroutine { continuation ->
+    private suspend fun OkHttpClient.request(request: Request): String = exchange(request) { reply ->
+        val source = requireNotNull(reply.body).source()
+        check(!source.request(MAX_RESPONSE + 1)) { "Sharing response is too large" }
+        source.readUtf8()
+    }
+
+    private suspend fun <T> OkHttpClient.exchange(request: Request, consume: (Response) -> T): T =
+        suspendCancellableCoroutine { continuation ->
         val call = newCall(request)
         continuation.invokeOnCancellation { call.cancel() }
         call.enqueue(object : Callback {
@@ -186,13 +273,11 @@ internal class AndroidPublicLinks(
 
             override fun onResponse(call: Call, response: Response) {
                 try {
-                    val text = response.use { reply ->
+                    val value = response.use { reply ->
                         check(reply.isSuccessful) { "Sharing service declined the request" }
-                        val source = requireNotNull(reply.body).source()
-                        check(!source.request(MAX_RESPONSE + 1)) { "Sharing response is too large" }
-                        source.readUtf8()
+                        consume(reply)
                     }
-                    continuation.resume(text)
+                    continuation.resume(value)
                 } catch (_: Exception) {
                     continuation.resumeWithException(IOException("Sharing service returned an invalid response"))
                 }
@@ -203,6 +288,7 @@ internal class AndroidPublicLinks(
     companion object {
         const val MAX_SHARE_BYTES = 512L * 1024 * 1024
         private const val MAX_RESPONSE = 1L * 1024 * 1024
+        private val hashPattern = Regex("[a-f0-9]{64}")
         private val linkId = Regex("[A-Za-z0-9_-]{43}")
     }
 }

@@ -27,4 +27,12 @@
     <string name="live_links_copy_notice">سيُرسَل ملف قابل للقراءة إلى %1$s. يستطيع من يملك الرابط تنزيله حتى انتهاء مدته أو إلغائه. كلمة السر اختيارية.</string>
     <string name="live_links_duration">مدة الصلاحية بالساعات (1–168)</string>
     <string name="live_links_password">كلمة سر الرابط (اختيارية)</string>
+    <string name="upload_requests_title">طلبات إرسال الملفات</string>
+    <string name="upload_requests_explainer">يقبل كل رابط ملفًا واحدًا. احفظ الملفات المستلمة في القرص قبل انتهاء صلاحية الرابط.</string>
+    <string name="upload_requests_maximum">أقصى حجم للملف بالميبيبايت</string>
+    <string name="upload_requests_create">إنشاء طلب</string>
+    <string name="upload_requests_waiting">في انتظار ملف</string>
+    <string name="upload_requests_save">حفظ في القرص</string>
+    <string name="upload_requests_saved">أُضيف إلى القرص</string>
+    <string name="upload_requests_revoke">هل تريد إغلاق الطلب وحذف نسخته من الخادم؟</string>
 </resources>

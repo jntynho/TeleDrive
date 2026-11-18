@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { uploadRequests } from './upload-requests.mjs';
 import { randomBytes, createHash, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { mkdir, readFile, writeFile, rename, unlink, readdir } from 'node:fs/promises';
@@ -45,12 +46,15 @@ export async function createSharingServer({ directory, ownerToken, publicOrigin,
     return bucket.count<=limit;
   }
   async function body(req,max=4096) {let bytes=0;const chunks=[];for await(const c of req){bytes+=c.length;if(bytes>max)throw Object.assign(new Error('Body too large'),{status:413});chunks.push(c);}return Buffer.concat(chunks).toString('utf8');}
+  const incoming = await uploadRequests({ directory, origin, maxBytes, clock, reply, headers, body, rate });
   const server=http.createServer(async(req,res)=>{
     try {
       const url=new URL(req.url,'http://local');const segments=url.pathname.split('/').filter(Boolean);
       if(req.method==='GET'&&url.pathname==='/health'){reply(res,200,{ok:true});return;}
+      if(segments[0]==='u'){await incoming.publicEndpoint(req,res,segments);return;}
       if(segments[0]==='api'){
         if(!authenticated(req)){reply(res,401,{error:'Unauthorized'});return;}
+        if(segments[1]==='requests'){await incoming.owner(req,res,segments);return;}
         if(req.method==='DELETE'&&segments.length===3&&segments[1]==='shares'&&validId(segments[2])){
           await remove(segments[2]);reply(res,200,{revoked:true});return;
         }
