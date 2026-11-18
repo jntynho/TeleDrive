@@ -1105,4 +1105,11 @@
     <string name="search_content_label">Note and PDF contents</string>
     <string name="search_content_notes_only">Note contents</string>
     <string name="search_content_skipped">Files skipped or partly searched: %1$d</string>
+    <string name="files_zip_title">Compress and upload as ZIP</string>
+    <string name="files_zip_description">Keep the originals and upload one compressed copy</string>
+    <string name="files_zip_default_name">Archive</string>
+    <string name="files_zip_name">Archive name</string>
+    <string name="files_zip_select">Select files</string>
+    <string name="files_zip_preparing">Compressing selected files…</string>
+    <string name="files_zip_failed">Couldn’t compress or queue the selected files.</string>
 </resources>

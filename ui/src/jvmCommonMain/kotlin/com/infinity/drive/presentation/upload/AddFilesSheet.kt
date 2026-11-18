@@ -13,6 +13,8 @@ import com.infinity.drive.core.files.FileNameUtils
 import com.infinity.drive.domain.repository.FileRepository
 import com.infinity.drive.presentation.components.*
 import com.infinity.drive.presentation.platform.*
+import com.infinity.drive.resources.*
+import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
@@ -32,7 +34,9 @@ fun AddFilesSheet(visible:Boolean,target:String?=null,onDismiss:()->Unit) {
     var error by remember{mutableStateOf<String?>(null)}
     var busy by remember{mutableStateOf(false)}
     var folderName by remember{mutableStateOf("")}
-    LaunchedEffect(visible){if(visible){page="actions";busy=false;folderName="";error=null}}
+    val defaultArchiveName = stringResource(Res.string.files_zip_default_name)
+    var archiveName by remember { mutableStateOf(defaultArchiveName) }
+    LaunchedEffect(visible){if(visible){page="actions";busy=false;folderName="";archiveName=defaultArchiveName;error=null}}
     fun capture(result:CaptureResult){when(result){
         is CaptureResult.Ready->uploads.importAndUpload(listOf(result.reference),target,copyImmediately=true)
         is CaptureResult.Failed->error=result.message
@@ -56,6 +60,29 @@ fun AddFilesSheet(visible:Boolean,target:String?=null,onDismiss:()->Unit) {
                     IconButton({page="actions"}){Icon(DriveIcons.ArrowBack,"Back to add options")}
                     TakeoutSheet(target=target){page="actions"}
                 }
+                "zip" -> Column(
+                    Modifier.fillMaxWidth().padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        IconButton({ page = "actions" }) { Icon(DriveIcons.ArrowBack, stringResource(Res.string.common_back)) }
+                        Text(stringResource(Res.string.files_zip_title), style = MaterialTheme.typography.titleLarge)
+                    }
+                    val finalName = archiveName.trim().let { if (it.endsWith(".zip", true)) it else "$it.zip" }
+                    OutlinedTextField(
+                        value = archiveName, onValueChange = { archiveName = it },
+                        label = { Text(stringResource(Res.string.files_zip_name)) },
+                        singleLine = true, modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(
+                        onClick = { launchPicker { picker.pick { uploads.importAsZip(it, finalName, target) } } },
+                        enabled = !busy && FileNameUtils.isValidName(finalName) &&
+                            FileNameUtils.isValidName(finalName.dropLast(4)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(Res.string.files_zip_select))
+                    }
+                }
                 "folder"->Column(Modifier.fillMaxWidth().padding(24.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){
                     Row{IconButton({if(!busy)page="actions"}){Icon(DriveIcons.ArrowBack,"Back to add options")};Text("New folder",style=MaterialTheme.typography.titleLarge)}
                     OutlinedTextField(folderName,{folderName=it},label={Text("Folder name")},singleLine=true,enabled=!busy,modifier=Modifier.fillMaxWidth())
@@ -72,6 +99,12 @@ fun AddFilesSheet(visible:Boolean,target:String?=null,onDismiss:()->Unit) {
                     Text("Add to ${if(target==null)"My Drive"else"this folder"}",Modifier.padding(horizontal=24.dp,vertical=12.dp),style=MaterialTheme.typography.titleLarge)
                     SheetActionRow("Upload files",DriveIcons.FileUpload,enabled=!busy,detail="Anything on this phone, any size"){launchPicker{picker.pick{uploads.importAndUpload(it,target)}}}
                     SheetActionRow("Upload photos and videos",DriveIcons.PhotoLibrary,enabled=!busy,detail="Originals, uncompressed"){launchPicker{device.pickMedia{uploads.importAndUpload(it,target)}}}
+                    if (uploads.canCompressImports) {
+                        SheetActionRow(
+                            stringResource(Res.string.files_zip_title), DriveIcons.Archive, enabled = !busy,
+                            detail = stringResource(Res.string.files_zip_description)
+                        ) { page = "zip" }
+                    }
                     SheetActionRow("Scan a document",DriveIcons.DocumentScanner,enabled=!busy,detail="Capture a document as a PDF"){launchPicker{device.scanDocument(::capture)}}
                     SheetActionRow("Take a photo",DriveIcons.PhotoCamera,enabled=!busy,detail="Goes straight here, not to your gallery"){launchPicker{device.takePhoto(::capture)}}
                     SheetActionRow("New folder",DriveIcons.CreateNewFolder,enabled=!busy){page="folder"}

@@ -152,4 +152,11 @@
     <string name="search_content_label">محتوى الملاحظات وملفات PDF</string>
     <string name="search_content_notes_only">محتوى الملاحظات</string>
     <string name="search_content_skipped">الملفات المتجاوزة أو المفحوصة جزئيًا: %1$d</string>
+    <string name="files_zip_title">ضغط ورفع بصيغة ZIP</string>
+    <string name="files_zip_description">الاحتفاظ بالملفات الأصلية ورفع نسخة مضغوطة واحدة</string>
+    <string name="files_zip_default_name">أرشيف</string>
+    <string name="files_zip_name">اسم الأرشيف</string>
+    <string name="files_zip_select">اختيار الملفات</string>
+    <string name="files_zip_preparing">جارٍ ضغط الملفات المحددة…</string>
+    <string name="files_zip_failed">تعذّر ضغط الملفات المحددة أو إضافتها إلى قائمة الرفع.</string>
 </resources>

@@ -708,13 +708,29 @@ class FileRepositoryImpl(
         markFolderStateDirty()
     }
 
-    override suspend fun registerImport(source:com.infinity.drive.core.files.ImportedFile,folderId:String?,displayName:String,allowDuplicate:Boolean):AppResult<DriveFile> {
-        if(File(source.path).isFile)return importLocalFile(source.path,folderId,displayName,allowDuplicate)
+    override suspend fun registerImport(
+        source: com.infinity.drive.core.files.ImportedFile,
+        folderId: String?,
+        displayName: String,
+        allowDuplicate: Boolean,
+        expectedDrive: Long?
+    ): AppResult<DriveFile> {
+        val drive = activeChannel.id()
+        if (expectedDrive != null) {
+            if (drive != expectedDrive) return AppResult.Failure(AppError.NotFound)
+            if (folderId != null) {
+                val folder = folderDao.byId(folderId)
+                if (folder?.chatId != expectedDrive || folder.trashedAt != null || !hiddenAccess.canReadFolder(folderId)) {
+                    return AppResult.Failure(AppError.NotFound)
+                }
+            }
+        }
+        if (File(source.path).isFile) return importLocalIntoDrive(source.path, folderId, displayName, allowDuplicate, drive)
         val now=System.currentTimeMillis()
         val mime=source.mimeType?:MimeTypes.fromFileName(displayName)
         val entity=FileEntity(id=UUID.randomUUID().toString(),folderId=folderId,name=displayName,sizeBytes=source.sizeBytes,
             mimeType=mime,category=FileCategory.fromMimeType(mime),localPath=null,importReference=source.path,
-            contentHash=null,chatId=activeChannel.id(),messageId=null,remoteFileId=null,remoteUniqueId=null,
+            contentHash=null,chatId=drive,messageId=null,remoteFileId=null,remoteUniqueId=null,
             backupState=BackupState.NONE,createdAt=now,modifiedAt=now,addedAt=now)
         fileDao.upsert(entity)
         return AppResult.Success(entity.toDomain())
@@ -725,6 +741,15 @@ class FileRepositoryImpl(
         folderId: String?,
         displayName: String?,
         allowDuplicate: Boolean
+    ): AppResult<DriveFile> =
+        importLocalIntoDrive(localPath, folderId, displayName, allowDuplicate, activeChannel.id())
+
+    private suspend fun importLocalIntoDrive(
+        localPath: String,
+        folderId: String?,
+        displayName: String?,
+        allowDuplicate: Boolean,
+        drive: Long?
     ): AppResult<DriveFile> {
         val source = File(localPath)
         if (!source.exists() || !source.isFile) return AppResult.Failure(AppError.NotFound)
@@ -738,7 +763,7 @@ class FileRepositoryImpl(
         val now = System.currentTimeMillis()
         val entity = FileEntity(
             id = UUID.randomUUID().toString(),
-            chatId = activeChannel.id(),
+            chatId = drive,
             folderId = folderId,
             name = name,
             sizeBytes = source.length(),

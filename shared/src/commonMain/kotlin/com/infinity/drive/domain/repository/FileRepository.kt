@@ -122,7 +122,13 @@ interface FileRepository {
         allowDuplicate: Boolean = false
     ): AppResult<DriveFile>
 
-    suspend fun registerImport(source:com.infinity.drive.core.files.ImportedFile,folderId:String?,displayName:String,allowDuplicate:Boolean=false):AppResult<DriveFile> = importLocalFile(source.path,folderId,displayName,allowDuplicate)
+    suspend fun registerImport(
+        source: com.infinity.drive.core.files.ImportedFile,
+        folderId: String?,
+        displayName: String,
+        allowDuplicate: Boolean = false,
+        expectedDrive: Long? = null
+    ): AppResult<DriveFile> = importLocalFile(source.path, folderId, displayName, allowDuplicate)
 
     /**
      * Brings a trashed file back when [localPath] holds the very same bytes,

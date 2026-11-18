@@ -66,6 +66,41 @@ class ImportPreparationTest {
             assertEquals(0,File(f.paths.filesDir,"imports").walkTopDown().count{it.isFile})
         }
     }
+    @Test fun `compressing selected originals creates one lossless archive with unique entry names`() = runTest {
+        Fixture().use { fixture ->
+            val local = File(fixture.root, "dir/Original.jpg").apply {
+                parentFile!!.mkdirs()
+                writeText("second file")
+            }
+            val archive = fixture.importer.prepareZip(
+                listOf(fixture.uri, local.path, fixture.uri), "selected.zip"
+            ) {}!!
+            assertTrue(fixture.importer.isStaged(archive.path))
+            java.util.zip.ZipFile(File(archive.path)).use { zip ->
+                assertEquals(2, zip.size())
+                assertArrayEquals(fixture.source.readBytes(), zip.getInputStream(zip.getEntry("Original.jpg")).readBytes())
+                assertEquals("second file", zip.getInputStream(zip.getEntry("Original (1).jpg")).reader().readText())
+            }
+            fixture.importer.discard(archive)
+            assertTrue(fixture.source.isFile)
+            assertEquals("second file", local.readText())
+        }
+    }
+
+    @Test fun `canceling a compressed import removes the partial archive`() = runTest {
+        Fixture().use { fixture ->
+            var checks = 0
+            val failure = runCatching {
+                fixture.importer.prepareZip(listOf(fixture.uri), "selected.zip") {
+                    if (++checks == 3) throw CancellationException("Canceled")
+                }
+            }.exceptionOrNull()
+            assertTrue(failure is CancellationException)
+            assertEquals(0, File(fixture.paths.filesDir, "imports").walkTopDown().count { it.isFile })
+            assertEquals(900_000L, fixture.source.length())
+        }
+    }
+
     @Test fun `an offline pin owns a separate copy that survives cache and source deletion`() {
         Fixture().use{f->
             val retained=f.importer.retainOffline(f.uri,"track")!!
