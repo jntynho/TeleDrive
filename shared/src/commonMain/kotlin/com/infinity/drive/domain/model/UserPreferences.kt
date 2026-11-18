@@ -14,6 +14,7 @@ data class UserPreferences(
     val backupIntervalHours: Int = 24,
     val backupMaxFileSizeMb: Int = 0,
     val backupMinFileSizeMb: Int = 0,
+    val backupFolderRules: List<BackupFolderRule> = emptyList(),
 
     val maxCacheSizeMb: Int = 1024,
     val trashAutoClearDays: Int = 30,

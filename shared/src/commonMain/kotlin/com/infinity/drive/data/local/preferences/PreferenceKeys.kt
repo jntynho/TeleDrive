@@ -16,6 +16,7 @@ object PreferenceKeys {
     val AUTO_BACKUP_ENABLED = booleanPreferencesKey("auto_backup_enabled")
     val INSTANT_BACKUP_ENABLED = booleanPreferencesKey("instant_backup_enabled")
     val BACKUP_FOLDERS = stringSetPreferencesKey("backup_folders")
+    val BACKUP_FOLDER_RULES = stringPreferencesKey("backup_folder_rules")
     val BACKUP_WIFI_ONLY = booleanPreferencesKey("backup_wifi_only")
     val DOWNLOAD_DIRECTORY = stringPreferencesKey("download_directory")
     val BACKUP_CHARGING_ONLY = booleanPreferencesKey("backup_charging_only")

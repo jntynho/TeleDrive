@@ -72,6 +72,10 @@ import com.infinity.drive.resources.backup_preview_description
 import com.infinity.drive.resources.backup_preview_title
 import com.infinity.drive.resources.backup_folder_remove_message
 import com.infinity.drive.resources.backup_folder_subtitle
+import com.infinity.drive.resources.backup_rule_title
+import com.infinity.drive.resources.backup_rule_subtitle
+import com.infinity.drive.resources.backup_rule_pick_folder
+import com.infinity.drive.domain.model.BackupFolderRule
 import com.infinity.drive.resources.backup_interval_labels
 import com.infinity.drive.resources.backup_interval_with_sweep
 import com.infinity.drive.resources.backup_size_limit_labels
@@ -668,6 +672,30 @@ private fun BackupSection(
     SettingsSectionTitle(stringResource(Res.string.settings_backup_folders_title))
 
     val backupFolders by viewModel.backupFolders.collectAsStateWithLifecycle()
+    var chooseRuleFolder by remember { mutableStateOf(false) }
+    var editingRule by remember(prefs.storageChatId) { mutableStateOf<BackupFolderRule?>(null) }
+    if (chooseRuleFolder && backupFolders.isNotEmpty()) {
+        ChoiceDialog(
+            title = stringResource(Res.string.backup_rule_pick_folder),
+            options = backupFolders.sorted().map { it to it },
+            selected = "",
+            onSelect = { path ->
+                chooseRuleFolder = false
+                prefs.storageChatId?.let { chat ->
+                    editingRule = prefs.backupFolderRules.firstOrNull { it.chatId == chat && it.path == path }
+                        ?: BackupFolderRule(chat, path)
+                }
+            },
+            onDismiss = { chooseRuleFolder = false }
+        )
+    }
+    editingRule?.let { rule ->
+        BackupFolderRuleDialog(rule, onSave = {
+            viewModel.saveBackupFolderRule(it)
+            editingRule = null
+        }, onDismiss = { editingRule = null })
+    }
+
 
     if (prefs.autoBackupEnabled && backupFolders.isEmpty()) {
         Surface(
@@ -715,6 +743,13 @@ private fun BackupSection(
                     onClick = { folderToRemove = folder }
                 )
             }
+        }
+        if (backupFolders.isNotEmpty()) add {
+            SettingsClickRow(
+                title = stringResource(Res.string.backup_rule_title),
+                subtitle = stringResource(Res.string.backup_rule_subtitle),
+                onClick = { chooseRuleFolder = true }
+            )
         }
         add {
             SettingsClickRow(

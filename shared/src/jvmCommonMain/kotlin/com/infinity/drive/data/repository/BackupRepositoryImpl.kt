@@ -18,6 +18,7 @@ import com.infinity.drive.data.local.entity.FileEntity
 import com.infinity.drive.data.local.entity.TransferEntity
 import com.infinity.drive.data.mapper.toDomain
 import com.infinity.drive.domain.model.BackupDecision
+import com.infinity.drive.domain.model.BackupFolderRule
 import com.infinity.drive.domain.model.BackupSession
 import com.infinity.drive.domain.model.BackupSessionStatus
 import com.infinity.drive.domain.model.BackupState
@@ -129,7 +130,10 @@ class BackupRepositoryImpl(
 
         if (applyLinks) backupDao.deleteOrphanedRecords()
         val exclusions = exclusionRepository.getEnabled()
-        val maxSizeBytes = prefs.backupMaxFileSizeMb.toLong() * 1024 * 1024
+        val rules = prefs.backupFolderRules.filter { it.chatId == chatId }.associateBy {
+            File(it.path).absoluteFile.normalize().path
+        }
+        val selectedRoots = folders.map { File(it).absoluteFile.normalize().path }.sortedByDescending { it.length }
         val minSizeBytes = prefs.backupMinFileSizeMb.toLong() * 1024 * 1024
         val skipHidden = exclusions.any { it.type == ExclusionType.HIDDEN }
         val candidates = linkedMapOf<String, File>()
@@ -164,7 +168,15 @@ class BackupRepositoryImpl(
         for (candidate in candidates.values) {
             coroutineContext.ensureActive()
             val size = candidate.length()
+            val mime = MimeTypes.fromFileName(candidate.name)
+            val rule = selectBackupFolderRule(candidate, selectedRoots, rules)
+            val maxSizeBytes = (rule?.maximumSizeMb ?: prefs.backupMaxFileSizeMb).toLong() * 1024 * 1024
             val sizeSkip = when {
+                rule?.includeSubfolders == false &&
+                    candidate.parentFile?.absoluteFile?.normalize()?.path != File(rule.path).absoluteFile.normalize().path ->
+                    BackupDecision.SKIP_EXCLUDED
+                rule?.mediaOnly == true && !mime.startsWith("image/") && !mime.startsWith("video/") ->
+                    BackupDecision.SKIP_EXCLUDED
                 minSizeBytes > 0 && size < minSizeBytes -> BackupDecision.SKIP_TOO_SMALL
                 maxSizeBytes > 0 && size > maxSizeBytes -> BackupDecision.SKIP_TOO_LARGE
                 else -> null
@@ -180,7 +192,7 @@ class BackupRepositoryImpl(
                     candidate = EvaluateExclusionsUseCase.Candidate(
                         absolutePath = candidate.absolutePath,
                         sizeBytes = size,
-                        mimeType = MimeTypes.fromFileName(candidate.name),
+                        mimeType = mime,
                         isHidden = isHiddenName(candidate)
                     ),
                     modifiedAt = candidate.lastModified(),
@@ -457,4 +469,16 @@ class BackupRepositoryImpl(
         private const val ENQUEUE_BATCH = 500
         private const val VOLUME_MOUNT_ROOT = "/storage/"
     }
+}
+
+
+/** A separately selected child folder owns the rules for files below it. */
+internal fun selectBackupFolderRule(
+    candidate: File,
+    deepestFirst: List<String>,
+    rules: Map<String, BackupFolderRule>
+): BackupFolderRule? {
+    val path = candidate.absoluteFile.normalize().path
+    val root = deepestFirst.firstOrNull { path.startsWith(it.trimEnd(File.separatorChar) + File.separator) }
+    return rules[root]
 }

@@ -273,6 +273,18 @@ class SettingsViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
+    fun saveBackupFolderRule(rule: com.infinity.drive.domain.model.BackupFolderRule) {
+        viewModelScope.launch {
+            if (rule.path !in channelRepository.backupFolders(rule.chatId, migrateLegacy = false)) return@launch
+            settingsRepository.update { prefs ->
+                if (prefs.storageChatId != rule.chatId) prefs
+                else prefs.copy(backupFolderRules = prefs.backupFolderRules.filterNot {
+                    it.chatId == rule.chatId && it.path == rule.path
+                } + rule)
+            }
+        }
+    }
+
     fun addBackupFolder(path: String) {
         editBackupFolders { it + path }
     }
@@ -288,6 +300,9 @@ class SettingsViewModel(
             val after = transform(before)
             if (after == before) return@launch
             channelRepository.setBackupFolders(chatId, after)
+            settingsRepository.update { prefs -> prefs.copy(backupFolderRules = prefs.backupFolderRules.filterNot {
+                it.chatId == chatId && it.path !in after
+            }) }
             backupRepository.syncActiveSessionWithSelection()
             rescheduleWork()
             if ((after - before).isNotEmpty()) scanForNewBackupWork()
@@ -614,7 +629,8 @@ class SettingsViewModel(
                             it.copy(
                                 onboardingComplete = false,
                                 storageChatId = null,
-                                backupFolders = emptySet()
+                                backupFolders = emptySet(),
+                                backupFolderRules = emptyList()
                             )
                         }
                     }

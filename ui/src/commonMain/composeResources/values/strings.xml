@@ -1034,4 +1034,11 @@
     <string name="settings_verified_cleanup_description">TeleDrive checks the contents in Telegram before deleting matching local copies. This can use mobile data and temporary cache space.</string>
     <string name="settings_cleanup_checking">Checking local files against Telegram…</string>
     <string name="settings_verified_cleanup_result">%1$d local copies removed · %2$d kept</string>
+    <string name="backup_rule_title">Backup folder rules</string>
+    <string name="backup_rule_subtitle">Set size, content, and subfolder rules for future scans</string>
+    <string name="backup_rule_pick_folder">Choose a backup folder</string>
+    <string name="backup_rule_nested">Include subfolders</string>
+    <string name="backup_rule_media_only">Photos and videos only</string>
+    <string name="backup_rule_maximum">Maximum size in MB</string>
+    <string name="backup_rule_maximum_help">Leave blank to use the backup default. Use 0 for no maximum.</string>
 </resources>
