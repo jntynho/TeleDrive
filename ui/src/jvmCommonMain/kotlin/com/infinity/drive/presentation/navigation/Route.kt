@@ -92,6 +92,9 @@ sealed interface Route {
     data object PreviousLibrary : Route
 
     @Serializable
+    data object RecoveryExport : Route
+
+    @Serializable
     data object Exclusions : Route
 
     @Serializable

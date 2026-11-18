@@ -43,12 +43,15 @@ import kotlinx.coroutines.withTimeoutOrNull
 import app.tgdrive.data.TdConnection
 import app.tgdrive.data.TdConnectionFactory
 import app.tgdrive.data.NativeTdConnectionFactory
+import com.infinity.drive.core.telegram.TelegramLoginRecovery
 import org.drinkless.tdlib.TdApi
 import java.io.File
 import java.util.Locale
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.time.Duration.Companion.milliseconds
+
+private const val LOGIN_RECOVERY_OPTION = "authentication_token"
 
 internal class TdLibTelegramClient(
     private val context: Context,
@@ -122,6 +125,7 @@ internal class TdLibTelegramClient(
 
     private fun handleUpdate(generation: Int, update: TdApi.Object) {
         if(generation!=clientGeneration)return
+        if (update is TdApi.UpdateOption && update.name == LOGIN_RECOVERY_OPTION) return
         updates.tryEmit(update)
         when (update) {
             is TdApi.UpdateAuthorizationState ->
@@ -369,6 +373,19 @@ internal class TdLibTelegramClient(
             _authState.value = TelegramAuthState.Closed
         }
         File(storagePaths.filesDir, "tdlib").deleteRecursively()
+    }
+
+    override suspend fun getLoginRecovery(): TelegramLoginRecovery? {
+        val active = client ?: return null
+        if (authState.value != TelegramAuthState.Ready) return null
+
+        val user = sendVia(active, TdApi.GetMe())
+        if (user.id <= 0L || user.phoneNumber.isBlank()) return null
+
+        val option = sendVia(active, TdApi.GetOption(LOGIN_RECOVERY_OPTION)) as? TdApi.OptionValueString
+        val token = option?.value?.takeIf { it.isNotBlank() && it.length <= 4096 } ?: return null
+        if (client !== active || authState.value != TelegramAuthState.Ready) return null
+        return TelegramLoginRecovery(user.id, user.phoneNumber, token)
     }
 
     override suspend fun getCurrentUser(): TelegramUser {

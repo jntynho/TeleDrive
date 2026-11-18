@@ -92,6 +92,32 @@ class TelegramTransportTest {
         runCurrent();wire.reply(TdApi.SendMessage::class.java,message(19));runCurrent()
         assertTrue(job.isCompleted);assertEquals(19L,result!!.messageId)
     }
+    @Test fun `recovery export uses only a token from the authorized account`() = runTest {
+        val wire = Wire()
+        val client = client(wire)
+        client.start(TelegramCredentials(12345, "a".repeat(32)))
+        assertNull(client.getLoginRecovery())
+        assertTrue(wire.sent.isEmpty())
+
+        wire.emit(TdApi.UpdateAuthorizationState(TdApi.AuthorizationStateReady()))
+        var recovery: com.infinity.drive.core.telegram.TelegramLoginRecovery? = null
+        val export = backgroundScope.launch { recovery = client.getLoginRecovery() }
+        runCurrent()
+        wire.reply(TdApi.GetMe::class.java, TdApi.User().apply {
+            id = 1234
+            phoneNumber = "00000000000"
+        })
+        runCurrent()
+        assertEquals("authentication_token", wire.sent.filterIsInstance<TdApi.GetOption>().single().name)
+        wire.reply(TdApi.GetOption::class.java, TdApi.OptionValueString("synthetic-token"))
+        runCurrent()
+
+        assertTrue(export.isCompleted)
+        assertEquals(1234L, recovery?.accountId)
+        assertEquals("00000000000", recovery?.phoneNumber)
+        assertEquals("synthetic-token", recovery?.token)
+    }
+
     @Test fun `stale connection updates cannot close the replacement client`()=runTest {
         val wire=Wire();val client=client(wire);val credentials=TelegramCredentials(12345,"a".repeat(32));client.start(credentials)
         val old=wire.callbacks.single()

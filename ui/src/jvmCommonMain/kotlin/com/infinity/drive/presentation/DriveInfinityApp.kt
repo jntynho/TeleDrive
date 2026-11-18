@@ -264,7 +264,8 @@ private fun MainScaffold(
 
     val showChrome=onboardingComplete&&currentDestination!=null&&
         currentDestination.hasRoute(Route.Onboarding::class).not()&&currentDestination.hasRoute(Route.Preview::class).not()&&
-        currentDestination.hasRoute(Route.NoteEditor::class).not()&&currentDestination.hasRoute(Route.Search::class).not()
+        currentDestination.hasRoute(Route.NoteEditor::class).not()&&currentDestination.hasRoute(Route.Search::class).not()&&
+        currentDestination.hasRoute(Route.RecoveryExport::class).not()
     val keyboardVisible=WindowInsets.ime.getBottom(LocalDensity.current)>0
 
     val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass

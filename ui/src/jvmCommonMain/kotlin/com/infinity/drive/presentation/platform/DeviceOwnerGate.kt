@@ -20,6 +20,10 @@ val LocalDeviceOwnerGate = staticCompositionLocalOf<DeviceOwnerGate> {
     error("DeviceOwnerGate is not provided")
 }
 
+val LocalRecoveryDeviceOwnerGate = staticCompositionLocalOf<DeviceOwnerGate> {
+    DeviceOwnerGate { _, _, denied, _ -> denied("Device authentication is unavailable. Please try again.") }
+}
+
 /** Hidden never confirms when the device has no secure screen lock or no authentication host. */
 val LocalHiddenDeviceOwnerGate = staticCompositionLocalOf<DeviceOwnerGate> {
     DeviceOwnerGate { _, _, denied, _ -> denied("Device authentication is unavailable. Please try again.") }

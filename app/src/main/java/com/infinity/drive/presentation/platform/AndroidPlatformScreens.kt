@@ -12,6 +12,11 @@ object AndroidPlatformScreens : PlatformScreens {
     }
 
     @Composable
+    override fun RecoveryExport(onBack: () -> Unit) {
+        com.infinity.drive.presentation.recovery.RecoveryExportScreen(onBack)
+    }
+
+    @Composable
     override fun Preview(onBack: () -> Unit, onEditNote: (String, String) -> Unit) {
         app.tgdrive.ui.DriveTheme { PreviewScreen(onBack = onBack, onEditNote = onEditNote) }
     }

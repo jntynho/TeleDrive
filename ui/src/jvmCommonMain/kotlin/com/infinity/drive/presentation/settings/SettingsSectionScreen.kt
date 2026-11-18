@@ -3,6 +3,7 @@ package com.infinity.drive.presentation.settings
 
 import app.tgdrive.ui.elasticVerticalScroll as verticalScroll
 import app.tgdrive.ui.DriveIcons
+import kotlinx.coroutines.flow.first
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -45,6 +46,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.infinity.drive.domain.model.AppLanguage
 import com.infinity.drive.resources.collection_hidden_title
 import com.infinity.drive.resources.Res
+import com.infinity.drive.resources.recovery_export_auth_prompt
+import com.infinity.drive.resources.recovery_export_subtitle
+import com.infinity.drive.resources.recovery_export_title
 import com.infinity.drive.resources.language_english
 import com.infinity.drive.resources.language_labels
 import com.infinity.drive.resources.language_portuguese_br
@@ -197,6 +201,7 @@ fun SettingsSectionScreen(
     onLoggedOut: () -> Unit,
     onOpenHidden:()->Unit={},
     onDashboardStyles:()->Unit={},
+    onOpenRecoveryExport: () -> Unit = {},
     viewModel: SettingsViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -252,7 +257,8 @@ fun SettingsSectionScreen(
                     onPickChannel = onOpenChannels,
                     state = state,
                     viewModel = viewModel,
-                    onLogout = { confirmLogout = true }
+                    onLogout = { confirmLogout = true },
+                    onOpenRecoveryExport = onOpenRecoveryExport
                 )
 
                 SettingsSectionType.BACKUP -> BackupSection(
@@ -320,8 +326,24 @@ private fun AccountSection(
     state: SettingsUiState,
     viewModel: SettingsViewModel,
     onPickChannel: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onOpenRecoveryExport: () -> Unit
 ) {
+    val recoveryGate = com.infinity.drive.presentation.platform.LocalRecoveryDeviceOwnerGate.current
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    var authenticating by remember { mutableStateOf(false) }
+    var openRecovery by remember { mutableStateOf(false) }
+    val recoveryTitle = stringResource(Res.string.recovery_export_title)
+    val recoveryPrompt = stringResource(Res.string.recovery_export_auth_prompt)
+    val openExport by androidx.compose.runtime.rememberUpdatedState(onOpenRecoveryExport)
+    LaunchedEffect(openRecovery, owner) {
+        if (openRecovery) {
+            owner.lifecycle.currentStateFlow.first { it.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) }
+            authenticating = false
+            openRecovery = false
+            openExport()
+        }
+    }
     val indexedSoFar by viewModel.indexedSoFar.collectAsStateWithLifecycle()
     val authorization by viewModel.authorization.collectAsStateWithLifecycle()
 
@@ -365,6 +387,22 @@ private fun AccountSection(
                 title = stringResource(Res.string.common_storage_channels),
                 subtitle = stringResource(Res.string.settings_switch_drives_create_another),
                 onClick = onPickChannel
+            )
+        }
+        add {
+            SettingsClickRow(
+                title = recoveryTitle,
+                subtitle = stringResource(Res.string.recovery_export_subtitle),
+                enabled = !authenticating && authorization == com.infinity.drive.core.telegram.TelegramAuthState.Ready,
+                onClick = {
+                    if (!authenticating) {
+                        authenticating = true
+                        recoveryGate.require(recoveryTitle, recoveryPrompt, onDenied = { message ->
+                            authenticating = false
+                            message?.let { viewModel.notify(UiText.Plain(it)) }
+                        }, onConfirmed = { openRecovery = true })
+                    }
+                }
             )
         }
         add {

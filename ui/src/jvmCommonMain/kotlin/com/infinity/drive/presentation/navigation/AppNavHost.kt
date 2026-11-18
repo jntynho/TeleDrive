@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.staticCompositionLocalOf
+import kotlinx.coroutines.flow.first
 
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -49,6 +50,9 @@ fun AppNavHost(
     modifier: Modifier = Modifier
 ) {
     NavigationCoordinator(navController)
+    val recoveryExportPermit = androidx.compose.runtime.remember(navController) {
+        java.util.concurrent.atomic.AtomicBoolean()
+    }
     val entry by navController.currentBackStackEntryAsState()
     val folderHistory=androidx.compose.runtime.saveable.rememberSaveable(saver=androidx.compose.runtime.saveable.listSaver(
         save={it:com.infinity.drive.presentation.components.FolderNavigationHistory->it.snapshot()},
@@ -265,6 +269,10 @@ fun AppNavHost(
                 onOpenHidden={navController.navigateOnce(Route.Collection(com.infinity.drive.presentation.collection.CollectionType.HIDDEN.name))},
                 onOpenChannels = { navController.navigateOnce(Route.Channels) },
                 onOpenPreviousLibrary = { navController.navigateOnce(Route.PreviousLibrary) },
+                onOpenRecoveryExport = {
+                    recoveryExportPermit.set(true)
+                    navController.navigateOnce(Route.RecoveryExport)
+                },
                 onBack = { navController.popBackStackOnce() },
                 onOpenExclusions = { navController.navigateOnce(Route.Exclusions) },
                 onOpenProxy = { navController.navigateOnce(Route.Proxy) },
@@ -278,6 +286,19 @@ fun AppNavHost(
         }
         stableComposable<Route.DashboardStyles>(navController) {
             com.infinity.drive.presentation.settings.DashboardStylesScreen(onBack={navController.popBackStackOnce()})
+        }
+        stableComposable<Route.RecoveryExport>(navController) { entry ->
+            val authorized = androidx.compose.runtime.remember(entry) { recoveryExportPermit.getAndSet(false) }
+            if (authorized) {
+                LocalPlatformScreens.current.RecoveryExport(onBack = { navController.popBackStackOnce() })
+            } else {
+                androidx.compose.runtime.LaunchedEffect(entry) {
+                    entry.lifecycle.currentStateFlow.first {
+                        it.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+                    }
+                    navController.popBackStackOnce()
+                }
+            }
         }
         stableComposable<Route.PreviousLibrary>(navController) {
             LocalPlatformScreens.current.PreviousLibrary(onBack = { navController.popBackStackOnce() })
@@ -315,7 +336,7 @@ private inline fun <reified T:Any> androidx.navigation.NavGraphBuilder.stableCom
 ) {
     composable<T>(enterTransition=enterTransition,exitTransition=exitTransition,popEnterTransition=popEnterTransition,popExitTransition=popExitTransition){entry->
         com.infinity.drive.presentation.common.AppBackHandler(controller.previousBackStackEntry!=null){controller.popBackStackOnce()}
-        val chrome = T::class !in setOf<kotlin.reflect.KClass<*>>(Route.Onboarding::class, Route.Preview::class, Route.NoteEditor::class, Route.Search::class)
+        val chrome = T::class !in setOf<kotlin.reflect.KClass<*>>(Route.Onboarding::class, Route.Preview::class, Route.NoteEditor::class, Route.Search::class, Route.RecoveryExport::class)
         // Every page draws behind overlay chrome; reserve occlusion in scroll padding, never the viewport.
         CompositionLocalProvider(LocalBottomBarInset provides if(chrome)LocalBottomBarHeight.current else 0.dp){
             Box(Modifier.fillMaxSize().padding(start=if(chrome)LocalNavigationRailWidth.current else 0.dp)){

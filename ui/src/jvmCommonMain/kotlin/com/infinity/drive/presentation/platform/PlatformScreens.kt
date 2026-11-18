@@ -11,6 +11,9 @@ interface PlatformScreens {
     fun PreviousLibrary(onBack: () -> Unit)
 
     @Composable
+    fun RecoveryExport(onBack: () -> Unit) = Unit
+
+    @Composable
     fun Preview(onBack: () -> Unit, onEditNote: (String, String) -> Unit)
 }
 

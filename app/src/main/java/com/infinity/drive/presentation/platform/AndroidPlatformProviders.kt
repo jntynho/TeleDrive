@@ -210,21 +210,36 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
         }
     }
 
-    val hiddenAuthentications=remember(activity){mutableSetOf<Long>()}
-    androidx.compose.runtime.DisposableEffect(activity,appLock){onDispose{
-        hiddenAuthentications.toList().forEach{appLock.finishDeviceAuthentication(it,false)}
-        hiddenAuthentications.clear()
-    }}
-    val hiddenDeviceGate=remember(activity,appLock){DeviceOwnerGate{title,subtitle,onDenied,onConfirmed->
-        val ticket=appLock.beginDeviceAuthentication();hiddenAuthentications.add(ticket)
-        fun finish(success:Boolean,action:()->Unit){
-            if(hiddenAuthentications.remove(ticket)&&appLock.finishDeviceAuthentication(ticket,success))action()
+    val deviceAuthenticationTickets = remember(activity) { mutableSetOf<Long>() }
+    androidx.compose.runtime.DisposableEffect(activity, appLock) {
+        onDispose {
+            deviceAuthenticationTickets.toList().forEach { appLock.finishDeviceAuthentication(it, false) }
+            deviceAuthenticationTickets.clear()
         }
-        try {requireDeviceOwner(activity as? FragmentActivity,title,subtitle,
-            onDenied={error->finish(false){onDenied(error)}},allowUnsecured=false,
-            onConfirmed={finish(true,onConfirmed)})}
-        catch(_:Exception){finish(false){onDenied("Couldn't open device authentication. Please try again.")}}
-    }}
+    }
+    fun protectedDeviceGate(allowWithoutScreenLock: Boolean) =
+        DeviceOwnerGate { title, subtitle, onDenied, onConfirmed ->
+            val host = activity as? FragmentActivity
+            val allowUnsecured = allowWithoutScreenLock &&
+                host?.getSystemService(android.app.KeyguardManager::class.java)?.isDeviceSecure == false
+            val ticket = appLock.beginDeviceAuthentication()
+            deviceAuthenticationTickets.add(ticket)
+            fun finish(success: Boolean, action: () -> Unit) {
+                if (deviceAuthenticationTickets.remove(ticket) && appLock.finishDeviceAuthentication(ticket, success)) action()
+            }
+            try {
+                requireDeviceOwner(
+                    host, title, subtitle,
+                    onDenied = { message -> finish(false) { onDenied(message) } },
+                    allowUnsecured = allowUnsecured,
+                    onConfirmed = { finish(true, onConfirmed) }
+                )
+            } catch (_: Exception) {
+                finish(false) { onDenied("Couldn't open device authentication. Please try again.") }
+            }
+        }
+    val hiddenDeviceGate = remember(activity, appLock) { protectedDeviceGate(allowWithoutScreenLock = false) }
+    val recoveryDeviceGate = remember(activity, appLock) { protectedDeviceGate(allowWithoutScreenLock = true) }
     val sensitiveClipboard=remember(context){com.infinity.drive.core.security.AndroidSensitiveClipboard(context)}
     androidx.compose.runtime.DisposableEffect(sensitiveClipboard){onDispose{sensitiveClipboard.close()}}
     val hiddenBiometrics=remember(activity){(activity as? FragmentActivity)?.let{com.infinity.drive.core.security.AndroidHiddenBiometrics(it)}}
@@ -278,6 +293,7 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
         LocalSystemScreens provides systemScreens,
         LocalDeviceOwnerGate provides deviceOwnerGate,
         LocalHiddenDeviceOwnerGate provides hiddenDeviceGate,
+        LocalRecoveryDeviceOwnerGate provides recoveryDeviceGate,
         LocalHiddenBiometrics provides hiddenBiometrics,
         LocalSensitiveClipboard provides sensitiveClipboard,
         LocalHiddenContentAccess provides org.koin.compose.koinInject<com.infinity.drive.core.security.HiddenContentAccess>(),

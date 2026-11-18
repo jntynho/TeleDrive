@@ -923,4 +923,19 @@
     <string name="settings_accent_colour">Accent colour</string>
     <string name="settings_dashboard_style">Dashboard Style</string>
     <string name="settings_skip_files_smaller_than">Skip files smaller than</string>
+    <string name="recovery_export_title">Create sign-in recovery file</string>
+    <string name="recovery_export_subtitle">Save an encrypted Telegram sign-in token</string>
+    <string name="recovery_export_auth_prompt">Verify your identity to create a recovery file</string>
+    <string name="recovery_export_instructions">Use several unrelated words and at least 16 characters. Keep the passphrase separate from the file.</string>
+    <string name="recovery_export_passphrase">File passphrase</string>
+    <string name="recovery_export_confirmation">Confirm passphrase</string>
+    <string name="recovery_export_confirm_again">Confirm passphrase again</string>
+    <string name="recovery_export_mismatch">The passphrases must match</string>
+    <string name="recovery_export_next">Next</string>
+    <string name="recovery_export_no_token">Telegram hasn’t provided a recovery token for this session.</string>
+    <string name="recovery_export_prepare_error">Couldn’t prepare the recovery file. Try again.</string>
+    <string name="recovery_export_save_error">Couldn’t save the recovery file. Try another location.</string>
+    <string name="recovery_export_saved">Recovery file saved</string>
+    <string name="recovery_export_sign_in">Sign in to Telegram to create a recovery file.</string>
+    <string name="recovery_export_working">Preparing recovery file</string>
 </resources>

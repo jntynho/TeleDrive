@@ -146,6 +146,7 @@ dependencies {
     // Existing native TDLib and Tink retain access to installed TG Drive sessions/vaults.
     implementation("io.github.tdlib-android:core:0.1.1")
     implementation("com.google.crypto.tink:tink-android:1.18.0")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.84")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

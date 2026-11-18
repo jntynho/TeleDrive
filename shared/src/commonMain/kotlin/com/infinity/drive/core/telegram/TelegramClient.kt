@@ -90,6 +90,9 @@ interface TelegramClient {
 
     suspend fun getCurrentUser(): TelegramUser
 
+    /** Returns a server-issued reauthorization token for the current signed-in account, if offered. */
+    suspend fun getLoginRecovery(): TelegramLoginRecovery? = null
+
     /** Read-only compatibility access; never a destination for new uploads. */
     suspend fun previousSavedMessagesChatId(): Long = error("Previous library access is unavailable")
 
