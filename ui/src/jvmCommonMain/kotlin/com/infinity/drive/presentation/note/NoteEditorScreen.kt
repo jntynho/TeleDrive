@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.infinity.drive.resources.Res
+import com.infinity.drive.resources.common_cancel
 import com.infinity.drive.resources.common_back
 import com.infinity.drive.resources.note_body_hint
 import com.infinity.drive.resources.note_bold
@@ -94,8 +95,13 @@ fun NoteEditorScreen(
             ) { Text(stringResource(Res.string.note_save)) }
         },
         dismissButton = {
-            androidx.compose.material3.TextButton(onClick = { confirmDiscard = false; onBack() }) {
-                Text("Discard")
+            Row {
+                androidx.compose.material3.TextButton(onClick = { confirmDiscard = false }) {
+                    Text(stringResource(Res.string.common_cancel))
+                }
+                androidx.compose.material3.TextButton(onClick = { confirmDiscard = false; onBack() }) {
+                    Text("Discard")
+                }
             }
         }
     )

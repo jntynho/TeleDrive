@@ -205,7 +205,7 @@ class RebuiltUiTest {
                 fileId="Report.pdf",displayName="Report.pdf",localPath=null,chatId=null,messageId=null,remoteFileId=null,sizeBytes=123,
                 state=com.infinity.drive.domain.model.TransferState.COMPLETED,createdAt=1,updatedAt=1,completedAt=1))}
         compose.waitUntil(15000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithText("Activity",substring=false).performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Activity").performClick()
         compose.onNodeWithText("All",substring=false).assertIsDisplayed()
         compose.onNode(hasText("Finished",substring=false) and hasClickAction()).performScrollTo().performClick()
         compose.waitUntil(5000){compose.onAllNodesWithContentDescription("Transfer options").fetchSemanticsNodes().isNotEmpty()}
@@ -329,11 +329,15 @@ class RebuiltUiTest {
     @Test fun sixLibraryDestinationsRemainReachableOutsideTheSummaryCard() {
         compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("Stored in Telegram").assertIsDisplayed()
-        listOf("All files", "Activity", "Favorites", "Archived", "Hidden", "Trash").forEach {
+        listOf("All files", "Note", "Favorites", "Archived", "Hidden", "Trash").forEach {
             compose.onNodeWithText(it, substring=false).performScrollTo().assertIsDisplayed()
         }
         compose.onNodeWithContentDescription("Show collections").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Activity").assertIsDisplayed()
         capture("library-shortcuts")
+        compose.onNodeWithText("Note", substring=false).performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Add note").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Hidden", substring=false).performClick()
         compose.onNodeWithText("Hidden", substring=false).assertIsDisplayed()
         compose.onNodeWithContentDescription("Back").performClick()
@@ -555,7 +559,7 @@ class RebuiltUiTest {
         runBlocking{GlobalContext.get().get<com.infinity.drive.data.local.dao.TransferDao>().upsert(
             com.infinity.drive.data.local.entity.TransferEntity(id="viewport-task",type=com.infinity.drive.domain.model.TransferType.UPLOAD,fileId="Report.pdf",displayName="Report.pdf",localPath=null,chatId=null,messageId=null,remoteFileId=null,sizeBytes=123,state=com.infinity.drive.domain.model.TransferState.COMPLETED,createdAt=1,updatedAt=1,completedAt=1))}
         compose.waitUntil(15000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithText("Activity",substring=false).performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Activity").performClick()
         compose.waitUntil(5000){compose.onNode(hasText("Finished",substring=false) and hasClickAction()).isDisplayed()}
         val viewport=compose.onNodeWithTag("navigation-host").fetchSemanticsNode().boundsInRoot
         val list=compose.onNode(hasScrollToIndexAction()).fetchSemanticsNode().boundsInRoot
@@ -648,7 +652,7 @@ class RebuiltUiTest {
         compose.waitUntil(5_000){compose.onAllNodesWithText("Original text",substring=false).fetchSemanticsNodes().isNotEmpty()}
         compose.onNode(hasText("Original text") and hasSetTextAction()).performTextReplacement("Changed draft")
         compose.onNodeWithContentDescription("Back").performClick()
-        compose.onNodeWithText("Discard changes?",substring=false).assertIsDisplayed()
+        compose.onNodeWithText("Save changes?",substring=false).assertIsDisplayed()
         compose.onNodeWithText("Cancel",substring=false).performClick()
         compose.onNodeWithText("Changed draft",substring=false).assertIsDisplayed()
         compose.runOnUiThread{activity.get().onBackPressedDispatcher.onBackPressed()}
