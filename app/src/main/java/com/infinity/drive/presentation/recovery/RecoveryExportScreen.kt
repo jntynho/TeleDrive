@@ -67,7 +67,6 @@ internal fun RecoveryExportScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var passphrase by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
-    var confirmationAgain by remember { mutableStateOf("") }
     var pendingFile by remember { mutableStateOf<ByteArray?>(null) }
     var pickerTicket by remember { mutableStateOf<Long?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -77,7 +76,6 @@ internal fun RecoveryExportScreen(onBack: () -> Unit) {
     fun clearPassphrases() {
         passphrase = ""
         confirmation = ""
-        confirmationAgain = ""
     }
     fun finishPicker() {
         val ticket = pickerTicket
@@ -131,7 +129,7 @@ internal fun RecoveryExportScreen(onBack: () -> Unit) {
     }
 
     val editable = !busy && pendingFile == null && !saved && auth == TelegramAuthState.Ready
-    val match = passphrase == confirmation && passphrase == confirmationAgain
+    val match = passphrase == confirmation
     AppBackHandler(busy || pendingFile != null) {}
     Scaffold(
         modifier = Modifier.imePadding(),
@@ -158,8 +156,7 @@ internal fun RecoveryExportScreen(onBack: () -> Unit) {
                 )
                 RecoveryPassphraseField(passphrase, { passphrase = it }, Res.string.recovery_export_passphrase, editable)
                 RecoveryPassphraseField(confirmation, { confirmation = it }, Res.string.recovery_export_confirmation, editable)
-                RecoveryPassphraseField(confirmationAgain, { confirmationAgain = it }, Res.string.recovery_export_confirm_again, editable)
-                if (confirmationAgain.isNotEmpty() && !match) {
+                if (confirmation.isNotEmpty() && !match) {
                     Text(stringResource(Res.string.recovery_export_mismatch), color = MaterialTheme.colorScheme.error)
                 }
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())

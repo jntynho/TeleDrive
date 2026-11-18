@@ -926,11 +926,10 @@
     <string name="recovery_export_title">Create sign-in recovery file</string>
     <string name="recovery_export_subtitle">Save an encrypted Telegram sign-in token</string>
     <string name="recovery_export_auth_prompt">Verify your identity to create a recovery file</string>
-    <string name="recovery_export_instructions">Choose a password of at least 16 characters to protect the file. Enter the same password in both confirmation fields.</string>
+    <string name="recovery_export_instructions">Choose a password of at least 16 characters to protect the file. Enter it again to confirm.</string>
     <string name="recovery_export_passphrase">File password</string>
     <string name="recovery_export_confirmation">Confirm password</string>
-    <string name="recovery_export_confirm_again">Confirm password again</string>
-    <string name="recovery_export_mismatch">Enter the same file password in all three fields</string>
+    <string name="recovery_export_mismatch">The passwords must match</string>
     <string name="recovery_export_next">Next</string>
     <string name="recovery_export_no_token">Telegram hasn’t provided a recovery token for this session.</string>
     <string name="recovery_export_prepare_error">Couldn’t prepare the recovery file. Try again.</string>
