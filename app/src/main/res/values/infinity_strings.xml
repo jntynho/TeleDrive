@@ -63,4 +63,11 @@
     <string name="video_picture_in_picture">Picture in picture</string>
     <string name="external_media_open">Stream in another player</string>
     <string name="external_media_failed">This file couldn’t be streamed in another player.</string>
+    <string name="extract_text">Extract text</string>
+    <string name="extract_text_working">Recognizing Latin-script text on this device…</string>
+    <string name="extract_text_failed">Text could not be extracted from this file.</string>
+    <string name="extract_text_partial">Showing the text within the page or size limit.</string>
+    <string name="extract_text_empty">No Latin-script text found.</string>
+    <string name="extract_text_result">Extracted text</string>
+    <string name="extract_text_note">Continue in Notes</string>
 </resources>

@@ -2,4 +2,11 @@
 <resources>
     <string name="external_media_open">البث في مشغّل آخر</string>
     <string name="external_media_failed">تعذّر بث الملف في مشغّل آخر.</string>
+    <string name="extract_text">استخراج النص</string>
+    <string name="extract_text_working">جارٍ التعرّف على النص المكتوب بالحروف اللاتينية على هذا الجهاز…</string>
+    <string name="extract_text_failed">تعذّر استخراج النص من هذا الملف.</string>
+    <string name="extract_text_partial">يُعرض النص ضمن الحدّ المسموح للصفحات أو الحجم.</string>
+    <string name="extract_text_empty">لم يُعثر على نص مكتوب بالحروف اللاتينية.</string>
+    <string name="extract_text_result">النص المستخرج</string>
+    <string name="extract_text_note">متابعة في الملاحظات</string>
 </resources>

@@ -163,6 +163,7 @@ import kotlin.time.Duration.Companion.milliseconds
 fun PreviewScreen(
     onBack: () -> Unit,
     onEditNote: (String, String) -> Unit,
+    onCreateNote: (String, String) -> Unit,
     viewModel: PreviewViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -178,6 +179,8 @@ fun PreviewScreen(
     var renameTarget by remember { mutableStateOf<DriveFile?>(null) }
     var deleteTarget by remember { mutableStateOf<DriveFile?>(null) }
     var showOverflow by remember { mutableStateOf(false) }
+    var recognitionTarget by remember { mutableStateOf<DriveFile?>(null) }
+    val recognizer = koinInject<AndroidTextRecognition>()
 
     val deleteConsentLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()
@@ -261,14 +264,18 @@ fun PreviewScreen(
     val externalTitle = androidx.compose.ui.res.stringResource(app.tgdrive.R.string.external_media_open)
     val externalError = androidx.compose.ui.res.stringResource(app.tgdrive.R.string.external_media_failed)
     val privacy = com.infinity.drive.presentation.platform.LocalHiddenContentAccess.current
-    var canStreamExternally by remember(currentFile.id, currentFile.modifiedAt, currentFile.folderId, currentFile.isHidden) {
+    var canUseExtraActions by remember(currentFile.id, currentFile.modifiedAt, currentFile.folderId, currentFile.isHidden) {
         mutableStateOf(false)
     }
-    LaunchedEffect(currentFile, activity, viewModel.fromTrash) {
-        canStreamExternally = !viewModel.fromTrash && activity != null && currentFile.hasRemoteCopy &&
-            currentFile.category in setOf(FileCategory.AUDIO, FileCategory.VIDEO) &&
-            privacy != null && !privacy.protectedFile(currentFile) && privacy.canRead(currentFile.id)
+    LaunchedEffect(currentFile, privacy, viewModel.fromTrash) {
+        canUseExtraActions = !viewModel.fromTrash && privacy != null &&
+            !privacy.protectedFile(currentFile) && privacy.canRead(currentFile.id)
     }
+    val canStreamExternally = canUseExtraActions && activity != null && currentFile.hasRemoteCopy &&
+        currentFile.category in setOf(FileCategory.AUDIO, FileCategory.VIDEO)
+    val canRecognizeText = canUseExtraActions && currentFile.sizeBytes in 1..(48L * 1024 * 1024) &&
+        (currentFile.hasLocalCopy || currentFile.hasRemoteCopy) &&
+        (MimeTypes.isImage(currentFile.mimeType) || MimeTypes.isPdf(currentFile.mimeType))
     fun openInPlayer() {
         val host = activity ?: return
         showOverflow = false
@@ -434,6 +441,21 @@ fun PreviewScreen(
         if (canStreamExternally) {
             com.infinity.drive.presentation.components.SheetActionRow(externalTitle, DriveIcons.OpenInNew, onClick = ::openInPlayer)
         }
+        if (canRecognizeText) {
+            com.infinity.drive.presentation.components.SheetActionRow(
+                androidx.compose.ui.res.stringResource(app.tgdrive.R.string.extract_text),
+                DriveIcons.DocumentScanner
+            ) {
+                showOverflow = false
+                recognitionTarget = currentFile
+            }
+        }
+    }
+    recognitionTarget?.takeIf { it.id == currentFile.id && canRecognizeText }?.let { source ->
+        TextRecognitionDialog(source, recognizer, onCreateNote = { title, text ->
+            recognitionTarget = null
+            onCreateNote(title, text)
+        }, dismiss = { recognitionTarget = null })
     }
 
     renameTarget?.let { file ->

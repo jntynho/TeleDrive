@@ -22,7 +22,7 @@ interface PlatformScreens {
     fun RecoveryExport(onBack: () -> Unit) = Unit
 
     @Composable
-    fun Preview(onBack: () -> Unit, onEditNote: (String, String) -> Unit)
+    fun Preview(onBack: () -> Unit, onEditNote: (String, String) -> Unit, onCreateNote: (String, String) -> Unit)
 }
 
 val LocalPlatformScreens = staticCompositionLocalOf<PlatformScreens> {

@@ -196,7 +196,8 @@ fun AppNavHost(
                 HiddenContentGuard(fileId = fileId, onBack = back) {
                     LocalPlatformScreens.current.Preview(
                         onBack = back,
-                        onEditNote = { id, title -> navController.navigateOnce(Route.NoteEditor(fileId = id, title = title)) }
+                        onEditNote = { id, title -> navController.navigateOnce(Route.NoteEditor(fileId = id, title = title)) },
+                        onCreateNote = { title, text -> navController.navigateOnce(Route.NoteEditor(title = title, sharedText = text)) }
                     )
                 }
             }
