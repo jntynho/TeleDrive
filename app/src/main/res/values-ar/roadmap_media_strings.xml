@@ -35,4 +35,13 @@
     <string name="upload_requests_save">حفظ في القرص</string>
     <string name="upload_requests_saved">أُضيف إلى القرص</string>
     <string name="upload_requests_revoke">هل تريد إغلاق الطلب وحذف نسخته من الخادم؟</string>
+    <string name="photo_history_title">سجلّ الصور</string>
+    <string name="photo_history_timeline">الخط الزمني</string>
+    <string name="photo_history_map">خريطة الصور</string>
+    <string name="photo_history_error">تعذّر قراءة سجلّ الصور.</string>
+    <string name="photo_history_empty">لا توجد صور مطابقة.</string>
+    <string name="photo_history_no_locations">لم يُعثر على بيانات موقع في هذه الصور.</string>
+    <string name="photo_history_more">عرض مزيد من الصور</string>
+    <string name="photo_history_backups">قراءة التواريخ والمواقع من النسخ الاحتياطية</string>
+    <string name="photo_history_file_date">تاريخ الملف · %1$s</string>
 </resources>

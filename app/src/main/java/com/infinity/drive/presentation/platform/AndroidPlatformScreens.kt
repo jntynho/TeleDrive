@@ -32,6 +32,10 @@ object AndroidPlatformScreens : PlatformScreens {
     override fun PublicLinksSetting() = com.infinity.drive.presentation.sharing.PublicLinksSetting()
 
     @Composable
+    override fun PhotoHistoryControl(onAlbum: Boolean, folder: String?, query: String, openFile: (String) -> Unit) =
+        com.infinity.drive.presentation.gallery.PhotoHistoryControl(onAlbum, folder, query, openFile)
+
+    @Composable
     override fun Preview(onBack: () -> Unit, onEditNote: (String, String) -> Unit, onCreateNote: (String, String) -> Unit) {
         app.tgdrive.ui.DriveTheme { PreviewScreen(onBack = onBack, onEditNote = onEditNote, onCreateNote = onCreateNote) }
     }

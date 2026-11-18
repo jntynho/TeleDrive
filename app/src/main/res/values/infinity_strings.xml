@@ -96,4 +96,13 @@
     <string name="upload_requests_save">Save to drive</string>
     <string name="upload_requests_saved">Added to drive</string>
     <string name="upload_requests_revoke">Close the request and remove its server copy?</string>
+    <string name="photo_history_title">Photo history</string>
+    <string name="photo_history_timeline">Timeline</string>
+    <string name="photo_history_map">Photo map</string>
+    <string name="photo_history_error">Photo history could not be read.</string>
+    <string name="photo_history_empty">No photos match this view.</string>
+    <string name="photo_history_no_locations">No location tags found in these photos.</string>
+    <string name="photo_history_more">Show more photos</string>
+    <string name="photo_history_backups">Read dates and locations from backups</string>
+    <string name="photo_history_file_date">File date · %1$s</string>
 </resources>

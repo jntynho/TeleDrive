@@ -101,7 +101,7 @@ class GalleryViewModel(
         savedStateHandle.toRoute<Route.GalleryAlbum>()
     }.getOrNull()
 
-    private val albumFolderId: String? = route?.folderId
+    val albumFolderId: String? = route?.folderId
     private val isAlbumView: Boolean = route != null
 
     private val tab = MutableStateFlow(runCatching{GalleryTab.valueOf(savedStateHandle.get<String>("gallery-tab")?:savedStateHandle.get<String>("initialTab")?:"ALL")}.getOrDefault(GalleryTab.ALL))

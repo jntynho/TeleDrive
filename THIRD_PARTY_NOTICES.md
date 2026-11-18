@@ -24,3 +24,7 @@ This project uses third-party software, including:
 AndroidX includes Compose/Material, WorkManager, Media3, Biometric, DocumentFile, Fragment and ExifInterface. The optional sharing service uses Node.js built-ins and has no npm dependencies; Node.js has its own runtime license inventory.
 
 Native TDLib builds also incorporate dependencies such as OpenSSL; their exact versions, license texts and distribution obligations must be inventoried against the selected binary before public production distribution. This list is a development inventory, not a completed legal audit or an assertion that the community binary is reproducible.
+
+## Photo map
+
+The bundled land outlines use the Natural Earth 1:110m land dataset, which is in the public domain. TeleDrive rounds the coordinates and stores the exterior rings for offline rendering. [Natural Earth terms](https://www.naturalearthdata.com/about/terms-of-use/) · [Source geometry](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_110m_land.geojson)
