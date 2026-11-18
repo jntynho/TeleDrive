@@ -916,6 +916,7 @@
         <item>English</item>
         <item>Русский</item>
         <item>Português (Brasil)</item>
+        <item>العربية</item>
     </string-array>
     <string name="nav_audio">Audio</string>
     <string name="settings_floating_navigation_bar">Floating navigation bar</string>
@@ -1053,4 +1054,16 @@
     <string name="smart_folder_name">Folder name</string>
     <string name="smart_folder_remove">Remove %s</string>
     <string name="smart_folder_same_name">Choose a different name for this smart folder.</string>
+    <string name="language_arabic">العربية</string>
+    <string name="notes_title">Note</string>
+    <string name="notes_search">Search notes</string>
+    <string name="notes_settings">Note settings</string>
+    <string name="notes_create">Add note</string>
+    <string name="notes_empty">No notes in this drive yet.</string>
+    <string name="notes_search_empty">No matching notes.</string>
+    <string name="notes_upload_waiting">Waiting to upload</string>
+    <string name="notes_upload_done">Saved in Telegram</string>
+    <string name="notes_upload_failed">Upload failed</string>
+    <string name="notes_local_only">Saved on this device</string>
+    <string name="notes_uploading">Uploading</string>
 </resources>

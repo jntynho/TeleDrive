@@ -90,6 +90,8 @@ import androidx.window.core.layout.WindowSizeClass
 import com.infinity.drive.core.common.NotificationDestinations
 import com.infinity.drive.core.files.PendingShare
 import androidx.compose.ui.platform.LocalLocaleList
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.intl.LocaleList
 import com.infinity.drive.domain.model.AppLanguage
@@ -149,12 +151,19 @@ fun DriveInfinityApp(
     val urlOpener = LocalUrlOpener.current
 
     val systemLocaleList = LocalLocaleList.current
+    val systemDirection = LocalLayoutDirection.current
+    val targetDirection = when (state.language) {
+        AppLanguage.SYSTEM -> systemDirection
+        AppLanguage.ARABIC -> LayoutDirection.Rtl
+        else -> LayoutDirection.Ltr
+    }
     val targetLocaleList = remember(state.language, systemLocaleList) {
         when (state.language) {
             AppLanguage.SYSTEM -> systemLocaleList
             AppLanguage.ENGLISH -> LocaleList(Locale("en"))
             AppLanguage.RUSSIAN -> LocaleList(Locale("ru"))
             AppLanguage.PORTUGUESE_BR -> LocaleList(Locale("pt-BR"))
+            AppLanguage.ARABIC -> LocaleList(Locale("ar"))
         }
     }
 
@@ -174,6 +183,7 @@ fun DriveInfinityApp(
     ) {
         CompositionLocalProvider(
             (LocalLocaleList as ProvidableCompositionLocal<LocaleList>) provides targetLocaleList,
+            LocalLayoutDirection provides targetDirection,
             app.tgdrive.ui.LocalDashboardStyle provides state.dashboardStyle.name,
             app.tgdrive.ui.LocalDashboardDark provides state.dashboardDark,
             LocalCompactLayout provides state.compactLayout

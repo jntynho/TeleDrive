@@ -20,6 +20,20 @@ import com.infinity.drive.domain.repository.TrashRepository
 import com.infinity.drive.presentation.common.Formatters
 import com.infinity.drive.presentation.components.ConfirmDialog
 import com.infinity.drive.presentation.navigation.LocalBottomBarInset
+import com.infinity.drive.resources.Res
+import com.infinity.drive.resources.common_back
+import com.infinity.drive.resources.notes_create
+import com.infinity.drive.resources.notes_empty
+import com.infinity.drive.resources.notes_local_only
+import com.infinity.drive.resources.notes_search
+import com.infinity.drive.resources.notes_search_empty
+import com.infinity.drive.resources.notes_settings
+import com.infinity.drive.resources.notes_title
+import com.infinity.drive.resources.notes_upload_done
+import com.infinity.drive.resources.notes_upload_failed
+import com.infinity.drive.resources.notes_upload_waiting
+import com.infinity.drive.resources.notes_uploading
+import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -75,14 +89,15 @@ fun NotesScreen(
     Scaffold(
         topBar = {
             ExpandableLibraryHeader(
-                "Note", query, { query = it }, searching, { searching = it }, "Search notes",
-                navigationIcon = { IconButton(onBack) { Icon(DriveIcons.ArrowBack, "Back") } },
-                actions = { IconButton(onSettings) { Icon(DriveIcons.Settings, "Note settings") } }
+                stringResource(Res.string.notes_title), query, { query = it }, searching, { searching = it },
+                stringResource(Res.string.notes_search),
+                navigationIcon = { IconButton(onBack) { Icon(DriveIcons.ArrowBack, stringResource(Res.string.common_back)) } },
+                actions = { IconButton(onSettings) { Icon(DriveIcons.Settings, stringResource(Res.string.notes_settings)) } }
             )
         },
         floatingActionButton = {
             FloatingActionButton(onNew, modifier = Modifier.padding(bottom = LocalBottomBarInset.current)) {
-                Icon(DriveIcons.EditNote, "Add note")
+                Icon(DriveIcons.EditNote, stringResource(Res.string.notes_create))
             }
         },
         snackbarHost = { SnackbarHost(snackbar) }
@@ -90,7 +105,7 @@ fun NotesScreen(
         when {
             matching == null -> LinearProgressIndicator(Modifier.fillMaxWidth().padding(padding))
             matching.isEmpty() -> Text(
-                if (query.isBlank()) "No notes in this drive yet." else "No matching notes.",
+                stringResource(if (query.isBlank()) Res.string.notes_empty else Res.string.notes_search_empty),
                 Modifier.padding(padding).padding(24.dp)
             )
             else -> LazyColumn(
@@ -99,11 +114,11 @@ fun NotesScreen(
             ) {
                 items(matching, key = { it.id }) { note ->
                     val status = when (note.backupState) {
-                        BackupState.BACKED_UP -> "Saved in Telegram"
-                        BackupState.QUEUED -> "Waiting to upload"
-                        BackupState.UPLOADING -> "Uploading"
-                        BackupState.FAILED -> "Upload failed"
-                        BackupState.NONE -> "Saved on this device"
+                        BackupState.BACKED_UP -> stringResource(Res.string.notes_upload_done)
+                        BackupState.QUEUED -> stringResource(Res.string.notes_upload_waiting)
+                        BackupState.UPLOADING -> stringResource(Res.string.notes_uploading)
+                        BackupState.FAILED -> stringResource(Res.string.notes_upload_failed)
+                        BackupState.NONE -> stringResource(Res.string.notes_local_only)
                     }
                     var excerpt by remember(note.id, note.modifiedAt, note.localPath) { mutableStateOf("") }
                     LaunchedEffect(note.id, note.modifiedAt, note.localPath) {

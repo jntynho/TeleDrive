@@ -63,6 +63,7 @@ import com.infinity.drive.resources.recovery_export_auth_prompt
 import com.infinity.drive.resources.recovery_export_subtitle
 import com.infinity.drive.resources.recovery_export_title
 import com.infinity.drive.resources.language_english
+import com.infinity.drive.resources.language_arabic
 import com.infinity.drive.resources.language_labels
 import com.infinity.drive.resources.language_portuguese_br
 import com.infinity.drive.resources.language_russian
@@ -1189,6 +1190,7 @@ private fun AppearanceSection(state: SettingsUiState, viewModel: SettingsViewMod
                     AppLanguage.ENGLISH -> stringResource(Res.string.language_english)
                     AppLanguage.RUSSIAN -> stringResource(Res.string.language_russian)
                     AppLanguage.PORTUGUESE_BR -> stringResource(Res.string.language_portuguese_br)
+                    AppLanguage.ARABIC -> stringResource(Res.string.language_arabic)
                 },
                 onClick = { showLanguageDialog = true }
             )

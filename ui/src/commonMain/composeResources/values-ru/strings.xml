@@ -938,6 +938,7 @@
         <item>English</item>
         <item>Русский</item>
         <item>Português (Brasil)</item>
+        <item>العربية</item>
     </string-array>
     <string name="nav_audio">Аудио</string>
 </resources>
