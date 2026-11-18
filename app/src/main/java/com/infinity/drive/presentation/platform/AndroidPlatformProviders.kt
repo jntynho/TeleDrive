@@ -272,7 +272,9 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
     val startupThumbnails=org.koin.compose.koinInject<com.infinity.drive.data.local.dao.ThumbnailDao>()
     val startupPreparation=remember(context,startupLoader,startupThumbnails){com.infinity.drive.presentation.startup.AndroidStartupPreparation(context,startupLoader,startupThumbnails)}
     val liquidNavigation=if(android.os.Build.VERSION.SDK_INT>=33)com.infinity.drive.presentation.navigation.liquid.rememberLiquidNavigation()else null
+    val portableKeyFiles = rememberAndroidPortableKeyFiles()
     CompositionLocalProvider(
+        LocalPortableKeyFiles provides portableKeyFiles,
         LocalLiquidNavigation provides liquidNavigation,
         LocalStartupPreparation provides startupPreparation,
         com.infinity.drive.presentation.components.LocalThumbnailRetryEpoch provides thumbnailRetryEpoch,

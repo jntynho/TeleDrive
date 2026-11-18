@@ -20,7 +20,7 @@ interface SyncRepository {
     suspend fun fullResync(): AppResult<SyncStats>
 
     /** Restores missing local entries from the selected drive with a durable cursor. */
-    suspend fun restoreLibrary(onProgress: (RestoreProgress) -> Unit): AppResult<RestoreProgress>
+    suspend fun restoreLibrary(restart: Boolean = false, onProgress: (RestoreProgress) -> Unit): AppResult<RestoreProgress>
 
     data class RestoreProgress(
         val scanned: Int = 0,

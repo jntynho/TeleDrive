@@ -80,6 +80,14 @@ class FileWrappedKeyRepository(
         cache[name] = key.copyOf()
     }
 
+    @Synchronized
+    override fun storeIfMissingOrMatching(name: String, key: ByteArray): Boolean {
+        val existing = get(name)
+        if (existing != null) return java.security.MessageDigest.isEqual(existing, key)
+        store(name, key)
+        return true
+    }
+
     private fun persist(file:File,wrapped:ByteArray) {
         file.parentFile?.mkdirs()
         val temporary=File.createTempFile("wrapped-",".tmp",file.parentFile)

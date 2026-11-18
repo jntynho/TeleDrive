@@ -15,4 +15,7 @@ interface WrappedKeyRepository {
     fun exists(name: String): Boolean
 
     fun store(name: String, key: ByteArray)
+
+    /** Installs a recovered key only if it does not replace a readable, different key. */
+    fun storeIfMissingOrMatching(name: String, key: ByteArray): Boolean
 }

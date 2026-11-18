@@ -965,4 +965,21 @@
     <string name="drive_integrity_progress">%1$d checked · %2$d available · %3$d missing · %4$d inconsistent</string>
     <string name="drive_integrity_details">%1$d unverified · %2$d need the encryption key · %3$d samples verified</string>
     <string name="drive_integrity_problems">Some files to review</string>
+    <string name="key_backup_verify">Verify Telegram key backup</string>
+    <string name="key_backup_verify_hint">Check the saved encryption key with your backup password</string>
+    <string name="key_backup_verified">The Telegram key backup opened successfully.</string>
+    <string name="key_file_export">Export content key</string>
+    <string name="key_file_export_hint">Save a password-protected key file for your Telegram account</string>
+    <string name="key_file_import">Import content key</string>
+    <string name="key_file_import_hint">Open a key file you previously exported for this account</string>
+    <string name="key_file_device_prompt">Confirm your device lock to manage the encryption key.</string>
+    <string name="key_file_password">Backup password</string>
+    <string name="key_file_password_repeat">Repeat password</string>
+    <string name="key_file_password_hint">Use at least 12 characters and keep the password separately from the file.</string>
+    <string name="key_file_invalid">The key backup is invalid or the password is incorrect.</string>
+    <string name="key_file_other_account">This key file belongs to a different Telegram account.</string>
+    <string name="key_file_conflict">This device already has a different encryption key.</string>
+    <string name="key_file_io_failed">TeleDrive could not read or save the key file.</string>
+    <string name="key_file_reindex_incomplete">The key is ready. Continue the file scan in Restore library.</string>
+    <string name="key_file_saved">Encrypted key file saved.</string>
 </resources>

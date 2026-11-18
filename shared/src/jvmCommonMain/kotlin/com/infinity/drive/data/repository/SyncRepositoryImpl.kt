@@ -98,13 +98,14 @@ class SyncRepositoryImpl(
         }
 
     override suspend fun restoreLibrary(
+        restart: Boolean,
         onProgress: (SyncRepository.RestoreProgress) -> Unit
     ): AppResult<SyncRepository.RestoreProgress> =
         syncMutex.withLock {
             _syncing.value = true
             _indexedSoFar.value = 0
             try {
-                withContext(Dispatchers.IO) { restoreSelectedDrive(onProgress) }
+                withContext(Dispatchers.IO) { restoreSelectedDrive(restart, onProgress) }
             } catch (e: TelegramException) {
                 AppResult.Failure(
                     if (e.isRateLimit) AppError.RateLimited(e.retryAfterSeconds ?: 0)
@@ -119,6 +120,7 @@ class SyncRepositoryImpl(
         }
 
     private suspend fun restoreSelectedDrive(
+        restart: Boolean,
         onProgress: (SyncRepository.RestoreProgress) -> Unit
     ): AppResult<SyncRepository.RestoreProgress> {
         if (telegramClient.authState.value != TelegramAuthState.Ready) {
@@ -129,6 +131,7 @@ class SyncRepositoryImpl(
         val directory = File(storagePaths.filesDir, "library-restore")
         Files.createDirectories(directory.toPath())
         val checkpoint = File(directory, "$userId-$chatId")
+        if (restart) Files.deleteIfExists(checkpoint.toPath())
         val saved = LibraryRestoreCheckpoint.read(checkpoint)
         var cursor = saved.cursor
         var progress = saved.progress

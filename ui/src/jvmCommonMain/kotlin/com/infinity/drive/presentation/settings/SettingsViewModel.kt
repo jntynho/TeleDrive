@@ -15,6 +15,11 @@ import com.infinity.drive.resources.message_rebuild_done
 import com.infinity.drive.resources.message_thumbnails_cleared
 import com.infinity.drive.resources.message_wrong_passphrase
 import com.infinity.drive.resources.rebuild_locked_files
+import com.infinity.drive.resources.key_backup_verified
+import com.infinity.drive.resources.key_file_invalid
+import com.infinity.drive.resources.key_file_other_account
+import com.infinity.drive.resources.key_file_conflict
+import com.infinity.drive.resources.key_file_reindex_incomplete
 import com.infinity.drive.core.files.DeleteConsentRequest
 import com.infinity.drive.core.common.AppResult
 import com.infinity.drive.core.permissions.PermissionChecker
@@ -33,6 +38,7 @@ import com.infinity.drive.domain.repository.CacheRepository
 import com.infinity.drive.domain.repository.ChannelRepository
 import com.infinity.drive.domain.repository.FileRepository
 import com.infinity.drive.domain.repository.KeyBackupRepository
+import com.infinity.drive.domain.repository.KeyBackupRepository.KeyVerification
 import com.infinity.drive.domain.repository.SettingsRepository
 import com.infinity.drive.domain.repository.SyncRepository
 import com.infinity.drive.domain.repository.TelegramAuthRepository
@@ -320,6 +326,59 @@ class SettingsViewModel(
                 }
 
                 is AppResult.Failure -> _messages.tryEmit(result.error.toUiText())
+            }
+        }
+    }
+
+    fun verifyKeyBackup(password: String) {
+        runKeyFileAction(password, keyBackupRepository::verifyBackup) {
+            announceKeyVerification(it, imported = false)
+        }
+    }
+
+    fun exportPortableKey(password: String, save: (ByteArray) -> Unit) {
+        runKeyFileAction(password, keyBackupRepository::exportPortable, save)
+    }
+
+    fun importPortableKey(blob: ByteArray, password: String) {
+        runKeyFileAction(password, { keyBackupRepository.importPortable(blob, it) }) {
+            announceKeyVerification(it, imported = true)
+        }
+    }
+
+    private fun <T> runKeyFileAction(
+        password: String,
+        action: suspend (CharArray) -> AppResult<T>,
+        onSuccess: suspend (T) -> Unit
+    ) {
+        if (_keyBackupWorking.value) return
+        _keyBackupWorking.value = true
+        val secret = password.toCharArray()
+        viewModelScope.launch {
+            try {
+                when (val result = action(secret)) {
+                    is AppResult.Success -> onSuccess(result.value)
+                    is AppResult.Failure -> _messages.tryEmit(result.error.toUiText())
+                }
+            } finally {
+                secret.fill('\u0000')
+                _keyBackupWorking.value = false
+            }
+        }
+    }
+
+    private suspend fun announceKeyVerification(result: KeyVerification, imported: Boolean) {
+        val message = when (result) {
+            KeyVerification.VERIFIED -> if (imported) Res.string.message_key_restored else Res.string.key_backup_verified
+            KeyVerification.INVALID_FILE_OR_PASSWORD -> Res.string.key_file_invalid
+            KeyVerification.OTHER_ACCOUNT -> Res.string.key_file_other_account
+            KeyVerification.DIFFERENT_LOCAL_KEY -> Res.string.key_file_conflict
+        }
+        _messages.tryEmit(UiText.Resource(message))
+        if (imported && result == KeyVerification.VERIFIED) {
+            when (syncRepository.restoreLibrary(restart = true) {}) {
+                is AppResult.Success -> Unit
+                is AppResult.Failure -> _messages.tryEmit(UiText.Resource(Res.string.key_file_reindex_incomplete))
             }
         }
     }

@@ -843,6 +843,7 @@ private fun SecuritySection(state: SettingsUiState, viewModel: SettingsViewModel
     var showKeyBackupDialog by remember { mutableStateOf(false) }
     var showKeyRestoreDialog by remember { mutableStateOf(false) }
     val keyHint by viewModel.keyHint.collectAsStateWithLifecycle()
+    val keyFileActions = rememberKeyFileActions(viewModel, keyBackupWorking)
     var enablingEncryption by remember { mutableStateOf(false) }
 
     if (showKeyBackupDialog) {
@@ -984,6 +985,30 @@ private fun SecuritySection(state: SettingsUiState, viewModel: SettingsViewModel
                 title = stringResource(Res.string.settings_restore_encryption_key),
                 subtitle = stringResource(Res.string.settings_unlock_files_encrypted_earlier),
                 onClick = { showKeyRestoreDialog = true }
+            )
+        }
+        add {
+            SettingsClickRow(
+                title = keyFileActions.verifyTitle,
+                subtitle = keyFileActions.verifySubtitle,
+                enabled = !keyBackupWorking,
+                onClick = keyFileActions.verify
+            )
+        }
+        add(visible = keyFileActions.export != null) {
+            SettingsClickRow(
+                title = keyFileActions.exportTitle,
+                subtitle = keyFileActions.exportSubtitle,
+                enabled = !keyBackupWorking,
+                onClick = { keyFileActions.export?.invoke() }
+            )
+        }
+        add(visible = keyFileActions.importKey != null) {
+            SettingsClickRow(
+                title = keyFileActions.importTitle,
+                subtitle = keyFileActions.importSubtitle,
+                enabled = !keyBackupWorking,
+                onClick = { keyFileActions.importKey?.invoke() }
             )
         }
         add {
