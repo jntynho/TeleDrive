@@ -9,6 +9,7 @@ import com.infinity.drive.core.files.AppStoragePaths
 import com.infinity.drive.core.telegram.TelegramClient
 import com.infinity.drive.core.telegram.TelegramUploadEvent
 import com.infinity.drive.data.local.entity.FileEntity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import java.io.File
 import java.util.UUID
@@ -22,63 +23,58 @@ class ApkIconUploader(
 ) {
     private fun stagingDir(): File = storagePaths.cacheDir.resolve("staging").apply { mkdirs() }
 
-    suspend fun uploadIconIfApk(
+    suspend fun uploadPreviewDocument(
         entity: FileEntity,
         chatId: Long,
         encrypt: Boolean
     ): String? {
-        if (!MimeTypes.isApk(entity.mimeType, entity.name)) return null
+        if (!canUploadPreview(entity.mimeType, entity.name, encrypt)) return null
 
-        val rawIconPath = thumbnailStore.uploadThumbnailFile(entity.id)?.absolutePath ?: return null
-
-        val iconUploadPath: String
-        val iconFileName: String
-        val iconMimeType: String
-        var stagingIconFile: File? = null
-
-        if (encrypt) {
-            val key = runCatching { wrappedKeyRepository.getOrCreate(CryptoKeys.CONTENT) }.getOrNull()
-                ?: return null
-            val rawIconBytes = runCatching { File(rawIconPath).readBytes() }.getOrNull()
-                ?: return null
-
-            val encryptedBytes = streamCrypto.encryptBytes(key, rawIconBytes)
-            val randomName = "${UUID.randomUUID()}.tde"
-            val staging = File(stagingDir(), randomName)
-            staging.writeBytes(encryptedBytes)
-            stagingIconFile = staging
-            iconUploadPath = staging.absolutePath
-            iconFileName = randomName
-            iconMimeType = "application/octet-stream"
-        } else {
-            iconUploadPath = rawIconPath
-            iconFileName = "${UUID.randomUUID()}.jpg"
-            iconMimeType = "image/jpeg"
-        }
-
-        var resultId: String? = null
-        try {
-            runCatching {
-                telegramClient.uploadDocument(
-                    chatId = chatId,
-                    localPath = iconUploadPath,
-                    fileName = iconFileName,
-                    mimeType = iconMimeType,
-                    caption = ICON_CAPTION,
-                    thumbnailPath = null
-                ).first { it is TelegramUploadEvent.Completed } as? TelegramUploadEvent.Completed
-            }.getOrNull()?.let { completed ->
-                val doc = completed.document
-                resultId = "${doc.remoteFileId}:${doc.messageId}"
+        var staging: File? = null
+        return try {
+            val uploadPath: String
+            val fileName: String
+            val mimeType: String
+            if (encrypt) {
+                val key = wrappedKeyRepository.getOrCreate(CryptoKeys.CONTENT)
+                val preview = thumbnailStore.thumbnailForBackup(entity.id)
+                    ?.takeIf { it.size in 1..MAX_PREVIEW_BYTES } ?: return null
+                fileName = "${UUID.randomUUID()}.tde"
+                val sealed = File(stagingDir(), fileName).also { staging = it }
+                sealed.writeBytes(streamCrypto.encryptBytes(key, preview))
+                uploadPath = sealed.absolutePath
+                mimeType = "application/octet-stream"
+            } else {
+                uploadPath = thumbnailStore.uploadThumbnailFile(entity.id)?.absolutePath ?: return null
+                fileName = "${UUID.randomUUID()}.jpg"
+                mimeType = "image/jpeg"
             }
+            val completed = telegramClient.uploadDocument(
+                chatId = chatId,
+                localPath = uploadPath,
+                fileName = fileName,
+                mimeType = mimeType,
+                caption = ICON_CAPTION,
+                thumbnailPath = null
+            ).first { it is TelegramUploadEvent.Completed } as TelegramUploadEvent.Completed
+            val doc = completed.document
+            "${doc.remoteFileId}:${doc.messageId}"
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
         } finally {
-            stagingIconFile?.delete()
+            staging?.delete()
         }
-
-        return resultId
     }
 
     companion object {
+        private const val MAX_PREVIEW_BYTES = 512 * 1024
         const val ICON_CAPTION = "#driveinfinity-icon"
     }
 }
+
+
+internal fun canUploadPreview(mimeType: String, name: String, encrypted: Boolean): Boolean =
+    MimeTypes.isApk(mimeType, name) ||
+        encrypted && (mimeType.startsWith("image/") || mimeType.startsWith("video/") || mimeType.startsWith("audio/"))

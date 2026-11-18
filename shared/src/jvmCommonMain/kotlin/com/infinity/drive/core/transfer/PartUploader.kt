@@ -47,8 +47,7 @@ class PartUploader(
     private val streamCrypto: StreamCrypto,
     private val wrappedKeyRepository: WrappedKeyRepository,
     private val thumbnailStore: ThumbnailStore,
-    private val dispatchers: DispatcherProvider,
-    private val apkIconUploader: ApkIconUploader
+    private val dispatchers: DispatcherProvider
 ) {
 
     sealed interface Event {
@@ -98,17 +97,13 @@ class PartUploader(
                 }
                 if (encrypt) emit(Event.PartDone(index, partCount))
 
-                val iconFileId = if (index == 0) {
-                    apkIconUploader.uploadIconIfApk(entity, chatId, encrypt)
-                } else null
-
                 val partManifest = manifest.copy(
                     version = RemoteFileManifest.PART_VERSION,
                     partCount = partCount,
                     partIndex = index,
                     partOffset = plainOffset,
                     partSize = plainSize,
-                    iconFileId = if (index == 0) iconFileId ?: manifest.iconFileId else null
+                    iconFileId = if (index == 0) manifest.iconFileId else null
                 )
                 val partName = if (encrypt) {
                     FileParts.nameFor(entity.id, index)

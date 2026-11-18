@@ -74,11 +74,11 @@ class AndroidThumbnailStore(
 
     override suspend fun thumbnailBytes(fileId: String): ByteArray? {
         if(!hiddenAccess.canRead(fileId))return null
-        return thumbnailForUpload(fileId)
+        return thumbnailForBackup(fileId)
     }
 
     /** Trusted background upload preparation does not grant UI thumbnail access. */
-    private suspend fun thumbnailForUpload(fileId:String):ByteArray? {
+    override suspend fun thumbnailForBackup(fileId:String):ByteArray? {
         return fileLocks[(fileId.hashCode() and Int.MAX_VALUE)%fileLocks.size].withLock {
         val entity=fileDao.byId(fileId)?:return null
         if (!settingsRepository.preferences.first().linkPreviews && isNote(fileId)) {
@@ -88,13 +88,14 @@ class AndroidThumbnailStore(
         thumbnailDao.byFileId(fileId)?.let { cached ->
             val file = File(cached.path)
             if (file.exists() && file.name==thumbnailName(entity)) {
-                thumbnailDao.touch(fileId, System.currentTimeMillis())
-                val raw = file.readBytes()
-                return if (cached.encrypted) {
-                    runCatching {
-                        streamCrypto.decryptBytes(thumbnailKey(), raw)
-                    }.getOrNull()
-                } else raw
+                val decoded = runCatching {
+                    val raw = file.readBytes()
+                    if (cached.encrypted) streamCrypto.decryptBytes(thumbnailKey(), raw) else raw
+                }.getOrNull()
+                if (decoded != null) {
+                    thumbnailDao.touch(fileId, System.currentTimeMillis())
+                    return decoded
+                }
             }
             file.delete()
             thumbnailDao.delete(fileId)
@@ -104,7 +105,7 @@ class AndroidThumbnailStore(
     }
 
     override suspend fun uploadThumbnailFile(fileId: String): File? {
-        val bytes = thumbnailForUpload(fileId) ?: return null
+        val bytes = thumbnailForBackup(fileId) ?: return null
         val dir = File(storagePaths.cacheDir, "upload-thumbs").apply { mkdirs() }
         val target = File(dir, "$fileId.jpg")
         return runCatching {
@@ -169,7 +170,8 @@ class AndroidThumbnailStore(
             }
         } ?: return null
 
-        val encrypt = settingsRepository.preferences.first().encryptThumbnails
+        val prefs = settingsRepository.preferences.first()
+        val encrypt = prefs.encryptThumbnails || entity.isEncrypted || prefs.encryptFiles
         val stored = if (encrypt) {
             streamCrypto.encryptBytes(thumbnailKey(), jpegBytes)
         } else jpegBytes
@@ -282,15 +284,17 @@ class AndroidThumbnailStore(
     private suspend fun fetchIconBytes(entity: FileEntity, iconFileId: String): ByteArray? {
         var readyPath: String? = null
         val rawRemoteFileId = iconFileId.substringBefore(":")
-        runCatching {
+        try {
             telegramClient.downloadDocument(rawRemoteFileId).collect { event ->
-                if (event is TelegramDownloadEvent.Completed) {
-                    readyPath = event.localPath
-                }
+                if (event is TelegramDownloadEvent.Completed) readyPath = event.localPath
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            return null
         }
-        val path = readyPath ?: return null
-        val rawBytes = runCatching { File(path).readBytes() }.getOrNull() ?: return null
+        val file = readyPath?.let(::File)?.takeIf { it.isFile && it.length() in 1..(600 * 1024L) } ?: return null
+        val rawBytes = runCatching { file.readBytes() }.getOrNull() ?: return null
         return if (entity.isEncrypted) {
             val key = wrappedKeyRepository.get(CryptoKeys.CONTENT) ?: return null
             runCatching { streamCrypto.decryptBytes(key, rawBytes) }.getOrNull()
@@ -300,6 +304,7 @@ class AndroidThumbnailStore(
     }
 
     private suspend fun fetchRemoteThumbnail(entity: FileEntity): ByteArray? {
+        if (entity.isEncrypted) return null
         val chatId = entity.chatId ?: return null
         val messageId = entity.messageId ?: return null
         if (MimeTypes.isText(entity.mimeType) &&

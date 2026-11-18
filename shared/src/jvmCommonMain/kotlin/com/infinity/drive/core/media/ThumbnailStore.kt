@@ -10,5 +10,8 @@ interface ThumbnailStore {
     /** Reads an existing, valid preview only. Never generates, downloads or fetches a link preview. */
     suspend fun cachedThumbnailBytes(fileId:String):ByteArray? = null
 
+    /** Upload preparation can seal these bytes without a plaintext staging image. */
+    suspend fun thumbnailForBackup(fileId: String): ByteArray? = thumbnailBytes(fileId)
+
     suspend fun uploadThumbnailFile(fileId: String): File?
 }

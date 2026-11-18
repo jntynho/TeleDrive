@@ -212,7 +212,7 @@ class TransferExecutor(
             ?.takeIf { entity.chatId == chatId && filePartDao.countOf(entity.id) == 0 }
 
         val rawIconPath = if(encrypt||entity.category==com.infinity.drive.domain.model.FileCategory.IMAGE)null else thumbnailStore.uploadThumbnailFile(entity.id)?.absolutePath
-        val iconFileId = apkIconUploader.uploadIconIfApk(entity, chatId, encrypt)
+        val iconFileId = apkIconUploader.uploadPreviewDocument(entity, chatId, encrypt)
         val previewPath = if (encrypt || entity.category == com.infinity.drive.domain.model.FileCategory.IMAGE) null else rawIconPath
 
         val manifest = RemoteFileManifest(
