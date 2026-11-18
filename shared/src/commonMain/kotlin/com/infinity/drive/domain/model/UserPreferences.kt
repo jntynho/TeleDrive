@@ -50,6 +50,7 @@ data class UserPreferences(
     val showRecentFiles: Boolean = true,
     val linkPreviews: Boolean = true,
     val textPreviewScale: Float = 1f,
+    val smartFolders: List<SmartFolder> = emptyList(),
 
     val sortField: FileSortField = FileSortField.NAME,
     val sortDirection: SortDirection = SortDirection.ASCENDING,

@@ -27,7 +27,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.unit.dp
@@ -46,6 +45,11 @@ import com.infinity.drive.resources.common_clear
 import com.infinity.drive.resources.search_section_files
 import com.infinity.drive.resources.search_section_folders
 import com.infinity.drive.domain.model.FileTags
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.infinity.drive.resources.smart_folders_title
 import com.infinity.drive.resources.search_files_or_tags
 import com.infinity.drive.domain.model.FileCategory
 import com.infinity.drive.presentation.components.EmptyState
@@ -67,6 +71,22 @@ fun SearchScreen(
     showHeader:Boolean=true,modifier:Modifier=Modifier
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    val smartFolders by viewModel.smartFolders.collectAsStateWithLifecycle()
+    var showSmartFolders by remember { mutableStateOf(false) }
+    if (showSmartFolders) {
+        SmartFoldersDialog(
+            folders = smartFolders,
+            canSave = state.searched,
+            open = {
+                viewModel.openSmartFolder(it)
+                showSmartFolders = false
+            },
+            remove = viewModel::removeSmartFolder,
+            save = viewModel::saveSmartFolder,
+            close = { showSmartFolders = false }
+        )
+    }
 
     val listState = rememberLazyListState()
     val lifted by rememberToolbarLift(listState)
@@ -92,6 +112,11 @@ fun SearchScreen(
                     .padding(horizontal = 12.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                FilterChip(
+                    selected = false,
+                    onClick = { showSmartFolders = true },
+                    label = { Text(stringResource(Res.string.smart_folders_title)) }
+                )
                 FilterChip(
                     selected = state.filters.backedUpOnly,
                     onClick = { viewModel.setBackedUpOnly(!state.filters.backedUpOnly) },

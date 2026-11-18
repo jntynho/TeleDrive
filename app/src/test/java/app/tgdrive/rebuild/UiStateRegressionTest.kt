@@ -11,6 +11,7 @@ import com.infinity.drive.domain.repository.ChannelRepository
 import com.infinity.drive.presentation.channels.ChannelsViewModel
 import com.infinity.drive.domain.repository.FileRepository
 import com.infinity.drive.domain.repository.TransferRepository
+import com.infinity.drive.domain.repository.SettingsRepository
 import com.infinity.drive.presentation.note.NoteEditorViewModel
 import com.infinity.drive.presentation.search.SearchViewModel
 import kotlinx.coroutines.*
@@ -89,6 +90,44 @@ class UiStateRegressionTest {
             assertFalse(vm.uiState.value.filters.backedUpOnly)
             assertTrue(vm.uiState.value.filters.notBackedUpOnly)
         }finally{clear(vm);Dispatchers.resetMain()}
+    }
+
+    @Test fun smartFoldersSaveSearchRulesAndRejectOpeningAnotherDrive() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val preferences = MutableStateFlow(UserPreferences(storageChatId = -1L))
+        val repo = fake<FileRepository> { method, _ -> error(method) }
+        val settings = fake<SettingsRepository> { method, args ->
+            when (method) {
+                "getPreferences" -> preferences
+                "update" -> {
+                    @Suppress("UNCHECKED_CAST")
+                    preferences.value = (args[0] as (UserPreferences) -> UserPreferences)(preferences.value)
+                    Unit
+                }
+                else -> error(method)
+            }
+        }
+        val vm = SearchViewModel(repo, settings)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.smartFolders.collect() }
+        try {
+            vm.setQuery("#travel")
+            vm.setCategory(FileCategory.IMAGE)
+            assertTrue(vm.saveSmartFolder("Travel photos"))
+            assertFalse(vm.saveSmartFolder("travel photos"))
+            runCurrent()
+            val folder = vm.smartFolders.value.single()
+            assertEquals("#travel", folder.query)
+            assertEquals(FileCategory.IMAGE, folder.category)
+            assertEquals(-1L, folder.chatId)
+            preferences.value = preferences.value.copy(storageChatId = -2L)
+            vm.removeSmartFolder(folder)
+            runCurrent()
+            assertTrue(vm.smartFolders.value.isEmpty())
+            assertEquals(folder, preferences.value.smartFolders.single())
+        } finally {
+            clear(vm)
+            Dispatchers.resetMain()
+        }
     }
 
     @Test fun noteKeepsExactBodyAndBuffersSaveCompletionUntilACollectorArrives()=runTest {

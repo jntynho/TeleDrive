@@ -9,6 +9,7 @@ import com.infinity.drive.core.telegram.TelegramCredentials
 import com.infinity.drive.data.local.preferences.PreferenceKeys
 import com.infinity.drive.domain.model.AppLanguage
 import com.infinity.drive.domain.model.BackupFolderRule
+import com.infinity.drive.domain.model.SmartFolder
 import kotlinx.serialization.json.Json
 import com.infinity.drive.domain.model.UserPreferences
 import com.infinity.drive.domain.model.DashboardStyle
@@ -22,7 +23,7 @@ class SettingsRepositoryImpl(
     private val credentialCipher: CredentialCipher
 ) : SettingsRepository {
 
-    private val folderRuleJson = Json { ignoreUnknownKeys = true }
+    private val collectionsJson = Json { ignoreUnknownKeys = true }
 
     override val preferences: Flow<UserPreferences> = dataStore.data.map { it.toUserPreferences() }
 
@@ -84,7 +85,10 @@ class SettingsRepositoryImpl(
                 ?: defaults.instantBackupEnabled,
             backupFolders = this[PreferenceKeys.BACKUP_FOLDERS] ?: defaults.backupFolders,
             backupFolderRules = this[PreferenceKeys.BACKUP_FOLDER_RULES]?.let { stored ->
-                runCatching { folderRuleJson.decodeFromString<List<BackupFolderRule>>(stored) }.getOrNull()
+                runCatching { collectionsJson.decodeFromString<List<BackupFolderRule>>(stored) }.getOrNull()
+            }.orEmpty(),
+            smartFolders = this[PreferenceKeys.SMART_FOLDERS]?.let { stored ->
+                runCatching { collectionsJson.decodeFromString<List<SmartFolder>>(stored) }.getOrNull()
             }.orEmpty(),
             backupWifiOnly = this[PreferenceKeys.BACKUP_WIFI_ONLY] ?: defaults.backupWifiOnly,
             downloadDirectory = this[PreferenceKeys.DOWNLOAD_DIRECTORY],
@@ -190,7 +194,9 @@ class SettingsRepositoryImpl(
         this[PreferenceKeys.INSTANT_BACKUP_ENABLED] = prefs.instantBackupEnabled
         this[PreferenceKeys.BACKUP_FOLDERS] = prefs.backupFolders
         if (prefs.backupFolderRules.isEmpty()) remove(PreferenceKeys.BACKUP_FOLDER_RULES)
-        else this[PreferenceKeys.BACKUP_FOLDER_RULES] = folderRuleJson.encodeToString(prefs.backupFolderRules)
+        else this[PreferenceKeys.BACKUP_FOLDER_RULES] = collectionsJson.encodeToString(prefs.backupFolderRules)
+        if (prefs.smartFolders.isEmpty()) remove(PreferenceKeys.SMART_FOLDERS)
+        else this[PreferenceKeys.SMART_FOLDERS] = collectionsJson.encodeToString(prefs.smartFolders)
         this[PreferenceKeys.BACKUP_WIFI_ONLY] = prefs.backupWifiOnly
         prefs.downloadDirectory?.let { this[PreferenceKeys.DOWNLOAD_DIRECTORY] = it }
             ?: remove(PreferenceKeys.DOWNLOAD_DIRECTORY)

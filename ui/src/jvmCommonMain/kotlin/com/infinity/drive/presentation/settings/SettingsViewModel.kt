@@ -630,7 +630,8 @@ class SettingsViewModel(
                                 onboardingComplete = false,
                                 storageChatId = null,
                                 backupFolders = emptySet(),
-                                backupFolderRules = emptyList()
+                                backupFolderRules = emptyList(),
+                                smartFolders = emptyList()
                             )
                         }
                     }

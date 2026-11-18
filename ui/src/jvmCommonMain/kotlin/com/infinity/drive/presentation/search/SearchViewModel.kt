@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.infinity.drive.domain.model.*
 import com.infinity.drive.domain.repository.FileRepository
+import com.infinity.drive.domain.repository.SettingsRepository
+import java.util.UUID
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -36,7 +39,10 @@ private data class SearchSnapshot(val request: SearchRequest? = null,
 
 /** One cancellable request owns both result types, loading and error; stale results never escape. */
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
-class SearchViewModel(private val fileRepository: FileRepository) : ViewModel() {
+class SearchViewModel(
+    private val fileRepository: FileRepository,
+    private val settings: SettingsRepository? = null
+) : ViewModel() {
     private val query = MutableStateFlow("")
     private val filters = MutableStateFlow(SearchFilters())
     private val retry = MutableStateFlow(0)
@@ -73,6 +79,48 @@ class SearchViewModel(private val fileRepository: FileRepository) : ViewModel() 
             searching=request.active&&(!current||snapshot.loading),searched=request.active,
             error=if(current)snapshot.error else null)
     }.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5_000),SearchUiState())
+    val smartFolders: StateFlow<List<SmartFolder>> = (settings?.preferences?.map { prefs ->
+        prefs.smartFolders.filter { it.chatId == prefs.storageChatId }.sortedBy { it.name.lowercase() }
+    } ?: flowOf(emptyList())).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    suspend fun saveSmartFolder(name: String): Boolean {
+        val repository = settings ?: return false
+        val title = name.trim()
+        val text = query.value.trim()
+        val filter = filters.value
+        if (title.isBlank() || title.length > 60 || (text.isBlank() && !filter.hasCriteria())) return false
+        val id = UUID.randomUUID().toString()
+        repository.update { prefs ->
+            val chat = prefs.storageChatId
+            if (chat == null || prefs.smartFolders.any { it.chatId == chat && it.name.equals(title, true) }) prefs
+            else prefs.copy(smartFolders = prefs.smartFolders + SmartFolder(
+                id, chat, title, text, filter.category, filter.backedUpOnly, filter.notBackedUpOnly,
+                filter.minSizeMb, filter.sortField, filter.sortDirection
+            ))
+        }
+        return repository.preferences.first().smartFolders.any { it.id == id }
+    }
+
+    fun openSmartFolder(folder: SmartFolder) {
+        viewModelScope.launch {
+            if (settings?.preferences?.first()?.storageChatId != folder.chatId) return@launch
+            filters.value = SearchFilters(
+                folder.category, folder.backedUpOnly, folder.notBackedUpOnly, folder.minimumSizeMb,
+                folder.sortField, folder.sortDirection
+            )
+            query.value = folder.query
+        }
+    }
+
+    fun removeSmartFolder(folder: SmartFolder) {
+        viewModelScope.launch {
+            settings?.update { prefs ->
+                if (prefs.storageChatId != folder.chatId) prefs
+                else prefs.copy(smartFolders = prefs.smartFolders.filterNot { it.id == folder.id && it.chatId == folder.chatId })
+            }
+        }
+    }
+
     fun setQuery(value:String){query.value=value}
     fun retry(){retry.update{it+1}}
     fun setCategory(category:FileCategory?){filters.update{it.copy(category=category)}}

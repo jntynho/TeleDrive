@@ -1047,4 +1047,10 @@
     <string name="files_tags_invalid">Use up to 8 short tags without pipe symbols.</string>
     <string name="files_tags_saved">Updated tags on %d files.</string>
     <string name="search_files_or_tags">Search files or #tag</string>
+    <string name="smart_folders_title">Smart folders</string>
+    <string name="smart_folder_create">Save current search</string>
+    <string name="smart_folder_empty">Search for files or choose a filter to save a smart folder.</string>
+    <string name="smart_folder_name">Folder name</string>
+    <string name="smart_folder_remove">Remove %s</string>
+    <string name="smart_folder_same_name">Choose a different name for this smart folder.</string>
 </resources>
