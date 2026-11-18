@@ -113,6 +113,7 @@ import com.infinity.drive.presentation.platform.PickResult
 import com.infinity.drive.presentation.preview.PreviewSequence
 import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.files_tree_export
+import com.infinity.drive.resources.files_duplicates_action
 import com.infinity.drive.resources.common_actions
 import com.infinity.drive.resources.common_add
 import com.infinity.drive.resources.common_add_favorites
@@ -217,6 +218,19 @@ fun FilesScreen(
     var confirmTrash by remember { mutableStateOf(false) }
     val treeDocument = LocalDirectoryTreeDocument.current
     var exportingTree by remember { mutableStateOf(false) }
+    var showDuplicates by remember { mutableStateOf(false) }
+    if (showDuplicates) {
+        val groupsFlow = remember(viewModel) { viewModel.observeDuplicateGroups() }
+        val groups by groupsFlow.collectAsStateWithLifecycle(initialValue = null)
+        DuplicatesSheet(
+            groups = groups,
+            onDismiss = { showDuplicates = false },
+            onOpen = { copy ->
+                showDuplicates = false
+                onOpenFile(copy.id, PreviewSequence(folderId = copy.folderId, filterByFolder = true))
+            }
+        )
+    }
 
     val uploadPicker = LocalMultiFilePicker.current
     val onPickUploads = {
@@ -509,6 +523,15 @@ fun FilesScreen(
                                     DropdownMenu(fileActions,{fileActions=false}){
                                         DropdownMenuItem(text={Text("Refresh")},enabled=!refreshing,onClick={fileActions=false;viewModel.refresh()})
                                         if(!audioOnly)DropdownMenuItem(text={Text("New folder")},onClick={fileActions=false;showCreateFolder=true})
+                                        if (!audioOnly) {
+                                            DropdownMenuItem(
+                                                text = { Text(stringResource(Res.string.files_duplicates_action)) },
+                                                onClick = {
+                                                    fileActions = false
+                                                    showDuplicates = true
+                                                }
+                                            )
+                                        }
                                         if (!audioOnly && treeDocument != null) {
                                             DropdownMenuItem(
                                                 text = { Text(stringResource(Res.string.files_tree_export)) },

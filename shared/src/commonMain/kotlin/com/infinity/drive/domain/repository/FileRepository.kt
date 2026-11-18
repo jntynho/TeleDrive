@@ -5,6 +5,7 @@ import com.infinity.drive.core.common.AppResult
 import com.infinity.drive.core.files.LocalCleanup
 import com.infinity.drive.domain.model.DriveFile
 import com.infinity.drive.domain.model.DriveFolder
+import com.infinity.drive.domain.model.DuplicateGroup
 import com.infinity.drive.domain.model.FileQuerySpec
 import com.infinity.drive.domain.model.FileSortField
 import com.infinity.drive.domain.model.FolderStatistics
@@ -66,6 +67,8 @@ interface FileRepository {
 
     /** Storage taken by each file category in the active drive, largest first. */
     fun observeStorageByCategory(): Flow<List<StorageSlice>>
+
+    fun observeDuplicateGroups(): Flow<List<DuplicateGroup>?>
 
     /** Emits a plain-text tree of accessible indexed names. A null folder means the drive root. */
     suspend fun exportDirectoryTree(folderId: String?, onLine: (String) -> Unit): AppResult<Int>

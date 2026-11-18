@@ -110,4 +110,36 @@ class GalleryQueryRegressionTest {
             db.close()
         }
     }
+    @Test fun duplicateIndexUsesBytesOrStableTelegramIdAndExcludesLockedItems() = runTest {
+        val db = database()
+        try {
+            val dao = db.fileDao()
+            val hash = "ab".repeat(32)
+            db.folderDao().upsert(FolderEntity(
+                "protected", 1, null, "Protected", isHidden = true, createdAt = 1, modifiedAt = 1
+            ))
+            val equalA = file("a", chat = 1).copy(contentHash = hash, sizeBytes = 30)
+            val equalB = file("b", chat = 1).copy(contentHash = hash.uppercase(), sizeBytes = 30)
+            dao.upsert(equalA)
+            dao.upsert(equalB)
+            dao.upsert(equalA.copy(id = "different-size", sizeBytes = 20))
+            dao.upsert(equalA.copy(id = "removed", trashedAt = 1))
+            dao.upsert(equalA.copy(id = "other", chatId = 2))
+            dao.upsert(equalA.copy(id = "hidden", folderId = "protected"))
+            dao.upsert(equalA.copy(id = "note", name = "Pinned.md"))
+            dao.upsert(file("remote-a", chat = 1).copy(remoteUniqueId = "shared"))
+            dao.upsert(file("remote-b", chat = 1).copy(remoteUniqueId = "shared"))
+            assertEquals(
+                setOf("a", "b", "remote-a", "remote-b"),
+                dao.observeDuplicateFiles(1, includeHidden = false, includeNotes = false).first().map { it.id }.toSet()
+            )
+            assertEquals(
+                setOf("a", "b", "hidden", "note", "remote-a", "remote-b"),
+                dao.observeDuplicateFiles(1, includeHidden = true, includeNotes = true).first().map { it.id }.toSet()
+            )
+            assertTrue(dao.observeDuplicateFiles(2, includeHidden = true, includeNotes = true).first().isEmpty())
+        } finally {
+            db.close()
+        }
+    }
 }

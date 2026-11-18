@@ -12,6 +12,7 @@ import androidx.room.Update
 import com.infinity.drive.data.local.entity.AlbumSummary
 import com.infinity.drive.data.local.entity.FolderEntity
 import com.infinity.drive.data.local.entity.FileEntity
+import com.infinity.drive.domain.model.DuplicateFile
 import com.infinity.drive.data.local.entity.HomeAggregates
 import com.infinity.drive.data.local.entity.LocalCopyRef
 import com.infinity.drive.domain.model.BackupState
@@ -378,6 +379,37 @@ interface FileDao {
            ORDER BY f.id LIMIT :limit"""
     )
     suspend fun integrityPage(chatId: Long, afterId: String, limit: Int): List<FileEntity>
+
+    @Query(
+        """WITH RECURSIVE blocked(id) AS (
+               SELECT id FROM folders WHERE isHidden = 1 AND NOT :includeHidden
+               UNION
+               SELECT f.id FROM folders f JOIN blocked b ON f.parentId = b.id
+           ), eligible AS (
+               SELECT f.id, f.name, f.folderId, p.name AS folderName, f.sizeBytes,
+                      CASE
+                        WHEN length(f.contentHash) = 64 AND f.contentHash NOT GLOB '*[^0-9a-fA-F]*'
+                          THEN 'sha256:' || lower(f.contentHash)
+                        WHEN length(f.remoteUniqueId) > 0 THEN 'telegram:' || f.remoteUniqueId
+                      END AS identity
+                 FROM files f LEFT JOIN folders p ON p.id = f.folderId AND p.chatId IS :chatId
+                WHERE f.chatId IS :chatId AND f.trashedAt IS NULL AND f.sizeBytes > 0
+                  AND (:includeHidden OR f.isHidden = 0)
+                  AND (:includeNotes OR lower(f.name) NOT LIKE '%.md')
+                  AND (f.folderId IS NULL OR f.folderId NOT IN (SELECT id FROM blocked))
+           ), matches AS (
+               SELECT identity, sizeBytes FROM eligible WHERE identity IS NOT NULL
+               GROUP BY identity, sizeBytes HAVING COUNT(*) > 1
+           )
+           SELECT e.* FROM eligible e JOIN matches m
+             ON e.identity = m.identity AND e.sizeBytes = m.sizeBytes
+           ORDER BY e.sizeBytes DESC, e.identity, e.name COLLATE NOCASE, e.id"""
+    )
+    fun observeDuplicateFiles(
+        chatId: Long?,
+        includeHidden: Boolean,
+        includeNotes: Boolean
+    ): Flow<List<DuplicateFile>>
 
     @Query("SELECT localPath FROM files WHERE localPath IS NOT NULL")
     suspend fun allLocalPaths(): List<String>

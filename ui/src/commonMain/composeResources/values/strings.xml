@@ -1001,4 +1001,9 @@
     <string name="folder_info_backed_up">Backed up to Telegram</string>
     <string name="files_tree_export">Export directory tree</string>
     <string name="files_tree_saved">Directory tree saved with %d entries.</string>
+    <string name="files_duplicates_action">Find duplicate files</string>
+    <string name="files_duplicates_method">Matches use the saved content hash or Telegram file ID.</string>
+    <string name="files_duplicates_empty">No duplicates found in the indexed files.</string>
+    <string name="files_duplicates_drive_root">Drive root</string>
+    <string name="files_duplicates_group">%1$d copies · %2$s each</string>
 </resources>

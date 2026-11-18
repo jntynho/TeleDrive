@@ -677,6 +677,8 @@ class FilesViewModel(
         _messages.tryEmit(message)
     }
 
+    fun observeDuplicateGroups() = fileRepository.observeDuplicateGroups()
+
     fun observeFolderStatistics(id: String) = fileRepository.observeFolderStatistics(id)
 
     fun dismissFolderInfo() = _folderInfoTarget.update { null }

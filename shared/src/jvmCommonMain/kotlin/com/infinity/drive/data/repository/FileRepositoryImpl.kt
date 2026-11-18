@@ -39,6 +39,8 @@ import com.infinity.drive.domain.model.LinkMetadata
 import com.infinity.drive.domain.model.MediaAlbum
 import com.infinity.drive.domain.model.SortDirection
 import com.infinity.drive.domain.model.StorageSlice
+import com.infinity.drive.domain.model.DuplicateFile
+import com.infinity.drive.domain.model.DuplicateGroup
 import com.infinity.drive.domain.model.FolderStatistics
 import com.infinity.drive.domain.repository.FileRepository
 import com.infinity.drive.domain.repository.SettingsRepository
@@ -267,6 +269,17 @@ class FileRepositoryImpl(
                 rows.map { StorageSlice(it.category, it.fileCount, it.totalBytes) }
             }
         }
+
+    override fun observeDuplicateGroups(): Flow<List<DuplicateGroup>?> =
+        combine(activeChannel.observe(), visibility) { chat, restriction -> chat to restriction }
+            .flatMapLatest { (chat, restriction) ->
+                fileDao.observeDuplicateFiles(chat, !restriction.first, !restriction.third)
+                    .map<List<DuplicateFile>, List<DuplicateGroup>?> { files ->
+                        files.groupBy { it.identity to it.sizeBytes }.map { (key, copies) ->
+                            DuplicateGroup(key.first, key.second, copies)
+                        }
+                    }.onStart { emit(null) }
+            }
 
     override suspend fun exportDirectoryTree(
         folderId: String?,
