@@ -114,6 +114,7 @@ import com.infinity.drive.presentation.preview.PreviewSequence
 import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.files_tree_export
 import com.infinity.drive.resources.files_duplicates_action
+import com.infinity.drive.resources.files_bulk_rename_title
 import com.infinity.drive.resources.common_actions
 import com.infinity.drive.resources.common_add
 import com.infinity.drive.resources.common_add_favorites
@@ -200,6 +201,15 @@ fun FilesScreen(
     AppBackHandler(searching){searching=false;searchModel.setQuery("")}
 
     val renameTarget by viewModel.renameTarget.collectAsStateWithLifecycle()
+    var bulkRenameIds by remember { mutableStateOf<List<String>?>(null) }
+    bulkRenameIds?.let { ids ->
+        BulkRenameDialog(
+            ids = ids,
+            load = viewModel::previewBulkRename,
+            apply = viewModel::applyBulkRename,
+            onClose = { bulkRenameIds = null }
+        )
+    }
     val files = viewModel.pagedFiles.collectAsLazyPagingItems()
     val infoTarget by viewModel.infoTarget.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
@@ -429,11 +439,18 @@ fun FilesScreen(
                                             }
                                         )
                                         DropdownMenuItem(
-                                            text = { Text(stringResource(Res.string.common_rename)) },
-                                            enabled = state.selectionCount == 1,
+                                            text = {
+                                                Text(stringResource(
+                                                    if (state.selection.size > 1 && state.folderSelection.isEmpty())
+                                                        Res.string.files_bulk_rename_title else Res.string.common_rename
+                                                ))
+                                            },
+                                            enabled = state.selectionCount == 1 ||
+                                                (state.selection.size > 1 && state.folderSelection.isEmpty()),
                                             onClick = {
                                                 showSelectionOverflow = false
-                                                viewModel.requestRenameSelected()
+                                                if (state.selection.size > 1) bulkRenameIds = state.selection.toList()
+                                                else viewModel.requestRenameSelected()
                                             }
                                         )
                                         DropdownMenuItem(

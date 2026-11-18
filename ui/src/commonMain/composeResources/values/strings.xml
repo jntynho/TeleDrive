@@ -1012,4 +1012,12 @@
     <string name="preview_zip_entry_saved">ZIP entry saved.</string>
     <string name="preview_zip_entry_password">ZIP password</string>
     <string name="preview_zip_entry_error">TeleDrive could not save this ZIP entry. Check the file and its password.</string>
+    <string name="files_bulk_rename_title">Rename files</string>
+    <string name="files_bulk_rename_help">Use {name} for the original name and {number} for the selection order. File extensions are kept.</string>
+    <string name="files_bulk_rename_template">Name pattern</string>
+    <string name="files_bulk_rename_invalid">Invalid file name</string>
+    <string name="files_bulk_rename_conflict">Name in use · %s</string>
+    <string name="files_bulk_rename_unchanged">Name stays the same</string>
+    <string name="files_bulk_rename_preview">→ %s</string>
+    <string name="files_bulk_rename_done">%d files renamed in TeleDrive.</string>
 </resources>

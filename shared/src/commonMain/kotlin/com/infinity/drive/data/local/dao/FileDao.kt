@@ -511,6 +511,9 @@ interface FileDao {
         chatId: Long?
     ): Flow<List<AlbumSummary>>
 
+    @Query("SELECT * FROM files WHERE folderId IS :folderId AND chatId IS :chatId AND trashedAt IS NULL")
+    suspend fun filesWithNamesInFolder(folderId: String?, chatId: Long?): List<FileEntity>
+
     @Query("SELECT name FROM files WHERE folderId IS :folderId AND trashedAt IS NULL")
     suspend fun namesInFolder(folderId: String?): List<String>
 

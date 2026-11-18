@@ -24,6 +24,8 @@ import com.infinity.drive.core.telegram.TelegramDownloadEvent
 import com.infinity.drive.core.telegram.TelegramException
 import com.infinity.drive.data.local.FileQueryBuilder
 import com.infinity.drive.data.local.dao.FileDao
+import com.infinity.drive.data.local.database.DriveInfinityDatabase
+import com.infinity.drive.data.local.database.inImmediateTransaction
 import com.infinity.drive.data.local.dao.FolderDao
 import com.infinity.drive.data.local.entity.FileEntity
 import com.infinity.drive.data.local.entity.FolderEntity
@@ -31,6 +33,8 @@ import com.infinity.drive.data.mapper.toDomain
 import com.infinity.drive.data.remote.telegram.ManifestCodec
 import com.infinity.drive.data.remote.telegram.RemoteFileManifest
 import com.infinity.drive.domain.model.BackupState
+import com.infinity.drive.domain.model.BulkRenamePreview
+import com.infinity.drive.domain.model.BulkRenameStatus
 import com.infinity.drive.domain.model.DriveFile
 import com.infinity.drive.domain.model.DriveFolder
 import com.infinity.drive.domain.model.FileCategory
@@ -45,6 +49,7 @@ import com.infinity.drive.domain.model.DuplicateGroup
 import com.infinity.drive.domain.model.FolderStatistics
 import com.infinity.drive.domain.repository.FileRepository
 import com.infinity.drive.domain.repository.SettingsRepository
+import com.infinity.drive.domain.usecase.BuildBulkRenamePreview
 import com.infinity.drive.domain.usecase.FolderCycleCheck
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -80,7 +85,8 @@ class FileRepositoryImpl(
     private val settingsRepository: SettingsRepository,
     private val fileImporter: FileImporter,
     private val hiddenAccess:com.infinity.drive.core.security.HiddenContentAccess,
-    private val transferDao: com.infinity.drive.data.local.dao.TransferDao
+    private val transferDao: com.infinity.drive.data.local.dao.TransferDao,
+    private val database: DriveInfinityDatabase
 ) : FileRepository {
 
     private val visibility=combine(hiddenAccess.lock.state.filter{it.ready}.map{it.restricted}.distinctUntilChanged(),hiddenAccess.protectedFolders.filterNotNull(), hiddenAccess.notesRestricted){restricted,folders,notes->Triple(restricted,folders,notes)}.distinctUntilChanged()
@@ -420,6 +426,45 @@ class FileRepositoryImpl(
         }
         markFilesDirty(listOf(id))
         return AppResult.Success(Unit)
+    }
+
+    override suspend fun previewBulkRename(ids: List<String>, template: String): AppResult<BulkRenamePreview> {
+        val drive = activeChannel.id()
+        val selected = ids.distinct()
+        val files = selected.chunked(SQL_BATCH).flatMap { fileDao.byIds(it) }.associateBy { it.id }
+        if (selected.size < 2 || files.size != selected.size) return AppResult.Failure(AppError.NotFound)
+        val sources = selected.map { id ->
+            val file = files.getValue(id)
+            if (file.chatId != drive || file.trashedAt != null || !hiddenAccess.canRead(id)) {
+                return AppResult.Failure(AppError.PermissionDenied())
+            }
+            BuildBulkRenamePreview.Source(id, file.folderId, file.name)
+        }
+        val siblings = sources.map { it.folderId }.distinct().associateWith { folder ->
+            fileDao.filesWithNamesInFolder(folder, drive)
+                .map { BuildBulkRenamePreview.Source(it.id, it.folderId, it.name) }
+        }
+        if (activeChannel.id() != drive) return AppResult.Failure(AppError.NotFound)
+        return AppResult.Success(BuildBulkRenamePreview.create(template, sources, siblings))
+    }
+
+    override suspend fun applyBulkRename(preview: BulkRenamePreview): AppResult<Int> {
+        val result = database.inImmediateTransaction {
+            val current = previewBulkRename(preview.rows.map { it.id }, preview.template)
+                .getOrNull()
+            if (current != preview || !preview.canApply) {
+                return@inImmediateTransaction AppResult.Failure(
+                    AppError.UnsupportedOperation("The rename preview has changed. Review the current names and try again.")
+                )
+            }
+            val toRename = preview.rows.filter { it.status == BulkRenameStatus.READY }
+            val now = System.currentTimeMillis()
+            for (row in toRename) fileDao.rename(row.id, row.newName, now)
+            toRename.map { it.id }.chunked(SQL_BATCH).forEach { fileDao.markPendingPublish(it) }
+            AppResult.Success(toRename.size)
+        }
+        if (result is AppResult.Success) publishScheduler.kick()
+        return result
     }
 
     override suspend fun renameFolder(id: String, newName: String): AppResult<Unit> {

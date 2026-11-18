@@ -13,6 +13,7 @@ import com.infinity.drive.core.files.DeleteConsentRequest
 import com.infinity.drive.core.files.FileImporter
 import com.infinity.drive.core.files.MimeTypes
 import com.infinity.drive.core.files.PendingShare
+import com.infinity.drive.domain.model.BulkRenamePreview
 import com.infinity.drive.domain.model.DriveFile
 import com.infinity.drive.domain.model.DriveFolder
 import com.infinity.drive.domain.model.FileQuerySpec
@@ -35,6 +36,7 @@ import com.infinity.drive.presentation.components.zoomedOut
 import com.infinity.drive.presentation.navigation.Route
 import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.files_tree_saved
+import com.infinity.drive.resources.files_bulk_rename_done
 import com.infinity.drive.resources.files_copied_all
 import com.infinity.drive.resources.files_copied_partial
 import com.infinity.drive.resources.files_import_copied
@@ -381,6 +383,18 @@ class FilesViewModel(
                 else -> null
             }
         }
+    }
+
+    suspend fun previewBulkRename(ids: List<String>, template: String): AppResult<BulkRenamePreview> =
+        fileRepository.previewBulkRename(ids, template)
+
+    suspend fun applyBulkRename(preview: BulkRenamePreview): AppResult<Int> {
+        val result = fileRepository.applyBulkRename(preview)
+        if (result is AppResult.Success) {
+            clearSelection()
+            _messages.tryEmit(UiText.Resource(Res.string.files_bulk_rename_done, result.value))
+        }
+        return result
     }
 
     fun dismissRename() {

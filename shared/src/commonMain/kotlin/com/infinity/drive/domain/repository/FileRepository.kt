@@ -3,6 +3,7 @@ package com.infinity.drive.domain.repository
 import androidx.paging.PagingData
 import com.infinity.drive.core.common.AppResult
 import com.infinity.drive.core.files.LocalCleanup
+import com.infinity.drive.domain.model.BulkRenamePreview
 import com.infinity.drive.domain.model.DriveFile
 import com.infinity.drive.domain.model.DriveFolder
 import com.infinity.drive.domain.model.DuplicateGroup
@@ -85,6 +86,10 @@ interface FileRepository {
     suspend fun createFolder(parentId: String?, name: String): AppResult<DriveFolder>
 
     suspend fun renameFile(id: String, newName: String): AppResult<Unit>
+
+    suspend fun previewBulkRename(ids: List<String>, template: String): AppResult<BulkRenamePreview>
+
+    suspend fun applyBulkRename(preview: BulkRenamePreview): AppResult<Int>
 
     suspend fun renameFolder(id: String, newName: String): AppResult<Unit>
 
