@@ -94,6 +94,8 @@ import org.koin.compose.viewmodel.koinViewModel
 import org.koin.compose.koinInject
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
+import com.infinity.drive.core.media.ExternalMediaStreams
+import kotlinx.coroutines.CancellationException
 import com.infinity.drive.resources.files_hide
 import com.infinity.drive.resources.files_unhide
 import com.infinity.drive.resources.Res
@@ -255,6 +257,31 @@ fun PreviewScreen(
 
     val view = LocalView.current
     val activity = LocalActivity.current
+    val externalStreams = koinInject<ExternalMediaStreams>()
+    val externalTitle = androidx.compose.ui.res.stringResource(app.tgdrive.R.string.external_media_open)
+    val externalError = androidx.compose.ui.res.stringResource(app.tgdrive.R.string.external_media_failed)
+    val privacy = com.infinity.drive.presentation.platform.LocalHiddenContentAccess.current
+    var canStreamExternally by remember(currentFile.id, currentFile.modifiedAt, currentFile.folderId, currentFile.isHidden) {
+        mutableStateOf(false)
+    }
+    LaunchedEffect(currentFile, activity, viewModel.fromTrash) {
+        canStreamExternally = !viewModel.fromTrash && activity != null && currentFile.hasRemoteCopy &&
+            currentFile.category in setOf(FileCategory.AUDIO, FileCategory.VIDEO) &&
+            privacy != null && !privacy.protectedFile(currentFile) && privacy.canRead(currentFile.id)
+    }
+    fun openInPlayer() {
+        val host = activity ?: return
+        showOverflow = false
+        mediaScope.launch {
+            try {
+                openExternalMedia(host, externalStreams, currentFile, externalTitle)
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (_: Exception) {
+                snackbarHostState.showSnackbar(externalError)
+            }
+        }
+    }
 
     val originalBarAppearance=remember(activity,view){
         activity?.window?.let{window->WindowInsetsControllerCompat(window,view).let{it.isAppearanceLightStatusBars to it.isAppearanceLightNavigationBars}}
@@ -335,7 +362,10 @@ fun PreviewScreen(
                     expandedHeight=com.infinity.drive.presentation.audio.audioHeaderHeight(),
                     title={com.infinity.drive.presentation.audio.AudioNowPlayingTitle(currentFile)},
                     navigationIcon={IconButton(onBack){Icon(DriveIcons.ArrowBack,stringResource(Res.string.common_back))}},
-                    actions={if(viewModel.fromTrash)IconButton({viewModel.showInfo(currentFile)}){Icon(DriveIcons.Info,"File details")}},
+                    actions = {
+                        if (viewModel.fromTrash) IconButton({ viewModel.showInfo(currentFile) }) { Icon(DriveIcons.Info, "File details") }
+                        else if (canStreamExternally) IconButton(::openInPlayer) { Icon(DriveIcons.OpenInNew, externalTitle) }
+                    },
                     colors=TopAppBarDefaults.topAppBarColors(containerColor=Color.Transparent,scrolledContainerColor=Color.Transparent,
                         titleContentColor=Color.White,navigationIconContentColor=Color.White,actionIconContentColor=Color.White)
                 )else TopAppBar(
@@ -398,7 +428,13 @@ fun PreviewScreen(
     }
     }
 
-    if(showOverflow)com.infinity.drive.presentation.components.FileActionsSheet(currentFile,onDismiss={showOverflow=false},onOpen={showOverflow=false},isOpen=true)
+    if (showOverflow) com.infinity.drive.presentation.components.FileActionsSheet(
+        currentFile, onDismiss = { showOverflow = false }, onOpen = { showOverflow = false }, isOpen = true
+    ) {
+        if (canStreamExternally) {
+            com.infinity.drive.presentation.components.SheetActionRow(externalTitle, DriveIcons.OpenInNew, onClick = ::openInPlayer)
+        }
+    }
 
     renameTarget?.let { file ->
         RenameDialog(

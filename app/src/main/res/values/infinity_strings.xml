@@ -61,4 +61,6 @@
     <string name="document_preview_empty">This document contains no previewable text or cells.</string>
     <string name="document_preview_truncated">Preview shortened. Download the original for the complete document.</string>
     <string name="video_picture_in_picture">Picture in picture</string>
+    <string name="external_media_open">Stream in another player</string>
+    <string name="external_media_failed">This file couldn’t be streamed in another player.</string>
 </resources>

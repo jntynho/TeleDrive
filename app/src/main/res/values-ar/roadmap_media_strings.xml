@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="external_media_open">البث في مشغّل آخر</string>
+    <string name="external_media_failed">تعذّر بث الملف في مشغّل آخر.</string>
+</resources>
