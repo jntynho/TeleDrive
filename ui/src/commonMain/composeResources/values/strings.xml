@@ -1020,4 +1020,10 @@
     <string name="files_bulk_rename_unchanged">Name stays the same</string>
     <string name="files_bulk_rename_preview">→ %s</string>
     <string name="files_bulk_rename_done">%d files renamed in TeleDrive.</string>
+    <string name="note_import_telegram">Import Telegram message</string>
+    <string name="note_import_telegram_link">Telegram message link</string>
+    <string name="note_import_telegram_action">Add to note</string>
+    <string name="note_import_telegram_invalid">Paste a link to a Telegram message.</string>
+    <string name="note_import_telegram_unavailable">This message has no text you can save with the current Telegram account.</string>
+    <string name="note_import_telegram_error">TeleDrive could not open the message. Check the link and try again.</string>
 </resources>

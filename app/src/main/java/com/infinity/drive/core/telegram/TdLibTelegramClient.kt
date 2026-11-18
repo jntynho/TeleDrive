@@ -1318,6 +1318,24 @@ internal class TdLibTelegramClient(
         return response.messages.mapNotNull { it?.toRemoteDocument() }
     }
 
+    override suspend fun messageMarkdown(link: String): String? {
+        val normalized = TelegramMessageLink.normalize(link) ?: return null
+        val message = send(TdApi.GetMessageLinkInfo(normalized)).message ?: return null
+        if (!message.canBeSaved || message.selfDestructType != null) return null
+        val formatted = when (val content = message.content) {
+            is TdApi.MessageText -> content.text
+            is TdApi.MessageDocument -> content.caption
+            is TdApi.MessagePhoto -> content.caption
+            is TdApi.MessageVideo -> content.caption
+            is TdApi.MessageAudio -> content.caption
+            is TdApi.MessageAnimation -> content.caption
+            is TdApi.MessageVoiceNote -> content.caption
+            else -> null
+        } ?: return null
+        if (formatted.text.isBlank()) return null
+        return send(TdApi.GetMarkdownText(formatted)).text.takeIf { it.isNotBlank() }
+    }
+
     override suspend fun listChats(query:String):List<TelegramChat> {
         val ids=if(query.isNotBlank()) send<TdApi.Chats>(TdApi.SearchChats(query,null,100)).chatIds else {
             runCatching { send<TdApi.Ok>(TdApi.LoadChats(TdApi.ChatListMain(),100)) }

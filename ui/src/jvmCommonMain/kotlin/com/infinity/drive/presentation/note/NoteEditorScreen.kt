@@ -53,6 +53,7 @@ import com.infinity.drive.resources.note_code
 import com.infinity.drive.resources.note_edit
 import com.infinity.drive.resources.note_heading
 import com.infinity.drive.resources.note_italic
+import com.infinity.drive.resources.note_import_telegram
 import com.infinity.drive.resources.note_link
 import com.infinity.drive.resources.note_link_text
 import com.infinity.drive.resources.note_link_url
@@ -74,6 +75,20 @@ fun NoteEditorScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var body by remember(state.loading) { mutableStateOf(TextFieldValue(state.body)) }
+
+    var importMessage by remember { mutableStateOf(false) }
+    if (importMessage) {
+        ImportTelegramNoteDialog(
+            onClose = { importMessage = false },
+            onImport = { markdown ->
+                val current = body.text
+                val updated = if (current.isBlank()) markdown else current.trimEnd() + "\n\n" + markdown
+                body = TextFieldValue(updated, selection = androidx.compose.ui.text.TextRange(updated.length))
+                viewModel.setBody(updated)
+                importMessage = false
+            }
+        )
+    }
 
     val linkText = stringResource(Res.string.note_link_text)
     val linkUrl = stringResource(Res.string.note_link_url)
@@ -124,6 +139,14 @@ fun NoteEditorScreen(
                             DriveIcons.ArrowBack,
                             contentDescription = stringResource(Res.string.common_back)
                         )
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = { importMessage = true },
+                        enabled = !state.saving && !state.loading && state.loadError == null
+                    ) {
+                        Icon(DriveIcons.Link, stringResource(Res.string.note_import_telegram))
                     }
                 }
             )
