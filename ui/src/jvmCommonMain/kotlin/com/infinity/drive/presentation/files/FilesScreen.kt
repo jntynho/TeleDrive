@@ -105,6 +105,10 @@ import com.infinity.drive.presentation.navigation.LocalBottomBarInset
 import com.infinity.drive.presentation.platform.FileDropArea
 import com.infinity.drive.presentation.platform.LocalDeleteConsentLauncher
 import com.infinity.drive.presentation.platform.LocalDirectoryTreeDocument
+import com.infinity.drive.presentation.platform.LocalFolderArchiveDocument
+import com.infinity.drive.resources.files_zip_export
+import com.infinity.drive.resources.files_zip_progress
+import com.infinity.drive.resources.files_zip_plaintext
 import com.infinity.drive.presentation.platform.LocalFileRevealer
 import com.infinity.drive.presentation.platform.LocalFileSharer
 import com.infinity.drive.presentation.platform.LocalFolderPicker
@@ -228,6 +232,31 @@ fun FilesScreen(
     var showCopyPicker by remember { mutableStateOf(false) }
     var showSelectionOverflow by remember { mutableStateOf(false) }
     var confirmTrash by remember { mutableStateOf(false) }
+    val archiveDocument = LocalFolderArchiveDocument.current
+    var confirmZip by remember { mutableStateOf(false) }
+    var exportingZip by remember { mutableStateOf(false) }
+    val writtenZip = remember { kotlinx.coroutines.flow.MutableStateFlow(0) }
+    if (confirmZip) {
+        ConfirmDialog(
+            title = stringResource(Res.string.files_zip_export),
+            message = stringResource(Res.string.files_zip_plaintext),
+            confirmLabel = stringResource(Res.string.files_zip_export),
+            onDismiss = { confirmZip = false },
+            onConfirm = {
+                confirmZip = false
+                exportingZip = true
+                writtenZip.value = 0
+                archiveDocument?.save(
+                    folderId = state.folderId,
+                    onProgress = { writtenZip.value = it },
+                    onResult = {
+                        exportingZip = false
+                        viewModel.onArchiveExported(it)
+                    }
+                )
+            }
+        )
+    }
     val treeDocument = LocalDirectoryTreeDocument.current
     var exportingTree by remember { mutableStateOf(false) }
     var showDuplicates by remember { mutableStateOf(false) }
@@ -549,6 +578,17 @@ fun FilesScreen(
                                                     fileActions = false
                                                     showDuplicates = true
                                                 }
+                                            )
+                                        }
+                                        if (!audioOnly && archiveDocument != null) {
+                                            val count by writtenZip.collectAsStateWithLifecycle()
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text(if (exportingZip) stringResource(Res.string.files_zip_progress, count)
+                                                    else stringResource(Res.string.files_zip_export))
+                                                },
+                                                enabled = !exportingZip,
+                                                onClick = { fileActions = false; confirmZip = true }
                                             )
                                         }
                                         if (!audioOnly && treeDocument != null) {

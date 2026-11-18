@@ -36,6 +36,7 @@ import com.infinity.drive.presentation.components.zoomedOut
 import com.infinity.drive.presentation.navigation.Route
 import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.files_tree_saved
+import com.infinity.drive.resources.files_zip_saved
 import com.infinity.drive.resources.files_bulk_rename_done
 import com.infinity.drive.resources.files_copied_all
 import com.infinity.drive.resources.files_copied_partial
@@ -681,6 +682,15 @@ class FilesViewModel(
 
     suspend fun exportDirectoryTree(folderId: String?, write: (String) -> Unit): AppResult<Int> =
         fileRepository.exportDirectoryTree(folderId, write)
+
+    fun onArchiveExported(result: AppResult<Int>?) {
+        val message = when (result) {
+            is AppResult.Success -> UiText.Resource(Res.string.files_zip_saved, result.value)
+            is AppResult.Failure -> result.error.toUiText()
+            null -> return
+        }
+        _messages.tryEmit(message)
+    }
 
     fun onDirectoryTreeExported(result: AppResult<Int>?) {
         val message = when (result) {

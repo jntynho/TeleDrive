@@ -35,6 +35,8 @@ val repositoryModule = module {
     singleOf(::ProxyRepositoryImpl) bind ProxyRepository::class
     singleOf(::SyncRepositoryImpl) bind SyncRepository::class
     singleOf(::DriveIntegrityChecker)
+    singleOf(::DriveContentReader)
+    singleOf(::FolderArchiveExporter)
     singleOf(::ChannelRepositoryImpl) bind ChannelRepository::class
     singleOf(::CacheRepositoryImpl) bind CacheRepository::class
     singleOf(::KeyBackupRepositoryImpl) bind KeyBackupRepository::class

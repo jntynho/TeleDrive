@@ -1026,4 +1026,8 @@
     <string name="note_import_telegram_invalid">Paste a link to a Telegram message.</string>
     <string name="note_import_telegram_unavailable">This message has no text you can save with the current Telegram account.</string>
     <string name="note_import_telegram_error">TeleDrive could not open the message. Check the link and try again.</string>
+    <string name="files_zip_export">Export folder as ZIP</string>
+    <string name="files_zip_plaintext">Save this folder and its accessible files as a standard ZIP. Files in the exported ZIP are readable without TeleDrive.</string>
+    <string name="files_zip_progress">Creating ZIP · %d files saved</string>
+    <string name="files_zip_saved">ZIP saved with %d files.</string>
 </resources>

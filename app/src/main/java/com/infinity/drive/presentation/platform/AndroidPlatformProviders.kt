@@ -274,9 +274,11 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
     val liquidNavigation=if(android.os.Build.VERSION.SDK_INT>=33)com.infinity.drive.presentation.navigation.liquid.rememberLiquidNavigation()else null
     val portableKeyFiles = rememberAndroidPortableKeyFiles()
     val directoryTreeDocument = rememberAndroidDirectoryTreeDocument()
+    val folderArchiveDocument = rememberAndroidFolderArchiveDocument()
     CompositionLocalProvider(
         LocalPortableKeyFiles provides portableKeyFiles,
         LocalDirectoryTreeDocument provides directoryTreeDocument,
+        LocalFolderArchiveDocument provides folderArchiveDocument,
         LocalLiquidNavigation provides liquidNavigation,
         LocalStartupPreparation provides startupPreparation,
         com.infinity.drive.presentation.components.LocalThumbnailRetryEpoch provides thumbnailRetryEpoch,
