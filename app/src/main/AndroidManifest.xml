@@ -37,6 +37,11 @@
         <action android:name="android.intent.action.BOOT_COMPLETED" />
       </intent-filter>
     </receiver>
+    <provider android:name="com.infinity.drive.core.files.TeleDriveDocumentsProvider"
+      android:authorities="${applicationId}.documents" android:exported="true"
+      android:grantUriPermissions="true" android:permission="android.permission.MANAGE_DOCUMENTS">
+      <intent-filter><action android:name="android.content.action.DOCUMENTS_PROVIDER" /></intent-filter>
+    </provider>
     <provider android:name="com.infinity.drive.core.media.ExternalMediaProvider" android:authorities="${applicationId}.stream" android:exported="false" android:grantUriPermissions="true" />
     <provider android:name="app.tgdrive.DriveFileProvider" android:authorities="${applicationId}.fileprovider" android:exported="false" android:grantUriPermissions="true">
       <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/infinity_file_paths" />

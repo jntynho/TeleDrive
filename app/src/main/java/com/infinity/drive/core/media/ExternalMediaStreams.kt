@@ -42,13 +42,24 @@ internal class ExternalMediaStreams(
 
     suspend fun authorize(context: Context, id: String): Uri {
         val file = files.getFile(id) ?: error("File unavailable")
-        require(file.category in setOf(FileCategory.VIDEO, FileCategory.AUDIO) && file.sizeBytes > 0)
+        require(file.category in setOf(FileCategory.VIDEO, FileCategory.AUDIO))
+        val grant = prepare(file)
+        synchronized(grants) {
+            grants.entries.removeAll { it.value.expiresAt <= SystemClock.elapsedRealtime() }
+            while (grants.size >= 12) grants.remove(grants.keys.first())
+            grants[grant.token] = grant
+        }
+        return Uri.Builder().scheme("content").authority(context.packageName + ".stream").appendPath(grant.token).build()
+    }
+
+    suspend fun prepare(file: DriveFile): Grant {
+        require(file.sizeBytes >= 0)
         val chatId = requireNotNull(file.chatId)
         val remote = requireNotNull(file.remoteFileId)
         require(file.hasRemoteCopy && canRead(file))
         check(telegram.ownedPrivateChannel(chatId) != null)
 
-        val fileParts = parts.partsOf(id).map { part ->
+        val fileParts = parts.partsOf(file.id).map { part ->
             require(part.chatId == chatId && part.messageId != null)
             MediaPart(requireNotNull(part.remoteFileId), part.plainOffset, part.plainSize)
         }.ifEmpty {
@@ -64,13 +75,7 @@ internal class ExternalMediaStreams(
         }
         if (file.isEncrypted) check(keys.exists(CryptoKeys.CONTENT))
 
-        val token = UUID.randomUUID().toString()
-        synchronized(grants) {
-            grants.entries.removeAll { it.value.expiresAt <= SystemClock.elapsedRealtime() }
-            while (grants.size >= 12) grants.remove(grants.keys.first())
-            grants[token] = Grant(token, file, fileParts, SystemClock.elapsedRealtime() + GRANT_DURATION_MS)
-        }
-        return Uri.Builder().scheme("content").authority(context.packageName + ".stream").appendPath(token).build()
+        return Grant(UUID.randomUUID().toString(), file, fileParts, SystemClock.elapsedRealtime() + GRANT_DURATION_MS)
     }
 
     fun grant(uri: Uri): Grant? = synchronized(grants) {
@@ -89,7 +94,7 @@ internal class ExternalMediaStreams(
         check(alive && canRead(grant.file))
     }
 
-    private suspend fun canRead(snapshot: DriveFile): Boolean {
+    suspend fun canRead(snapshot: DriveFile): Boolean {
         if (appLock.locked.value || telegram.authState.value != TelegramAuthState.Ready) return false
         val prefs = settings.preferences.first()
         if (!prefs.onboardingComplete || prefs.storageChatId != snapshot.chatId || prefs.blockScreenCapture) return false
