@@ -2,10 +2,12 @@ package com.infinity.drive.presentation.onboarding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.infinity.drive.core.common.AppError
 import com.infinity.drive.core.common.AppResult
 import com.infinity.drive.core.telegram.CodeDeliveryChannel
 import com.infinity.drive.core.telegram.TelegramAuthState
 import com.infinity.drive.core.telegram.TelegramCredentials
+import com.infinity.drive.core.telegram.TelegramLoginRecovery
 import com.infinity.drive.core.transfer.MaintenanceScheduler
 import com.infinity.drive.domain.model.Country
 import com.infinity.drive.domain.model.DriveChannel
@@ -22,6 +24,7 @@ import com.infinity.drive.resources.onboarding_api_hash_short
 import com.infinity.drive.resources.onboarding_api_id_number
 import com.infinity.drive.resources.onboarding_enter_phone
 import com.infinity.drive.resources.onboarding_no_account
+import com.infinity.drive.resources.recovery_import_configure
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -43,6 +46,7 @@ class OnboardingViewModel(
     private val platformCapabilities: PlatformCapabilities
 ) : ViewModel() {
 
+    private var submittingRecovery = false
     val inputDrafts=com.infinity.drive.presentation.input.InlineDrafts()
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
@@ -54,12 +58,14 @@ class OnboardingViewModel(
     }
 
     private fun onAuthStateChanged(state: TelegramAuthState) {
+        if (state == TelegramAuthState.Ready && submittingRecovery) return
         if(state is TelegramAuthState.Ready)inputDrafts.clear()
         _uiState.update { current ->
             when (state) {
                 /* Falling back here from a QR wait means the token died, so the
                    cached link is dropped and a fresh one can be asked for. */
                 is TelegramAuthState.WaitingForPhoneNumber -> when {
+                    submittingRecovery -> current
                     current.step in listOf(OnboardingStep.API_CREDENTIALS, OnboardingStep.PHONE) && current.working ->
                         current.copy(step = OnboardingStep.PHONE, working = false, error = null)
 
@@ -217,6 +223,71 @@ class OnboardingViewModel(
 
     fun selectCountry(country: Country) {
         _uiState.update { it.copy(selectedCountry = country) }
+    }
+
+    fun submitRecovery(recovery: TelegramLoginRecovery) {
+        if (_uiState.value.working) return
+        _uiState.update { it.copy(step = OnboardingStep.PHONE, qrLink = null, qrMode = false) }
+        submittingRecovery = true
+        runAction {
+            try {
+                when (val result = telegramAuthRepository.startFromStoredCredentials()) {
+                    is AppResult.Failure -> result
+                    is AppResult.Success -> if (!result.value) {
+                        _uiState.update {
+                            it.copy(step = OnboardingStep.API_CREDENTIALS, working = false,
+                                error = UiText.Resource(Res.string.recovery_import_configure))
+                        }
+                        AppResult.Success(Unit)
+                    } else {
+                        val state = withTimeoutOrNull(30_000) {
+                            telegramAuthRepository.authState.first {
+                                it == TelegramAuthState.WaitingForPhoneNumber ||
+                                    it == TelegramAuthState.Ready || it is TelegramAuthState.Failed
+                            }
+                        }
+                        when (state) {
+                            TelegramAuthState.WaitingForPhoneNumber -> {
+                                val accepted = telegramAuthRepository.submitLoginRecovery(recovery)
+                                if (accepted is AppResult.Success) {
+                                    val next = withTimeoutOrNull(30_000) {
+                                        telegramAuthRepository.authState.first {
+                                            it != TelegramAuthState.WaitingForPhoneNumber &&
+                                                it != TelegramAuthState.Initializing
+                                        }
+                                    }
+                                    when (next) {
+                                        null, TelegramAuthState.Closed, TelegramAuthState.LoggingOut ->
+                                            AppResult.Failure(AppError.AuthenticationFailed())
+                                        TelegramAuthState.Ready -> finishRecovery()
+                                        else -> accepted
+                                    }
+                                } else accepted
+                            }
+                            TelegramAuthState.Ready -> {
+                                val user = telegramAuthRepository.getCurrentUser()
+                                when {
+                                    user is AppResult.Failure -> user
+                                    user is AppResult.Success && user.value.id == recovery.accountId -> finishRecovery()
+                                    else -> AppResult.Failure(AppError.AuthenticationFailed(
+                                        "A different Telegram account is already signed in."
+                                    ))
+                                }
+                            }
+                            else -> AppResult.Failure(AppError.AuthenticationFailed())
+                        }
+                    }
+                }
+            } finally {
+                submittingRecovery = false
+            }
+        }
+    }
+
+    private fun finishRecovery(): AppResult<Unit> {
+        submittingRecovery = false
+        onAuthStateChanged(TelegramAuthState.Ready)
+        return AppResult.Success(Unit)
     }
 
     fun submitPhone(phone: String) {

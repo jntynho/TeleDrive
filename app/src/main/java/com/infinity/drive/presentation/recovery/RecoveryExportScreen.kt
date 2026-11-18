@@ -216,7 +216,7 @@ internal fun RecoveryExportScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun RecoveryPassphraseField(
+internal fun RecoveryPassphraseField(
     value: String,
     onChange: (String) -> Unit,
     label: StringResource,

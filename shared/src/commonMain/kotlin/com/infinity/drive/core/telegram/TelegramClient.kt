@@ -93,6 +93,10 @@ interface TelegramClient {
     /** Returns a server-issued reauthorization token for the current signed-in account, if offered. */
     suspend fun getLoginRecovery(): TelegramLoginRecovery? = null
 
+    suspend fun submitLoginRecovery(recovery: TelegramLoginRecovery) {
+        throw TelegramException(400, "Sign-in recovery is unavailable on this platform.")
+    }
+
     /** Read-only compatibility access; never a destination for new uploads. */
     suspend fun previousSavedMessagesChatId(): Long = error("Previous library access is unavailable")
 

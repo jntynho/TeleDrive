@@ -91,7 +91,7 @@ class NativeSignInUiTest {
                     override fun openAppSettings()=Unit
                     override fun openAllFilesAccess(){fileAccessOpened=true}
                 }
-            ){DriveInfinityTheme{OnboardingScreen({},{},model)}}
+            ){DriveInfinityTheme{OnboardingScreen({},{},model,com.infinity.drive.presentation.platform.AndroidPlatformScreens)}}
         }}
     }
     @After fun close(){
@@ -104,6 +104,14 @@ class NativeSignInUiTest {
         val file=File("build/design-previews/native-auth-$name.png").apply{parentFile.mkdirs()}
         file.outputStream().use{compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG,100,it)}
     }
+    @Test fun welcomeCanOpenRecoveryAndReturnToSignIn() {
+        compose.onNodeWithText("Restore sign-in from file", substring = false).performScrollTo().performClick()
+        compose.onNodeWithText("Choose recovery file", substring = false).assertIsDisplayed()
+        compose.onNodeWithText("Open recovery file", substring = false).assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithText("Get started", substring = false).performScrollTo().assertIsDisplayed()
+    }
+
     @Test fun nativePhoneAndCodeEditorsSupportPasteAndImeSubmissionWithoutAnEmbeddedKeyboard(){
         compose.onNodeWithText("Get started").assertIsDisplayed()
         compose.onNodeWithContentDescription("Use light theme").assertDoesNotExist()

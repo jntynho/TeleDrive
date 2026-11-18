@@ -30,6 +30,23 @@ class LoginRecoveryFileTest {
     }
 
     @Test
+    fun importsExistingVersionOneFilesAndRejectsWrongPasswordsAndDamagedData() {
+        val file = LoginRecoveryFile.encrypt(recovery, passphrase)
+        val imported = LoginRecoveryFile.decrypt(file, passphrase)
+        assertEquals(recovery.accountId, imported.accountId)
+        assertEquals(recovery.phoneNumber, imported.phoneNumber)
+        assertEquals(recovery.token, imported.token)
+        assertThrows(AEADBadTagException::class.java) {
+            LoginRecoveryFile.decrypt(file, "incorrect passphrase".toCharArray())
+        }
+        file[file.lastIndex] = (file.last().toInt() xor 1).toByte()
+        assertThrows(AEADBadTagException::class.java) { LoginRecoveryFile.decrypt(file, passphrase) }
+        assertThrows(IllegalArgumentException::class.java) {
+            LoginRecoveryFile.decrypt(ByteArray(LoginRecoveryFile.MAX_FILE_SIZE + 1), passphrase)
+        }
+    }
+
+    @Test
     fun authenticatesTheHeaderAndRequiresTheCorrectPassphrase() {
         val file = LoginRecoveryFile.encrypt(recovery, passphrase)
         val otherFile = LoginRecoveryFile.encrypt(recovery, passphrase)

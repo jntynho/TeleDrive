@@ -228,13 +228,16 @@ import com.infinity.drive.presentation.common.UiText
 import com.infinity.drive.presentation.common.resolve
 import com.infinity.drive.presentation.components.ChannelAvatar
 import com.infinity.drive.presentation.components.QrCode
+import com.infinity.drive.presentation.platform.PlatformScreens
+import com.infinity.drive.resources.recovery_import_title
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun OnboardingScreen(
     onOpenProxy: () -> Unit,
     onFinished: () -> Unit,
-    viewModel: OnboardingViewModel = koinViewModel()
+    viewModel: OnboardingViewModel = koinViewModel(),
+    recoveryScreens: PlatformScreens? = null
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -242,6 +245,24 @@ fun OnboardingScreen(
         LaunchedEffect(Unit) { onFinished() }
         return
     }
+
+    var showRecoveryImport by remember { mutableStateOf(false) }
+    if (recoveryScreens != null && showRecoveryImport &&
+        state.step in setOf(OnboardingStep.WELCOME, OnboardingStep.PHONE)
+    ) {
+        com.infinity.drive.presentation.common.AppBackHandler { showRecoveryImport = false }
+        recoveryScreens.RecoveryImport(
+            onBack = { showRecoveryImport = false },
+            onImport = {
+                showRecoveryImport = false
+                viewModel.submitRecovery(it)
+            }
+        )
+        return
+    }
+    val openRecovery = if (recoveryScreens?.supportsRecoveryImport == true && !state.working) {
+        { showRecoveryImport = true }
+    } else null
 
     // Follow the app palette and selected accent; fresh installations default to dark.
     val colors=MaterialTheme.colorScheme
@@ -274,7 +295,7 @@ fun OnboardingScreen(
                                 CompositionLocalProvider(LocalInlineInput provides pageInput,com.infinity.drive.presentation.input.LocalInlineDrafts provides viewModel.inputDrafts){
                                     formStates.SaveableStateProvider(step.name){
                         when (step) {
-                            OnboardingStep.WELCOME -> WelcomeStep(availableHeight=viewportHeight,onContinue = viewModel::start)
+                            OnboardingStep.WELCOME -> WelcomeStep(availableHeight=viewportHeight,onContinue = viewModel::start, onRecover = openRecovery)
                             OnboardingStep.API_CREDENTIALS -> CredentialsStep(
                                 working = state.working,
                                 error = state.error,
@@ -309,6 +330,7 @@ fun OnboardingScreen(
                                 onLoadCountries = viewModel::loadCountries,
                                 onSelectCountry = viewModel::selectCountry,
                                 onUseQrCode = viewModel::startQrLogin,
+                                onRecover = openRecovery,
                                 onOpenProxy = onOpenProxy,
                                 working = state.working,
                                 error = state.error,
@@ -572,7 +594,7 @@ private fun StepTitle(title: String, description: String,centered:Boolean=false)
 /** A native welcome with the same surfaces, spacing and typography as the signed-in library. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun WelcomeStep(availableHeight:androidx.compose.ui.unit.Dp,onContinue:()->Unit){
+private fun WelcomeStep(availableHeight: androidx.compose.ui.unit.Dp, onContinue: () -> Unit, onRecover: (() -> Unit)?) {
     val compact=availableHeight<650.dp||androidx.compose.ui.platform.LocalDensity.current.fontScale>=1.3f
     Column(Modifier.fillMaxWidth().heightIn(min=availableHeight).padding(horizontal=24.dp,vertical=24.dp),
         verticalArrangement=Arrangement.SpaceBetween){
@@ -596,6 +618,9 @@ private fun WelcomeStep(availableHeight:androidx.compose.ui.unit.Dp,onContinue:(
             Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
                 Text("Start with your Telegram account",style=MaterialTheme.typography.titleSmall)
                 BigButton("Get started",onContinue)
+                if (onRecover != null) {
+                    TextButton(onRecover) { Text(stringResource(Res.string.recovery_import_title)) }
+                }
                 Text("Your files stay in your storage channels.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -919,6 +944,7 @@ private fun PhoneStep(
     onLoadCountries: () -> Unit,
     onSelectCountry: (Country) -> Unit,
     onUseQrCode: () -> Unit,
+    onRecover: (() -> Unit)?,
     onOpenProxy: () -> Unit,
     onSubmit: (String) -> Unit
 ) {
@@ -982,6 +1008,11 @@ private fun PhoneStep(
             )
             Spacer(Modifier.width(8.dp))
             Text(stringResource(Res.string.onboarding_qr_sign_in))
+        }
+        if (onRecover != null) {
+            TextButton(onRecover, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                Text(stringResource(Res.string.recovery_import_title))
+            }
         }
         Spacer(Modifier.height(12.dp))
         BlockedNetworkCard(onOpenProxy = onOpenProxy)

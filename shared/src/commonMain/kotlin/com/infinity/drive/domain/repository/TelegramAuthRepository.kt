@@ -29,6 +29,9 @@ interface TelegramAuthRepository {
 
     suspend fun submitPhoneNumber(phoneNumber: String): AppResult<Unit>
 
+    suspend fun submitLoginRecovery(recovery: com.infinity.drive.core.telegram.TelegramLoginRecovery): AppResult<Unit> =
+        AppResult.Failure(com.infinity.drive.core.common.AppError.UnsupportedOperation())
+
     suspend fun requestQrCodeAuthentication(): AppResult<Unit>
 
     suspend fun restartAuthentication(): AppResult<Unit>

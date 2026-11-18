@@ -937,4 +937,11 @@
     <string name="recovery_export_saved">Recovery file saved</string>
     <string name="recovery_export_sign_in">Sign in to Telegram to create a recovery file.</string>
     <string name="recovery_export_working">Preparing recovery file</string>
+    <string name="recovery_import_title">Restore sign-in from file</string>
+    <string name="recovery_import_choose">Choose recovery file</string>
+    <string name="recovery_import_chosen">Recovery file selected</string>
+    <string name="recovery_import_open">Open recovery file</string>
+    <string name="recovery_import_invalid">The file or password could not be verified.</string>
+    <string name="recovery_import_confirm">Continue with account ending in %1$s</string>
+    <string name="recovery_import_configure">Set up Telegram API credentials first, then choose Restore sign-in from file.</string>
 </resources>

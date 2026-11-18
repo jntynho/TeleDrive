@@ -118,6 +118,62 @@ class TelegramTransportTest {
         assertEquals("synthetic-token", recovery?.token)
     }
 
+    @Test fun `recovery still waits for the Telegram password and verifies the account before Ready`() = runTest {
+        val wire = Wire()
+        val client = client(wire)
+        client.start(TelegramCredentials(12345, "a".repeat(32)))
+        wire.emit(TdApi.UpdateAuthorizationState(TdApi.AuthorizationStateWaitPhoneNumber()))
+
+        val recovery = com.infinity.drive.core.telegram.TelegramLoginRecovery(1234, "+12025550123", "synthetic-token")
+        val submit = backgroundScope.launch { client.submitLoginRecovery(recovery) }
+        runCurrent()
+        val request = wire.sent.filterIsInstance<TdApi.SetAuthenticationPhoneNumber>().single()
+        assertEquals(recovery.phoneNumber, request.phoneNumber)
+        assertArrayEquals(arrayOf(recovery.token), request.settings.authenticationTokens)
+        wire.reply(TdApi.SetAuthenticationPhoneNumber::class.java, TdApi.Ok())
+        runCurrent()
+        assertTrue(submit.isCompleted)
+
+        wire.emit(TdApi.UpdateAuthorizationState(TdApi.AuthorizationStateWaitPassword()))
+        assertTrue(client.authState.value is TelegramAuthState.WaitingForPassword)
+        wire.emit(TdApi.UpdateAuthorizationState(TdApi.AuthorizationStateReady()))
+        runCurrent()
+        assertEquals(TelegramAuthState.Initializing, client.authState.value)
+        wire.reply(TdApi.GetMe::class.java, TdApi.User().apply { id = 1234 })
+        runCurrent()
+        assertEquals(TelegramAuthState.Ready, client.authState.value)
+    }
+
+    @Test fun `a recovery account mismatch remains blocked after a client restart`() = runTest {
+        val credentials = TelegramCredentials(12345, "a".repeat(32))
+        val firstWire = Wire()
+        val first = client(firstWire)
+        first.start(credentials)
+        firstWire.emit(TdApi.UpdateAuthorizationState(TdApi.AuthorizationStateWaitPhoneNumber()))
+        val submit = backgroundScope.launch {
+            first.submitLoginRecovery(com.infinity.drive.core.telegram.TelegramLoginRecovery(1234, "+12025550123", "synthetic-token"))
+        }
+        runCurrent()
+        firstWire.reply(TdApi.SetAuthenticationPhoneNumber::class.java, TdApi.Ok())
+        runCurrent()
+        assertTrue(submit.isCompleted)
+
+        val secondWire = Wire()
+        val second = client(secondWire)
+        second.start(credentials)
+        secondWire.emit(TdApi.UpdateAuthorizationState(TdApi.AuthorizationStateReady()))
+        runCurrent()
+        assertEquals(TelegramAuthState.Initializing, second.authState.value)
+        secondWire.reply(TdApi.GetMe::class.java, TdApi.User().apply { id = 4321 })
+        runCurrent()
+        assertTrue(secondWire.sent.any { it is TdApi.LogOut })
+        assertEquals(TelegramAuthState.Initializing, second.authState.value)
+        secondWire.reply(TdApi.LogOut::class.java, TdApi.Ok())
+        secondWire.emit(TdApi.UpdateAuthorizationState(TdApi.AuthorizationStateClosed()))
+        runCurrent()
+        assertTrue(second.authState.value is TelegramAuthState.Failed)
+    }
+
     @Test fun `stale connection updates cannot close the replacement client`()=runTest {
         val wire=Wire();val client=client(wire);val credentials=TelegramCredentials(12345,"a".repeat(32));client.start(credentials)
         val old=wire.callbacks.single()

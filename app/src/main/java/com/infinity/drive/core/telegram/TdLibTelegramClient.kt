@@ -63,6 +63,12 @@ internal class TdLibTelegramClient(
 ) : TelegramClient {
 
     private val clientMutex = Mutex()
+    private val phoneAuthMutex = Mutex()
+    private val recoveryPreferences by lazy {
+        context.getSharedPreferences("telegram-login-recovery", Context.MODE_PRIVATE)
+    }
+
+    private fun clearRecoveryAccount() = recoveryPreferences.edit().remove("expected-account").commit()
 
     @Volatile
     private var client: TdConnection? = null
@@ -75,6 +81,7 @@ internal class TdLibTelegramClient(
 
     @Volatile
     private var databaseDropped = false
+    @Volatile
     private var clientGeneration = 0
 
     private val _authState = MutableStateFlow<TelegramAuthState>(TelegramAuthState.Uninitialized)
@@ -193,8 +200,15 @@ internal class TdLibTelegramClient(
             is TdApi.AuthorizationStateWaitRegistration ->
                 _authState.value = TelegramAuthState.RegistrationRequired
 
-            is TdApi.AuthorizationStateReady ->
-                _authState.value = TelegramAuthState.Ready
+            is TdApi.AuthorizationStateReady -> {
+                val expected = recoveryPreferences.getLong("expected-account", 0)
+                if (expected == 0L) {
+                    _authState.value = TelegramAuthState.Ready
+                } else {
+                    _authState.value = TelegramAuthState.Initializing
+                    scope.launch { verifyRecoveredAccount(generation, expected) }
+                }
+            }
 
             is TdApi.AuthorizationStateLoggingOut ->
                 _authState.value = TelegramAuthState.LoggingOut
@@ -211,6 +225,35 @@ internal class TdLibTelegramClient(
             }
 
             else -> SafeLog.w(TAG, "Unhandled authorization state: ${state::class.simpleName}")
+        }
+    }
+
+    private suspend fun verifyRecoveredAccount(generation: Int, expected: Long) {
+        if (generation != clientGeneration) return
+        val active = client ?: return
+        try {
+            val user = sendVia(active, TdApi.GetMe())
+            if (generation != clientGeneration || client !== active) return
+            if (user.id == expected) {
+                clearRecoveryAccount()
+                _authState.value = TelegramAuthState.Ready
+                return
+            }
+            // Never publish Ready for a different account, including after a restart.
+            sendVia(active, TdApi.LogOut())
+            val closed = withTimeoutOrNull(CLOSE_WAIT_LIMIT_MS.milliseconds) {
+                authState.first { it == TelegramAuthState.Closed }
+            }
+            if (generation == clientGeneration) {
+                if (closed != null) clearRecoveryAccount()
+                _authState.value = TelegramAuthState.Failed("The recovery file does not match the Telegram account.")
+            }
+        } catch (cancel: kotlinx.coroutines.CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            if (generation == clientGeneration) {
+                _authState.value = TelegramAuthState.Failed("Could not verify the recovered Telegram account. Try again.")
+            }
         }
     }
 
@@ -308,17 +351,56 @@ internal class TdLibTelegramClient(
     override suspend fun detectedCountryCode(): String? =
         send(TdApi.GetCountryCode()).text.takeIf { it.isNotBlank() }
 
-    override suspend fun submitPhoneNumber(phoneNumber: String) {
-        send(
-            TdApi.SetAuthenticationPhoneNumber(
-                phoneNumber,
-                TdApi.PhoneNumberAuthenticationSettings()
-            )
-        )
+    override suspend fun submitPhoneNumber(phoneNumber: String) = phoneAuthMutex.withLock {
+        // A new, explicit sign-in from the phone prompt supersedes an abandoned recovery.
+        resetRecoveryAtPhonePrompt()
+        send(TdApi.SetAuthenticationPhoneNumber(phoneNumber, TdApi.PhoneNumberAuthenticationSettings()))
+        Unit
     }
 
-    override suspend fun requestQrCodeAuthentication() {
+    override suspend fun submitLoginRecovery(recovery: TelegramLoginRecovery) = phoneAuthMutex.withLock {
+        if (authState.value != TelegramAuthState.WaitingForPhoneNumber) {
+            throw TelegramException(400, "Telegram is not waiting for a phone number.")
+        }
+        val pendingAccount = recoveryPreferences.getLong("expected-account", 0)
+        if (pendingAccount != 0L && pendingAccount != recovery.accountId) resetRecoveryAtPhonePrompt()
+        val active = client ?: throw TelegramException(500, "Telegram client not started")
+        if (recovery.accountId <= 0 || !recoveryPreferences.edit().putLong("expected-account", recovery.accountId).commit()) {
+            throw TelegramException(500, "Could not prepare the recovery attempt.")
+        }
+        try {
+            val settings = TdApi.PhoneNumberAuthenticationSettings().apply {
+                authenticationTokens = arrayOf(recovery.token)
+            }
+            sendVia(active, TdApi.SetAuthenticationPhoneNumber(recovery.phoneNumber, settings))
+        } catch (cancel: kotlinx.coroutines.CancellationException) {
+            throw cancel
+        } catch (error: TelegramException) {
+            // Keep the identity check in place if a timeout leaves the server outcome uncertain.
+            throw TelegramException(error.code, "Telegram could not start recovery. Try another sign-in method.", error.retryAfterSeconds)
+        }
+        Unit
+    }
+
+    private suspend fun resetRecoveryAtPhonePrompt() {
+        if (authState.value != TelegramAuthState.WaitingForPhoneNumber ||
+            !recoveryPreferences.contains("expected-account")
+        ) return
+        restartAuthentication()
+        val phonePrompt = withTimeoutOrNull(30_000) {
+            authState.first { it == TelegramAuthState.WaitingForPhoneNumber || it is TelegramAuthState.Failed }
+        }
+        if (phonePrompt != TelegramAuthState.WaitingForPhoneNumber ||
+            recoveryPreferences.contains("expected-account")
+        ) {
+            throw TelegramException(500, "Could not reset the recovery attempt.")
+        }
+    }
+
+    override suspend fun requestQrCodeAuthentication() = phoneAuthMutex.withLock {
+        resetRecoveryAtPhonePrompt()
         send(TdApi.RequestQrCodeAuthentication(LongArray(0)))
+        Unit
     }
 
     override suspend fun restartAuthentication() {
@@ -328,10 +410,12 @@ internal class TdLibTelegramClient(
             _authState.first { it == TelegramAuthState.Closed }
         }
         clientMutex.withLock {
+            clientGeneration++
             client = null
             parametersReady = false
+            _authState.value = TelegramAuthState.Closed
         }
-        File(storagePaths.filesDir, "tdlib").deleteRecursively()
+        if (File(storagePaths.filesDir, "tdlib").deleteRecursively()) clearRecoveryAccount()
         start(current)
     }
 
@@ -372,7 +456,7 @@ internal class TdLibTelegramClient(
             credentials = null
             _authState.value = TelegramAuthState.Closed
         }
-        File(storagePaths.filesDir, "tdlib").deleteRecursively()
+        if (File(storagePaths.filesDir, "tdlib").deleteRecursively()) clearRecoveryAccount()
     }
 
     override suspend fun getLoginRecovery(): TelegramLoginRecovery? {

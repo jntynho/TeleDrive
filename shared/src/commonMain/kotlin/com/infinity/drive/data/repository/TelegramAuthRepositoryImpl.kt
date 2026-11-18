@@ -79,6 +79,9 @@ class TelegramAuthRepositoryImpl(
     override suspend fun submitPhoneNumber(phoneNumber: String): AppResult<Unit> =
         runTelegram { telegramClient.submitPhoneNumber(phoneNumber) }
 
+    override suspend fun submitLoginRecovery(recovery: com.infinity.drive.core.telegram.TelegramLoginRecovery): AppResult<Unit> =
+        runTelegram { telegramClient.submitLoginRecovery(recovery) }
+
     override suspend fun requestQrCodeAuthentication(): AppResult<Unit> =
         runTelegram { telegramClient.requestQrCodeAuthentication() }
 

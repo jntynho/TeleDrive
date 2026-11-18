@@ -75,6 +75,7 @@ fun AppNavHost(
     ) {
         stableComposable<Route.Onboarding>(navController) {
             OnboardingScreen(
+                recoveryScreens = LocalPlatformScreens.current,
                 onOpenProxy = { navController.navigateOnce(Route.Proxy) },
                 onFinished = {
                     navController.navigateOnce(Route.Home) {

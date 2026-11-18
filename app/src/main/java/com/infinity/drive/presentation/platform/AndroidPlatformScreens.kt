@@ -11,6 +11,16 @@ object AndroidPlatformScreens : PlatformScreens {
         app.tgdrive.migration.PreviousLibraryScreen(onBack)
     }
 
+    override val supportsRecoveryImport = true
+
+    @Composable
+    override fun RecoveryImport(
+        onBack: () -> Unit,
+        onImport: (com.infinity.drive.core.telegram.TelegramLoginRecovery) -> Unit
+    ) {
+        com.infinity.drive.presentation.recovery.RecoveryImportScreen(onBack, onImport)
+    }
+
     @Composable
     override fun RecoveryExport(onBack: () -> Unit) {
         com.infinity.drive.presentation.recovery.RecoveryExportScreen(onBack)

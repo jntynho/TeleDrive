@@ -10,6 +10,14 @@ interface PlatformScreens {
     @Composable
     fun PreviousLibrary(onBack: () -> Unit)
 
+    val supportsRecoveryImport: Boolean get() = false
+
+    @Composable
+    fun RecoveryImport(
+        onBack: () -> Unit,
+        onImport: (com.infinity.drive.core.telegram.TelegramLoginRecovery) -> Unit
+    ) = Unit
+
     @Composable
     fun RecoveryExport(onBack: () -> Unit) = Unit
 
