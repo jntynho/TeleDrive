@@ -30,4 +30,26 @@
     <string name="notification_update_skip">Skip this version</string>
     <string name="notification_update_title">Update available</string>
     <string name="notification_upload_failed">Upload failed</string>
+    <plurals name="notification_transfer_failures">
+        <item quantity="one">%d transfer failed</item>
+        <item quantity="other">%d transfers failed</item>
+    </plurals>
+    <plurals name="notification_transfer_completions">
+        <item quantity="one">%d transfer completed</item>
+        <item quantity="other">%d transfers completed</item>
+    </plurals>
+    <string name="notification_transfer_open_activity">Tap to view Activity</string>
+    <string name="notification_transfers_running_count">%d running</string>
+    <string name="notification_transfers_queued_count">%d queued</string>
+    <string name="notification_transfers_retry_count">%d waiting to retry</string>
+    <string name="notification_transfers_preparing_count">%d preparing files</string>
+    <string name="notification_transfers_sealing_count">%d encrypting files</string>
+    <string name="notification_transfers_joining_count">%d joining file parts</string>
+    <string name="notification_transfer_reason_key">%d need the encryption key</string>
+    <string name="notification_transfer_reason_local">%d could not access the original file</string>
+    <string name="notification_transfer_reason_remote">%d could not access the Telegram copy</string>
+    <string name="notification_transfer_reason_save">%d could not save the download</string>
+    <string name="notification_transfer_reason_decrypt">%d could not decrypt the download</string>
+    <string name="notification_transfer_reason_retryable">%d can be retried in Activity</string>
+    <string name="notification_transfer_reason_activity">%d need attention in Activity</string>
 </resources>

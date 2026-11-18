@@ -27,12 +27,17 @@ class AppNotifications(
     }
 
     @SuppressLint("MissingPermission")
-    fun notifyFailure(title: String, message: String) {
+    fun notifyTransferFailures(title: String, details: List<String>) {
         if (!hasPermission()) return
+        val style = NotificationCompat.InboxStyle()
+        details.forEach { style.addLine(it) }
         val notification = NotificationCompat.Builder(context, CHANNEL_FAILURES)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
-            .setContentText(message)
+            .setContentText(details.joinToString(" · "))
+            .setStyle(style)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setOnlyAlertOnce(true)
             .setContentIntent(screenIntent(DESTINATION_TRANSFERS, REQUEST_FAILURE))
             .setAutoCancel(true)
             .build()
@@ -53,6 +58,21 @@ class AppNotifications(
             .build()
         runCatching {
             NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_BACKUP, notification)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    fun notifyTransferCompletion(title: String, message: String) {
+        if (!hasPermission()) return
+        val notification = NotificationCompat.Builder(context, CHANNEL_TRANSFERS)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setContentIntent(screenIntent(DESTINATION_TRANSFERS, REQUEST_TRANSFER_COMPLETIONS))
+            .setAutoCancel(true)
+            .build()
+        runCatching {
+            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_TRANSFER_COMPLETIONS, notification)
         }
     }
 
@@ -153,9 +173,9 @@ class AppNotifications(
         const val DESTINATION_UPDATE = NotificationDestinations.UPDATE
         private const val REQUEST_FAILURE = 1
         private const val REQUEST_BACKUP = 2
-        private const val REQUEST_QUEUE = 3
         private const val REQUEST_UPDATE = 4
         private const val REQUEST_SKIP = 5
+        private const val REQUEST_TRANSFER_COMPLETIONS = 6
         const val CHANNEL_TRANSFERS = "transfers"
         const val CHANNEL_BACKUP = "backup"
         const val CHANNEL_FAILURES = "failures"
@@ -164,5 +184,6 @@ class AppNotifications(
         const val NOTIFICATION_ID_BACKUP = 1002
         const val NOTIFICATION_ID_FAILURE = 1003
         const val NOTIFICATION_ID_UPDATE = 1004
+        private const val NOTIFICATION_ID_TRANSFER_COMPLETIONS = 1005
     }
 }

@@ -74,7 +74,12 @@ class TransferQueueDrainer(
                                 } else {
                                     if(transferDao.failRunning(current.id, outcome.message, nowMillis(), outcome.retryable)==1){
                                         current.fileId?.let { fileDao.markLocalFailureIfTransferStillFailed(it, current.id) }
-                                        onTerminalFailure(current); refreshSession(current.backupSessionId)
+                                        onTerminalFailure(current.copy(
+                                            state = TransferState.FAILED,
+                                            errorMessage = outcome.message,
+                                            retryableFailure = outcome.retryable
+                                        ))
+                                        refreshSession(current.backupSessionId)
                                     }
                                 }
                             }

@@ -10,6 +10,18 @@ import com.infinity.drive.domain.model.TransferState
 import kotlinx.coroutines.flow.Flow
 import com.infinity.drive.domain.model.TransferStage
 
+data class TransferNotificationProgress(
+    val running: Int,
+    val waitingToRetry: Int,
+    val queued: Int,
+    val preparing: Int,
+    val sealing: Int,
+    val joining: Int,
+    val knownBytes: Double,
+    val transferredBytes: Double,
+    val unknownSize: Int
+)
+
 @Dao
 interface TransferDao {
 
@@ -74,6 +86,9 @@ interface TransferDao {
     @Query("SELECT COUNT(*) FROM transfers WHERE state = 'COMPLETED' AND completedAt >= :startedAt")
     suspend fun completedSince(startedAt:Long):Int
 
+
+    @Query("SELECT COUNT(*) FROM transfers WHERE state = 'COMPLETED' AND completedAt >= :startedAt AND backupSessionId IS NULL")
+    suspend fun completedOutsideBackupSince(startedAt: Long): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(transfer: TransferEntity)
@@ -144,6 +159,21 @@ interface TransferDao {
 
     @Query("SELECT COUNT(*) FROM transfers WHERE state IN ('QUEUED', 'RUNNING')")
     fun observeActiveCount(): Flow<Int>
+
+    @Query(
+        """SELECT
+            COUNT(CASE WHEN state = 'RUNNING' THEN 1 END) AS running,
+            COUNT(CASE WHEN state = 'QUEUED' AND nextAttemptAt > 0 AND errorMessage IS NOT NULL THEN 1 END) AS waitingToRetry,
+            COUNT(CASE WHEN state = 'QUEUED' AND (nextAttemptAt = 0 OR errorMessage IS NULL) THEN 1 END) AS queued,
+            COUNT(CASE WHEN state = 'RUNNING' AND stage = 'PREPARING' THEN 1 END) AS preparing,
+            COUNT(CASE WHEN state = 'RUNNING' AND stage = 'SEALING' THEN 1 END) AS sealing,
+            COUNT(CASE WHEN state = 'RUNNING' AND stage = 'JOINING' THEN 1 END) AS joining,
+            COALESCE(SUM(CASE WHEN state = 'RUNNING' AND sizeBytes > 0 THEN CAST(sizeBytes AS REAL) ELSE 0.0 END), 0.0) AS knownBytes,
+            COALESCE(SUM(CASE WHEN state = 'RUNNING' AND sizeBytes > 0 THEN CAST(MIN(sizeBytes, MAX(transferredBytes, 0)) AS REAL) ELSE 0.0 END), 0.0) AS transferredBytes,
+            COUNT(CASE WHEN state = 'RUNNING' AND sizeBytes <= 0 THEN 1 END) AS unknownSize
+          FROM transfers WHERE state IN ('QUEUED', 'RUNNING')"""
+    )
+    fun observeNotificationProgress(): Flow<TransferNotificationProgress>
 
     @Query("UPDATE transfers SET stage = :stage, updatedAt = :updatedAt WHERE id = :id")
     suspend fun setStage(id: String, stage: TransferStage?, updatedAt: Long)
