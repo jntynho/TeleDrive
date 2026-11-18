@@ -6,6 +6,7 @@ import com.infinity.drive.data.local.FileQueryBuilder
 import com.infinity.drive.data.local.database.DriveInfinityDatabase
 import com.infinity.drive.data.local.entity.AudioTagEntity
 import com.infinity.drive.data.local.entity.FileEntity
+import com.infinity.drive.data.local.entity.FolderEntity
 import com.infinity.drive.data.mapper.toDomain
 import com.infinity.drive.domain.model.*
 import kotlinx.coroutines.flow.first
@@ -79,5 +80,34 @@ class GalleryQueryRegressionTest {
             dao.upsert(row.copy(modifiedAt=2))
             assertTrue(dao.idList(query("M83")).isEmpty())
         }finally{db.close()}
+    }
+    @Test fun recursiveFolderStatisticsHonorDriveAndLocks() = runTest {
+        val db = database()
+        try {
+            val stats = db.folderDao()
+            fun folder(id: String, parent: String?, chat: Long = 1, hidden: Boolean = false, trash: Long? = null) =
+                FolderEntity(id, chat, parent, id, isHidden = hidden, trashedAt = trash, createdAt = 1, modifiedAt = 1)
+            stats.upsert(folder("root", null))
+            stats.upsert(folder("level-one", "root"))
+            stats.upsert(folder("level-two", "level-one"))
+            stats.upsert(folder("hidden", "root", hidden = true))
+            stats.upsert(folder("trashed", "root", trash = 1))
+            stats.upsert(folder("other-drive", "root", chat = 2))
+            val files = db.fileDao()
+            files.upsert(file("both", chat = 1).copy(
+                sizeBytes = 15, folderId = "level-two", localPath = "/local",
+                messageId = 1, backupState = BackupState.BACKED_UP
+            ))
+            files.upsert(file("local", chat = 1).copy(sizeBytes = 4, folderId = "root", localPath = "/local-2"))
+            files.upsert(file("hidden file", chat = 1).copy(folderId = "hidden", sizeBytes = 70))
+            files.upsert(file("note", "secret.md", chat = 1).copy(folderId = "root", sizeBytes = 100))
+            files.upsert(file("different drive", chat = 2).copy(folderId = "other-drive", sizeBytes = 400))
+            files.upsert(file("trashed file", chat = 1).copy(folderId = "trashed", sizeBytes = 800))
+            assertEquals(FolderStatistics(2, 2, 19, 19, 15), stats.observeStatistics("root", 1, false, false).first())
+            assertEquals(FolderStatistics(4, 3, 189, 19, 15), stats.observeStatistics("root", 1, true, true).first())
+            assertEquals(FolderStatistics(0, 0, 0, 0, 0), stats.observeStatistics("root", 2, true, true).first())
+        } finally {
+            db.close()
+        }
     }
 }

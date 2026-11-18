@@ -18,18 +18,24 @@ import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.unit.dp
 import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.info_contents
+import com.infinity.drive.resources.folder_info_backed_up
+import com.infinity.drive.resources.folder_info_local
+import com.infinity.drive.resources.folder_info_recursive_contents
+import com.infinity.drive.resources.folder_info_size
+import com.infinity.drive.resources.folder_info_stats_loading
 import com.infinity.drive.resources.info_created
 import com.infinity.drive.resources.info_favorite
 import com.infinity.drive.resources.info_modified
 import com.infinity.drive.resources.info_no
 import com.infinity.drive.resources.info_yes
 import com.infinity.drive.domain.model.DriveFolder
+import com.infinity.drive.domain.model.FolderStatistics
 import com.infinity.drive.presentation.common.Formatters
 
 /** Folder counterpart to [FileInfoSheet], with what a folder actually has. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FolderInfoSheet(folder: DriveFolder, onDismiss: () -> Unit) {
+fun FolderInfoSheet(folder: DriveFolder, statistics: FolderStatistics?, onDismiss: () -> Unit) {
     com.infinity.drive.presentation.components.DriveBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
@@ -39,10 +45,19 @@ fun FolderInfoSheet(folder: DriveFolder, onDismiss: () -> Unit) {
             Text(text = folder.name, style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(16.dp))
 
-            FolderInfoRow(
-                label = stringResource(Res.string.info_contents),
-                value = folder.contentsLabel()
-            )
+            if (statistics == null) {
+                Text(stringResource(Res.string.folder_info_stats_loading), style = MaterialTheme.typography.bodyMedium)
+            } else {
+                FolderInfoRow(
+                    label = stringResource(Res.string.info_contents),
+                    value = stringResource(
+                        Res.string.folder_info_recursive_contents, statistics.fileCount, statistics.subfolderCount
+                    )
+                )
+                FolderInfoRow(stringResource(Res.string.folder_info_size), Formatters.bytes(statistics.totalBytes))
+                FolderInfoRow(stringResource(Res.string.folder_info_local), Formatters.bytes(statistics.localCopyBytes))
+                FolderInfoRow(stringResource(Res.string.folder_info_backed_up), Formatters.bytes(statistics.backedUpBytes))
+            }
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 

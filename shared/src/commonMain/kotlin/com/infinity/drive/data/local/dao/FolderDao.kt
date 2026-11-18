@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.infinity.drive.data.local.entity.FolderEntity
+import com.infinity.drive.domain.model.FolderStatistics
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -22,6 +23,31 @@ interface FolderDao {
 
     @Update
     suspend fun update(folder: FolderEntity)
+
+    @Query(
+        """WITH RECURSIVE subtree(id) AS (
+               SELECT id FROM folders WHERE id = :folderId AND chatId IS :chatId AND trashedAt IS NULL
+               UNION
+               SELECT f.id FROM folders f JOIN subtree s ON f.parentId = s.id
+                 WHERE f.chatId IS :chatId AND f.trashedAt IS NULL AND (:includeHidden OR f.isHidden = 0)
+           )
+           SELECT COUNT(file.id) AS fileCount,
+                  MAX((SELECT COUNT(*) FROM subtree) - 1, 0) AS subfolderCount,
+                  COALESCE(SUM(MAX(file.sizeBytes, 0)), 0) AS totalBytes,
+                  COALESCE(SUM(CASE WHEN file.localPath IS NOT NULL THEN MAX(file.sizeBytes, 0) ELSE 0 END), 0) AS localCopyBytes,
+                  COALESCE(SUM(CASE WHEN file.messageId IS NOT NULL AND file.backupState = 'BACKED_UP'
+                                    THEN MAX(file.sizeBytes, 0) ELSE 0 END), 0) AS backedUpBytes
+             FROM files file JOIN subtree s ON file.folderId = s.id
+            WHERE file.chatId IS :chatId AND file.trashedAt IS NULL
+              AND (:includeHidden OR file.isHidden = 0)
+              AND (:includeNotes OR lower(file.name) NOT LIKE '%.md')"""
+    )
+    fun observeStatistics(
+        folderId: String,
+        chatId: Long?,
+        includeHidden: Boolean,
+        includeNotes: Boolean
+    ): Flow<FolderStatistics>
 
     @Query("UPDATE folders SET pendingPublish = 1")
     suspend fun markPendingPublish()

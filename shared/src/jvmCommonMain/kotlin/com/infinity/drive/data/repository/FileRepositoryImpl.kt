@@ -39,6 +39,7 @@ import com.infinity.drive.domain.model.LinkMetadata
 import com.infinity.drive.domain.model.MediaAlbum
 import com.infinity.drive.domain.model.SortDirection
 import com.infinity.drive.domain.model.StorageSlice
+import com.infinity.drive.domain.model.FolderStatistics
 import com.infinity.drive.domain.repository.FileRepository
 import com.infinity.drive.domain.repository.SettingsRepository
 import com.infinity.drive.domain.usecase.FolderCycleCheck
@@ -261,6 +262,20 @@ class FileRepositoryImpl(
         visibleChannel().flatMapLatest { chatId ->
             fileDao.observeUsageByCategory(chatId).map { rows ->
                 rows.map { StorageSlice(it.category, it.fileCount, it.totalBytes) }
+            }
+        }
+
+    override fun observeFolderStatistics(id: String): Flow<FolderStatistics?> =
+        combine(activeChannel.observe(), visibility, folderDao.observeById(id)) { chatId, restrictions, row ->
+            Triple(chatId, restrictions, row)
+        }.flatMapLatest { (chatId, restrictions, row) ->
+            if (row == null || row.chatId != chatId || row.trashedAt != null || !hiddenAccess.canReadFolder(id)) {
+                flowOf(null)
+            } else {
+                folderDao.observeStatistics(id, chatId, !restrictions.first, !restrictions.third)
+                    .map<FolderStatistics, FolderStatistics?> {
+                        it.takeIf { hiddenAccess.canReadFolder(id) }
+                    }.onStart { emit(null) }
             }
         }
 

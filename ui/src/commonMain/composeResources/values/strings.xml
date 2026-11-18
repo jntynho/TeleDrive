@@ -994,4 +994,9 @@
     <string name="backup_preview_unreadable">%d folders could not be read</string>
     <string name="backup_preview_start">Start backup</string>
     <string name="backup_preview_started">Backup queued in Activity.</string>
+    <string name="folder_info_recursive_contents">%1$d files · %2$d subfolders</string>
+    <string name="folder_info_stats_loading">Calculating folder statistics…</string>
+    <string name="folder_info_size">Total size</string>
+    <string name="folder_info_local">With a local copy</string>
+    <string name="folder_info_backed_up">Backed up to Telegram</string>
 </resources>

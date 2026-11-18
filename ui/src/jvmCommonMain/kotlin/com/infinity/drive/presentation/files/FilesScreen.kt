@@ -684,7 +684,9 @@ fun FilesScreen(
 
     val folderInfoTarget by viewModel.folderInfoTarget.collectAsStateWithLifecycle()
     folderInfoTarget?.let { folder ->
-        FolderInfoSheet(folder = folder, onDismiss = viewModel::dismissFolderInfo)
+        val statisticsFlow = remember(folder.id, viewModel) { viewModel.observeFolderStatistics(folder.id) }
+        val statistics by statisticsFlow.collectAsStateWithLifecycle(initialValue = null)
+        FolderInfoSheet(folder = folder, statistics = statistics, onDismiss = viewModel::dismissFolderInfo)
     }
 
     infoTarget?.let { file ->

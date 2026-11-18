@@ -664,6 +664,8 @@ class FilesViewModel(
         }
     }
 
+    fun observeFolderStatistics(id: String) = fileRepository.observeFolderStatistics(id)
+
     fun dismissFolderInfo() = _folderInfoTarget.update { null }
 
     fun dismissInfo() = _infoTarget.update { null }

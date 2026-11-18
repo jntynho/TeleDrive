@@ -7,6 +7,7 @@ import com.infinity.drive.domain.model.DriveFile
 import com.infinity.drive.domain.model.DriveFolder
 import com.infinity.drive.domain.model.FileQuerySpec
 import com.infinity.drive.domain.model.FileSortField
+import com.infinity.drive.domain.model.FolderStatistics
 import com.infinity.drive.domain.model.LinkMetadata
 import com.infinity.drive.domain.model.MediaAlbum
 import com.infinity.drive.domain.model.SortDirection
@@ -65,6 +66,9 @@ interface FileRepository {
 
     /** Storage taken by each file category in the active drive, largest first. */
     fun observeStorageByCategory(): Flow<List<StorageSlice>>
+
+    /** Logical size of accessible files in this folder and all of its descendants. */
+    fun observeFolderStatistics(id: String): Flow<FolderStatistics?>
 
     fun observeFolder(id: String): Flow<DriveFolder?>
 
