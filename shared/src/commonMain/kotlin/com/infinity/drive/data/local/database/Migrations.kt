@@ -3,6 +3,7 @@ package com.infinity.drive.data.local.database
 import androidx.room.migration.Migration
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.execSQL
+import com.infinity.drive.core.files.FileOrderKeys
 
 /** Adds the covering index used to claim queued transfers in priority order. */
 val MIGRATION_10_11 = object : Migration(10, 11) {
@@ -184,5 +185,39 @@ val MIGRATION_14_15 = object : Migration(14, 15) {
     override fun migrate(connection: SQLiteConnection) {
         connection.execSQL("ALTER TABLE transfers ADD COLUMN retryableFailure INTEGER NOT NULL DEFAULT 0")
         connection.execSQL("ALTER TABLE transfers ADD COLUMN uploadBatchId TEXT")
+    }
+}
+
+
+/** Compute sort keys for existing files as well as new rows. */
+val MIGRATION_15_16 = object : Migration(15, 16) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE files ADD COLUMN naturalNameKey TEXT NOT NULL DEFAULT ''")
+        connection.execSQL("ALTER TABLE files ADD COLUMN extensionSortKey TEXT NOT NULL DEFAULT ''")
+        var afterId: String? = null
+        connection.prepare(
+            "UPDATE files SET naturalNameKey = ?, extensionSortKey = ? WHERE id = ?"
+        ).use { update ->
+            while (true) {
+                val cursor = afterId
+                val sql = if (cursor == null) "SELECT id, name FROM files ORDER BY id LIMIT 512"
+                    else "SELECT id, name FROM files WHERE id > ? ORDER BY id LIMIT 512"
+                val page = connection.prepare(sql).use { query ->
+                    if (cursor != null) query.bindText(1, cursor)
+                    buildList {
+                        while (query.step()) add(query.getText(0) to query.getText(1))
+                    }
+                }
+                if (page.isEmpty()) break
+                for ((id, name) in page) {
+                    update.bindText(1, FileOrderKeys.natural(name))
+                    update.bindText(2, FileOrderKeys.byExtension(name))
+                    update.bindText(3, id)
+                    update.step()
+                    update.reset()
+                }
+                afterId = page.last().first
+            }
+        }
     }
 }

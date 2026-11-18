@@ -142,4 +142,36 @@ class GalleryQueryRegressionTest {
             db.close()
         }
     }
+    @Test fun naturalAndExtensionSortStayConsistentAfterRenameAndAcrossPreviewPages() = runTest {
+        val db = database()
+        try {
+            val dao = db.fileDao()
+            dao.upsert(file("1", "take10.MP3"))
+            dao.upsert(file("2", "take2.mp3"))
+            dao.upsert(file("3", "take100000000000000000000.png"))
+            dao.upsert(file("4", "take1.JPG"))
+            dao.upsert(file("5", ".dotfile"))
+            val natural = FileQuerySpec(sortField = FileSortField.NATURAL_NAME)
+            val extension = FileQuerySpec(sortField = FileSortField.EXTENSION)
+            assertEquals(listOf("5", "4", "2", "1", "3"), dao.idList(FileQueryBuilder.buildIds(natural)))
+            assertEquals(listOf("5", "4", "2", "1", "3"), dao.idList(FileQueryBuilder.buildIds(extension)))
+            dao.rename("1", "take3.gif", 2)
+            dao.upsert(dao.byId("2")!!.copy(name = "take0.bmp"))
+            assertEquals(listOf("5", "2", "4", "1", "3"), dao.idList(FileQueryBuilder.buildIds(natural)))
+            assertEquals(listOf("5", "2", "1", "4", "3"), dao.idList(FileQueryBuilder.buildIds(extension)))
+            for (field in listOf(FileSortField.NATURAL_NAME, FileSortField.EXTENSION)) {
+                for (direction in SortDirection.entries) {
+                    val spec = FileQuerySpec(sortField = field, sortDirection = direction)
+                    val order = dao.idList(FileQueryBuilder.buildIds(spec))
+                    for ((index, id) in order.withIndex()) {
+                        val file = dao.byId(id)!!.toDomain()
+                        assertEquals(index, dao.queryCount(FileQueryBuilder.rank(spec, file)))
+                        assertEquals(id, dao.observeList(FileQueryBuilder.buildWindow(spec, index, 1)).first().single().id)
+                    }
+                }
+            }
+        } finally {
+            db.close()
+        }
+    }
 }

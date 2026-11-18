@@ -1,7 +1,7 @@
 package com.infinity.drive.data.local
 
 import androidx.room.RoomRawQuery
-import com.infinity.drive.data.local.FileQueryBuilder.build
+import com.infinity.drive.core.files.FileOrderKeys
 import com.infinity.drive.domain.model.DriveFile
 import com.infinity.drive.domain.model.FileQuerySpec
 import com.infinity.drive.domain.model.FileSortField
@@ -22,13 +22,16 @@ object FileQueryBuilder {
 
     fun buildWindow(spec:FileQuerySpec,offset:Int,limit:Int):RoomRawQuery = query("*",spec,limit.coerceIn(1,400),offset.coerceAtLeast(0))
     fun rank(spec:FileQuerySpec,file:DriveFile):RoomRawQuery {
-        val column=when(spec.sortField){
-            FileSortField.NAME->"name COLLATE NOCASE";FileSortField.DATE_MODIFIED->"modifiedAt";FileSortField.DATE_ADDED->"addedAt"
-            FileSortField.SIZE->"sizeBytes";FileSortField.TYPE->"mimeType";FileSortField.BACKUP_STATUS->"backupState"
-        }
-        val value:Any=when(spec.sortField){
-            FileSortField.NAME->file.name;FileSortField.DATE_MODIFIED->file.modifiedAt;FileSortField.DATE_ADDED->file.addedAt
-            FileSortField.SIZE->file.sizeBytes;FileSortField.TYPE->file.mimeType;FileSortField.BACKUP_STATUS->file.backupState.name
+        val column = orderColumn(spec.sortField)
+        val value: Any = when (spec.sortField) {
+            FileSortField.NAME -> file.name
+            FileSortField.NATURAL_NAME -> FileOrderKeys.natural(file.name)
+            FileSortField.EXTENSION -> FileOrderKeys.byExtension(file.name)
+            FileSortField.DATE_MODIFIED -> file.modifiedAt
+            FileSortField.DATE_ADDED -> file.addedAt
+            FileSortField.SIZE -> file.sizeBytes
+            FileSortField.TYPE -> file.mimeType
+            FileSortField.BACKUP_STATUS -> file.backupState.name
         }
         val operator=if(spec.sortDirection==SortDirection.ASCENDING)"<"else">"
         return query("COUNT(*)",spec,extra=" AND ($column $operator ? OR ($column = ? AND id < ?))",extraArgs=listOf(value,value,file.id))
@@ -94,14 +97,7 @@ object FileQueryBuilder {
         if (!spec.showArchived) where.append(" AND isArchived = 0")
         if (spec.excludeHiddenAncestors) where.append(" AND (folderId IS NULL OR folderId NOT IN (SELECT id FROM protected_folders))")
 
-        val orderColumn = when (spec.sortField) {
-            FileSortField.NAME -> "name COLLATE NOCASE"
-            FileSortField.SIZE -> "sizeBytes"
-            FileSortField.DATE_MODIFIED -> "modifiedAt"
-            FileSortField.DATE_ADDED -> "addedAt"
-            FileSortField.TYPE -> "mimeType"
-            FileSortField.BACKUP_STATUS -> "backupState"
-        }
+        val orderColumn = orderColumn(spec.sortField)
         val direction = when (spec.sortDirection) {
             SortDirection.ASCENDING -> "ASC"
             SortDirection.DESCENDING -> "DESC"
@@ -121,6 +117,17 @@ object FileQueryBuilder {
                 }
             }
         }
+    }
+
+    private fun orderColumn(field: FileSortField): String = when (field) {
+        FileSortField.NAME -> "name COLLATE NOCASE"
+        FileSortField.NATURAL_NAME -> "naturalNameKey"
+        FileSortField.EXTENSION -> "extensionSortKey"
+        FileSortField.SIZE -> "sizeBytes"
+        FileSortField.DATE_MODIFIED -> "modifiedAt"
+        FileSortField.DATE_ADDED -> "addedAt"
+        FileSortField.TYPE -> "mimeType"
+        FileSortField.BACKUP_STATUS -> "backupState"
     }
 
     private fun escapeLike(value: String): String =

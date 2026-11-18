@@ -1,9 +1,11 @@
 package com.infinity.drive.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.infinity.drive.core.files.FileOrderKeys
 import com.infinity.drive.domain.model.BackupState
 import com.infinity.drive.domain.model.FileCategory
 
@@ -64,4 +66,11 @@ data class FileEntity(
     val createdAt: Long,
     val modifiedAt: Long,
     val addedAt: Long
-)
+) {
+    // Keeping derived columns out of the constructor also recomputes them for copy(name = ...).
+    @ColumnInfo(defaultValue = "''")
+    var naturalNameKey: String = FileOrderKeys.natural(name)
+
+    @ColumnInfo(defaultValue = "''")
+    var extensionSortKey: String = FileOrderKeys.byExtension(name)
+}

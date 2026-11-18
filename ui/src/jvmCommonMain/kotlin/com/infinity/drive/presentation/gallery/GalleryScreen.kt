@@ -470,7 +470,7 @@ fun GalleryScreen(
                     actions = {
                         Box {
                             IconButton(onClick={sorting=true}){Icon(DriveIcons.Sort,"Sort gallery")}
-                            SortMenu(expanded=sorting,current=state.sortField,direction=state.sortDirection,onDismiss={sorting=false},onSelect={field,direction->sorting=false;viewModel.setSort(field,direction)},fields=if(state.tab==GalleryTab.ALBUMS)listOf(FileSortField.NAME,FileSortField.DATE_MODIFIED)else listOf(FileSortField.DATE_MODIFIED,FileSortField.DATE_ADDED,FileSortField.NAME,FileSortField.SIZE,FileSortField.TYPE),prefixContent={
+                            SortMenu(expanded=sorting,current=state.sortField,direction=state.sortDirection,onDismiss={sorting=false},onSelect={field,direction->sorting=false;viewModel.setSort(field,direction)},fields=if(state.tab==GalleryTab.ALBUMS)listOf(FileSortField.NAME,FileSortField.DATE_MODIFIED)else listOf(FileSortField.DATE_MODIFIED,FileSortField.DATE_ADDED,FileSortField.NAME,FileSortField.NATURAL_NAME,FileSortField.SIZE,FileSortField.EXTENSION,FileSortField.TYPE),prefixContent={
                                 if(!state.isAlbumView){
                                     Text("View",Modifier.padding(horizontal=16.dp,vertical=8.dp),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
                                     DropdownMenuItem(text={Text("All media")},onClick={sorting=false;viewModel.setTab(GalleryTab.ALL)},trailingIcon={if(state.tab!=GalleryTab.ALBUMS)Icon(DriveIcons.Check,null)})

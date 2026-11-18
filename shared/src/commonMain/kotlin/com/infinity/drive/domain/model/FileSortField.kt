@@ -6,5 +6,7 @@ enum class FileSortField {
     DATE_MODIFIED,
     DATE_ADDED,
     TYPE,
-    BACKUP_STATUS
+    BACKUP_STATUS,
+    NATURAL_NAME,
+    EXTENSION
 }

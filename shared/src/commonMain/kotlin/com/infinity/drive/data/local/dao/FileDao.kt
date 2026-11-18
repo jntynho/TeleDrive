@@ -9,6 +9,7 @@ import androidx.room.Query
 import androidx.room.RawQuery
 import androidx.room.RoomRawQuery
 import androidx.room.Update
+import com.infinity.drive.core.files.FileOrderKeys
 import com.infinity.drive.data.local.entity.AlbumSummary
 import com.infinity.drive.data.local.entity.FolderEntity
 import com.infinity.drive.data.local.entity.FileEntity
@@ -219,8 +220,17 @@ interface FileDao {
     )
     fun observeHomeAggregates(chatId: Long?): Flow<HomeAggregates>
 
-    @Query("UPDATE files SET name = :name, modifiedAt = :modifiedAt WHERE id = :id")
-    suspend fun rename(id: String, name: String, modifiedAt: Long)
+    suspend fun rename(id: String, name: String, modifiedAt: Long) = updateName(
+        id, name, modifiedAt, FileOrderKeys.natural(name), FileOrderKeys.byExtension(name)
+    )
+
+    @Query(
+        """UPDATE files SET name = :name, modifiedAt = :modifiedAt, naturalNameKey = :naturalNameKey,
+                               extensionSortKey = :extensionSortKey WHERE id = :id"""
+    )
+    suspend fun updateName(
+        id: String, name: String, modifiedAt: Long, naturalNameKey: String, extensionSortKey: String
+    )
 
     @Query("UPDATE files SET folderId = :folderId, modifiedAt = :modifiedAt WHERE id IN (:ids)")
     suspend fun move(ids: List<String>, folderId: String?, modifiedAt: Long)

@@ -10,6 +10,7 @@ import com.infinity.drive.core.crypto.CryptoKeys
 import com.infinity.drive.core.crypto.StreamCrypto
 import com.infinity.drive.core.crypto.WrappedKeyRepository
 import com.infinity.drive.core.files.FileImporter
+import com.infinity.drive.core.files.FileOrderKeys
 import com.infinity.drive.core.files.FileNameUtils
 import com.infinity.drive.core.files.Hashing
 import com.infinity.drive.core.files.LocalCleanup
@@ -243,6 +244,8 @@ class FileRepositoryImpl(
             FileSortField.DATE_MODIFIED -> sortedBy { it.modifiedAt }
             FileSortField.DATE_ADDED -> sortedBy { it.createdAt }
             FileSortField.SIZE -> sortedBy { it.fileCount + it.folderCount }
+            FileSortField.NATURAL_NAME, FileSortField.EXTENSION ->
+                sortedWith(compareBy<DriveFolder> { FileOrderKeys.natural(it.name) }.thenBy { it.id })
             else -> sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
         }
         return if (direction == SortDirection.ASCENDING) ordered else ordered.reversed()

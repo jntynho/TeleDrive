@@ -57,7 +57,7 @@ fun AudioScreen(onOpenFile:(String,PreviewSequence)->Unit,viewModel:AudioViewMod
     Scaffold(modifier=filters.scrollModifier,topBar={Column{
         ExpandableLibraryHeader("Audio",query,viewModel::search,searching,{searching=it},"Search audio",actions={Box {
             IconButton({sorting=true}){Icon(DriveIcons.Sort,"Sort audio",Modifier.size(24.dp))}
-            SortMenu(sorting,prefs.audioSortField,prefs.audioSortDirection,{sorting=false},{field,direction->sorting=false;viewModel.sort(field,direction)},fields=listOf(FileSortField.NAME,FileSortField.DATE_ADDED,FileSortField.DATE_MODIFIED,FileSortField.SIZE))
+            SortMenu(sorting,prefs.audioSortField,prefs.audioSortDirection,{sorting=false},{field,direction->sorting=false;viewModel.sort(field,direction)},fields=listOf(FileSortField.NAME,FileSortField.NATURAL_NAME,FileSortField.EXTENSION,FileSortField.DATE_ADDED,FileSortField.DATE_MODIFIED,FileSortField.SIZE))
         }})
         androidx.compose.animation.AnimatedVisibility(filters.visible,enter=androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180))+androidx.compose.animation.expandVertically(androidx.compose.animation.core.tween(220)),exit=androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140))+androidx.compose.animation.shrinkVertically(androidx.compose.animation.core.tween(220))){
             LibraryFilters(listOf("All","Favorites","On device"),filter.ordinal,{viewModel.filter(AudioFilter.entries[it])})

@@ -1006,4 +1006,6 @@
     <string name="files_duplicates_empty">No duplicates found in the indexed files.</string>
     <string name="files_duplicates_drive_root">Drive root</string>
     <string name="files_duplicates_group">%1$d copies · %2$s each</string>
+    <string name="files_sort_natural_name">Name with numeric order</string>
+    <string name="files_sort_extension">File extension</string>
 </resources>

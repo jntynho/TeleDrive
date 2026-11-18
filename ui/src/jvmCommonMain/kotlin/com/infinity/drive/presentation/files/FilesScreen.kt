@@ -161,6 +161,8 @@ import com.infinity.drive.resources.files_sort_date_added
 import com.infinity.drive.resources.files_sort_date_modified
 import com.infinity.drive.resources.files_sort_descending
 import com.infinity.drive.resources.files_sort_name
+import com.infinity.drive.resources.files_sort_extension
+import com.infinity.drive.resources.files_sort_natural_name
 import com.infinity.drive.resources.files_sort_size
 import com.infinity.drive.resources.files_sort_type
 import com.infinity.drive.resources.info_details
@@ -985,6 +987,8 @@ internal fun SortMenu(
                         stringResource(
                             when (field) {
                                 FileSortField.NAME -> Res.string.files_sort_name
+                                FileSortField.NATURAL_NAME -> Res.string.files_sort_natural_name
+                                FileSortField.EXTENSION -> Res.string.files_sort_extension
                                 FileSortField.SIZE -> Res.string.files_sort_size
                                 FileSortField.DATE_MODIFIED -> Res.string.files_sort_date_modified
                                 FileSortField.DATE_ADDED -> Res.string.files_sort_date_added

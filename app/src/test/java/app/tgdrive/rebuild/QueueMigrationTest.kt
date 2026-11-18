@@ -49,13 +49,16 @@ class QueueMigrationTest {
             }
             old.version=11
         }
-        fun open()=Room.databaseBuilder(context,DriveInfinityDatabase::class.java,name).addMigrations(MIGRATION_11_12,MIGRATION_12_13,MIGRATION_13_14,MIGRATION_14_15).allowMainThreadQueries().build()
+        fun open()=Room.databaseBuilder(context,DriveInfinityDatabase::class.java,name).addMigrations(MIGRATION_11_12,MIGRATION_12_13,MIGRATION_13_14,MIGRATION_14_15,MIGRATION_15_16).allowMainThreadQueries().build()
         try {
             val first=open()
             try {
                 val db=first
                 val file=db.fileDao().byId("original-file")!!
-                assertEquals("Original.jpg",file.name);assertFalse(file.offlinePinned);assertNull(file.importReference);assertTrue(file.uploadRequested)
+                assertEquals("Original.jpg",file.name)
+                assertEquals("original.jpg", file.naturalNameKey)
+                assertEquals("jpg\u0001original.jpg", file.extensionSortKey)
+                assertFalse(file.offlinePinned);assertNull(file.importReference);assertTrue(file.uploadRequested)
                 assertEquals(0,db.transferDao().byId("original-transfer")!!.retryCount)
                 assertFalse(db.transferDao().byId("original-transfer")!!.retryableFailure)
                 assertEquals(1,db.transferDao().claim("original-transfer",100))
