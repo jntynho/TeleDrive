@@ -631,6 +631,7 @@ class SettingsViewModel(
                                 storageChatId = null,
                                 backupFolders = emptySet(),
                                 backupFolderRules = emptyList(),
+                                linkedTelegramSources = emptyList(),
                                 smartFolders = emptyList(),
                                 audioPlaylists = emptyList()
                             )

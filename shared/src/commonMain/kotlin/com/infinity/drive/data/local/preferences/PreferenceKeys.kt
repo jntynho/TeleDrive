@@ -39,6 +39,7 @@ object PreferenceKeys {
     val FOLDER_OWNERSHIP_REPAIRED = booleanPreferencesKey("folder_ownership_repaired")
 
     val AUDIO_PLAYLISTS = stringPreferencesKey("audio_playlists")
+    val LINKED_TELEGRAM_SOURCES = stringPreferencesKey("linked_telegram_sources")
     val SMART_FOLDERS = stringPreferencesKey("smart_folders")
     val THEME = stringPreferencesKey("theme")
     val LANGUAGE = stringPreferencesKey("language")

@@ -1086,4 +1086,20 @@
     <string name="audio_playlist_remove_track">Remove track from playlist</string>
     <string name="audio_playlist_save_queue">Save playing queue</string>
     <string name="audio_playlist_unavailable">Choose a different name and make sure the tracks are still available.</string>
+    <string name="chat_import_title">Save from a Telegram chat</string>
+    <string name="chat_import_back">Choose another chat</string>
+    <string name="chat_import_clear_visible">Clear shown</string>
+    <string name="chat_import_select_visible">Select shown</string>
+    <string name="chat_import_search">Search files in this chat</string>
+    <string name="chat_import_all_types">All types</string>
+    <string name="chat_import_encryption_enabled">To save encrypted copies, download the originals and upload them from your device.</string>
+    <string name="chat_import_unavailable">Couldn’t load files from this chat. It may be protected or unavailable.</string>
+    <string name="chat_import_retry">Retry</string>
+    <string name="chat_import_more">Load more messages</string>
+    <string name="chat_import_no_files">No matching files</string>
+    <string name="chat_import_save_selected">Save selected (%1$d)</string>
+    <string name="chat_import_link">Link as a read-only source</string>
+    <string name="chat_import_linked">Linked source · Read only</string>
+    <string name="chat_import_unlink">Unlink source</string>
+    <string name="chat_import_link_failed">This channel could not be linked.</string>
 </resources>

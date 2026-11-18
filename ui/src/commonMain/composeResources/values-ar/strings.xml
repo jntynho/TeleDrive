@@ -133,4 +133,20 @@
     <string name="note_tasks_title">قائمة المهام</string>
     <string name="note_tasks_open">المهام · %1$d/%2$d</string>
     <string name="note_checklist_insert">إدراج مهمة</string>
+    <string name="chat_import_title">حفظ من محادثة تيليجرام</string>
+    <string name="chat_import_back">اختيار محادثة أخرى</string>
+    <string name="chat_import_clear_visible">إلغاء تحديد الظاهر</string>
+    <string name="chat_import_select_visible">تحديد الظاهر</string>
+    <string name="chat_import_search">البحث في ملفات المحادثة</string>
+    <string name="chat_import_all_types">كل الأنواع</string>
+    <string name="chat_import_encryption_enabled">لحفظ نسخ مشفّرة، نزّل الملفات الأصلية وارفعها من جهازك.</string>
+    <string name="chat_import_unavailable">تعذّر تحميل ملفات المحادثة. قد تكون محمية أو غير متاحة.</string>
+    <string name="chat_import_retry">إعادة المحاولة</string>
+    <string name="chat_import_more">تحميل المزيد من الرسائل</string>
+    <string name="chat_import_no_files">لا توجد ملفات مطابقة</string>
+    <string name="chat_import_save_selected">حفظ المحدد (%1$d)</string>
+    <string name="chat_import_link">ربط كمصدر للقراءة فقط</string>
+    <string name="chat_import_linked">مصدر مرتبط · للقراءة فقط</string>
+    <string name="chat_import_unlink">إلغاء ربط المصدر</string>
+    <string name="chat_import_link_failed">تعذّر ربط هذه القناة.</string>
 </resources>

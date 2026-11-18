@@ -9,6 +9,7 @@ import com.infinity.drive.core.telegram.TelegramCredentials
 import com.infinity.drive.data.local.preferences.PreferenceKeys
 import com.infinity.drive.domain.model.AppLanguage
 import com.infinity.drive.domain.model.BackupFolderRule
+import com.infinity.drive.domain.model.LinkedTelegramSource
 import com.infinity.drive.domain.model.SmartFolder
 import com.infinity.drive.domain.model.AudioPlaylist
 import kotlinx.serialization.json.Json
@@ -90,6 +91,9 @@ class SettingsRepositoryImpl(
             }.orEmpty(),
             audioPlaylists = this[PreferenceKeys.AUDIO_PLAYLISTS]?.let { stored ->
                 runCatching { collectionsJson.decodeFromString<List<AudioPlaylist>>(stored) }.getOrNull()
+            }.orEmpty(),
+            linkedTelegramSources = this[PreferenceKeys.LINKED_TELEGRAM_SOURCES]?.let { stored ->
+                runCatching { collectionsJson.decodeFromString<List<LinkedTelegramSource>>(stored) }.getOrNull()
             }.orEmpty(),
             smartFolders = this[PreferenceKeys.SMART_FOLDERS]?.let { stored ->
                 runCatching { collectionsJson.decodeFromString<List<SmartFolder>>(stored) }.getOrNull()
@@ -201,6 +205,8 @@ class SettingsRepositoryImpl(
         else this[PreferenceKeys.BACKUP_FOLDER_RULES] = collectionsJson.encodeToString(prefs.backupFolderRules)
         if (prefs.audioPlaylists.isEmpty()) remove(PreferenceKeys.AUDIO_PLAYLISTS)
         else this[PreferenceKeys.AUDIO_PLAYLISTS] = collectionsJson.encodeToString(prefs.audioPlaylists)
+        if (prefs.linkedTelegramSources.isEmpty()) remove(PreferenceKeys.LINKED_TELEGRAM_SOURCES)
+        else this[PreferenceKeys.LINKED_TELEGRAM_SOURCES] = collectionsJson.encodeToString(prefs.linkedTelegramSources)
         if (prefs.smartFolders.isEmpty()) remove(PreferenceKeys.SMART_FOLDERS)
         else this[PreferenceKeys.SMART_FOLDERS] = collectionsJson.encodeToString(prefs.smartFolders)
         this[PreferenceKeys.BACKUP_WIFI_ONLY] = prefs.backupWifiOnly

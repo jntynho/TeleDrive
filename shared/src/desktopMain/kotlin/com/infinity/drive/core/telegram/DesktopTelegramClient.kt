@@ -1110,15 +1110,48 @@ class DesktopTelegramClient(
         )
     }
 
+    override suspend fun ownedPrivateChannel(chatId: Long): TelegramChat? {
+        val chat = send(TdApi.GetChat(chatId))
+        val type = chat.type as? TdApi.ChatTypeSupergroup ?: return null
+        if (!type.isChannel || chat.hasProtectedContent) return null
+
+        val channel = send(TdApi.GetSupergroup(type.supergroupId))
+        val owner = channel.status as? TdApi.ChatMemberStatusCreator ?: return null
+        if (!owner.isMember || !channel.usernames?.activeUsernames.isNullOrEmpty()) return null
+
+        val photo = chat.photo?.small
+        return TelegramChat(chat.id, chat.title, photo?.id,
+            photo?.local?.path?.takeIf { it.isNotEmpty() && File(it).isFile },
+            canSendDocuments = false)
+    }
+
+    override suspend fun browseChatFiles(
+        chatId: Long,
+        query: String,
+        fromMessageId: Long,
+        limit: Int
+    ): RemoteDocumentPage {
+        val chat = send(TdApi.GetChat(chatId))
+        require(!chat.hasProtectedContent) { "This chat protects its content." }
+        if (fromMessageId == 0L) send(TdApi.OpenChat(chatId))
+        val found = searchMessages(chatId, fromMessageId, limit, query)
+        val files = found.messages.mapNotNull { message ->
+            message.takeIf { it.canBeSaved && it.selfDestructType == null && it.sendingState == null }
+                ?.toRemoteDocument()
+        }
+        return RemoteDocumentPage(files, found.nextFromMessageId)
+    }
+
     private suspend fun searchMessages(
         chatId: Long,
         fromMessageId: Long,
-        limit: Int
+        limit: Int,
+        query: String = ""
     ): TdApi.FoundChatMessages = send(
         TdApi.SearchChatMessages(
             chatId,
             null,
-            "",
+            query,
             null,
             fromMessageId,
             0,

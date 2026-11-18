@@ -876,11 +876,24 @@ class FileRepositoryImpl(
         fileDao.setOfflinePinned(id,pinned)
     }
 
-    override suspend fun importTelegramFile(document:com.infinity.drive.core.telegram.RemoteDocument,folderId:String?,name:String):AppResult<DriveFile> {
+    override suspend fun importTelegramFile(
+        document: com.infinity.drive.core.telegram.RemoteDocument,
+        folderId: String?,
+        name: String,
+        expectedDrive: Long?
+    ): AppResult<DriveFile> {
+        val drive = activeChannel.id() ?: return AppResult.Failure(AppError.NotFound)
+        if (expectedDrive != null && drive != expectedDrive) return AppResult.Failure(AppError.NotFound)
+        if (folderId != null) {
+            val folder = folderDao.byId(folderId)
+            if (folder?.chatId != drive || folder.trashedAt != null || !hiddenAccess.canReadFolder(folderId)) {
+                return AppResult.Failure(AppError.NotFound)
+            }
+        }
         val now=System.currentTimeMillis()
         val entity=FileEntity(id=java.util.UUID.randomUUID().toString(),folderId=folderId,name=name,
             sizeBytes=document.sizeBytes,mimeType=document.mimeType,category=FileCategory.fromMimeType(document.mimeType),
-            localPath=null,contentHash=null,chatId=activeChannel.id(),messageId=null,
+            localPath=null,contentHash=null,chatId=drive,messageId=null,
             remoteFileId=document.remoteFileId,remoteUniqueId=document.uniqueFileId,sourceChatId=document.chatId,sourceMessageId=document.messageId,backupState=BackupState.NONE,
             createdAt=document.dateSeconds*1000L,modifiedAt=document.dateSeconds*1000L,addedAt=now)
         fileDao.upsert(entity)

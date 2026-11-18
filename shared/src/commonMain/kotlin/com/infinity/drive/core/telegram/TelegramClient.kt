@@ -178,6 +178,17 @@ interface TelegramClient {
 
     suspend fun fetchDocuments(chatId: Long, fromMessageId: Long, limit: Int): RemoteDocumentPage
 
+    /** Verifies ownership, membership and privacy for a read-only linked channel. */
+    suspend fun ownedPrivateChannel(chatId: Long): TelegramChat? = null
+
+    /** User-facing search only returns files that Telegram allows the user to save. */
+    suspend fun browseChatFiles(
+        chatId: Long,
+        query: String,
+        fromMessageId: Long,
+        limit: Int
+    ): RemoteDocumentPage = error("Browsing chat files is unavailable")
+
     suspend fun getDocument(chatId: Long, messageId: Long): RemoteDocument?
 
     /** Looks up at most 100 messages in one chat, propagating a failed request. */

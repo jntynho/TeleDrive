@@ -104,24 +104,30 @@ class UploadCoordinator(private val fileRepository:FileRepository,
             })
         }}
     }
-    fun importFromTelegram(documents:List<RemoteDocument>,target:String?=null) {
+    fun importFromTelegram(documents: List<RemoteDocument>, target: String?, expectedDrive: Long) {
         importScope.launch {serial.withLock {
-            val context=settings.preferences.first().let{it.storageChatId to it.onboardingComplete}
+            val context = settings.preferences.first()
+            if (!context.onboardingComplete || context.storageChatId != expectedDrive || context.encryptFiles) {
+                _messages.tryEmit(UiText.Resource(Res.string.files_import_failed))
+                return@withLock
+            }
             var apply:Answer?=null
             val ids=mutableListOf<String>()
             for((index,document)in documents.withIndex()){
                 try {
-                    if(settings.preferences.first().let{it.storageChatId to it.onboardingComplete}!=context)throw CancellationException("Drive changed")
+                    if (settings.preferences.first().let { it.storageChatId != expectedDrive || !it.onboardingComplete || it.encryptFiles }) {
+                        throw CancellationException("Drive or encryption changed")
+                    }
                     val(answer,name)=choice(document.fileName,document.sizeBytes,target,documents.size-index,apply)
                     if(answer?.applyToAll==true)apply=answer
                     if(answer?.choice==Choice.SKIP)continue
-                    val row=fileRepository.importTelegramFile(document,target,name)
+                    val row=fileRepository.importTelegramFile(document,target,name,expectedDrive)
                     if(row is AppResult.Success)ids+=row.value.id
                 }catch(cancel:CancellationException){throw cancel}
                 catch(error:Exception){SafeLog.w("UploadCoordinator","Could not import Telegram file",error)}
             }
             val result=transferRepository.enqueueUploads(ids)
-            _messages.tryEmit(if(result is AppResult.Success)UiText.Resource(Res.string.files_import_uploading,result.value)else UiText.Resource(Res.string.files_import_failed))
+            _messages.tryEmit(if(result is AppResult.Success && result.value > 0)UiText.Resource(Res.string.files_import_uploading,result.value)else UiText.Resource(Res.string.files_import_failed))
         }}
     }
 }

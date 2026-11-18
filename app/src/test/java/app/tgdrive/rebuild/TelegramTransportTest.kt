@@ -217,13 +217,55 @@ class TelegramTransportTest {
         val events=mutableListOf<TelegramUploadEvent>()
         val job=backgroundScope.launch{client.copyMessageEvents(-1001,-2002,31,"new manifest").toList(events)}
         runCurrent()
-        val send=wire.sent.single() as TdApi.SendMessage
+        wire.reply(TdApi.GetChat::class.java, TdApi.Chat().apply { id = -2002 }); runCurrent()
+        wire.reply(TdApi.GetMessage::class.java, message(31).apply { chatId = -2002; canBeSaved = true }); runCurrent()
+        wire.reply(TdApi.GetMessageProperties::class.java, TdApi.MessageProperties().apply { canBeCopied = true }); runCurrent()
+        val send=wire.sent.filterIsInstance<TdApi.SendMessage>().single()
         val forwarded=send.inputMessageContent as TdApi.InputMessageForwarded
         assertEquals(-2002L,forwarded.fromChatId);assertEquals(31L,forwarded.messageId)
         assertTrue(forwarded.copyOptions.sendCopy);assertTrue(forwarded.copyOptions.replaceCaption)
         assertEquals("new manifest",forwarded.copyOptions.newCaption.text)
         wire.reply(TdApi.SendMessage::class.java,message(41));runCurrent()
         assertTrue(job.isCompleted);assertEquals(41L,(events.last() as TelegramUploadEvent.Completed).document.messageId)
+    }
+
+    @Test fun `chat search preserves the cursor while skipping protected messages`() = runTest {
+        val wire = Wire()
+        val client = client(wire)
+        client.start(TelegramCredentials(12345, "a".repeat(32)))
+        val result = async { client.browseChatFiles(-1001, "photo", 20, 100) }
+        runCurrent()
+        wire.reply(TdApi.GetChat::class.java, TdApi.Chat().apply { id = -1001 }); runCurrent()
+        val request = wire.sent.filterIsInstance<TdApi.SearchChatMessages>().single()
+        assertEquals("photo", request.query)
+        assertEquals(20L, request.fromMessageId)
+        wire.reply(TdApi.SearchChatMessages::class.java, TdApi.FoundChatMessages().apply {
+            messages = arrayOf(message(19).apply { canBeSaved = true }, message(18))
+            nextFromMessageId = 17L
+        }); runCurrent()
+        assertEquals(listOf(19L), result.await().documents.map { it.messageId })
+        assertEquals(17L, result.await().nextFromMessageId)
+        assertFalse(wire.sent.any { it is TdApi.SendMessage || it is TdApi.DeleteMessages })
+    }
+
+    @Test fun `linking a channel requires ownership membership and no public username`() = runTest {
+        val wire = Wire()
+        val client = client(wire)
+        client.start(TelegramCredentials(12345, "a".repeat(32)))
+        val chat = TdApi.Chat().apply { id = -1001; title = "Source"; type = TdApi.ChatTypeSupergroup(77, true) }
+        suspend fun checkChannel(member: Boolean, public: Boolean): Boolean {
+            val result = async { client.ownedPrivateChannel(-1001) }
+            runCurrent()
+            wire.reply(TdApi.GetChat::class.java, chat); runCurrent()
+            wire.reply(TdApi.GetSupergroup::class.java, TdApi.Supergroup().apply {
+                status = TdApi.ChatMemberStatusCreator(false, member)
+                usernames = TdApi.Usernames().apply { activeUsernames = if (public) arrayOf("public") else emptyArray() }
+            }); runCurrent()
+            return result.await()?.canSendDocuments == false
+        }
+        assertTrue(checkChannel(member = true, public = false))
+        assertFalse(checkChannel(member = true, public = true))
+        assertFalse(checkChannel(member = false, public = false))
     }
 
     @Test fun `canceling before send acceptance cleans up a late final reply instead of leaking a message`()=runTest {

@@ -12,6 +12,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.layout.ContentScale
@@ -19,17 +21,28 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import androidx.compose.ui.unit.dp
 import com.infinity.drive.core.telegram.*
+import com.infinity.drive.domain.model.FileCategory
+import com.infinity.drive.domain.model.LinkedTelegramSource
 import com.infinity.drive.domain.repository.SettingsRepository
+import com.infinity.drive.resources.*
 import com.infinity.drive.presentation.components.*
 import com.infinity.drive.presentation.common.Formatters
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.first
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
 /** Search is debounced and canceled with the sheet. Loading and failures never look like an empty chat list. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TelegramChatPicker(title:String,onDismiss:()->Unit,forSending:Boolean=false,onSelected:(TelegramChat)->Unit) {
+fun TelegramChatPicker(
+    title: String,
+    onDismiss: () -> Unit,
+    forSending: Boolean = false,
+    linked: List<LinkedTelegramSource> = emptyList(),
+    onUnlink: (LinkedTelegramSource) -> Unit = {},
+    onOpenLinked: (LinkedTelegramSource) -> Unit = {},
+    onSelected: (TelegramChat) -> Unit
+) {
     val client=koinInject<TelegramClient>()
     val photoSlots=remember(client){Semaphore(2)}
     var query by remember{mutableStateOf("")}
@@ -42,6 +55,8 @@ fun TelegramChatPicker(title:String,onDismiss:()->Unit,forSending:Boolean=false,
         try{rows=client.listChats(query)}catch(cancel:CancellationException){throw cancel}
         catch(_:Exception){error="Couldn't load your chats. Check your connection and retry."}
     }
+    val linkedShown = linked.filter { it.title.contains(query.trim(), ignoreCase = true) }
+    val unlinkedChats = rows?.filter { chat -> linked.none { it.sourceChatId == chat.id } }
     DriveBottomSheet(onDismissRequest=onDismiss) { dismiss ->
         Row(Modifier.fillMaxWidth().padding(start=24.dp,end=12.dp,top=4.dp,bottom=8.dp),verticalAlignment=Alignment.CenterVertically){
             Text(title,Modifier.weight(1f),style=MaterialTheme.typography.titleLarge)
@@ -54,10 +69,23 @@ fun TelegramChatPicker(title:String,onDismiss:()->Unit,forSending:Boolean=false,
             modifier=Modifier.fillMaxWidth().padding(horizontal=24.dp))
         Spacer(Modifier.height(12.dp))
         LazyColumn(Modifier.fillMaxWidth().heightIn(max=440.dp)) {
+            items(linkedShown, key = { "linked-${it.sourceChatId}" }) { source ->
+                ListItem(
+                    headlineContent = { Text(source.title, maxLines = 1) },
+                    supportingContent = { Text(stringResource(Res.string.chat_import_linked)) },
+                    leadingContent = { Icon(DriveIcons.Link, null) },
+                    trailingContent = {
+                        IconButton({ onUnlink(source) }) {
+                            Icon(DriveIcons.Close, stringResource(Res.string.chat_import_unlink))
+                        }
+                    },
+                    modifier = Modifier.clickable { onOpenLinked(source) }
+                )
+            }
             if(error!=null)item{Column(Modifier.padding(24.dp)){Text(error!!);TextButton({retry++}){Text("Retry")}}}
             else if(rows==null)item{LinearProgressIndicator(Modifier.fillMaxWidth().padding(24.dp))}
-            else if(rows!!.isEmpty())item{Text("No matching chats",Modifier.padding(24.dp))}
-            else items(rows!!,key={it.id}){chat->
+            else if(unlinkedChats.isNullOrEmpty() && linkedShown.isEmpty())item{Text("No matching chats",Modifier.padding(24.dp))}
+            else items(unlinkedChats.orEmpty(),key={it.id}){chat->
                 ListItem(headlineContent={Text(chat.title,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)},
                     leadingContent={TelegramChatAvatar(chat){photoSlots.withPermit{withTimeoutOrNull(8_000){client.fetchChannelPhoto(chat.id)}}}},
                     supportingContent={if(forSending&&!chat.canSendDocuments)Text("Documents are not allowed in this chat")},
@@ -88,60 +116,241 @@ fun TelegramChatAvatar(chat:TelegramChat,load:suspend ()->String?) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TelegramImportSheet(target:String?=null,onDismiss:()->Unit) {
-    val client=koinInject<TelegramClient>()
-    val uploads=koinInject<UploadCoordinator>()
-    val settings=koinInject<SettingsRepository>()
-    var chat by remember{mutableStateOf<TelegramChat?>(null)}
-    var documents by remember{mutableStateOf<List<RemoteDocument>>(emptyList())}
-    var selected by remember{mutableStateOf<Set<Long>>(emptySet())}
-    var cursor by remember{mutableLongStateOf(0)}
-    var page by remember{mutableIntStateOf(0)}
-    var end by remember{mutableStateOf(false)}
-    var loading by remember{mutableStateOf(false)}
-    var error by remember{mutableStateOf<String?>(null)}
-    var encrypted by remember{mutableStateOf(false)}
-    LaunchedEffect(Unit){encrypted=settings.preferences.first().encryptFiles}
+fun TelegramImportSheet(target: String? = null, onDismiss: () -> Unit) {
+    val client = koinInject<TelegramClient>()
+    val uploads = koinInject<UploadCoordinator>()
+    val settings = koinInject<SettingsRepository>()
+    val preferences by settings.preferences.collectAsState(initial = null)
+    val drive = preferences?.takeIf { it.onboardingComplete }?.storageChatId
+    val sourceList = preferences?.linkedTelegramSources.orEmpty().filter { it.driveChatId == drive }
+    val scope = rememberCoroutineScope()
+    var chat by remember(drive) { mutableStateOf<TelegramChat?>(null) }
 
-    LaunchedEffect(chat?.id,page){
-        if(chat==null)return@LaunchedEffect
-        loading=true;error=null
-        try{
-            val result=client.fetchDocuments(chat!!.id,cursor,100)
-            documents=(documents+result.documents).distinctBy{it.messageId}
-            end=result.nextFromMessageId==0L||result.nextFromMessageId==cursor
-            cursor=result.nextFromMessageId
-        }catch(cancel:CancellationException){throw cancel}
-        catch(_:Exception){error="Couldn't load this chat. It may be protected or unavailable."}
-        finally{loading=false}
-    }
-    DriveBottomSheet(onDismissRequest=onDismiss) { dismiss ->
-        val closeThen=LocalSheetCloseThen.current
-        DriveSheetPage(chat){shown ->
-        if(shown==null)TelegramChatPicker("Save from a Telegram chat",dismiss){chat=it}
-        else Column {
-        Row(Modifier.fillMaxWidth().padding(end=24.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
-            IconButton({chat=null;documents=emptyList();selected=emptySet();cursor=0;end=false;page=0}){Icon(DriveIcons.ArrowBack,"Choose another chat")}
-            Text(shown.title,Modifier.weight(1f),style=MaterialTheme.typography.titleLarge)
-            TextButton({selected=if(selected.size==documents.size)emptySet()else documents.map{it.messageId}.toSet()},enabled=documents.isNotEmpty()){Text(if(selected.size==documents.size)"Clear"else"Select loaded")}
-        }
-        Text("Original messages stay in this chat. Copies go into your private drive.",Modifier.padding(horizontal=24.dp,vertical=8.dp),style=MaterialTheme.typography.bodySmall)
-        if(encrypted)Text("Direct copies remain unencrypted. Turn off file encryption to use this option, or download and upload the originals.",Modifier.padding(horizontal=24.dp),color=MaterialTheme.colorScheme.error)
-        LazyColumn(Modifier.fillMaxWidth().heightIn(max=420.dp)) {
-            items(documents,key={it.messageId}){document->
-                ListItem(headlineContent={Text(document.fileName)},supportingContent={Text(Formatters.bytes(document.sizeBytes))},leadingContent={Icon(DriveIcons.InsertDriveFile,null)},
-                    trailingContent={Checkbox(document.messageId in selected,{checked->selected=if(checked)selected+document.messageId else selected-document.messageId})},
-                    modifier=Modifier.clickable{selected=if(document.messageId in selected)selected-document.messageId else selected+document.messageId})
+    fun unlink(source: LinkedTelegramSource) {
+        scope.launch {
+            settings.update { prefs ->
+                prefs.copy(linkedTelegramSources = prefs.linkedTelegramSources.filterNot {
+                    it.driveChatId == source.driveChatId && it.sourceChatId == source.sourceChatId
+                })
             }
-            if(loading)item{LinearProgressIndicator(Modifier.fillMaxWidth().padding(24.dp))}
-            else if(error!=null)item{Column(Modifier.padding(24.dp)){Text(error!!);TextButton({page++}){Text("Retry")}}}
-            else if(!end)item{TextButton({page++},Modifier.fillMaxWidth()){Text("Load more messages")}}
-            else if(documents.isEmpty())item{Text("No supported files in this chat",Modifier.padding(24.dp))}
-        }
-        Button({val chosen=documents.filter{it.messageId in selected};closeThen{uploads.importFromTelegram(chosen,target)}},enabled=selected.isNotEmpty()&&!encrypted,modifier=Modifier.fillMaxWidth().padding(24.dp)){
-            Text("Save ${selected.size} ${if(selected.size==1)"file"else"files"}")
         }
     }
+
+    DriveBottomSheet(onDismissRequest = onDismiss) { dismiss ->
+        val closeThen = LocalSheetCloseThen.current
+        DriveSheetPage(chat) { shown ->
+            if (shown == null) {
+                TelegramChatPicker(
+                    title = stringResource(Res.string.chat_import_title),
+                    onDismiss = dismiss,
+                    linked = sourceList,
+                    onUnlink = ::unlink,
+                    onOpenLinked = { chat = TelegramChat(it.sourceChatId, it.title, canSendDocuments = false) }
+                ) { chat = it }
+            } else {
+                key(drive, shown.id) {
+                    val linked = sourceList.firstOrNull { it.sourceChatId == shown.id }
+                    var linkable by remember { mutableStateOf<TelegramChat?>(null) }
+                    var linking by remember { mutableStateOf(false) }
+                    var linkFailed by remember { mutableStateOf(false) }
+                    LaunchedEffect(drive, shown.id) {
+                        if (drive == null || drive == shown.id || linked != null) return@LaunchedEffect
+                        linkable = try {
+                            client.ownedPrivateChannel(shown.id)
+                        } catch (cancel: CancellationException) {
+                            throw cancel
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
+                    TelegramChatFiles(
+                        chat = shown,
+                        client = client,
+                        isLinked = linked != null,
+                        encrypted = preferences?.encryptFiles == true,
+                        canImport = drive != null,
+                        onBack = { chat = null },
+                        onImport = { files ->
+                            if (drive != null) closeThen { uploads.importFromTelegram(files, target, drive) }
+                        },
+                        sourceAction = {
+                            val source = linkable
+                            when {
+                                linked != null -> Text(
+                                    stringResource(Res.string.chat_import_linked),
+                                    Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                source != null && drive != null -> TextButton(
+                                    onClick = {
+                                        linking = true
+                                        linkFailed = false
+                                        scope.launch {
+                                            try {
+                                                val current = client.ownedPrivateChannel(source.id)
+                                                    ?: error("Channel is no longer linkable")
+                                                val shortcut = LinkedTelegramSource(drive, current.id, current.title)
+                                                settings.update { prefs ->
+                                                    if (prefs.storageChatId != drive || !prefs.onboardingComplete) prefs
+                                                    else prefs.copy(linkedTelegramSources = (
+                                                        prefs.linkedTelegramSources + shortcut
+                                                    ).distinctBy { it.driveChatId to it.sourceChatId })
+                                                }
+                                            } catch (cancel: CancellationException) {
+                                                throw cancel
+                                            } catch (_: Exception) {
+                                                linkFailed = true
+                                            } finally {
+                                                linking = false
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    enabled = !linking
+                                ) {
+                                    Icon(DriveIcons.Link, null, Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(stringResource(Res.string.chat_import_link))
+                                }
+                            }
+                            if (linkFailed) {
+                                Text(
+                                    stringResource(Res.string.chat_import_link_failed),
+                                    Modifier.padding(horizontal = 24.dp),
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    )
+                }
+            }
+        }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TelegramChatFiles(
+    chat: TelegramChat,
+    client: TelegramClient,
+    isLinked: Boolean,
+    encrypted: Boolean,
+    canImport: Boolean,
+    onBack: () -> Unit,
+    onImport: (List<RemoteDocument>) -> Unit,
+    sourceAction: @Composable () -> Unit
+) {
+    var query by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf<FileCategory?>(null) }
+    val selected = remember { mutableStateMapOf<Long, RemoteDocument>() }
+
+    val term = query.trim()
+    var documents by remember(term, isLinked) { mutableStateOf(emptyList<RemoteDocument>()) }
+    var cursor by remember(term, isLinked) { mutableLongStateOf(0) }
+    var page by remember(term, isLinked) { mutableIntStateOf(0) }
+    var end by remember(term, isLinked) { mutableStateOf(false) }
+    var loading by remember(term, isLinked) { mutableStateOf(true) }
+    var failed by remember(term, isLinked) { mutableStateOf(false) }
+
+    LaunchedEffect(term, page, isLinked) {
+        loading = true
+        failed = false
+        try {
+            if (term.isNotEmpty() && cursor == 0L) delay(300)
+            if (isLinked) {
+                check(client.ownedPrivateChannel(chat.id) != null) { "Linked channel is no longer available" }
+            }
+            val result = client.browseChatFiles(chat.id, term, cursor, 100)
+            documents = (documents + result.documents).distinctBy(RemoteDocument::messageId)
+            end = result.nextFromMessageId == 0L || result.nextFromMessageId == cursor
+            cursor = result.nextFromMessageId
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            failed = true
+        } finally {
+            loading = false
+        }
+    }
+    val visible = remember(documents, category) {
+        documents.filter { category == null || FileCategory.fromMimeType(it.mimeType) == category }
+    }
+    val allVisibleSelected = visible.isNotEmpty() && visible.all { it.messageId in selected }
+
+    Column {
+        Row(Modifier.fillMaxWidth().padding(end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onBack) { Icon(DriveIcons.ArrowBack, stringResource(Res.string.chat_import_back)) }
+            Text(chat.title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, maxLines = 1)
+            TextButton(
+                onClick = {
+                    if (allVisibleSelected) visible.forEach { selected.remove(it.messageId) }
+                    else visible.forEach { selected[it.messageId] = it }
+                },
+                enabled = visible.isNotEmpty()
+            ) {
+                Text(stringResource(if (allVisibleSelected) Res.string.chat_import_clear_visible else Res.string.chat_import_select_visible))
+            }
+        }
+        sourceAction()
+        TextField(
+            value = query,
+            onValueChange = { query = it },
+            singleLine = true,
+            placeholder = { Text(stringResource(Res.string.chat_import_search)) },
+            leadingIcon = { Icon(DriveIcons.Search, null) },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
+        )
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(category == null, { category = null }, { Text(stringResource(Res.string.chat_import_all_types)) })
+            FileCategory.entries.forEach { type ->
+                FilterChip(category == type, { category = type }, { Text(type.label()) })
+            }
+        }
+        if (encrypted) {
+            Text(
+                stringResource(Res.string.chat_import_encryption_enabled),
+                Modifier.padding(horizontal = 24.dp),
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 380.dp).weight(1f, fill = false)) {
+            items(visible, key = { it.messageId }) { document ->
+                val checked = document.messageId in selected
+                ListItem(
+                    headlineContent = { Text(document.fileName) },
+                    supportingContent = { Text(Formatters.bytes(document.sizeBytes)) },
+                    leadingContent = { Icon(DriveIcons.InsertDriveFile, null) },
+                    trailingContent = { Checkbox(checked = checked, onCheckedChange = null) },
+                    modifier = Modifier.clickable {
+                        if (checked) selected.remove(document.messageId) else selected[document.messageId] = document
+                    }
+                )
+            }
+            when {
+                loading -> item { LinearProgressIndicator(Modifier.fillMaxWidth().padding(24.dp)) }
+                failed -> item {
+                    Column(Modifier.padding(24.dp)) {
+                        Text(stringResource(Res.string.chat_import_unavailable))
+                        TextButton({ page++ }) { Text(stringResource(Res.string.chat_import_retry)) }
+                    }
+                }
+                !end -> item {
+                    TextButton({ page++ }, Modifier.fillMaxWidth()) { Text(stringResource(Res.string.chat_import_more)) }
+                }
+                visible.isEmpty() -> item {
+                    Text(stringResource(Res.string.chat_import_no_files), Modifier.padding(24.dp))
+                }
+            }
+        }
+        Button(
+            onClick = { onImport(selected.values.sortedByDescending(RemoteDocument::messageId)) },
+            enabled = selected.isNotEmpty() && !encrypted && canImport && !failed,
+            modifier = Modifier.fillMaxWidth().padding(24.dp)
+        ) {
+            Text(stringResource(Res.string.chat_import_save_selected, selected.size))
+        }
     }
 }

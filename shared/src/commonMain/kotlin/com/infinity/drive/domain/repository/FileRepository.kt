@@ -161,7 +161,12 @@ interface FileRepository {
     suspend fun rememberContentHash(id:String,hash:String) {}
     suspend fun findNameClash(name:String,folderId:String?):DriveFile? = observeFiles(FileQuerySpec(folderId=folderId,filterByFolder=true,respectHiddenLock=false,showHidden=true,showArchived=true)).first().firstOrNull{it.name.equals(name,true)}
     suspend fun setOfflinePinned(id:String,pinned:Boolean) {}
-    suspend fun importTelegramFile(document:com.infinity.drive.core.telegram.RemoteDocument,folderId:String?,name:String=document.fileName):AppResult<DriveFile> = AppResult.Failure(com.infinity.drive.core.common.AppError.NotFound)
+    suspend fun importTelegramFile(
+        document: com.infinity.drive.core.telegram.RemoteDocument,
+        folderId: String?,
+        name: String = document.fileName,
+        expectedDrive: Long? = null
+    ): AppResult<DriveFile> = AppResult.Failure(com.infinity.drive.core.common.AppError.NotFound)
 
     /** Deletes import staging copies that no file references anymore. */
     suspend fun sweepImportOrphans()

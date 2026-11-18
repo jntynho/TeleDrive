@@ -22,6 +22,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.ensureActive
@@ -1291,15 +1293,48 @@ internal class TdLibTelegramClient(
         )
     }
 
+    override suspend fun ownedPrivateChannel(chatId: Long): TelegramChat? {
+        val chat = send(TdApi.GetChat(chatId))
+        val type = chat.type as? TdApi.ChatTypeSupergroup ?: return null
+        if (!type.isChannel || chat.hasProtectedContent) return null
+
+        val channel = send(TdApi.GetSupergroup(type.supergroupId))
+        val owner = channel.status as? TdApi.ChatMemberStatusCreator ?: return null
+        if (!owner.isMember || !channel.usernames?.activeUsernames.isNullOrEmpty()) return null
+
+        val photo = chat.photo?.small
+        return TelegramChat(chat.id, chat.title, photo?.id,
+            photo?.local?.path?.takeIf { it.isNotEmpty() && File(it).isFile },
+            canSendDocuments = false)
+    }
+
+    override suspend fun browseChatFiles(
+        chatId: Long,
+        query: String,
+        fromMessageId: Long,
+        limit: Int
+    ): RemoteDocumentPage {
+        val chat = send(TdApi.GetChat(chatId))
+        require(!chat.hasProtectedContent) { "This chat protects its content." }
+        if (fromMessageId == 0L) send(TdApi.OpenChat(chatId))
+        val found = searchMessages(chatId, fromMessageId, limit, query)
+        val files = found.messages.mapNotNull { message ->
+            message.takeIf { it.canBeSaved && it.selfDestructType == null && it.sendingState == null }
+                ?.toRemoteDocument()
+        }
+        return RemoteDocumentPage(files, found.nextFromMessageId)
+    }
+
     private suspend fun searchMessages(
         chatId: Long,
         fromMessageId: Long,
-        limit: Int
+        limit: Int,
+        query: String = ""
     ): TdApi.FoundChatMessages = send(
         TdApi.SearchChatMessages(
             chatId,
             null,
-            "",
+            query,
             null,
             fromMessageId,
             0,
@@ -1372,14 +1407,26 @@ internal class TdLibTelegramClient(
     override suspend fun copyMessage(chatId:Long,fromChatId:Long,messageId:Long,caption:String):RemoteDocument =
         copyMessageEvents(chatId,fromChatId,messageId,caption).filterIsInstance<TelegramUploadEvent.Completed>().first().document
 
-    override fun copyMessageEvents(chatId:Long,fromChatId:Long,messageId:Long,caption:String):Flow<TelegramUploadEvent> {
+    override fun copyMessageEvents(
+        chatId: Long,
+        fromChatId: Long,
+        messageId: Long,
+        caption: String
+    ): Flow<TelegramUploadEvent> = flow {
+        val chat = send(TdApi.GetChat(fromChatId))
+        val source = send(TdApi.GetMessage(fromChatId, messageId))
+        val properties = send(TdApi.GetMessageProperties(fromChatId, messageId))
+        check(!chat.hasProtectedContent && source.canBeSaved && source.selfDestructType == null &&
+            properties.canBeCopied && source.sendingState == null) {
+            "Telegram doesn't allow copying this message."
+        }
         val content=TdApi.InputMessageForwarded().apply {
             this.fromChatId=fromChatId;this.messageId=messageId
             copyOptions=TdApi.MessageCopyOptions().apply {
                 sendCopy=true;replaceCaption=true;newCaption=TdApi.FormattedText(caption,emptyArray())
             }
         }
-        return sendUploadContent(chatId,content)
+        emitAll(sendUploadContent(chatId, content))
     }
 
     private suspend fun actionMessage(chatId:Long,messageId:Long):TdApi.Message {
