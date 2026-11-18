@@ -7,6 +7,8 @@ import com.infinity.drive.resources.files_removed_local_copies
 import com.infinity.drive.resources.settings_nothing_to_remove
 import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.about_no_update
+import com.infinity.drive.resources.backup_preview_started
+import com.infinity.drive.resources.home_backup_nothing_to_back_up
 import com.infinity.drive.resources.message_backing_up_new_folder
 import com.infinity.drive.resources.message_cache_cleared
 import com.infinity.drive.resources.message_key_backup_saved
@@ -198,6 +200,44 @@ class SettingsViewModel(
             if(current.storageChatId!=previous.storageChatId)backupRepository.syncActiveSessionWithSelection()
             fun scheduleKey(p:UserPreferences)=listOf(p.autoBackupEnabled,p.backupIntervalHours,p.backupWifiOnly,p.backupChargingOnly,p.instantBackupEnabled,p.updateCheckEnabled)
             if(scheduleKey(current)!=scheduleKey(previous))rescheduleWork()
+    }
+
+    private val _backupPreview = MutableStateFlow(BackupPreviewState())
+    internal val backupPreview = _backupPreview.asStateFlow()
+    private var backupPreviewJob: Job? = null
+
+    fun previewBackup() {
+        if (backupPreviewJob?.isActive == true) return
+        _backupPreview.value = BackupPreviewState(running = true)
+        backupPreviewJob = viewModelScope.launch {
+            try {
+                _backupPreview.value = when (val result = backupRepository.previewBackup()) {
+                    is AppResult.Success -> BackupPreviewState(report = result.value)
+                    is AppResult.Failure -> BackupPreviewState(error = result.error.toUiText())
+                }
+            } finally {
+                _backupPreview.value = _backupPreview.value.copy(running = false)
+            }
+        }
+    }
+
+    fun cancelBackupPreview() {
+        backupPreviewJob?.cancel()
+    }
+
+    fun startBackupAfterPreview() {
+        if (_backupPreview.value.report?.uploads?.let { it > 0 } != true) return
+        _backupPreview.value = BackupPreviewState()
+        viewModelScope.launch {
+            val message = when (val result = backupRepository.startBackup(BackupTrigger.MANUAL)) {
+                is AppResult.Success -> UiText.Resource(
+                    if (result.value == null) Res.string.home_backup_nothing_to_back_up
+                    else Res.string.backup_preview_started
+                )
+                is AppResult.Failure -> result.error.toUiText()
+            }
+            _messages.tryEmit(message)
+        }
     }
 
     private suspend fun scanForNewBackupWork() {

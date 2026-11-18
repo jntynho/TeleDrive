@@ -68,6 +68,8 @@ import com.infinity.drive.resources.language_portuguese_br
 import com.infinity.drive.resources.language_russian
 import com.infinity.drive.resources.language_system
 import com.infinity.drive.resources.settings_language
+import com.infinity.drive.resources.backup_preview_description
+import com.infinity.drive.resources.backup_preview_title
 import com.infinity.drive.resources.backup_folder_remove_message
 import com.infinity.drive.resources.backup_folder_subtitle
 import com.infinity.drive.resources.backup_interval_labels
@@ -538,6 +540,21 @@ private fun BackupSection(
     var showSizeLimitDialog by remember { mutableStateOf(false) }
     var showMinimumDialog by remember { mutableStateOf(false) }
 
+    var showBackupPreview by remember { mutableStateOf(false) }
+    val backupPreview by viewModel.backupPreview.collectAsStateWithLifecycle()
+    if (showBackupPreview) {
+        BackupPreviewDialog(
+            state = backupPreview,
+            onClose = {
+                viewModel.cancelBackupPreview()
+                showBackupPreview = false
+            },
+            onStart = {
+                viewModel.startBackupAfterPreview()
+                showBackupPreview = false
+            }
+        )
+    }
     if (showIntervalDialog) {
         ChoiceDialog(
             title = stringResource(Res.string.settings_backup_interval),
@@ -570,6 +587,16 @@ private fun BackupSection(
     }
 
     SettingsGroup {
+        add {
+            SettingsClickRow(
+                title = stringResource(Res.string.backup_preview_title),
+                subtitle = stringResource(Res.string.backup_preview_description),
+                onClick = {
+                    viewModel.previewBackup()
+                    showBackupPreview = true
+                }
+            )
+        }
         add {
             SettingsSwitchRow(
                 title = stringResource(Res.string.settings_automatic_backup),

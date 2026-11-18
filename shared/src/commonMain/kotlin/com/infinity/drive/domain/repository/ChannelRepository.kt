@@ -38,7 +38,7 @@ interface ChannelRepository {
     suspend fun deleteRemotely(chatId: Long): AppResult<Unit>
 
     /** Backup folders configured for [chatId]. */
-    suspend fun backupFolders(chatId: Long): Set<String>
+    suspend fun backupFolders(chatId: Long, migrateLegacy: Boolean = true): Set<String>
 
     suspend fun setBackupFolders(chatId: Long, folders: Set<String>)
 }

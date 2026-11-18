@@ -1,6 +1,7 @@
 package com.infinity.drive.domain.repository
 
 import com.infinity.drive.core.common.AppResult
+import com.infinity.drive.domain.model.BackupDecision
 import com.infinity.drive.domain.model.BackupSession
 import com.infinity.drive.domain.model.BackupTrigger
 import kotlinx.coroutines.flow.Flow
@@ -17,6 +18,16 @@ interface BackupRepository {
      * queues uploads. Returns the session id, or null when nothing to back up.
      */
     suspend fun startBackup(trigger: BackupTrigger): AppResult<String?>
+
+    /** Applies the same backup selection without modifying local or remote state. */
+    suspend fun previewBackup(): AppResult<BackupPreview>
+
+    data class BackupPreview(
+        val uploads: Int,
+        val uploadBytes: Long,
+        val skips: Map<BackupDecision, Int>,
+        val unreadableFolders: Int
+    )
 
     suspend fun pauseBackup(sessionId: String)
 

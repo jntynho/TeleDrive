@@ -49,6 +49,12 @@ interface BackupDao {
     @Query("SELECT * FROM backup_records WHERE sourcePath = :sourcePath")
     suspend fun recordByPath(sourcePath: String): BackupRecordEntity?
 
+    @Query(
+        """SELECT r.* FROM backup_records r INNER JOIN files f ON f.id = r.fileId
+           WHERE r.sourcePath = :sourcePath AND f.chatId = :chatId AND f.messageId IS NOT NULL"""
+    )
+    suspend fun recordForRemoteFile(sourcePath: String, chatId: Long): BackupRecordEntity?
+
     @Query("DELETE FROM backup_records WHERE fileId IN (:fileIds)")
     suspend fun deleteRecordsForFiles(fileIds: List<String>)
 

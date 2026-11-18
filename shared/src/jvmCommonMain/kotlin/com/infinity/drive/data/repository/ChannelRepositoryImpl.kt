@@ -208,13 +208,13 @@ class ChannelRepositoryImpl(
      * to ask adopts whatever was configured there, so an upgrade keeps backing
      * up the folders the user already picked.
      */
-    override suspend fun backupFolders(chatId: Long): Set<String> {
+    override suspend fun backupFolders(chatId: Long, migrateLegacy: Boolean): Set<String> {
         val row = channelDao.byId(chatId) ?: return emptySet()
         val stored = row.backupFolders.toFolderSet()
         if (stored.isNotEmpty()) return stored
 
         val legacy = settingsRepository.preferences.first().backupFolders
-        if (legacy.isEmpty()) return emptySet()
+        if (legacy.isEmpty() || !migrateLegacy) return legacy
         setBackupFolders(chatId, legacy)
         SafeLog.d(TAG, "Adopted ${legacy.size} backup folders from device settings")
         return legacy

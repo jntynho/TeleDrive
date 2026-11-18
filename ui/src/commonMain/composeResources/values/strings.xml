@@ -982,4 +982,16 @@
     <string name="key_file_io_failed">TeleDrive could not read or save the key file.</string>
     <string name="key_file_reindex_incomplete">The key is ready. Continue the file scan in Restore library.</string>
     <string name="key_file_saved">Encrypted key file saved.</string>
+    <string name="backup_preview_title">Preview backup</string>
+    <string name="backup_preview_description">Estimate uploads and skips before starting a backup</string>
+    <string name="backup_preview_scanning">Reading the selected backup folders…</string>
+    <string name="backup_preview_uploads">%1$d to upload · %2$s</string>
+    <string name="backup_preview_unchanged">%d unchanged</string>
+    <string name="backup_preview_excluded">%d excluded by your rules</string>
+    <string name="backup_preview_large">%d above the size limit</string>
+    <string name="backup_preview_small">%d below the size limit</string>
+    <string name="backup_preview_duplicates">%d already have a reusable copy</string>
+    <string name="backup_preview_unreadable">%d folders could not be read</string>
+    <string name="backup_preview_start">Start backup</string>
+    <string name="backup_preview_started">Backup queued in Activity.</string>
 </resources>

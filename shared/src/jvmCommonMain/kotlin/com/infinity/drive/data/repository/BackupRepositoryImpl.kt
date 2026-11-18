@@ -32,12 +32,17 @@ import com.infinity.drive.domain.repository.FileRepository
 import com.infinity.drive.domain.repository.SettingsRepository
 import com.infinity.drive.domain.usecase.DecideBackupActionUseCase
 import com.infinity.drive.domain.usecase.EvaluateExclusionsUseCase
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.nio.file.Files
 import java.util.UUID
+import kotlin.coroutines.coroutineContext
 
 class BackupRepositoryImpl(
     private val backupDao: BackupDao,
@@ -61,144 +66,171 @@ class BackupRepositoryImpl(
 
     override fun observeLastBackupAt(): Flow<Long?> = backupDao.observeLastBackupAt()
 
+    private val startMutex = Mutex()
+
     override suspend fun startBackup(trigger: BackupTrigger): AppResult<String?> =
-        withContext(dispatchers.io) { runBackup(trigger) }
+        withContext(dispatchers.io) {
+            startMutex.withLock { runBackup(trigger) }
+        }
+
+    override suspend fun previewBackup(): AppResult<BackupRepository.BackupPreview> =
+        withContext(dispatchers.io) {
+            when (val result = scanBackup(applyLinks = false)) {
+                is AppResult.Success -> AppResult.Success(result.value.preview)
+                is AppResult.Failure -> result
+            }
+        }
+
+    private data class BackupScan(
+        val chatId: Long,
+        val uploads: List<File>,
+        val preview: BackupRepository.BackupPreview
+    )
 
     private suspend fun runBackup(trigger: BackupTrigger): AppResult<String?> {
         if (backupDao.activeSession() != null) {
             return AppResult.Failure(AppError.BackupAlreadyRunning)
         }
-
-        val prefs = settingsRepository.preferences.first()
-        val activeChatId = prefs.storageChatId
-        val folders = if (activeChatId != null) {
-            channelRepository.backupFolders(activeChatId)
-        } else {
-            emptySet()
+        val scan = when (val result = scanBackup(applyLinks = true)) {
+            is AppResult.Success -> result.value
+            is AppResult.Failure -> return result
         }
-        if (folders.isEmpty()) {
-            return AppResult.Failure(
-                AppError.UnsupportedOperation(
-                    "No backup folders selected. Pick folders in Settings, " +
-                            "or upload files from Files."
-                )
-            )
-        }
-
-        backupDao.deleteOrphanedRecords()
-        val exclusions = exclusionRepository.getEnabled()
-        val maxSizeBytes = prefs.backupMaxFileSizeMb.toLong() * 1024 * 1024
-        val skipHidden = exclusions.any { it.type == ExclusionType.HIDDEN }
-        val candidates = mutableListOf<File>()
-        var unreadable = 0
-        for (folderPath in folders) {
-            val root = File(folderPath)
-            if (!root.exists()) continue
-            if (root.listFiles() == null) {
-                unreadable++
-                SafeLog.w(TAG, "Backup folder cannot be read: $folderPath")
-                continue
-            }
-            root.walkTopDown()
-                .onEnter { dir -> dir == root || !skipHidden || !isHiddenName(dir) }
-                .filter { it.isFile && it.length() > 0 }
-                .forEach { candidates.add(it) }
-        }
-
-        if (candidates.isEmpty() && (unreadable > 0 || storageUnreadable())) {
-            return AppResult.Failure(AppError.BackupFoldersUnreadable)
-        }
-
-        var totalBytes = 0L
-        var skipped = 0
-        val reasons = mutableMapOf<BackupDecision, Int>()
-        val toBackup = mutableListOf<File>()
-        for (candidate in candidates) {
-            val size=candidate.length()
-            val sizeSkip=when {
-                prefs.backupMinFileSizeMb>0&&size<prefs.backupMinFileSizeMb.toLong()*1024*1024->BackupDecision.SKIP_TOO_SMALL
-                maxSizeBytes>0&&size>maxSizeBytes->BackupDecision.SKIP_TOO_LARGE
-                else->null
-            }
-            if(sizeSkip!=null){skipped++;reasons[sizeSkip]=(reasons[sizeSkip]?:0)+1;continue}
-
-            if (backupDao.recordByPath(candidate.absolutePath) == null &&
-                (adoptLinkedUpload(candidate) ||
-                        reviveTrashedUpload(candidate) ||
-                        adoptUploadedCopy(candidate, activeChatId))
-            ) {
-                skipped++
-                continue
-            }
-            val record = backupDao.recordByPath(candidate.absolutePath)
-            val mime = MimeTypes.fromFileName(candidate.name)
-            val decision = decideBackupAction(
-                candidate = EvaluateExclusionsUseCase.Candidate(
-                    absolutePath = candidate.absolutePath,
-                    sizeBytes = candidate.length(),
-                    mimeType = mime,
-                    isHidden = candidate.name.startsWith('.')
-                ),
-                modifiedAt = candidate.lastModified(),
-                existingRecord = record?.let {
-                    DecideBackupActionUseCase.ExistingRecord(
-                        it.sizeBytes, it.modifiedAt, it.contentHash
-                    )
-                },
-                exclusions = exclusions,
-                maxFileSizeBytes = maxSizeBytes,
-                minFileSizeBytes = prefs.backupMinFileSizeMb.toLong() * 1024 * 1024,
-                contentHashProvider = { Hashing.sha256(candidate) }
-            )
-            if (decision == BackupDecision.BACKUP) {
-                toBackup.add(candidate)
-                totalBytes += candidate.length()
-            } else {
-                skipped++
-                reasons[decision] = (reasons[decision] ?: 0) + 1
-            }
-        }
-
-        if (toBackup.isEmpty()) {
-            SafeLog.d(
-                TAG,
-                "Backup scan: nothing to do, $skipped of ${candidates.size} skipped, " +
-                        "reasons=$reasons"
-            )
-            return AppResult.Success(null)
+        if (scan.uploads.isEmpty()) return AppResult.Success(null)
+        if (settingsRepository.preferences.first().storageChatId != scan.chatId) {
+            return AppResult.Failure(AppError.NotFound)
         }
 
         val session = BackupSessionEntity(
             id = UUID.randomUUID().toString(),
             trigger = trigger,
             status = BackupSessionStatus.RUNNING,
-            totalFiles = toBackup.size,
-            skippedFiles = skipped,
-            totalBytes = totalBytes,
+            totalFiles = scan.preview.uploads,
+            skippedFiles = scan.preview.skips.values.sum(),
+            totalBytes = scan.preview.uploadBytes,
             startedAt = System.currentTimeMillis()
         )
         backupDao.upsertSession(session)
-
-        for (batch in toBackup.chunked(ENQUEUE_BATCH)) {
-            val fileIds = batch.map { registerFile(it, backupFolderIdFor(it), activeChatId) }
+        for (batch in scan.uploads.chunked(ENQUEUE_BATCH)) {
+            val fileIds = batch.map { registerFile(it, backupFolderIdFor(it), scan.chatId) }
             transferRepository.enqueueBackupBatch(fileIds, session.id)
         }
         return AppResult.Success(session.id)
+    }
+
+    private suspend fun scanBackup(applyLinks: Boolean): AppResult<BackupScan> {
+        val prefs = settingsRepository.preferences.first()
+        val chatId = prefs.storageChatId ?: return AppResult.Failure(AppError.NotFound)
+        val folders = channelRepository.backupFolders(chatId, migrateLegacy = applyLinks)
+        if (folders.isEmpty()) {
+            return AppResult.Failure(
+                AppError.UnsupportedOperation("No backup folders selected. Pick folders in Settings.")
+            )
+        }
+
+        if (applyLinks) backupDao.deleteOrphanedRecords()
+        val exclusions = exclusionRepository.getEnabled()
+        val maxSizeBytes = prefs.backupMaxFileSizeMb.toLong() * 1024 * 1024
+        val minSizeBytes = prefs.backupMinFileSizeMb.toLong() * 1024 * 1024
+        val skipHidden = exclusions.any { it.type == ExclusionType.HIDDEN }
+        val candidates = linkedMapOf<String, File>()
+        var unreadable = 0
+        for (folderPath in folders) {
+            val root = File(folderPath)
+            if (!root.isDirectory) {
+                unreadable++
+                continue
+            }
+            val context = coroutineContext
+            root.walkTopDown()
+                .onEnter { dir ->
+                    context.ensureActive()
+                    dir == root || (!Files.isSymbolicLink(dir.toPath()) && (!skipHidden || !isHiddenName(dir)))
+                }
+                .onFail { _, _ -> unreadable++ }
+                .filter { it.isFile && !Files.isSymbolicLink(it.toPath()) && it.length() > 0 }
+                .forEach {
+                    context.ensureActive()
+                    candidates.putIfAbsent(it.absolutePath, it)
+                }
+        }
+
+        if (applyLinks && candidates.isEmpty() && (unreadable > 0 || storageUnreadable())) {
+            return AppResult.Failure(AppError.BackupFoldersUnreadable)
+        }
+
+        var totalBytes = 0L
+        val reasons = mutableMapOf<BackupDecision, Int>()
+        val toBackup = mutableListOf<File>()
+        for (candidate in candidates.values) {
+            coroutineContext.ensureActive()
+            val size = candidate.length()
+            val sizeSkip = when {
+                minSizeBytes > 0 && size < minSizeBytes -> BackupDecision.SKIP_TOO_SMALL
+                maxSizeBytes > 0 && size > maxSizeBytes -> BackupDecision.SKIP_TOO_LARGE
+                else -> null
+            }
+            val decision = if (sizeSkip != null) sizeSkip else {
+                val record = backupDao.recordForRemoteFile(candidate.absolutePath, chatId)
+                if (applyLinks && record == null && settingsRepository.preferences.first().storageChatId != chatId) {
+                    return AppResult.Failure(AppError.NotFound)
+                }
+                if (record == null && hasReusableCopy(candidate, chatId, applyLinks)) {
+                    BackupDecision.SKIP_DUPLICATE
+                } else decideBackupAction(
+                    candidate = EvaluateExclusionsUseCase.Candidate(
+                        absolutePath = candidate.absolutePath,
+                        sizeBytes = size,
+                        mimeType = MimeTypes.fromFileName(candidate.name),
+                        isHidden = isHiddenName(candidate)
+                    ),
+                    modifiedAt = candidate.lastModified(),
+                    existingRecord = record?.let {
+                        DecideBackupActionUseCase.ExistingRecord(it.sizeBytes, it.modifiedAt, it.contentHash)
+                    },
+                    exclusions = exclusions,
+                    maxFileSizeBytes = maxSizeBytes,
+                    minFileSizeBytes = minSizeBytes,
+                    contentHashProvider = { Hashing.sha256(candidate) }
+                )
+            }
+            if (decision == BackupDecision.BACKUP) {
+                toBackup.add(candidate)
+                totalBytes = totalBytes.coerceAtMost(Long.MAX_VALUE - size) + size
+            } else {
+                reasons[decision] = (reasons[decision] ?: 0) + 1
+            }
+        }
+
+        val preview = BackupRepository.BackupPreview(toBackup.size, totalBytes, reasons, unreadable)
+        return AppResult.Success(BackupScan(chatId, toBackup, preview))
+    }
+
+    private suspend fun hasReusableCopy(candidate: File, chatId: Long, applyLinks: Boolean): Boolean {
+        val existing = linkedUpload(candidate, chatId)
+        if (existing != null) {
+            if (applyLinks) recordBackedUp(candidate, existing.id, existing.contentHash)
+            return true
+        }
+        if (applyLinks) {
+            if (reviveTrashedUpload(candidate)) return true
+        } else {
+            val trashed = fileDao.trashedMatches(candidate.name, candidate.length(), chatId)
+            if (trashed.isNotEmpty()) {
+                val hash = Hashing.sha256(candidate)
+                if (hash != null && trashed.firstOrNull { it.contentHash == hash }?.messageId != null) return true
+            }
+        }
+        return adoptUploadedCopy(candidate, chatId, applyLinks)
     }
 
     /**
      * A file uploaded by hand already carries its remote mapping, so a folder
      * added to backup later must claim it instead of uploading a second copy.
      */
-    private suspend fun adoptLinkedUpload(candidate: File): Boolean {
-        val existing = fileDao.byLocalPath(candidate.absolutePath) ?: return false
-        if (existing.messageId == null || existing.backupState != BackupState.BACKED_UP) {
-            return false
+    private suspend fun linkedUpload(candidate: File, chatId: Long): FileEntity? =
+        fileDao.byLocalPath(candidate.absolutePath)?.takeIf {
+            it.chatId == chatId && it.messageId != null && it.backupState == BackupState.BACKED_UP
         }
-        recordBackedUp(candidate, existing.id, existing.contentHash)
-        SafeLog.d(TAG, "Claimed a manual upload already stored at this path")
-        return true
-    }
 
     /**
      * A file deleted inside the app but still on disk is restored rather than
@@ -220,7 +252,7 @@ class BackupRepositoryImpl(
      * have no path on this device. Matching them back to the identical local
      * file avoids uploading a second copy and keeps the local copy reclaimable.
      */
-    private suspend fun adoptUploadedCopy(candidate: File, chatId: Long?): Boolean {
+    private suspend fun adoptUploadedCopy(candidate: File, chatId: Long, applyLinks: Boolean): Boolean {
         val matches = fileDao.unlinkedRemoteMatches(candidate.name, candidate.length(), chatId)
         if (matches.isEmpty()) return false
 
@@ -229,9 +261,11 @@ class BackupRepositoryImpl(
             ?: matches.singleOrNull()?.takeIf { it.contentHash == null }
             ?: return false
 
-        fileDao.setLocalPath(match.id, candidate.absolutePath)
-        recordBackedUp(candidate, match.id, localHash)
-        SafeLog.d(TAG, "Linked an existing upload to its local copy")
+        if (applyLinks) {
+            fileDao.setLocalPath(match.id, candidate.absolutePath)
+            recordBackedUp(candidate, match.id, localHash)
+            SafeLog.d(TAG, "Linked an existing upload to its local copy")
+        }
         return true
     }
 
