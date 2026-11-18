@@ -212,6 +212,12 @@ class VideoPlayerRegressionTest {
         assertEquals(Player.REPEAT_MODE_ONE,replacement.repeat)
         assertTrue(replacement.requested)
     }
+    @Test fun pictureInPictureFitsAndroidAspectRatioLimits() {
+        assertEquals(android.util.Rational(16, 9), pictureInPictureRatio(0, 1))
+        assertEquals(android.util.Rational(16, 9), pictureInPictureRatio(400, 100))
+        assertEquals(android.util.Rational(9, 16), pictureInPictureRatio(1080, 1920))
+    }
+
     @Test fun seekPolicyHandlesUnknownDurationAndExtremePositions() {
         assertEquals(22_000,videoSeekTarget(12_000,10_000,C.TIME_UNSET))
         assertEquals(0,videoSeekTarget(3_000,-10_000,120_000))

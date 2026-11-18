@@ -47,7 +47,8 @@ fun PlayerControls(
     player:Player,visible:Boolean,audioOnly:Boolean,resizeMode:PlayerResizeMode,
     onCycleResizeMode:()->Unit,onInteraction:()->Unit,
     onScrubbingChanged:(Boolean)->Unit={},onOverlayChanged:(Boolean)->Unit={},
-    modifier:Modifier=Modifier
+    modifier:Modifier=Modifier,
+    onPictureInPicture: (() -> Unit)? = null
 ) {
     var requested by remember(player){mutableStateOf(player.playWhenReady)}
     var playbackState by remember(player){mutableIntStateOf(player.playbackState)}
@@ -219,6 +220,14 @@ fun PlayerControls(
                                 stringResource(R.string.video_track_picker),
                                 Modifier.size(24.dp),
                                 tint = Color.White
+                            )
+                        }
+                    }
+                    if (onPictureInPicture != null) {
+                        IconButton(onClick = { onInteraction(); onPictureInPicture() }) {
+                            Icon(
+                                DriveIcons.OpenInNew, stringResource(R.string.video_picture_in_picture),
+                                Modifier.size(24.dp), tint = Color.White
                             )
                         }
                     }

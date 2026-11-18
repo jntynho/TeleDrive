@@ -74,7 +74,7 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 @OptIn(UnstableApi::class)
 @Composable
-fun MediaPlayer(
+internal fun MediaPlayer(
     content: PreviewContent,
     title: String,
     fileId: String,
@@ -86,7 +86,9 @@ fun MediaPlayer(
     interactionBlocked: Boolean = false,
     onGestureInProgress: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
-    contentRevision:String=""
+    contentRevision: String = "",
+    pip: VideoPictureInPicture? = null,
+    allowPictureInPicture: Boolean = false
 ) {
     val context = LocalContext.current
     val activity=androidx.activity.compose.LocalActivity.current
@@ -117,6 +119,9 @@ fun MediaPlayer(
     val audioPlayback = com.infinity.drive.presentation.platform.LocalAudioPlayback.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val backgroundAllowed by rememberUpdatedState(allowBackgroundPlayback)
+    val inPip by rememberUpdatedState(pip?.active == true)
+    val privacy = com.infinity.drive.presentation.platform.LocalHiddenContentAccess.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     var retryInitialization by remember(fileId) { mutableIntStateOf(0) }
     val touchExploration = app.tgdrive.ui.rememberTouchExploration()
     var initializationFailed by remember(content, isActivePage, retryInitialization) { mutableStateOf(false) }
@@ -199,8 +204,11 @@ fun MediaPlayer(
         val observer = LifecycleEventObserver { _, event ->
             if (player != null) when (event) {
                 Lifecycle.Event.ON_STOP -> {
-                    VideoSessionPool.background(player,backgroundAllowed)
-                    if(!backgroundAllowed||!VideoSessionPool.serviceAvailable)checkpoint.suspend(player)
+                    val playingInPip = inPip || activity?.isInPictureInPictureMode == true
+                    VideoSessionPool.background(player, backgroundAllowed || playingInPip)
+                    if (!playingInPip && (!backgroundAllowed || !VideoSessionPool.serviceAvailable)) {
+                        checkpoint.suspend(player)
+                    }
                 }
                 Lifecycle.Event.ON_START -> if (activePage) checkpoint.resume(player)
                 else -> Unit
@@ -395,7 +403,17 @@ fun MediaPlayer(
                 onCycleResizeMode = { resizeMode = resizeMode.next() },
                 onInteraction = { interactionTick++ },
                 onScrubbingChanged={scrubbing=it;onGestureInProgress(it)},
-                onOverlayChanged={overlayOpen=it}
+                onOverlayChanged = { overlayOpen = it },
+                onPictureInPicture = if (allowPictureInPicture && pip?.supported() == true && !inPip) {
+                    {
+                        scope.launch {
+                            val file = privacy?.observeAccessFile(fileId)?.first()
+                            if (privacy == null || file != null && !privacy.protectedFile(file) && privacy.canRead(fileId)) {
+                                pip.enter(player.videoSize.width, player.videoSize.height)
+                            }
+                        }
+                    }
+                } else null
             )
         }
     }

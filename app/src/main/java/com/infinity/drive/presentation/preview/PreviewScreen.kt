@@ -169,6 +169,7 @@ fun PreviewScreen(
     val storedTextScale by viewModel.textScale.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val pip = rememberVideoPictureInPicture()
     val shareChooserTitle = stringResource(Res.string.preview_share_chooser_title)
     val dataSourceFactory = koinInject<TelegramDataSourceFactory>()
 
@@ -250,7 +251,7 @@ fun PreviewScreen(
     var imageZoomed by remember { mutableStateOf(false) }
     var videoScrubbing by remember { mutableStateOf(false) }
     LaunchedEffect(pagerState.currentPage){imageZoomed=false;videoScrubbing=false;chromeVisible=true;showOverflow=false}
-    val chromeShown = (chromeVisible&&!imageZoomed) || !immersive
+    val chromeShown = !pip.active && ((chromeVisible && !imageZoomed) || !immersive)
 
     val view = LocalView.current
     val activity = LocalActivity.current
@@ -291,7 +292,7 @@ fun PreviewScreen(
             }else HorizontalPager(
                 state = pagerState,
                 beyondViewportPageCount = 1,
-                userScrollEnabled=!imageZoomed && !videoScrubbing,
+                userScrollEnabled = !pip.active && !imageZoomed && !videoScrubbing,
                 modifier = Modifier
                     .fillMaxSize()
                     .background(if(immersive)Color.Black else MaterialTheme.colorScheme.background),
@@ -308,7 +309,8 @@ fun PreviewScreen(
                     isActivePage = pagerState.settledPage == page,
                     dataSourceFactory = dataSourceFactory,
                     onDownload = { viewModel.download(file) },
-                    chromeVisible = chromeVisible,
+                    chromeVisible = chromeVisible && !pip.active,
+                    pip = pip,
                     interactionBlocked = showOverflow,
                     onVideoScrubbing = { videoScrubbing = it },
                     allowBackgroundPlayback = backgroundPlayback,
@@ -441,6 +443,7 @@ private fun PreviewPage(
     interactionBlocked: Boolean,
     onVideoScrubbing: (Boolean) -> Unit,
     allowBackgroundPlayback: Boolean,
+    pip: VideoPictureInPicture,
 
     onToggleChrome: () -> Unit,
     onImageZoomChanged:(Boolean)->Unit={},
@@ -507,6 +510,8 @@ private fun PreviewPage(
                 interactionBlocked = interactionBlocked,
                 onGestureInProgress = onVideoScrubbing,
                 allowBackgroundPlayback = allowBackgroundPlayback,
+                pip = pip,
+                allowPictureInPicture = !file.isHidden && file.category == FileCategory.VIDEO,
 
                 onControlsVisibilityChanged = onChromeRequested
             )
