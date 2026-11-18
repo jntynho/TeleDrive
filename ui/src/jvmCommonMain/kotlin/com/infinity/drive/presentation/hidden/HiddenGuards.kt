@@ -47,3 +47,15 @@ fun HiddenContentGuard(fileId:String?=null,folderId:String?=null,onBack:()->Unit
         true->{if(lock.unlocked)SensitiveScreen();content()}
     }
 }
+
+@Composable
+fun NotePreviewGate(fileId: String, onBack: () -> Unit, content: @Composable () -> Unit) {
+    val access = koinInject<HiddenContentAccess>()
+    val file by remember(access, fileId) { access.observeAccessFile(fileId) }
+        .collectAsStateWithLifecycle(initialValue = null)
+    when (file?.extension?.equals("md", ignoreCase = true)) {
+        true -> CollectionAccessGate("NOTES", onBack, content)
+        false -> content()
+        null -> LoadingState(Modifier)
+    }
+}

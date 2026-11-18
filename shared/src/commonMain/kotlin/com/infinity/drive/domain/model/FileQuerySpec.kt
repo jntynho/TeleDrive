@@ -24,5 +24,6 @@ data class FileQuerySpec(
     val initialLoadIndex:Int?=null,
     val scopeToChat:Boolean=false,
     val respectHiddenLock:Boolean=true,
-    val excludeHiddenAncestors:Boolean=false
+    val excludeHiddenAncestors:Boolean=false,
+    val excludeNotes: Boolean = false
 )

@@ -84,6 +84,7 @@ fun AppNavHost(
             val openFavorites=rememberCollectionEntry(collectionLocks.manager("FAVORITES"),"Favorites"){navController.navigateOnce(Route.Collection("FAVORITES"))}
             val openArchived=rememberCollectionEntry(collectionLocks.manager("ARCHIVED"),"Archived"){navController.navigateOnce(Route.Collection("ARCHIVED"))}
             val openTrash=rememberCollectionEntry(collectionLocks.manager("TRASH"),"Trash"){navController.navigateOnce(Route.Trash)}
+            val openNotes = rememberCollectionEntry(collectionLocks.manager("NOTES"), "Note") { navController.navigateOnce(Route.Notes) }
             UnderBottomBar {
                 HomeScreen(
                     onOpenFile = { id, sequence ->
@@ -100,6 +101,7 @@ fun AppNavHost(
                         }
                     },
                     onOpenTransfers = { navController.navigateOnce(Route.Transfers) },
+                    onOpenNotes = openNotes,
                     onOpenTrash = openTrash,
                     onOpenChannels = { navController.navigateOnce(Route.Channels) },
                     onOpenCollection = { when(it.name){"HIDDEN"->openHidden();"ARCHIVED"->openArchived();else->openFavorites()} },
@@ -183,19 +185,30 @@ fun AppNavHost(
             popEnterTransition = { NavigationTransitions.enter(forward(false)) },
             popExitTransition = { NavigationTransitions.exit(forward(false)) }
         ) { entry ->
-            HiddenContentGuard(fileId=entry.toRoute<Route.Preview>().fileId,onBack={navController.popBackStackOnce()}){
-            LocalPlatformScreens.current.Preview(
-                onBack = { navController.popBackStackOnce() },
-                onEditNote = { fileId, title ->
-                    navController.navigateOnce(
-                        Route.NoteEditor(fileId = fileId, title = title)
+            val fileId = entry.toRoute<Route.Preview>().fileId
+            val back: () -> Unit = { navController.popBackStackOnce() }
+            com.infinity.drive.presentation.hidden.NotePreviewGate(fileId, back) {
+                HiddenContentGuard(fileId = fileId, onBack = back) {
+                    LocalPlatformScreens.current.Preview(
+                        onBack = back,
+                        onEditNote = { id, title -> navController.navigateOnce(Route.NoteEditor(fileId = id, title = title)) }
                     )
                 }
-            )
             }
         }
         stableComposable<Route.Transfers>(navController) {
             TransfersScreen(onBack={navController.popBackStackOnce()},onOpenFile={id,sequence->navController.navigateOnce(sequence.routeFor(id))})
+        }
+        stableComposable<Route.Notes>(navController) {
+            val back: () -> Unit = { navController.popBackStackOnce() }
+            CollectionAccessGate("NOTES", back) {
+                com.infinity.drive.presentation.note.NotesScreen(
+                    onBack = back,
+                    onNew = { navController.navigateOnce(Route.NoteEditor()) },
+                    onEdit = { file -> navController.navigateOnce(Route.NoteEditor(fileId = file.id)) },
+                    onSettings = { navController.navigateOnce(Route.CollectionSettings("NOTES")) }
+                )
+            }
         }
         stableComposable<Route.Search>(navController) {
             SearchScreen(
@@ -216,8 +229,10 @@ fun AppNavHost(
         stableComposable<Route.HiddenSettings>(navController){HiddenSettingsScreen{navController.popBackStackOnce()}}
         stableComposable<Route.NoteEditor>(navController) { entry ->
             val route=entry.toRoute<Route.NoteEditor>()
-            HiddenContentGuard(fileId=route.fileId,folderId=route.folderId,onBack={navController.popBackStackOnce()}){
-                NoteEditorScreen(onBack={navController.popBackStackOnce()})
+            CollectionAccessGate("NOTES", { navController.popBackStackOnce() }) {
+                HiddenContentGuard(fileId=route.fileId,folderId=route.folderId,onBack={navController.popBackStackOnce()}){
+                    NoteEditorScreen(onBack={navController.popBackStackOnce()})
+                }
             }
         }
         stableComposable<Route.Channels>(navController) {

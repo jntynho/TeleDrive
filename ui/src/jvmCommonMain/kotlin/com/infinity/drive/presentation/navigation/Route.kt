@@ -51,6 +51,9 @@ sealed interface Route {
     data object Transfers : Route
 
     @Serializable
+    data object Notes : Route
+
+    @Serializable
     data object Search : Route
 
     @Serializable

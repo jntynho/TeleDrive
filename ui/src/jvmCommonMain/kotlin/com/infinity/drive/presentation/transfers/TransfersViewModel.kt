@@ -53,7 +53,7 @@ class TransfersViewModel(
         transferRepository.observeSectionCount(TransferSection.COMPLETED)
     ) { counts -> counts.toList() }
 
-    val uiState: StateFlow<TransfersUiState> = combine(rows, totals,hidden.lock.state,hidden.protectedFolders) { rawSections, counts, _, _ ->
+    val uiState: StateFlow<TransfersUiState> = combine(rows, totals,hidden.lock.state,hidden.protectedFolders,hidden.notesRestricted) { rawSections, counts, _, _, _ ->
         val sections=rawSections.map{section->section.map{task->task.copy(displayName=hidden.notificationName(task.fileId,task.displayName),errorMessage=if(task.fileId?.let{!hidden.canRead(it)}==true)null else task.errorMessage)}}
         TransfersUiState(
             active = sections[0],

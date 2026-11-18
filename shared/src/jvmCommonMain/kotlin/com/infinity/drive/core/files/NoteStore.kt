@@ -9,16 +9,21 @@ class NoteStore(
 
     fun write(name: String, body: String, existingPath: String?): File {
         val directory = File(storagePaths.filesDir, NOTE_DIR).apply { mkdirs() }
-        val target = existingPath?.let(::File)?.takeIf { it.parentFile == directory }
-            ?: File(directory, name)
-        if (target.name != name) {
-            val renamed = File(directory, name)
-            target.renameTo(renamed)
-            renamed.writeText(body)
-            return renamed
+        val target = existingPath?.let(::File)
+            ?.takeIf { it.parentFile?.parentFile == directory }
+            ?: File(File(directory, java.util.UUID.randomUUID().toString()).apply { mkdirs() }, name)
+        val temporary = File.createTempFile("note-", ".tmp", target.parentFile)
+        try {
+            temporary.writeText(body)
+            java.nio.file.Files.move(
+                temporary.toPath(), target.toPath(),
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING
+            )
+            return target
+        } finally {
+            temporary.delete()
         }
-        target.writeText(body)
-        return target
     }
 
     fun read(path: String): String? = File(path).takeIf { it.isFile }?.readText()

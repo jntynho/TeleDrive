@@ -72,10 +72,11 @@ class FileRepositoryImpl(
     private val wrappedKeyRepository: WrappedKeyRepository,
     private val settingsRepository: SettingsRepository,
     private val fileImporter: FileImporter,
-    private val hiddenAccess:com.infinity.drive.core.security.HiddenContentAccess
+    private val hiddenAccess:com.infinity.drive.core.security.HiddenContentAccess,
+    private val transferDao: com.infinity.drive.data.local.dao.TransferDao
 ) : FileRepository {
 
-    private val visibility=combine(hiddenAccess.lock.state.filter{it.ready}.map{it.restricted}.distinctUntilChanged(),hiddenAccess.protectedFolders.filterNotNull()){restricted,folders->restricted to folders}.distinctUntilChanged()
+    private val visibility=combine(hiddenAccess.lock.state.filter{it.ready}.map{it.restricted}.distinctUntilChanged(),hiddenAccess.protectedFolders.filterNotNull(), hiddenAccess.notesRestricted){restricted,folders,notes->Triple(restricted,folders,notes)}.distinctUntilChanged()
     private fun visibleChannel()=combine(activeChannel.observe(),visibility){chat,_->chat}
     private val startupCache=StartupFileCache()
     override fun clearStartupCache()=startupCache.clear()
@@ -603,9 +604,16 @@ class FileRepositoryImpl(
         body: String
     ): AppResult<String> {
         val name = noteStore.fileName(title.ifBlank { fallbackTitle(body) })
+        if (fileId != null && !hiddenAccess.canRead(fileId)) {
+            return AppResult.Failure(AppError.PermissionDenied())
+        }
         val existing = fileId?.let { fileDao.byId(it) }
+        if (fileId != null && existing == null) return AppResult.Failure(AppError.NotFound)
+        if (existing != null && transferDao.unfinishedIdsForFiles(listOf(existing.id)).isNotEmpty()) {
+            return AppResult.Failure(AppError.TransferFailed("Wait for the current note upload to finish before saving again."))
+        }
         val file = noteStore.write(name, body, existing?.localPath)
-        val now = System.currentTimeMillis()
+        val now = maxOf(System.currentTimeMillis(), (existing?.modifiedAt ?: 0) + 1)
 
         if (existing == null) {
             return when (val imported = importLocalFile(file.absolutePath, folderId, name)) {
@@ -614,21 +622,15 @@ class FileRepositoryImpl(
             }
         }
 
-        val chatId = existing.chatId
-        val messageId = existing.messageId
-        if (chatId != null && messageId != null) {
-            runCatching { telegramClient.deleteMessages(chatId, listOf(messageId)) }
-        }
+        // Keep the last confirmed Telegram mapping until TransferExecutor commits the replacement.
         fileDao.upsert(
             existing.copy(
                 name = name,
                 localPath = file.absolutePath,
                 sizeBytes = file.length(),
                 contentHash = null,
-                messageId = null,
-                remoteFileId = null,
-                remoteUniqueId = null,
                 backupState = BackupState.NONE,
+                uploadRequested = true,
                 modifiedAt = now
             )
         )
@@ -641,6 +643,7 @@ class FileRepositoryImpl(
     }
 
     override suspend fun readNote(fileId: String): AppResult<String> {
+        if (!hiddenAccess.canRead(fileId)) return AppResult.Failure(AppError.PermissionDenied())
         val entity = fileDao.byId(fileId) ?: return AppResult.Failure(AppError.NotFound)
         entity.localPath?.let(noteStore::read)?.let { return AppResult.Success(it) }
         // Saving replaces the file, but the editor still has to show what is there.

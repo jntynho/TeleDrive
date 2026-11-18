@@ -13,13 +13,14 @@ class CollectionLocksTest {
             override suspend fun write(record:HiddenLockRecord){this.record=record}
             override suspend fun clear(){record=null}
         }}
-        val names=listOf("FAVORITES","ARCHIVED","TRASH")
+        val names=listOf("FAVORITES","ARCHIVED","TRASH","NOTES")
         names.forEach{locks.manager(it).awaitReady();assertFalse(locks.manager(it).state.value.configured)}
         val favorites=locks.manager("FAVORITES")
         assertTrue(favorites.setDeviceLock(true,favorites.state.value.epoch))
         assertTrue(favorites.unlockWithDevice(favorites.state.value.epoch))
         assertTrue(favorites.state.value.unlocked)
         assertFalse(locks.manager("ARCHIVED").state.value.configured)
+        assertFalse(locks.manager("NOTES").state.value.configured)
         locks.onAppStopped()
         assertTrue(favorites.state.value.restricted)
         locks.clearAll()

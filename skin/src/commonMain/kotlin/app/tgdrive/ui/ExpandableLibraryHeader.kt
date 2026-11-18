@@ -32,7 +32,8 @@ fun ExpandableLibraryHeader(
     onExpandedChange:(Boolean)->Unit, placeholder:String,
     navigationIcon:@Composable ()->Unit={}, actions:@Composable RowScope.()->Unit={},
     titleStyle:androidx.compose.ui.text.TextStyle?=null,
-    requestSearchFocus:Boolean=true
+    requestSearchFocus:Boolean=true,
+    actionsBeforeSearch:@Composable RowScope.()->Unit={}
 ) {
     val focus=LocalFocusManager.current
     val keyboard=LocalSoftwareKeyboardController.current
@@ -70,7 +71,9 @@ fun ExpandableLibraryHeader(
                     }else{
                         navigationIcon()
                         Text(title,Modifier.weight(1f).padding(start=8.dp),style=titleStyle?:MaterialTheme.typography.headlineLarge,maxLines=1,overflow=TextOverflow.Ellipsis)
+                        if (androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Ltr) actionsBeforeSearch()
                         IconButton({onExpandedChange(true)}){Icon(DriveIcons.Search,"Search ${title.lowercase()}")}
+                        if (androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl) actionsBeforeSearch()
                         actions()
                     }
                 }

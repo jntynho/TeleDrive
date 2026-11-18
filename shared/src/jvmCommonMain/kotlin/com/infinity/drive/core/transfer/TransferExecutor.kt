@@ -195,7 +195,8 @@ class TransferExecutor(
         if (!sourceFile.exists()) return Outcome.Failed(messages.localFileGone)
 
         val prefs = settingsRepository.preferences.first()
-        val chatId = transfer.chatId ?: prefs.storageChatId
+        val noteChatId = entity.chatId.takeIf { entity.name.endsWith(".md", ignoreCase = true) }
+        val chatId = transfer.chatId ?: noteChatId ?: prefs.storageChatId
             ?: telegramClient.ensureStorageChat(null).also { resolved ->
                 if (resolved != prefs.storageChatId) {
                     settingsRepository.update { it.copy(storageChatId = resolved) }
@@ -306,7 +307,8 @@ class TransferExecutor(
                             remoteFileId = document.remoteFileId,
                             remoteUniqueId = document.uniqueFileId,
                             state = BackupState.BACKED_UP,
-                            iconFileId = iconFileId
+                            iconFileId = iconFileId,
+                            encrypted = encrypt
                         )
                         if (transfer.type == TransferType.BACKUP) {
                             backupDao.upsertRecord(
@@ -426,7 +428,8 @@ class TransferExecutor(
                                 remoteFileId = first.remoteFileId,
                                 remoteUniqueId = first.remoteUniqueId,
                                 state = BackupState.BACKED_UP,
-                                iconFileId = manifest.iconFileId
+                                iconFileId = manifest.iconFileId,
+                                encrypted = encrypt
                             )
                             if (transfer.type == TransferType.BACKUP) {
                                 backupDao.upsertRecord(

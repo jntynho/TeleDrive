@@ -68,6 +68,7 @@ fun HomeScreen(
     onOpenFile: (String, PreviewSequence) -> Unit,
     onOpenFolder: (String) -> Unit,
     onOpenTransfers: () -> Unit,
+    onOpenNotes: () -> Unit = {},
     onOpenTrash: () -> Unit,
     onOpenChannels: () -> Unit,
     onOpenCollection: (CollectionType) -> Unit,
@@ -132,7 +133,12 @@ fun HomeScreen(
             }
         },
         topBar = {
-            app.tgdrive.ui.ExpandableLibraryHeader("Home",searchState.query,searchModel::setQuery,searching,{searching=it},"Search your files")
+            app.tgdrive.ui.ExpandableLibraryHeader("Home",searchState.query,searchModel::setQuery,searching,{searching=it},"Search your files",
+                actionsBeforeSearch = {
+                    androidx.compose.material3.IconButton(onOpenTransfers) {
+                        Icon(app.tgdrive.ui.LibraryIcons.Activity, "Activity")
+                    }
+                })
         }
 
     ) { padding ->
@@ -165,7 +171,7 @@ fun HomeScreen(
                 Spacer(Modifier.height(20.dp))
                 app.tgdrive.ui.LibraryBrowse(listOf(
                     app.tgdrive.ui.LibraryShortcut("All files", DriveIcons.Folder, onOpenFiles),
-                    app.tgdrive.ui.LibraryShortcut("Activity", app.tgdrive.ui.LibraryIcons.Activity, onOpenTransfers),
+                    app.tgdrive.ui.LibraryShortcut("Note", DriveIcons.EditNote, onOpenNotes),
                     app.tgdrive.ui.LibraryShortcut("Favorites", DriveIcons.Star) { onOpenCollection(CollectionType.FAVORITES) },
                     app.tgdrive.ui.LibraryShortcut("Archived", app.tgdrive.ui.LibraryIcons.Archive) { onOpenCollection(CollectionType.ARCHIVED) },
                     app.tgdrive.ui.LibraryShortcut("Hidden", app.tgdrive.ui.LibraryIcons.Hidden) { onOpenCollection(CollectionType.HIDDEN) },

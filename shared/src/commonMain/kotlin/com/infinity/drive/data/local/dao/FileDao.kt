@@ -243,12 +243,14 @@ interface FileDao {
      * Transfer bookkeeping must never claim a file is unsaved while its copy
      * still sits in the channel, so downgrades only apply to local-only rows.
      */
-    @Query("UPDATE files SET backupState = :state WHERE id = :id AND messageId IS NULL")
+    @Query("""UPDATE files SET backupState = :state WHERE id = :id
+        AND (messageId IS NULL OR (lower(name) LIKE '%.md' AND backupState != 'BACKED_UP'))""")
     suspend fun setBackupStateIfLocalOnly(id: String, state: BackupState)
 
     @Query(
         """UPDATE files SET backupState = 'BACKED_UP'
            WHERE messageId IS NOT NULL
+             AND lower(name) NOT LIKE '%.md'
              AND backupState NOT IN ('BACKED_UP', 'UPLOADING')"""
     )
     suspend fun repairBackedUpStates(): Int
@@ -290,6 +292,7 @@ interface FileDao {
         """UPDATE files SET chatId = :chatId, messageId = :messageId,
            remoteFileId = :remoteFileId, remoteUniqueId = :remoteUniqueId,
            iconFileId = COALESCE(:iconFileId, iconFileId),
+           isEncrypted = COALESCE(:encrypted, isEncrypted),
            backupState = :state WHERE id = :id"""
     )
     suspend fun setRemoteMapping(
@@ -299,7 +302,8 @@ interface FileDao {
         remoteFileId: String?,
         remoteUniqueId: String?,
         state: BackupState,
-        iconFileId: String? = null
+        iconFileId: String? = null,
+        encrypted: Boolean? = null
     )
 
     @Query(
@@ -399,7 +403,7 @@ interface FileDao {
            WHERE trashedAt IS NULL
              AND (localPath IS NOT NULL OR importReference IS NOT NULL OR sourceMessageId IS NOT NULL)
              AND uploadRequested = 1
-             AND messageId IS NULL
+             AND (messageId IS NULL OR lower(name) LIKE '%.md')
              AND backupState IN ('NONE', 'FAILED')
              AND chatId IS :chatId"""
     )
@@ -408,7 +412,7 @@ interface FileDao {
     @Query(
         """SELECT id FROM files
            WHERE trashedAt IS NULL
-             AND messageId IS NULL
+             AND (messageId IS NULL OR lower(name) LIKE '%.md')
              AND backupState = 'QUEUED'
              AND chatId IS :chatId
              AND id NOT IN (

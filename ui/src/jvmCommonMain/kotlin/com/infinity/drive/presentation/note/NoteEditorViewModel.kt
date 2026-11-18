@@ -66,7 +66,9 @@ class NoteEditorViewModel(
         try {
             when (val result = fileRepository.readNote(fileId)) {
                 is AppResult.Success -> {
-                    initialTitle=route.title.orEmpty();initialBody=result.value
+                    initialTitle = route.title ?: fileRepository.getFile(fileId)?.name.orEmpty()
+                    if (initialTitle.endsWith(".md", ignoreCase = true)) initialTitle = initialTitle.dropLast(3)
+                    initialBody = result.value
                     _uiState.update{it.copy(title=initialTitle,body=initialBody,loading=false,dirty=false,loadError=null)}
                 }
                 is AppResult.Failure -> _uiState.update{it.copy(loading=false,loadError="Couldn't open this note. Your original file is unchanged.")}

@@ -83,9 +83,22 @@ fun NoteEditorScreen(
     fun requestBack(){if(state.saving)return;if(state.dirty)confirmDiscard=true else onBack()}
     com.infinity.drive.presentation.common.AppBackHandler(state.dirty||state.saving){requestBack()}
     LaunchedEffect(viewModel,owner){owner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED){viewModel.saved.collect{onBack()}}}
-    if(confirmDiscard)com.infinity.drive.presentation.components.ConfirmDialog(
-        title="Discard changes?",message="Your changes have not been saved.",confirmLabel="Discard",destructive=true,
-        onConfirm={confirmDiscard=false;onBack()},onDismiss={confirmDiscard=false})
+    if (confirmDiscard) androidx.compose.material3.AlertDialog(
+        onDismissRequest = { confirmDiscard = false },
+        title = { Text("Save changes?") },
+        text = { Text("Your changes have not been saved.") },
+        confirmButton = {
+            androidx.compose.material3.TextButton(
+                onClick = { confirmDiscard = false; viewModel.save() },
+                enabled = state.body.isNotBlank()
+            ) { Text(stringResource(Res.string.note_save)) }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = { confirmDiscard = false; onBack() }) {
+                Text("Discard")
+            }
+        }
+    )
 
     Scaffold(
         modifier = Modifier.imePadding(),

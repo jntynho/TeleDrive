@@ -12,5 +12,5 @@ val securityModule = module {
     single {HiddenLockManager(get(),elapsedClock=android.os.SystemClock::elapsedRealtime)}
     single<CollectionLockStores>{CollectionLockStores { name->AndroidHiddenLockStore(androidContext(),get(),"collection-$name-lock.bin") }}
     single {CollectionLocks(stores=get(),elapsedClock=android.os.SystemClock::elapsedRealtime)}
-    singleOf(::HiddenContentAccess).onClose{it?.close()}
+    single { HiddenContentAccess(get(), get(), get(), get<CollectionLocks>().manager("NOTES")) }.onClose{it?.close()}
 }

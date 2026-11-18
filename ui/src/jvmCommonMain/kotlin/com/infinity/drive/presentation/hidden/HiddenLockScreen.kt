@@ -178,7 +178,7 @@ fun rememberCollectionEntry(manager:HiddenLockManager,title:String,onOpen:()->Un
 @Composable
 fun CollectionSettingsScreen(type:String,onBack:()->Unit){
     val locks=koinInject<com.infinity.drive.core.security.CollectionLocks>()
-    val title=when(type){"FAVORITES"->"Favorites";"ARCHIVED"->"Archived";else->"Trash"}
+    val title=when(type){"FAVORITES"->"Favorites";"ARCHIVED"->"Archived";"NOTES"->"Note";else->"Trash"}
     val manager=locks.manager(type)
     val lock by manager.state.collectAsStateWithLifecycle()
     Scaffold(topBar={PageHeader(title={Text("$title settings")},navigationIcon={IconButton(onBack){Icon(DriveIcons.ArrowBack,"Back")}})}){padding->
@@ -195,6 +195,7 @@ fun CollectionAccessGate(type:String,onBack:()->Unit,content:@Composable ()->Uni
     val locks=koinInject<com.infinity.drive.core.security.CollectionLocks>()
     val manager=locks.manager(type)
     val lock by manager.state.collectAsStateWithLifecycle()
+    if(type == "NOTES" && lock.configured) SensitiveScreen()
     if(lock.ready&&!lock.error&&(!lock.configured||lock.unlocked))content()
-    else HiddenLockScreen(onBack,manager,when(type){"FAVORITES"->"Favorites";"ARCHIVED"->"Archived";else->"Trash"})
+    else HiddenLockScreen(onBack,manager,when(type){"FAVORITES"->"Favorites";"ARCHIVED"->"Archived";"NOTES"->"Note";else->"Trash"})
 }

@@ -277,8 +277,13 @@ class SyncRepositoryImpl(
         known: KnownRows
     ): ReconcileResult {
         val manifest = known.manifests[document]
-        val existing = manifest?.let { known.byId[it.fileId] }
-            ?: known.byUniqueId[document.uniqueFileId]
+        val note = manifest?.takeIf { it.name.endsWith(".md", ignoreCase = true) && !it.isPart }
+        val existing = if (note != null) fileDao.byId(note.fileId)
+            else manifest?.let { known.byId[it.fileId] } ?: known.byUniqueId[document.uniqueFileId]
+        if (note != null && existing != null &&
+            (existing.modifiedAt > note.modifiedAt ||
+                existing.modifiedAt == note.modifiedAt && (existing.messageId ?: 0L) > document.messageId)
+        ) return ReconcileResult.UNCHANGED
 
         if (manifest != null && manifest.isPart) {
             recordPart(document, manifest)
