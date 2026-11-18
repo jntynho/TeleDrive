@@ -28,6 +28,10 @@ import com.infinity.drive.presentation.files.SortMenu
 import com.infinity.drive.presentation.navigation.LocalBottomBarInset
 import com.infinity.drive.presentation.platform.*
 import com.infinity.drive.presentation.preview.PreviewSequence
+import com.infinity.drive.resources.Res
+import com.infinity.drive.resources.audio_playlist_title
+import com.infinity.drive.resources.audio_playlist_add
+import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.koin.compose.viewmodel.koinViewModel
@@ -37,8 +41,14 @@ fun AudioScreen(onOpenFile:(String,PreviewSequence)->Unit,viewModel:AudioViewMod
     val query by viewModel.query.collectAsStateWithLifecycle()
     val filter by viewModel.filter.collectAsStateWithLifecycle()
     val prefs by viewModel.preferences.collectAsStateWithLifecycle()
+    var showPlaylists by rememberSaveable { mutableStateOf(false) }
+    var trackToAdd by remember { mutableStateOf<DriveFile?>(null) }
     val appliedQuery by viewModel.appliedQuery.collectAsStateWithLifecycle()
     val player=LocalAudioPlayback.current
+    if (showPlaylists) AudioPlaylistsDialog(viewModel, player, trackToAdd) {
+        showPlaylists = false
+        trackToAdd = null
+    }
     val playback by remember(player){player.state.map{it.copy(positionMs=0)}.distinctUntilChanged()}.collectAsStateWithLifecycle(player.state.value)
     val audio=viewModel.audio.collectAsLazyPagingItems()
     var searching by rememberSaveable{mutableStateOf(false)}
@@ -55,7 +65,11 @@ fun AudioScreen(onOpenFile:(String,PreviewSequence)->Unit,viewModel:AudioViewMod
 
     val filters=com.infinity.drive.presentation.components.rememberCollapsingFilters(query to filter){listState.canScrollBackward}
     Scaffold(modifier=filters.scrollModifier,topBar={Column{
-        ExpandableLibraryHeader("Audio",query,viewModel::search,searching,{searching=it},"Search audio",actions={Box {
+        ExpandableLibraryHeader("Audio",query,viewModel::search,searching,{searching=it},"Search audio",actions={
+            IconButton(onClick = { trackToAdd = null; showPlaylists = true }) {
+                Icon(DriveIcons.MusicNotes, stringResource(Res.string.audio_playlist_title))
+            }
+            Box {
             IconButton({sorting=true}){Icon(DriveIcons.Sort,"Sort audio",Modifier.size(24.dp))}
             SortMenu(sorting,prefs.audioSortField,prefs.audioSortDirection,{sorting=false},{field,direction->sorting=false;viewModel.sort(field,direction)},fields=listOf(FileSortField.NAME,FileSortField.NATURAL_NAME,FileSortField.EXTENSION,FileSortField.DATE_ADDED,FileSortField.DATE_MODIFIED,FileSortField.SIZE))
         }})
@@ -72,7 +86,10 @@ fun AudioScreen(onOpenFile:(String,PreviewSequence)->Unit,viewModel:AudioViewMod
 
                 items(audio.itemCount,key=audio.itemKey{it.id}){index->
                     val file=audio[index]?:return@items
-                    AudioLibraryRow(file,playback.file?.id==file.id&&playback.playing,playback.metadata.takeIf{playback.file?.id==file.id},modifier=Modifier.animateItem(fadeInSpec=androidx.compose.animation.core.tween(240)),onPlay={viewModel.play(file,player);onOpenFile(file.id,PreviewSequence(categories=listOf(FileCategory.AUDIO),localCopiesOnly=filter==AudioFilter.ON_DEVICE,favoritesOnly=filter==AudioFilter.FAVORITES,nameQuery=appliedQuery.trim().takeIf{it.isNotBlank()},sortField=prefs.audioSortField,sortDirection=prefs.audioSortDirection))},onFavorite={viewModel.favorite(file)}){
+                    AudioLibraryRow(file,playback.file?.id==file.id&&playback.playing,playback.metadata.takeIf{playback.file?.id==file.id},modifier=Modifier.animateItem(fadeInSpec=androidx.compose.animation.core.tween(240)),onPlay={viewModel.play(file,player);onOpenFile(file.id,PreviewSequence(categories=listOf(FileCategory.AUDIO),localCopiesOnly=filter==AudioFilter.ON_DEVICE,favoritesOnly=filter==AudioFilter.FAVORITES,nameQuery=appliedQuery.trim().takeIf{it.isNotBlank()},sortField=prefs.audioSortField,sortDirection=prefs.audioSortDirection))},onFavorite={viewModel.favorite(file)}, onAddToPlaylist = {
+                        trackToAdd = it
+                        showPlaylists = true
+                    }){
                         onOpenFile(file.id,PreviewSequence(categories=listOf(FileCategory.AUDIO),nameQuery=appliedQuery.trim().takeIf{it.isNotBlank()},favoritesOnly=filter==AudioFilter.FAVORITES,localCopiesOnly=filter==AudioFilter.ON_DEVICE,sortField=prefs.audioSortField,sortDirection=prefs.audioSortDirection))
                     }
                 }
@@ -90,7 +107,7 @@ fun AudioListHeading(loading:Boolean=false){
 
 @Composable
 fun AudioLibraryRow(file:DriveFile?,playing:Boolean=false,currentMetadata:AudioMetadata?=null,modifier:Modifier=Modifier,
-    onPlay:()->Unit={},onFavorite:()->Unit={},onDetails:()->Unit={}
+    onPlay:()->Unit={},onFavorite:()->Unit={},onAddToPlaylist:((DriveFile)->Unit)?=null,onDetails:()->Unit={}
 ) {
     val loading=file==null
     val player=LocalAudioPlayback.current
@@ -103,7 +120,14 @@ fun AudioLibraryRow(file:DriveFile?,playing:Boolean=false,currentMetadata:AudioM
     }
     val meta=if(currentMetadata!=null)AudioMetadata(currentMetadata.title?.takeIf(String::isNotBlank)?:storedMetadata.title,currentMetadata.artist?.takeIf(String::isNotBlank)?:storedMetadata.artist,currentMetadata.durationMs?:storedMetadata.durationMs)else storedMetadata
     var menu by remember(file?.id){mutableStateOf(false)}
-    if(menu&&file!=null)com.infinity.drive.presentation.components.FileActionsSheet(file,onDismiss={menu=false},onOpen=onPlay)
+    if (menu && file != null) FileActionsSheet(file, onDismiss = { menu = false }, onOpen = onPlay, extraActions = {
+        if (onAddToPlaylist != null) {
+            val close = LocalSheetCloseThen.current
+            SheetActionRow(stringResource(Res.string.audio_playlist_add), DriveIcons.MusicNotes) {
+                close { onAddToPlaylist(file) }
+            }
+        }
+    })
     Column(modifier) {
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(enabled=!loading,onClick=onPlay).padding(vertical=LibraryLayout.AudioRowPadding),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(LibraryLayout.AudioRowGap)){
         if(file!=null)FileThumbnail(file,Modifier.size(LibraryLayout.AudioCover).clip(RoundedCornerShape(LibraryLayout.CoverCorner)))

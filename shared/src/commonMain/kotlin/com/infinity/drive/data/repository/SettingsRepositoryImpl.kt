@@ -10,6 +10,7 @@ import com.infinity.drive.data.local.preferences.PreferenceKeys
 import com.infinity.drive.domain.model.AppLanguage
 import com.infinity.drive.domain.model.BackupFolderRule
 import com.infinity.drive.domain.model.SmartFolder
+import com.infinity.drive.domain.model.AudioPlaylist
 import kotlinx.serialization.json.Json
 import com.infinity.drive.domain.model.UserPreferences
 import com.infinity.drive.domain.model.DashboardStyle
@@ -86,6 +87,9 @@ class SettingsRepositoryImpl(
             backupFolders = this[PreferenceKeys.BACKUP_FOLDERS] ?: defaults.backupFolders,
             backupFolderRules = this[PreferenceKeys.BACKUP_FOLDER_RULES]?.let { stored ->
                 runCatching { collectionsJson.decodeFromString<List<BackupFolderRule>>(stored) }.getOrNull()
+            }.orEmpty(),
+            audioPlaylists = this[PreferenceKeys.AUDIO_PLAYLISTS]?.let { stored ->
+                runCatching { collectionsJson.decodeFromString<List<AudioPlaylist>>(stored) }.getOrNull()
             }.orEmpty(),
             smartFolders = this[PreferenceKeys.SMART_FOLDERS]?.let { stored ->
                 runCatching { collectionsJson.decodeFromString<List<SmartFolder>>(stored) }.getOrNull()
@@ -195,6 +199,8 @@ class SettingsRepositoryImpl(
         this[PreferenceKeys.BACKUP_FOLDERS] = prefs.backupFolders
         if (prefs.backupFolderRules.isEmpty()) remove(PreferenceKeys.BACKUP_FOLDER_RULES)
         else this[PreferenceKeys.BACKUP_FOLDER_RULES] = collectionsJson.encodeToString(prefs.backupFolderRules)
+        if (prefs.audioPlaylists.isEmpty()) remove(PreferenceKeys.AUDIO_PLAYLISTS)
+        else this[PreferenceKeys.AUDIO_PLAYLISTS] = collectionsJson.encodeToString(prefs.audioPlaylists)
         if (prefs.smartFolders.isEmpty()) remove(PreferenceKeys.SMART_FOLDERS)
         else this[PreferenceKeys.SMART_FOLDERS] = collectionsJson.encodeToString(prefs.smartFolders)
         this[PreferenceKeys.BACKUP_WIFI_ONLY] = prefs.backupWifiOnly

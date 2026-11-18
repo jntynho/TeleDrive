@@ -1074,4 +1074,16 @@
     <string name="note_tasks_title">Checklist</string>
     <string name="note_tasks_open">Tasks · %1$d/%2$d</string>
     <string name="note_checklist_insert">Insert checklist item</string>
+    <string name="audio_playlist_title">Playlists</string>
+    <string name="audio_playlist_add">Add to playlist</string>
+    <string name="audio_playlist_create">New playlist</string>
+    <string name="audio_playlist_delete">Delete playlist</string>
+    <string name="audio_playlist_empty">There are no playable tracks here yet.</string>
+    <string name="audio_playlist_move_down">Move track down</string>
+    <string name="audio_playlist_move_up">Move track up</string>
+    <string name="audio_playlist_name">Playlist name</string>
+    <string name="audio_playlist_play">Play playlist</string>
+    <string name="audio_playlist_remove_track">Remove track from playlist</string>
+    <string name="audio_playlist_save_queue">Save playing queue</string>
+    <string name="audio_playlist_unavailable">Choose a different name and make sure the tracks are still available.</string>
 </resources>

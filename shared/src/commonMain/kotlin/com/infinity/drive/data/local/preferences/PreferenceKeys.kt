@@ -38,6 +38,7 @@ object PreferenceKeys {
     val KEY_BACKUP_CREATED = booleanPreferencesKey("key_backup_created")
     val FOLDER_OWNERSHIP_REPAIRED = booleanPreferencesKey("folder_ownership_repaired")
 
+    val AUDIO_PLAYLISTS = stringPreferencesKey("audio_playlists")
     val SMART_FOLDERS = stringPreferencesKey("smart_folders")
     val THEME = stringPreferencesKey("theme")
     val LANGUAGE = stringPreferencesKey("language")

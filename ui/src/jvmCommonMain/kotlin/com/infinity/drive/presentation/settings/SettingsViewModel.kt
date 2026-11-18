@@ -631,7 +631,8 @@ class SettingsViewModel(
                                 storageChatId = null,
                                 backupFolders = emptySet(),
                                 backupFolderRules = emptyList(),
-                                smartFolders = emptyList()
+                                smartFolders = emptyList(),
+                                audioPlaylists = emptyList()
                             )
                         }
                     }

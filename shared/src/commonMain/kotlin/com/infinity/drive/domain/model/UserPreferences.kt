@@ -57,6 +57,7 @@ data class UserPreferences(
 
     val audioSortField: FileSortField = FileSortField.NAME,
     val audioSortDirection: SortDirection = SortDirection.ASCENDING,
+    val audioPlaylists: List<AudioPlaylist> = emptyList(),
 
     val backgroundPlayback: Boolean = false,
     val streamBeforeDownload: Boolean = true,
