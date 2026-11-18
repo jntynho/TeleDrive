@@ -5,5 +5,6 @@ import org.koin.dsl.module
 
 val sharedFilesModule = module {
     singleOf(::NoteStore)
+    singleOf(::NoteDraftStore)
     singleOf(::StorageInspector)
 }

@@ -47,6 +47,12 @@ import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.common_cancel
 import com.infinity.drive.resources.common_back
 import com.infinity.drive.resources.note_body_hint
+import com.infinity.drive.presentation.platform.LocalFilePicker
+import com.infinity.drive.presentation.platform.PickResult
+import com.infinity.drive.resources.note_attach_file
+import com.infinity.drive.resources.note_checklist_insert
+import com.infinity.drive.resources.note_keep_draft
+import com.infinity.drive.resources.note_tasks_open
 import com.infinity.drive.resources.note_bold
 import com.infinity.drive.resources.note_bullet
 import com.infinity.drive.resources.note_code
@@ -70,11 +76,28 @@ import com.infinity.drive.presentation.components.LoadingState
 @Composable
 fun NoteEditorScreen(
     onBack: () -> Unit,
-    viewModel: NoteEditorViewModel = koinViewModel()
+    viewModel: NoteEditorViewModel = koinViewModel(),
+    onOpenAttachment: (String) -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var body by remember(state.loading) { mutableStateOf(TextFieldValue(state.body)) }
+
+    LaunchedEffect(state.body) {
+        if (state.body != body.text) {
+            body = TextFieldValue(state.body, selection = androidx.compose.ui.text.TextRange(state.body.length))
+        }
+    }
+    val attachments = remember(body.text) { NoteExtras.attachments(body.text) }
+    val tasks = remember(body.text) { NoteExtras.tasks(body.text) }
+    var showChecklist by remember { mutableStateOf(false) }
+    if (showChecklist) {
+        NoteChecklistDialog(tasks, toggle = { task ->
+            val updated = NoteExtras.toggle(body.text, task)
+            body = TextFieldValue(updated, selection = androidx.compose.ui.text.TextRange(updated.length))
+            viewModel.setBody(updated)
+        }, close = { showChecklist = false })
+    }
 
     var importMessage by remember { mutableStateOf(false) }
     if (importMessage) {
@@ -114,9 +137,16 @@ fun NoteEditorScreen(
                 androidx.compose.material3.TextButton(onClick = { confirmDiscard = false }) {
                     Text(stringResource(Res.string.common_cancel))
                 }
-                androidx.compose.material3.TextButton(onClick = { confirmDiscard = false; onBack() }) {
-                    Text("Discard")
+                androidx.compose.material3.TextButton(onClick = {
+                    confirmDiscard = false
+                    viewModel.leaveEditor(true, onBack)
+                }) {
+                    Text(stringResource(Res.string.note_keep_draft))
                 }
+                androidx.compose.material3.TextButton(onClick = {
+                    confirmDiscard = false
+                    viewModel.leaveEditor(false, onBack)
+                }) { Text("Discard") }
             }
         }
     )
@@ -153,7 +183,7 @@ fun NoteEditorScreen(
         },
         floatingActionButton = {
             if (!state.loading && state.loadError==null) {
-                val canSave = body.text.isNotBlank() && !state.saving && (state.dirty || state.isNew)
+                val canSave = body.text.isNotBlank() && !state.saving && !state.attaching && (state.dirty || state.isNew)
                 FloatingActionButton(
                     onClick = { if (canSave) viewModel.save() },
                     modifier=Modifier.semantics{if(!canSave)disabled()},
@@ -213,6 +243,28 @@ fun NoteEditorScreen(
                 }
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            if (viewModel.canAttach || tasks.isNotEmpty() || attachments.isNotEmpty()) {
+                val picker = if (viewModel.canAttach) LocalFilePicker.current else null
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (picker != null) androidx.compose.material3.TextButton(
+                        enabled = !state.saving && !state.attaching,
+                        onClick = { picker.pick { result ->
+                            if (result is PickResult.Picked) viewModel.addAttachment(result.path)
+                        } }
+                    ) { Text(stringResource(Res.string.note_attach_file)) }
+                    if (tasks.isNotEmpty()) androidx.compose.material3.TextButton(
+                        enabled = !state.saving, onClick = { showChecklist = true }
+                    ) { Text(stringResource(Res.string.note_tasks_open, tasks.count { it.checked }, tasks.size)) }
+                    for (attachment in attachments) {
+                        androidx.compose.material3.TextButton(onClick = { onOpenAttachment(attachment.fileId) }) {
+                            Text(attachment.name, maxLines = 1)
+                        }
+                    }
+                }
+            }
             TextField(
                 value = body,
                 onValueChange = {
@@ -265,6 +317,9 @@ private fun MarkdownToolbar(enabled: Boolean, onAction: (MarkdownAction) -> Unit
             enabled
         ) {
             onAction(MarkdownAction.LinePrefix("- "))
+        }
+        ToolbarButton(DriveIcons.FactCheck, Res.string.note_checklist_insert, enabled) {
+            onAction(MarkdownAction.LinePrefix("- [ ] "))
         }
         ToolbarButton(DriveIcons.FormatQuote, Res.string.note_quote, enabled) {
             onAction(MarkdownAction.LinePrefix("> "))

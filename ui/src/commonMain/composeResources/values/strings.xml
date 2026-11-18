@@ -1066,4 +1066,12 @@
     <string name="notes_upload_failed">Upload failed</string>
     <string name="notes_local_only">Saved on this device</string>
     <string name="notes_uploading">Uploading</string>
+    <string name="note_keep_draft">Keep draft</string>
+    <string name="note_draft_failed">The draft could not be stored. Your changes are still open.</string>
+    <string name="note_attach_file">Attach file</string>
+    <string name="note_attachment_failed">The file could not be attached.</string>
+    <string name="note_attachment_waiting">Attachment added. Upload it from Files to make it available on other devices.</string>
+    <string name="note_tasks_title">Checklist</string>
+    <string name="note_tasks_open">Tasks · %1$d/%2$d</string>
+    <string name="note_checklist_insert">Insert checklist item</string>
 </resources>

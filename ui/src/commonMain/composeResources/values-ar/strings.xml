@@ -125,4 +125,12 @@
         <item>البرتغالية البرازيلية</item>
         <item>العربية</item>
     </string-array>
+    <string name="note_keep_draft">الاحتفاظ بالمسودة</string>
+    <string name="note_draft_failed">تعذّر حفظ المسودة. لا تزال تعديلاتك مفتوحة.</string>
+    <string name="note_attach_file">إرفاق ملف</string>
+    <string name="note_attachment_failed">تعذّر إرفاق الملف.</string>
+    <string name="note_attachment_waiting">أُضيف المرفق. ارفعه من الملفات ليصبح متاحًا على أجهزتك الأخرى.</string>
+    <string name="note_tasks_title">قائمة المهام</string>
+    <string name="note_tasks_open">المهام · %1$d/%2$d</string>
+    <string name="note_checklist_insert">إدراج مهمة</string>
 </resources>

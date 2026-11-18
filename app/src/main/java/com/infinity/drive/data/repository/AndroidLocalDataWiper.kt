@@ -43,6 +43,6 @@ class AndroidLocalDataWiper(
         const val TAG = "LocalDataWiper"
 
         /** Import staging and generated previews; the key store is left alone. */
-        val APP_DIRECTORIES = listOf("imports", "resumable-imports", "previews", "notes", "library-restore")
+        val APP_DIRECTORIES = listOf("imports", "resumable-imports", "previews", "notes", "note-drafts", "library-restore")
     }
 }

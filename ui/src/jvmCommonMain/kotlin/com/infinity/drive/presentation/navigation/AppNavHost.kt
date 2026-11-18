@@ -236,7 +236,10 @@ fun AppNavHost(
             val route=entry.toRoute<Route.NoteEditor>()
             CollectionAccessGate("NOTES", { navController.popBackStackOnce() }) {
                 HiddenContentGuard(fileId=route.fileId,folderId=route.folderId,onBack={navController.popBackStackOnce()}){
-                    NoteEditorScreen(onBack={navController.popBackStackOnce()})
+                    NoteEditorScreen(
+                        onBack = { navController.popBackStackOnce() },
+                        onOpenAttachment = { id -> navController.navigateOnce(Route.Preview(fileId = id)) }
+                    )
                 }
             }
         }
