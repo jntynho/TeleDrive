@@ -36,7 +36,7 @@ val sharedUiModule = module {
     viewModelOf(::OnboardingViewModel)
     viewModelOf(::NoteEditorViewModel)
     viewModelOf(::ProxyViewModel)
-    viewModelOf(::SearchViewModel)
+    viewModel { SearchViewModel(get(), get(), getOrNull()) }
     viewModelOf(::SettingsViewModel)
     viewModelOf(::ExclusionsViewModel)
     viewModelOf(::TransfersViewModel)

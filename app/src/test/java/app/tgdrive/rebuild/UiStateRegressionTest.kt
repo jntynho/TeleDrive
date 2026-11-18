@@ -14,6 +14,8 @@ import com.infinity.drive.domain.repository.TransferRepository
 import com.infinity.drive.domain.repository.SettingsRepository
 import com.infinity.drive.presentation.note.NoteEditorViewModel
 import com.infinity.drive.presentation.search.SearchViewModel
+import com.infinity.drive.presentation.search.ContentMatches
+import com.infinity.drive.presentation.search.DriveTextSearch
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.test.*
@@ -90,6 +92,50 @@ class UiStateRegressionTest {
             assertFalse(vm.uiState.value.filters.backedUpOnly)
             assertTrue(vm.uiState.value.filters.notBackedUpOnly)
         }finally{clear(vm);Dispatchers.resetMain()}
+    }
+
+    @Test fun contentSearchRunsOnlyWhenRequestedAndClearsStaleMatches() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val file = DriveFile("note", null, "meeting.md", 10, "text/markdown", FileCategory.DOCUMENT,
+            null, null, null, null, null, null, BackupState.NONE, false, false, false, false,
+            null, null, null, null, createdAt = 1, modifiedAt = 1, addedAt = 1)
+        val repo = fake<FileRepository> { method, args ->
+            when (method) {
+                "observeFiles" -> flowOf(if ((args[0] as FileQuerySpec).nameQuery == null) listOf(file) else emptyList())
+                "searchFolders" -> flowOf(emptyList<DriveFolder>())
+                else -> error(method)
+            }
+        }
+        val terms = mutableListOf<String>()
+        val search = object : DriveTextSearch {
+            override val supportsPdf = true
+            override suspend fun search(query: String, candidates: List<DriveFile>): ContentMatches {
+                terms += query
+                return ContentMatches(candidates, skipped = 2)
+            }
+        }
+        val vm = SearchViewModel(repo, textSearch = search)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect() }
+        try {
+            vm.setQuery("proposal")
+            advanceTimeBy(300); runCurrent()
+            assertTrue(terms.isEmpty())
+            assertTrue(vm.uiState.value.results.isEmpty())
+            vm.toggleContentSearch()
+            advanceTimeBy(300); runCurrent()
+            assertEquals(listOf("proposal"), terms)
+            assertEquals(listOf(file), vm.uiState.value.results)
+            assertEquals(2, vm.uiState.value.contentSkipped)
+            vm.setQuery("agenda")
+            runCurrent()
+            assertTrue(vm.uiState.value.results.isEmpty())
+            advanceTimeBy(300); runCurrent()
+            assertEquals(listOf("proposal"), terms)
+            assertFalse(vm.uiState.value.searchingContents)
+        } finally {
+            clear(vm)
+            Dispatchers.resetMain()
+        }
     }
 
     @Test fun smartFoldersSaveSearchRulesAndRejectOpeningAnotherDrive() = runTest {

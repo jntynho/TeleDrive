@@ -5,6 +5,8 @@ import com.infinity.drive.presentation.hidden.HiddenLockViewModel
 import com.infinity.drive.presentation.di.sharedUiModule
 import com.infinity.drive.presentation.platform.AndroidPlatformCapabilities
 import com.infinity.drive.presentation.platform.AndroidStandardFolderPaths
+import com.infinity.drive.presentation.search.AndroidDriveTextSearch
+import com.infinity.drive.presentation.search.DriveTextSearch
 import com.infinity.drive.presentation.platform.PlatformCapabilities
 import com.infinity.drive.presentation.platform.StandardFolderPaths
 import org.koin.core.module.dsl.singleOf
@@ -18,5 +20,6 @@ val presentationModule = module {
     singleOf(::AndroidStandardFolderPaths) bind StandardFolderPaths::class
     singleOf(::AndroidPlatformCapabilities) bind PlatformCapabilities::class
     single { com.infinity.drive.presentation.audio.AndroidAudioPlayback(androidContext(), get(), get(), get(),hiddenAccess=get()) }
+    single<DriveTextSearch> { AndroidDriveTextSearch(androidContext(), get(), get(), get(), get(), get()) }
     includes(sharedUiModule)
 }

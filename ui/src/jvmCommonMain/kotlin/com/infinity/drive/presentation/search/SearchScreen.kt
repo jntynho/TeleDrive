@@ -51,6 +51,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.infinity.drive.resources.smart_folders_title
 import com.infinity.drive.resources.search_files_or_tags
+import com.infinity.drive.resources.search_content_label
+import com.infinity.drive.resources.search_content_notes_only
+import com.infinity.drive.resources.search_content_skipped
 import com.infinity.drive.domain.model.FileCategory
 import com.infinity.drive.presentation.components.EmptyState
 import com.infinity.drive.presentation.components.FileListItem
@@ -77,7 +80,7 @@ fun SearchScreen(
     if (showSmartFolders) {
         SmartFoldersDialog(
             folders = smartFolders,
-            canSave = state.searched,
+            canSave = state.searched && !state.searchingContents,
             open = {
                 viewModel.openSmartFolder(it)
                 showSmartFolders = false
@@ -117,6 +120,16 @@ fun SearchScreen(
                     onClick = { showSmartFolders = true },
                     label = { Text(stringResource(Res.string.smart_folders_title)) }
                 )
+                if (viewModel.supportsContentSearch) {
+                    FilterChip(
+                        selected = state.searchingContents,
+                        enabled = state.query.isNotBlank() && FileTags.searchTag(state.query) == null,
+                        onClick = viewModel::toggleContentSearch,
+                        label = { Text(stringResource(
+                            if (viewModel.supportsPdfSearch) Res.string.search_content_label else Res.string.search_content_notes_only
+                        )) }
+                    )
+                }
                 FilterChip(
                     selected = state.filters.backedUpOnly,
                     onClick = { viewModel.setBackedUpOnly(!state.filters.backedUpOnly) },
@@ -138,6 +151,14 @@ fun SearchScreen(
                         label = { Text(category.label()) }
                     )
                 }
+            }
+
+            if (state.searchingContents && state.contentSkipped > 0) {
+                Text(
+                    stringResource(Res.string.search_content_skipped, state.contentSkipped),
+                    Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
 
             when {
@@ -197,7 +218,7 @@ fun SearchScreen(
                                 onOpenFile(
                                     file.id,
                                     PreviewSequence(
-                                        nameQuery = state.query.takeIf { it.isNotBlank() && FileTags.searchTag(it) == null },
+                                        nameQuery = state.query.takeIf { !state.searchingContents && it.isNotBlank() && FileTags.searchTag(it) == null },
                                         tag = FileTags.searchTag(state.query),
                                         categories = state.filters.category
                                             ?.let { category -> listOf(category) }

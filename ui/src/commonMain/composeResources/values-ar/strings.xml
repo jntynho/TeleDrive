@@ -149,4 +149,7 @@
     <string name="chat_import_linked">مصدر مرتبط · للقراءة فقط</string>
     <string name="chat_import_unlink">إلغاء ربط المصدر</string>
     <string name="chat_import_link_failed">تعذّر ربط هذه القناة.</string>
+    <string name="search_content_label">محتوى الملاحظات وملفات PDF</string>
+    <string name="search_content_notes_only">محتوى الملاحظات</string>
+    <string name="search_content_skipped">الملفات المتجاوزة أو المفحوصة جزئيًا: %1$d</string>
 </resources>

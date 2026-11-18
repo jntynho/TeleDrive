@@ -1102,4 +1102,7 @@
     <string name="chat_import_linked">Linked source · Read only</string>
     <string name="chat_import_unlink">Unlink source</string>
     <string name="chat_import_link_failed">This channel could not be linked.</string>
+    <string name="search_content_label">Note and PDF contents</string>
+    <string name="search_content_notes_only">Note contents</string>
+    <string name="search_content_skipped">Files skipped or partly searched: %1$d</string>
 </resources>
