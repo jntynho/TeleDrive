@@ -47,6 +47,8 @@ class VideoPlayerRegressionTest {
         var speed=1f
         var repeat=Player.REPEAT_MODE_OFF
         var seekable=true
+        var availableTracks = Tracks.EMPTY
+        var selectionParameters: TrackSelectionParameters = TrackSelectionParameters.DEFAULT_WITHOUT_CONTEXT
         private val listeners=mutableListOf<Player.Listener>()
         val player:Player=Proxy.newProxyInstance(Player::class.java.classLoader,arrayOf(Player::class.java)){proxy,method,args->
             val a=args?:emptyArray()
@@ -60,11 +62,19 @@ class VideoPlayerRegressionTest {
                 "getPlaybackParameters"->PlaybackParameters(speed)
                 "getVolume"->volume
                 "getRepeatMode"->repeat
-                "getCurrentTracks"->Tracks.EMPTY
+                "getCurrentTracks"->availableTracks
                 "getAvailableCommands"->Player.Commands.Builder().addAllCommands().build()
                 "isCommandAvailable"->if(a[0]==Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)seekable else true
                 "getPlaybackSuppressionReason"->Player.PLAYBACK_SUPPRESSION_REASON_NONE
-                "getTrackSelectionParameters"->TrackSelectionParameters.DEFAULT_WITHOUT_CONTEXT
+                "getTrackSelectionParameters"->selectionParameters
+                "setTrackSelectionParameters"->{
+                    selectionParameters=a[0] as TrackSelectionParameters
+                    listeners.toList().forEach {
+                        it.onEvents(proxy as Player, Player.Events(FlagSet.Builder()
+                            .add(Player.EVENT_TRACK_SELECTION_PARAMETERS_CHANGED).build()))
+                    }
+                    null
+                }
                 "addListener"->{listeners.add(a[0] as Player.Listener);null}
                 "removeListener"->{listeners.remove(a[0] as Player.Listener);null}
                 "pause"->{requested=false;notifyChange();null}
@@ -107,6 +117,32 @@ class VideoPlayerRegressionTest {
         compose.onNodeWithContentDescription("Playback speed, 1.5×").assertIsDisplayed()
         compose.onNodeWithText("Playback speed",substring=false).assertDoesNotExist()
     }
+    @Test fun selectsAvailableAudioAndSubtitlesAndDisablesSubtitlesIndependently() {
+        fun group(id: String, label: String, mime: String) = androidx.media3.common.TrackGroup(
+            id, androidx.media3.common.Format.Builder().setLabel(label).setSampleMimeType(mime).build()
+        )
+        fun supported(group: androidx.media3.common.TrackGroup) =
+            Tracks.Group(group, false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(false))
+        val sourceAudio = group("original", "Original audio", "audio/aac")
+        val dub = group("dub", "Dubbed audio", "audio/aac")
+        val captions = group("subtitle", "Japanese captions", "text/vtt")
+        val video = FakeVideo().apply {
+            availableTracks = Tracks(listOf(supported(sourceAudio), supported(dub), supported(captions)))
+            selectionParameters = selectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build()
+        }
+        install(video)
+        compose.onNodeWithContentDescription("Audio and subtitles").performClick()
+        compose.onNodeWithText("Dubbed audio").performScrollTo().performClick()
+        compose.onNodeWithText("Japanese captions").performScrollTo().performClick()
+        assertEquals(listOf(0), video.selectionParameters.overrides[dub]?.trackIndices)
+        assertEquals(listOf(0), video.selectionParameters.overrides[captions]?.trackIndices)
+        assertFalse(C.TRACK_TYPE_TEXT in video.selectionParameters.disabledTrackTypes)
+        compose.onNodeWithText("Off", substring = false).performScrollTo().performClick()
+        assertTrue(C.TRACK_TYPE_TEXT in video.selectionParameters.disabledTrackTypes)
+        assertFalse(captions in video.selectionParameters.overrides)
+        assertTrue(dub in video.selectionParameters.overrides)
+    }
+
     @Test fun bufferingCanBePausedAndStartedAgain() {
         val video=FakeVideo();install(video)
         compose.onNodeWithContentDescription("Pause").assertIsDisplayed().performClick()

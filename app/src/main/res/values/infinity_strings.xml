@@ -52,4 +52,10 @@
     <string name="notification_transfer_reason_decrypt">%d could not decrypt the download</string>
     <string name="notification_transfer_reason_retryable">%d can be retried in Activity</string>
     <string name="notification_transfer_reason_activity">%d need attention in Activity</string>
+    <string name="video_track_picker">Audio and subtitles</string>
+    <string name="video_audio_tracks">Audio tracks</string>
+    <string name="video_subtitle_tracks">Subtitle tracks</string>
+    <string name="video_tracks_off">Off</string>
+    <string name="video_tracks_automatic">Automatic</string>
+    <string name="video_track_number">Track %d</string>
 </resources>

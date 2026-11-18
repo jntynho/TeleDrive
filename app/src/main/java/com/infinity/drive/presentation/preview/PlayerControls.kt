@@ -30,14 +30,17 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.media3.common.C
 import androidx.media3.common.Player
+import androidx.compose.ui.res.stringResource
+import app.tgdrive.R
 import com.infinity.drive.presentation.common.Formatters
 import kotlinx.coroutines.delay
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 
-/** One quiet toolbar in both orientations. No subtitle/audio-track picker or expandable tools. */
+/** Playback controls in both orientations with track selection when the video offers choices. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerControls(
@@ -55,6 +58,12 @@ fun PlayerControls(
     var rate by remember(player){mutableFloatStateOf(player.playbackParameters.speed)}
     var scrub by remember(player){mutableStateOf<Float?>(null)}
     var speedMenu by remember(player){mutableStateOf(false)}
+    var trackMenu by remember(player) { mutableStateOf(false) }
+    var tracks by remember(player) { mutableStateOf(player.currentTracks) }
+    var trackParameters by remember(player) { mutableStateOf(player.trackSelectionParameters) }
+    val audioTracks = remember(tracks) { supportedVideoTracks(tracks, C.TRACK_TYPE_AUDIO) }
+    val textTracks = remember(tracks) { supportedVideoTracks(tracks, C.TRACK_TYPE_TEXT) }
+    val canChooseTracks = textTracks.isNotEmpty() || audioTracks.size > 1
     val overlay by rememberUpdatedState(onOverlayChanged)
     val scrubbing by rememberUpdatedState(onScrubbingChanged)
     val activity=LocalActivity.current
@@ -70,6 +79,10 @@ fun PlayerControls(
                 requested=player.playWhenReady;playbackState=player.playbackState
                 duration=player.duration.coerceAtLeast(0);rate=player.playbackParameters.speed
                 seekable=player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
+                if (events.contains(Player.EVENT_TRACKS_CHANGED)) tracks = player.currentTracks
+                if (events.contains(Player.EVENT_TRACK_SELECTION_PARAMETERS_CHANGED)) {
+                    trackParameters = player.trackSelectionParameters
+                }
             }
             override fun onPositionDiscontinuity(oldPosition:Player.PositionInfo,newPosition:Player.PositionInfo,reason:Int){position=newPosition.positionMs.coerceAtLeast(0)}
         }
@@ -88,8 +101,29 @@ fun PlayerControls(
         }
     }}
     LaunchedEffect(seekable,duration){if(!seekable||duration<=0){scrub=null;scrubbing(false)}}
-    LaunchedEffect(speedMenu){overlay(speedMenu)}
-    LaunchedEffect(visible){if(!visible){speedMenu=false;scrub=null;scrubbing(false)}}
+    LaunchedEffect(speedMenu, trackMenu) { overlay(speedMenu || trackMenu) }
+    LaunchedEffect(visible) {
+        if (!visible) {
+            speedMenu = false
+            trackMenu = false
+            scrub = null
+            scrubbing(false)
+        }
+    }
+    LaunchedEffect(canChooseTracks) { if (!canChooseTracks) trackMenu = false }
+
+    if (trackMenu && canChooseTracks) {
+        MaterialTheme(colorScheme = darkColorScheme(
+            primary = Color.White,
+            surface = Color(0xFF191B1E),
+            surfaceContainerLow = Color(0xFF191B1E)
+        )) {
+            VideoTrackPicker(player, audioTracks, textTracks, trackParameters, onDismiss = {
+                trackMenu = false
+                onInteraction()
+            })
+        }
+    }
 
     if(speedMenu){
         MaterialTheme(colorScheme=darkColorScheme(primary=Color.White,surface=Color(0xFF191B1E),surfaceContainerLow=Color(0xFF191B1E))){
@@ -175,6 +209,19 @@ fun PlayerControls(
                         SeekButton(DriveIcons.Forward10,"Forward 10 seconds",iconSize,canSeek){onInteraction();player.seekTo(videoSeekTarget(player.currentPosition,10_000,player.duration))}
                     }
                     if(viewportHeight>=240.dp)Spacer(Modifier.weight(1f))
+                    if (canChooseTracks) {
+                        IconButton(onClick = {
+                            onInteraction()
+                            trackMenu = true
+                        }) {
+                            Icon(
+                                if (textTracks.isEmpty()) DriveIcons.Tune else DriveIcons.Subtitles,
+                                stringResource(R.string.video_track_picker),
+                                Modifier.size(24.dp),
+                                tint = Color.White
+                            )
+                        }
+                    }
                     speed();fit();rotate()
                 }
             }
