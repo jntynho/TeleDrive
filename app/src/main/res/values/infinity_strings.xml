@@ -70,4 +70,22 @@
     <string name="extract_text_empty">No Latin-script text found.</string>
     <string name="extract_text_result">Extracted text</string>
     <string name="extract_text_note">Continue in Notes</string>
+    <string name="live_links_title">Public links</string>
+    <string name="live_links_subtitle">Connect a sharing service and manage links</string>
+    <string name="live_links_configure">Enter the HTTPS address and owner token for your TeleDrive sharing service.</string>
+    <string name="live_links_origin">Sharing service HTTPS address</string>
+    <string name="live_links_owner_token">Owner token</string>
+    <string name="live_links_connect">Connect</string>
+    <string name="live_links_disconnect">Disconnect</string>
+    <string name="live_links_refresh">Refresh</string>
+    <string name="live_links_failure">The sharing service could not complete this request.</string>
+    <string name="live_links_empty">No active links</string>
+    <string name="live_links_copy">Copy link</string>
+    <string name="live_links_copied">Copied</string>
+    <string name="live_links_revoke">Revoke link</string>
+    <string name="live_links_revoke_message">Stop future downloads of %1$s from this link?</string>
+    <string name="live_links_create">Create public link</string>
+    <string name="live_links_copy_notice">This sends a readable copy to %1$s. Anyone with the link can download it until it expires or you revoke it. A password is optional.</string>
+    <string name="live_links_duration">Expiry in hours (1–168)</string>
+    <string name="live_links_password">Link password (optional)</string>
 </resources>

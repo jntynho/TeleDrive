@@ -2,6 +2,7 @@ package com.infinity.drive.domain.repository
 
 import com.infinity.drive.core.telegram.TelegramCredentials
 import com.infinity.drive.domain.model.UserPreferences
+import com.infinity.drive.domain.model.PublicLinkConnection
 import kotlinx.coroutines.flow.Flow
 
 interface SettingsRepository {
@@ -19,4 +20,10 @@ interface SettingsRepository {
     suspend fun hasStoredTelegramCredentials(): Boolean
 
     suspend fun clearTelegramCredentials()
+
+    suspend fun publicLinkConnection(drive: Long): PublicLinkConnection? = null
+
+    suspend fun setPublicLinkConnection(drive: Long, connection: PublicLinkConnection?) {
+        error("Public link connections are unavailable")
+    }
 }

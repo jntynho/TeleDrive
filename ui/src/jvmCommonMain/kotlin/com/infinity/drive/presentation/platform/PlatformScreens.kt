@@ -21,6 +21,11 @@ interface PlatformScreens {
     @Composable
     fun RecoveryExport(onBack: () -> Unit) = Unit
 
+    val supportsPublicLinks: Boolean get() = false
+
+    @Composable
+    fun PublicLinksSetting() = Unit
+
     @Composable
     fun Preview(onBack: () -> Unit, onEditNote: (String, String) -> Unit, onCreateNote: (String, String) -> Unit)
 }

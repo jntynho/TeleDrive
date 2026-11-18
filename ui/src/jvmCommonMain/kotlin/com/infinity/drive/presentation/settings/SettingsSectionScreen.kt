@@ -427,6 +427,7 @@ private fun AccountSection(
             onClose = { showIntegrity = false }
         )
     }
+    val platform = com.infinity.drive.presentation.platform.LocalPlatformScreens.current
     val indexedSoFar by viewModel.indexedSoFar.collectAsStateWithLifecycle()
     val authorization by viewModel.authorization.collectAsStateWithLifecycle()
 
@@ -494,6 +495,7 @@ private fun AccountSection(
                 onClick = onPickChannel
             )
         }
+        if (platform.supportsPublicLinks) add { platform.PublicLinksSetting() }
         add {
             SettingsClickRow(
                 title = recoveryTitle,

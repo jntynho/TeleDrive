@@ -1,6 +1,7 @@
 package com.infinity.drive.presentation
 
 import com.infinity.drive.presentation.hidden.HiddenLockViewModel
+import com.infinity.drive.presentation.sharing.AndroidPublicLinks
 import com.infinity.drive.presentation.preview.AndroidTextRecognition
 
 import com.infinity.drive.presentation.di.sharedUiModule
@@ -23,5 +24,6 @@ val presentationModule = module {
     single { com.infinity.drive.presentation.audio.AndroidAudioPlayback(androidContext(), get(), get(), get(),hiddenAccess=get()) }
     single<DriveTextSearch> { AndroidDriveTextSearch(androidContext(), get(), get(), get(), get(), get()) }
     single { AndroidTextRecognition(androidContext(), get(), get(), get(), get(), get()) }
+    single { AndroidPublicLinks(androidContext(), get(), get(), get(), get(), get(), get()) }
     includes(sharedUiModule)
 }

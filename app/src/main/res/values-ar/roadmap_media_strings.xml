@@ -9,4 +9,22 @@
     <string name="extract_text_empty">لم يُعثر على نص مكتوب بالحروف اللاتينية.</string>
     <string name="extract_text_result">النص المستخرج</string>
     <string name="extract_text_note">متابعة في الملاحظات</string>
+    <string name="live_links_title">الروابط العامة</string>
+    <string name="live_links_subtitle">ربط خدمة مشاركة وإدارة الروابط</string>
+    <string name="live_links_configure">أدخل عنوان HTTPS ورمز المالك لخدمة مشاركة TeleDrive الخاصة بك.</string>
+    <string name="live_links_origin">عنوان HTTPS لخدمة المشاركة</string>
+    <string name="live_links_owner_token">رمز المالك</string>
+    <string name="live_links_connect">اتصال</string>
+    <string name="live_links_disconnect">قطع الاتصال</string>
+    <string name="live_links_refresh">تحديث</string>
+    <string name="live_links_failure">تعذّر على خدمة المشاركة إكمال الطلب.</string>
+    <string name="live_links_empty">لا توجد روابط نشطة</string>
+    <string name="live_links_copy">نسخ الرابط</string>
+    <string name="live_links_copied">تم النسخ</string>
+    <string name="live_links_revoke">إلغاء الرابط</string>
+    <string name="live_links_revoke_message">هل تريد إيقاف تنزيل %1$s مستقبلاً عبر هذا الرابط؟</string>
+    <string name="live_links_create">إنشاء رابط عام</string>
+    <string name="live_links_copy_notice">سيُرسَل ملف قابل للقراءة إلى %1$s. يستطيع من يملك الرابط تنزيله حتى انتهاء مدته أو إلغائه. كلمة السر اختيارية.</string>
+    <string name="live_links_duration">مدة الصلاحية بالساعات (1–168)</string>
+    <string name="live_links_password">كلمة سر الرابط (اختيارية)</string>
 </resources>

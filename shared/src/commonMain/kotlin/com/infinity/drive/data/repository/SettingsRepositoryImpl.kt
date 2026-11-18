@@ -3,6 +3,7 @@ package com.infinity.drive.data.repository
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.infinity.drive.core.crypto.CredentialCipher
 import kotlin.io.encoding.Base64
 import com.infinity.drive.core.telegram.TelegramCredentials
@@ -11,6 +12,7 @@ import com.infinity.drive.domain.model.AppLanguage
 import com.infinity.drive.domain.model.BackupFolderRule
 import com.infinity.drive.domain.model.LinkedTelegramSource
 import com.infinity.drive.domain.model.SmartFolder
+import com.infinity.drive.domain.model.PublicLinkConnection
 import com.infinity.drive.domain.model.AudioPlaylist
 import kotlinx.serialization.json.Json
 import com.infinity.drive.domain.model.UserPreferences
@@ -70,7 +72,42 @@ class SettingsRepositoryImpl(
         dataStore.edit {
             it.remove(PreferenceKeys.API_ID_ENCRYPTED)
             it.remove(PreferenceKeys.API_HASH_ENCRYPTED)
+            it.asMap().keys.filter { key -> key.name.startsWith(PUBLIC_LINK_PREFIX) }.forEach { key -> it.remove(key) }
         }
+    }
+
+    override suspend fun publicLinkConnection(drive: Long): PublicLinkConnection? {
+        val current = dataStore.data.first()
+        if (current[PreferenceKeys.STORAGE_CHAT_ID] != drive) return null
+        val encoded = current[stringPreferencesKey("$PUBLIC_LINK_PREFIX$drive")] ?: return null
+        return runCatching {
+            val bytes = credentialCipher.decrypt(Base64.decode(encoded))
+            try {
+                collectionsJson.decodeFromString<PublicLinkConnection>(bytes.decodeToString())
+            } finally {
+                bytes.fill(0)
+            }
+        }.getOrNull()
+    }
+
+    override suspend fun setPublicLinkConnection(drive: Long, connection: PublicLinkConnection?) {
+        val key = stringPreferencesKey("$PUBLIC_LINK_PREFIX$drive")
+        dataStore.edit { prefs ->
+            require(prefs[PreferenceKeys.STORAGE_CHAT_ID] == drive && prefs[PreferenceKeys.ONBOARDING_COMPLETE] == true)
+            if (connection == null) prefs.remove(key)
+            else {
+                val bytes = collectionsJson.encodeToString(connection).encodeToByteArray()
+                try {
+                    prefs[key] = Base64.encode(credentialCipher.encrypt(bytes))
+                } finally {
+                    bytes.fill(0)
+                }
+            }
+        }
+    }
+
+    private companion object {
+        const val PUBLIC_LINK_PREFIX = "public_link_connection_"
     }
 
     private fun Preferences.toUserPreferences(): UserPreferences {

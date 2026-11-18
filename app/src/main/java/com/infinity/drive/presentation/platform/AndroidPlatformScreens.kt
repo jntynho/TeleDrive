@@ -26,6 +26,11 @@ object AndroidPlatformScreens : PlatformScreens {
         com.infinity.drive.presentation.recovery.RecoveryExportScreen(onBack)
     }
 
+    override val supportsPublicLinks = true
+
+    @Composable
+    override fun PublicLinksSetting() = com.infinity.drive.presentation.sharing.PublicLinksSetting()
+
     @Composable
     override fun Preview(onBack: () -> Unit, onEditNote: (String, String) -> Unit, onCreateNote: (String, String) -> Unit) {
         app.tgdrive.ui.DriveTheme { PreviewScreen(onBack = onBack, onEditNote = onEditNote, onCreateNote = onCreateNote) }
