@@ -18,7 +18,6 @@ class NativeLaunchTest {
         compose.onNodeWithText("Get started").performScrollTo().performClick()
         compose.onNodeWithText("API access").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("API ID").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("API hash").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Continue",substring=false).assertIsNotEnabled()
         val apiInput=compose.onNode(hasSetTextAction() and hasText("API ID"))
         apiInput.performScrollTo().performClick().performTextInput("1")
@@ -31,6 +30,13 @@ class NativeLaunchTest {
                 visible=insets?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())==true
             }
             visible
+        }
+
+        // The automatic keyboard resizes the scroll viewport after the form opens.
+        // Exercise scrolling to the second input once the IME is visible.
+        val apiHashInput = compose.onNode(hasSetTextAction() and hasText("API hash"))
+        compose.waitUntil(5_000) {
+            apiHashInput.performScrollTo().isDisplayed()
         }
     }
 }
