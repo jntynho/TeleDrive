@@ -3,8 +3,8 @@ package com.infinity.drive.presentation.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.infinity.drive.resources.files_removed_local_copies
-import com.infinity.drive.resources.settings_nothing_to_remove
+import com.infinity.drive.resources.settings_verified_cleanup_result
+import com.infinity.drive.core.files.LocalCleanup
 import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.about_no_update
 import com.infinity.drive.resources.backup_preview_started
@@ -433,30 +433,46 @@ class SettingsViewModel(
     val indexedSoFar: StateFlow<Int> = syncRepository.indexedSoFar
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
-    fun freeUpSpace() {
-        viewModelScope.launch {
-            when (val result = fileRepository.freeUpSpace()) {
-                is AppResult.Success -> {
-                    val consent = result.value.consentRequest
-                    if (consent != null) {
-                        _deleteConsentRequests.tryEmit(consent)
-                    } else {
-                        _messages.tryEmit(
-                            if (result.value.deletedCount == 0) {
-                                UiText.Resource(Res.string.settings_nothing_to_remove)
-                            } else {
-                                UiText.Resource(
-                                    Res.string.files_removed_local_copies,
-                                    result.value.deletedCount
-                                )
-                            }
-                        )
-                    }
-                }
+    private val _cleaningLocal = MutableStateFlow(false)
+    val cleaningLocal = _cleaningLocal.asStateFlow()
+    private var pendingCleanup: LocalCleanup? = null
 
-                is AppResult.Failure -> _messages.tryEmit(result.error.toUiText())
+    fun freeUpSpace() {
+        if (_cleaningLocal.value || pendingCleanup != null) return
+        _cleaningLocal.value = true
+        viewModelScope.launch {
+            try {
+                when (val result = fileRepository.freeUpSpace()) {
+                    is AppResult.Success -> {
+                        val cleanup = result.value
+                        val consent = cleanup.consentRequest
+                        if (consent == null) {
+                            showCleanupResult(cleanup.deletedCount, cleanup.keptCount)
+                        } else {
+                            pendingCleanup = cleanup
+                            _deleteConsentRequests.emit(consent)
+                        }
+                    }
+                    is AppResult.Failure -> _messages.tryEmit(result.error.toUiText())
+                }
+            } finally {
+                _cleaningLocal.value = false
             }
         }
+    }
+
+    fun onVerifiedCleanupConsent(granted: Boolean) {
+        val cleanup = pendingCleanup ?: return
+        pendingCleanup = null
+        if (!granted) return
+        viewModelScope.launch {
+            val removed = fileRepository.reconcileVerifiedCleanup(cleanup.consentCopies)
+            showCleanupResult(removed, cleanup.keptCount + cleanup.consentCopies.size - removed)
+        }
+    }
+
+    private fun showCleanupResult(removed: Int, kept: Int) {
+        _messages.tryEmit(UiText.Resource(Res.string.settings_verified_cleanup_result, removed, kept))
     }
 
     fun clearCache() {

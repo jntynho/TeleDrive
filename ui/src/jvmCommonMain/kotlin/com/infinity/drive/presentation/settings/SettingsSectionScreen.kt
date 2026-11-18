@@ -115,7 +115,7 @@ import com.infinity.drive.resources.settings_files_folders_skipped_backup
 import com.infinity.drive.resources.settings_files_sealed_leaving_device
 import com.infinity.drive.resources.settings_files_stay_telegram_channel
 import com.infinity.drive.resources.settings_folder_unreadable
-import com.infinity.drive.resources.settings_free_up_space_title
+import com.infinity.drive.resources.settings_verified_cleanup_title
 import com.infinity.drive.resources.settings_gallery_previews_regenerated_browse
 import com.infinity.drive.resources.settings_gallery_grid_columns
 import com.infinity.drive.resources.settings_gallery_grid_view
@@ -126,7 +126,8 @@ import com.infinity.drive.resources.settings_hides_app_screenshots_screen
 import com.infinity.drive.resources.settings_key_backup_stored
 import com.infinity.drive.resources.settings_link_previews
 import com.infinity.drive.resources.settings_link_previews_subtitle
-import com.infinity.drive.resources.settings_local_copies_files_already
+import com.infinity.drive.resources.settings_verified_cleanup_description
+import com.infinity.drive.resources.settings_cleanup_checking
 import com.infinity.drive.resources.settings_log
 import com.infinity.drive.resources.settings_log_telegram
 import com.infinity.drive.resources.settings_no_folders_selected
@@ -231,9 +232,7 @@ fun SettingsSectionScreen(
     CollectSnackbarMessages(viewModel.messages, snackbarHostState)
     LaunchedEffect(Unit) {
         viewModel.deleteConsentRequests.collect { request ->
-            deleteConsentLauncher.launch(request) { granted ->
-                if (granted) viewModel.freeUpSpace()
-            }
+            deleteConsentLauncher.launch(request, viewModel::onVerifiedCleanupConsent)
         }
     }
 
@@ -734,6 +733,7 @@ private fun StorageSection(
     onClearCache: () -> Unit
 ) {
     val prefs = state.preferences
+    val cleaningLocal by viewModel.cleaningLocal.collectAsStateWithLifecycle()
     val reclaimable by viewModel.reclaimableBytes.collectAsStateWithLifecycle()
     var showTrashDialog by remember { mutableStateOf(false) }
     var confirmFreeUpSpace by remember { mutableStateOf(false) }
@@ -755,10 +755,10 @@ private fun StorageSection(
     if (confirmFreeUpSpace) {
         ConfirmDialog(
             title = stringResource(
-                Res.string.settings_free_up_space_title,
+                Res.string.settings_verified_cleanup_title,
                 Formatters.bytes(reclaimable)
             ),
-            message = stringResource(Res.string.settings_local_copies_files_already),
+            message = stringResource(Res.string.settings_verified_cleanup_description),
             confirmLabel = stringResource(Res.string.common_free_space),
             destructive = true,
             onConfirm = {
@@ -809,7 +809,9 @@ private fun StorageSection(
         add {
             SettingsClickRow(
                 title = stringResource(Res.string.common_free_space),
-                subtitle = if (reclaimable > 0) {
+                subtitle = if (cleaningLocal) {
+                    stringResource(Res.string.settings_cleanup_checking)
+                } else if (reclaimable > 0) {
                     stringResource(
                         Res.string.settings_free_up_subtitle,
                         Formatters.bytes(reclaimable)
@@ -817,7 +819,8 @@ private fun StorageSection(
                 } else {
                     stringResource(Res.string.settings_free_up_none)
                 },
-                onClick = { if (reclaimable > 0) confirmFreeUpSpace = true }
+                enabled = reclaimable > 0 && !cleaningLocal,
+                onClick = { confirmFreeUpSpace = true }
             )
         }
         add {

@@ -25,7 +25,7 @@ class MediaStoreLocalCopyDeleter(
         val mediaUris = paths.mapNotNull { mediaUriFor(it) }
         if (needsUserConsent() && mediaUris.isNotEmpty()) {
             val request = runCatching {
-                MediaStore.createDeleteRequest(context.contentResolver, mediaUris)
+                MediaStore.createDeleteRequest(context.contentResolver, mediaUris.distinct().take(1000))
             }.getOrNull()
             if (request != null) return LocalCleanup(0, request.intentSender)
         }

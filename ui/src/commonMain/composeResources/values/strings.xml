@@ -1030,4 +1030,8 @@
     <string name="files_zip_plaintext">Save this folder and its accessible files as a standard ZIP. Files in the exported ZIP are readable without TeleDrive.</string>
     <string name="files_zip_progress">Creating ZIP · %d files saved</string>
     <string name="files_zip_saved">ZIP saved with %d files.</string>
+    <string name="settings_verified_cleanup_title">Check up to %1$s of local files?</string>
+    <string name="settings_verified_cleanup_description">TeleDrive checks the contents in Telegram before deleting matching local copies. This can use mobile data and temporary cache space.</string>
+    <string name="settings_cleanup_checking">Checking local files against Telegram…</string>
+    <string name="settings_verified_cleanup_result">%1$d local copies removed · %2$d kept</string>
 </resources>

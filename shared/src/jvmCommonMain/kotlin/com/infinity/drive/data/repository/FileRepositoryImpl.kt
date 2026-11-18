@@ -86,7 +86,8 @@ class FileRepositoryImpl(
     private val fileImporter: FileImporter,
     private val hiddenAccess:com.infinity.drive.core.security.HiddenContentAccess,
     private val transferDao: com.infinity.drive.data.local.dao.TransferDao,
-    private val database: DriveInfinityDatabase
+    private val database: DriveInfinityDatabase,
+    private val verifiedCleanup: VerifiedLocalCleanup
 ) : FileRepository {
 
     private val visibility=combine(hiddenAccess.lock.state.filter{it.ready}.map{it.restricted}.distinctUntilChanged(),hiddenAccess.protectedFolders.filterNotNull(), hiddenAccess.notesRestricted){restricted,folders,notes->Triple(restricted,folders,notes)}.distinctUntilChanged()
@@ -622,8 +623,10 @@ class FileRepositoryImpl(
             fileDao.observeReclaimableBytes(chatId)
         }
 
-    override suspend fun freeUpSpace(): AppResult<LocalCleanup> =
-        deleteLocalCopy(fileDao.reclaimableFileIds(activeChannel.id()))
+    override suspend fun freeUpSpace(): AppResult<LocalCleanup> = verifiedCleanup.run()
+
+    override suspend fun reconcileVerifiedCleanup(copies: Map<String, String>): Int =
+        verifiedCleanup.reconcile(copies)
 
     private suspend fun ancestorsOf(folderId: String?): List<String> {
         val chain = mutableListOf<String>()

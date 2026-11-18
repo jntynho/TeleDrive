@@ -434,13 +434,16 @@ interface FileDao {
     fun observeReclaimableBytes(chatId: Long?): Flow<Long>
 
     @Query(
-        """SELECT id FROM files
-           WHERE localPath IS NOT NULL
-             AND messageId IS NOT NULL
-             AND backupState = 'BACKED_UP' AND offlinePinned = 0
-             AND chatId IS :chatId"""
+        """SELECT f.* FROM files f
+           WHERE f.localPath IS NOT NULL AND f.messageId IS NOT NULL AND f.chatId = :chatId
+             AND f.backupState = 'BACKED_UP' AND f.offlinePinned = 0 AND f.pendingPublish = 0
+             AND f.trashedAt IS NULL
+             AND NOT EXISTS (SELECT 1 FROM files other WHERE other.localPath = f.localPath AND other.id != f.id)
+             AND NOT EXISTS (
+                SELECT 1 FROM transfers t WHERE t.fileId = f.id AND t.state IN ('QUEUED','RUNNING','PAUSED'))
+           ORDER BY f.sizeBytes, f.id"""
     )
-    suspend fun reclaimableFileIds(chatId: Long?): List<String>
+    suspend fun cleanupCandidates(chatId: Long): List<FileEntity>
 
     @Query(
         """SELECT id, localPath FROM files

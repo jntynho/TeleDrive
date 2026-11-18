@@ -177,4 +177,6 @@ interface FileRepository {
 
     /** Deletes every local copy that has a verified Telegram backup. */
     suspend fun freeUpSpace(): AppResult<LocalCleanup>
+
+    suspend fun reconcileVerifiedCleanup(copies: Map<String, String>): Int
 }
