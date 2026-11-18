@@ -122,6 +122,7 @@ class PreviewContentResolver(
                 (MimeTypes.isImage(file.mimeType) ||
                         MimeTypes.isText(file.mimeType) ||
                         file.mimeType == "application/zip" ||
+                        StructuredDocumentReader.supports(file.name, file.mimeType) ||
                         MimeTypes.isApk(file.mimeType, file.name))
         if (!autoFetchable) {
             emit(PreviewContent.RequiresDownload(file.sizeBytes))
@@ -148,6 +149,9 @@ class PreviewContentResolver(
         MimeTypes.isVideo(file.mimeType) -> PreviewContent.LocalMedia(path, isAudio = false)
         MimeTypes.isAudio(file.mimeType) -> PreviewContent.LocalMedia(path, isAudio = true)
         MimeTypes.isPdf(file.mimeType) -> PreviewContent.Pdf(path)
+        StructuredDocumentReader.supports(file.name, file.mimeType) -> runCatching {
+            PreviewContent.StructuredDocument(StructuredDocumentReader.read(File(path), file.name, file.mimeType))
+        }.getOrElse { PreviewContent.Failed(Res.string.preview_read_failed) }
         MimeTypes.isText(file.mimeType) -> readText(path)
         MimeTypes.isArchive(file.mimeType) -> readArchive(file, path)
         MimeTypes.isApk(file.mimeType, file.name) -> readApk(path)

@@ -58,4 +58,6 @@
     <string name="video_tracks_off">Off</string>
     <string name="video_tracks_automatic">Automatic</string>
     <string name="video_track_number">Track %d</string>
+    <string name="document_preview_empty">This document contains no previewable text or cells.</string>
+    <string name="document_preview_truncated">Preview shortened. Download the original for the complete document.</string>
 </resources>

@@ -563,6 +563,7 @@ private fun PreviewPage(
             }
         }
 
+        is PreviewContent.StructuredDocument -> StructuredDocumentPreview(content.content)
         is PreviewContent.Archive -> ArchiveList(content)
         is PreviewContent.RequiresDownload -> EmptyState(
             icon = DriveIcons.Download,

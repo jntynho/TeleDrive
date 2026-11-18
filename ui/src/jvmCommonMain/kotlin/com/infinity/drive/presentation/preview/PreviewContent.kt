@@ -27,6 +27,8 @@ sealed interface PreviewContent {
 
     data class Pdf(val path: String) : PreviewContent
 
+    data class StructuredDocument(val content: StructuredDocumentReader.Document) : PreviewContent
+
     data class PlainText(val text: String, val truncated: Boolean) : PreviewContent
 
     data class Archive(
