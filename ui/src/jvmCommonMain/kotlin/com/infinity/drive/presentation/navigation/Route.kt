@@ -44,7 +44,8 @@ sealed interface Route {
         val minSizeBytes: Long? = null,
         val sortField: String? = null,
         val sortDescending: Boolean = false,
-        val fromTrash:Boolean=false
+        val fromTrash:Boolean=false,
+        val tag: String? = null
     ) : Route
 
     @Serializable

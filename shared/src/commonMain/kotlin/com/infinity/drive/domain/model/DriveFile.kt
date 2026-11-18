@@ -26,7 +26,8 @@ data class DriveFile(
     val offlinePinned: Boolean = false,
     val createdAt: Long,
     val modifiedAt: Long,
-    val addedAt: Long
+    val addedAt: Long,
+    val tags: List<String> = emptyList()
 ) {
     val hasLocalCopy: Boolean get() = localPath != null
     val hasRemoteCopy: Boolean get() = messageId != null && chatId != null

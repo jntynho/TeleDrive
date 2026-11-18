@@ -45,6 +45,8 @@ import com.infinity.drive.resources.common_back
 import com.infinity.drive.resources.common_clear
 import com.infinity.drive.resources.search_section_files
 import com.infinity.drive.resources.search_section_folders
+import com.infinity.drive.domain.model.FileTags
+import com.infinity.drive.resources.search_files_or_tags
 import com.infinity.drive.domain.model.FileCategory
 import com.infinity.drive.presentation.components.EmptyState
 import com.infinity.drive.presentation.components.FileListItem
@@ -74,7 +76,7 @@ fun SearchScreen(
         topBar = {
             if(showHeader)app.tgdrive.ui.ExpandableLibraryHeader(
                 title="Search",query=state.query,onQueryChange=viewModel::setQuery,
-                expanded=true,onExpandedChange={if(!it)onBack()},placeholder=stringResource(Res.string.app_search_files)
+                expanded=true,onExpandedChange={if(!it)onBack()},placeholder=stringResource(Res.string.search_files_or_tags)
             )
         }
     ) { padding ->
@@ -170,7 +172,8 @@ fun SearchScreen(
                                 onOpenFile(
                                     file.id,
                                     PreviewSequence(
-                                        nameQuery = state.query.takeIf { it.isNotBlank() },
+                                        nameQuery = state.query.takeIf { it.isNotBlank() && FileTags.searchTag(it) == null },
+                                        tag = FileTags.searchTag(state.query),
                                         categories = state.filters.category
                                             ?.let { category -> listOf(category) }
                                             .orEmpty(),

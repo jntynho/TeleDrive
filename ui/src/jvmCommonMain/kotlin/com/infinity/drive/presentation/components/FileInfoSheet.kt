@@ -18,6 +18,7 @@ import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.infinity.drive.resources.Res
+import com.infinity.drive.resources.files_tags_label
 import com.infinity.drive.resources.info_added
 import com.infinity.drive.resources.info_backup
 import com.infinity.drive.resources.info_backup_done
@@ -62,6 +63,9 @@ fun FileInfoSheet(
             )
             Spacer(Modifier.height(16.dp))
 
+            if (file.tags.isNotEmpty()) {
+                InfoRow(stringResource(Res.string.files_tags_label), file.tags.joinToString(" · ") { "#$it" })
+            }
             InfoRow(stringResource(Res.string.info_size), Formatters.bytes(file.sizeBytes))
             InfoRow(stringResource(Res.string.info_type), file.mimeType)
             file.extension.takeIf { it.isNotEmpty() }?.let {

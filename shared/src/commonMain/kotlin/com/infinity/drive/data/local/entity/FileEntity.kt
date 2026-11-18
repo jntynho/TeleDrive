@@ -65,7 +65,8 @@ data class FileEntity(
     val iconFileId: String? = null,
     val createdAt: Long,
     val modifiedAt: Long,
-    val addedAt: Long
+    val addedAt: Long,
+    @ColumnInfo(defaultValue = "''") val tagsEncoded: String = ""
 ) {
     // Keeping derived columns out of the constructor also recomputes them for copy(name = ...).
     @ColumnInfo(defaultValue = "''")

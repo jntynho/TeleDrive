@@ -36,6 +36,7 @@ import com.infinity.drive.presentation.components.zoomedOut
 import com.infinity.drive.presentation.navigation.Route
 import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.files_tree_saved
+import com.infinity.drive.resources.files_tags_saved
 import com.infinity.drive.resources.files_zip_saved
 import com.infinity.drive.resources.files_bulk_rename_done
 import com.infinity.drive.resources.files_copied_all
@@ -385,6 +386,16 @@ class FilesViewModel(
             }
         }
     }
+
+    suspend fun tagsForFile(id: String): List<String> =
+        fileRepository.observeFile(id).first()?.tags.orEmpty()
+
+    suspend fun saveFileTags(ids: List<String>, tags: List<String>): AppResult<Int> =
+        fileRepository.setTags(ids, tags).also { result ->
+            if (result is AppResult.Success) {
+                _messages.tryEmit(UiText.Resource(Res.string.files_tags_saved, result.value))
+            }
+        }
 
     suspend fun previewBulkRename(ids: List<String>, template: String): AppResult<BulkRenamePreview> =
         fileRepository.previewBulkRename(ids, template)

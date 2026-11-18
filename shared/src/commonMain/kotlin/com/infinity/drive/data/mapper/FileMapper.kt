@@ -2,6 +2,7 @@ package com.infinity.drive.data.mapper
 
 import com.infinity.drive.data.local.entity.FileEntity
 import com.infinity.drive.domain.model.DriveFile
+import com.infinity.drive.domain.model.FileTags
 
 fun FileEntity.toDomain(): DriveFile = DriveFile(
     id = id,
@@ -29,7 +30,8 @@ fun FileEntity.toDomain(): DriveFile = DriveFile(
     iconFileId = iconFileId,
     createdAt = createdAt,
     modifiedAt = modifiedAt,
-    addedAt = addedAt
+    addedAt = addedAt,
+    tags = FileTags.decode(tagsEncoded)
 )
 
 fun DriveFile.toEntity(preTrashFolderId: String? = null): FileEntity = FileEntity(
@@ -59,5 +61,6 @@ fun DriveFile.toEntity(preTrashFolderId: String? = null): FileEntity = FileEntit
     iconFileId = iconFileId,
     createdAt = createdAt,
     modifiedAt = modifiedAt,
-    addedAt = addedAt
+    addedAt = addedAt,
+    tagsEncoded = FileTags.encode(tags)
 )

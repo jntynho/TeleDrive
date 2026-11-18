@@ -24,6 +24,7 @@ import com.infinity.drive.data.remote.telegram.RemoteFileManifest
 import com.infinity.drive.data.remote.telegram.RemoteFolderState
 import com.infinity.drive.domain.model.BackupState
 import com.infinity.drive.domain.model.FileCategory
+import com.infinity.drive.domain.model.FileTags
 import com.infinity.drive.domain.repository.SettingsRepository
 import com.infinity.drive.domain.repository.SyncRepository
 import kotlinx.coroutines.Dispatchers
@@ -466,6 +467,9 @@ class SyncRepositoryImpl(
             ?: (document.dateSeconds * 1000L),
             addedAt = existing?.addedAt ?: now,
             partCount = manifest?.partCount ?: existing?.partCount ?: 0,
+            tagsEncoded = local?.tagsEncoded ?: manifest?.let {
+                FileTags.encode(FileTags.normalize(it.tags).orEmpty())
+            } ?: existing?.tagsEncoded.orEmpty(),
             iconFileId = manifest?.iconFileId ?: existing?.iconFileId
         )
 

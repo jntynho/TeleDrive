@@ -1041,4 +1041,10 @@
     <string name="backup_rule_media_only">Photos and videos only</string>
     <string name="backup_rule_maximum">Maximum size in MB</string>
     <string name="backup_rule_maximum_help">Leave blank to use the backup default. Use 0 for no maximum.</string>
+    <string name="files_tags_label">Tags</string>
+    <string name="files_tags_edit">Edit tags</string>
+    <string name="files_tags_edit_help">Separate tags with commas. Saving replaces the tags on the selected files.</string>
+    <string name="files_tags_invalid">Use up to 8 short tags without pipe symbols.</string>
+    <string name="files_tags_saved">Updated tags on %d files.</string>
+    <string name="search_files_or_tags">Search files or #tag</string>
 </resources>

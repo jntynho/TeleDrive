@@ -85,6 +85,8 @@ interface FileRepository {
 
     suspend fun createFolder(parentId: String?, name: String): AppResult<DriveFolder>
 
+    suspend fun setTags(ids: List<String>, tags: List<String>): AppResult<Int>
+
     suspend fun renameFile(id: String, newName: String): AppResult<Unit>
 
     suspend fun previewBulkRename(ids: List<String>, template: String): AppResult<BulkRenamePreview>

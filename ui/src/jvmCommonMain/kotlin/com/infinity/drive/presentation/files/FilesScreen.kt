@@ -117,6 +117,8 @@ import com.infinity.drive.presentation.platform.PickResult
 import com.infinity.drive.presentation.preview.PreviewSequence
 import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.files_tree_export
+import com.infinity.drive.resources.files_tags_edit
+import com.infinity.drive.resources.search_files_or_tags
 import com.infinity.drive.resources.files_duplicates_action
 import com.infinity.drive.resources.files_bulk_rename_title
 import com.infinity.drive.resources.common_actions
@@ -205,6 +207,10 @@ fun FilesScreen(
     AppBackHandler(searching){searching=false;searchModel.setQuery("")}
 
     val renameTarget by viewModel.renameTarget.collectAsStateWithLifecycle()
+    var editTagsIds by remember { mutableStateOf<List<String>?>(null) }
+    editTagsIds?.let { ids ->
+        EditFileTagsDialog(ids, viewModel::tagsForFile, viewModel::saveFileTags) { editTagsIds = null }
+    }
     var bulkRenameIds by remember { mutableStateOf<List<String>?>(null) }
     bulkRenameIds?.let { ids ->
         BulkRenameDialog(
@@ -483,6 +489,14 @@ fun FilesScreen(
                                             }
                                         )
                                         DropdownMenuItem(
+                                            text = { Text(stringResource(Res.string.files_tags_edit)) },
+                                            enabled = state.selection.isNotEmpty() && state.folderSelection.isEmpty(),
+                                            onClick = {
+                                                showSelectionOverflow = false
+                                                editTagsIds = state.selection.toList()
+                                            }
+                                        )
+                                        DropdownMenuItem(
                                             text = { Text(stringResource(Res.string.files_copy)) },
                                             enabled = !state.folderInSelection,
                                             onClick = {
@@ -536,7 +550,7 @@ fun FilesScreen(
                     } else {
                         app.tgdrive.ui.ExpandableLibraryHeader(
                             title=if(audioOnly)"Audio"else "All files",titleStyle=MaterialTheme.typography.titleLarge,
-                            query=searchState.query,onQueryChange=searchModel::setQuery,expanded=searching,onExpandedChange={searching=it},placeholder="Search files",
+                            query=searchState.query,onQueryChange=searchModel::setQuery,expanded=searching,onExpandedChange={searching=it},placeholder=stringResource(Res.string.search_files_or_tags),
                             navigationIcon = {
                                 onBack?.let {
                                     IconButton(onClick = it) {

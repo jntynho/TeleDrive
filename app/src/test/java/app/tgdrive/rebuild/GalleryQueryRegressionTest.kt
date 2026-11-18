@@ -174,4 +174,18 @@ class GalleryQueryRegressionTest {
             db.close()
         }
     }
+    @Test fun tagSearchUsesExactValuesAndTreatsWildcardsAsCharacters() = runTest {
+        val db = database()
+        try {
+            val dao = db.fileDao()
+            dao.upsert(file("1", "regular.jpg").copy(tagsEncoded = "|travel|50%|"))
+            dao.upsert(file("2", "other.jpg").copy(tagsEncoded = "|travel plans|500|"))
+            dao.upsert(file("3", "hidden.jpg").copy(tagsEncoded = "|travel|", isHidden = true))
+            assertEquals(listOf("1"), dao.idList(FileQueryBuilder.buildIds(FileQuerySpec(tag = "travel"))))
+            assertEquals(listOf("1"), dao.idList(FileQueryBuilder.buildIds(FileQuerySpec(tag = "50%"))))
+            assertEquals(listOf("2"), dao.idList(FileQueryBuilder.buildIds(FileQuerySpec(tag = "travel plans"))))
+        } finally {
+            db.close()
+        }
+    }
 }

@@ -24,6 +24,7 @@ import com.infinity.drive.data.local.entity.TransferEntity
 import com.infinity.drive.data.remote.telegram.ManifestCodec
 import com.infinity.drive.data.remote.telegram.RemoteFileManifest
 import com.infinity.drive.data.repository.FolderPathResolver
+import com.infinity.drive.domain.model.FileTags
 import com.infinity.drive.domain.model.BackupState
 import com.infinity.drive.domain.model.TransferStage
 import com.infinity.drive.domain.model.TransferState
@@ -164,7 +165,7 @@ class TransferExecutor(
             if(prefs.encryptFiles)return Outcome.Failed("Turn off file encryption to copy directly from Telegram, or upload the original file instead.")
             val target=entity.chatId?:prefs.storageChatId?:telegramClient.ensureStorageChat(null)
             val manifest=RemoteFileManifest(fileId=entity.id,name=entity.name,folderPath=folderPathResolver.pathOf(entity.folderId),folderId=entity.folderId,
-                mimeType=entity.mimeType,sizeBytes=entity.sizeBytes,contentHash=null,hidden=false,archived=false,encrypted=false,createdAt=entity.createdAt,modifiedAt=entity.modifiedAt)
+                mimeType=entity.mimeType,sizeBytes=entity.sizeBytes,contentHash=null,hidden=false,archived=false,encrypted=false,createdAt=entity.createdAt,modifiedAt=entity.modifiedAt,tags=FileTags.decode(entity.tagsEncoded))
             val caption=manifestCodec.encode(manifest,false)
             val recovered=if(transfer.messageId!=null){
                 val landed=telegramClient.fetchDocuments(target,0,100).documents.firstOrNull { manifestCodec.decode(it.caption)?.fileId==entity.id }
@@ -231,7 +232,8 @@ class TransferExecutor(
             width = entity.width,
             height = entity.height,
             durationMs = entity.durationMs,
-            iconFileId = iconFileId
+            iconFileId = iconFileId,
+            tags = FileTags.decode(entity.tagsEncoded)
         )
         val caption = manifestCodec.encode(manifest, encrypt)
 

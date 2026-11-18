@@ -22,7 +22,8 @@ data class PreviewSequence(
     val notBackedUpOnly: Boolean = false,
     val minSizeBytes: Long? = null,
     val sortField: FileSortField = FileSortField.NAME,
-    val sortDirection: SortDirection = SortDirection.ASCENDING
+    val sortDirection: SortDirection = SortDirection.ASCENDING,
+    val tag: String? = null
 ) {
 
     fun routeFor(fileId: String): Route.Preview = Route.Preview(
@@ -40,7 +41,8 @@ data class PreviewSequence(
         notBackedUpOnly = notBackedUpOnly,
         minSizeBytes = minSizeBytes,
         sortField = sortField.name,
-        sortDescending = sortDirection == SortDirection.DESCENDING
+        sortDescending = sortDirection == SortDirection.DESCENDING,
+        tag = tag
     )
 }
 

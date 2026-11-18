@@ -235,6 +235,9 @@ interface FileDao {
     @Query("UPDATE files SET folderId = :folderId, modifiedAt = :modifiedAt WHERE id IN (:ids)")
     suspend fun move(ids: List<String>, folderId: String?, modifiedAt: Long)
 
+    @Query("UPDATE files SET tagsEncoded = :tags, pendingPublish = 1 WHERE id IN (:ids)")
+    suspend fun updateTags(ids: List<String>, tags: String)
+
     @Query("UPDATE files SET isFavorite = :favorite WHERE id IN (:ids)")
     suspend fun setFavorite(ids: List<String>, favorite: Boolean)
 

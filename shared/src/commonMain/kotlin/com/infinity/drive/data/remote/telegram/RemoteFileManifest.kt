@@ -32,7 +32,8 @@ data class RemoteFileManifest(
     @SerialName("pi") val partIndex: Int = 0,
     @SerialName("po") val partOffset: Long = 0,
     @SerialName("ps") val partSize: Long = 0,
-    @SerialName("icon") val iconFileId: String? = null
+    @SerialName("icon") val iconFileId: String? = null,
+    @SerialName("tags") val tags: List<String> = emptyList()
 ) {
     val isPart: Boolean get() = partCount > 1
 

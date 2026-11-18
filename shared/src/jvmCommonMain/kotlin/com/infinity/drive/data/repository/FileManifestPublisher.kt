@@ -5,6 +5,8 @@ import com.infinity.drive.core.common.AppResult
 import com.infinity.drive.core.telegram.TelegramClient
 import com.infinity.drive.core.telegram.TelegramException
 import com.infinity.drive.data.local.entity.FileEntity
+import com.infinity.drive.data.local.dao.FilePartDao
+import com.infinity.drive.domain.model.FileTags
 import com.infinity.drive.data.remote.telegram.ManifestCodec
 import com.infinity.drive.data.remote.telegram.RemoteFileManifest
 
@@ -17,13 +19,19 @@ import com.infinity.drive.data.remote.telegram.RemoteFileManifest
 class FileManifestPublisher(
     private val telegramClient: TelegramClient,
     private val manifestCodec: ManifestCodec,
-    private val folderPathResolver: FolderPathResolver
+    private val folderPathResolver: FolderPathResolver,
+    private val parts: FilePartDao
 ) {
 
     suspend fun publish(entity: FileEntity): AppResult<Unit> {
         val chatId = entity.chatId ?: return AppResult.Success(Unit)
         val messageId = entity.messageId ?: return AppResult.Success(Unit)
+        val part = if (entity.partCount > 1) {
+            parts.partsOf(entity.id).firstOrNull { it.chatId == chatId && it.messageId == messageId }
+                ?: return AppResult.Failure(AppError.NotFound)
+        } else null
         val manifest = RemoteFileManifest(
+            version = if (part == null) RemoteFileManifest.VERSION else RemoteFileManifest.PART_VERSION,
             fileId = entity.id,
             name = entity.name,
             folderPath = folderPathResolver.pathOf(entity.folderId ?: entity.preTrashFolderId),
@@ -40,7 +48,13 @@ class FileManifestPublisher(
             modifiedAt = entity.modifiedAt,
             width = entity.width,
             height = entity.height,
-            durationMs = entity.durationMs
+            durationMs = entity.durationMs,
+            iconFileId = entity.iconFileId,
+            tags = FileTags.decode(entity.tagsEncoded),
+            partCount = entity.partCount,
+            partIndex = part?.partIndex ?: 0,
+            partOffset = part?.plainOffset ?: 0,
+            partSize = part?.plainSize ?: 0
         )
         return try {
             telegramClient.editCaption(

@@ -111,6 +111,7 @@ class PreviewViewModel(
                     filterByFolder = route.filterByFolder,
                     categories = categories,
                     nameQuery = route.nameQuery,
+                    tag = route.tag,
                     backedUpOnly = route.backedUpOnly,
                     notBackedUpOnly = route.notBackedUpOnly,
                     minSizeBytes = route.minSizeBytes,

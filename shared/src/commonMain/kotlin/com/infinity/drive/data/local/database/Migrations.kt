@@ -221,3 +221,10 @@ val MIGRATION_15_16 = object : Migration(15, 16) {
         }
     }
 }
+
+
+val MIGRATION_16_17 = object : Migration(16, 17) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE files ADD COLUMN tagsEncoded TEXT NOT NULL DEFAULT ''")
+    }
+}

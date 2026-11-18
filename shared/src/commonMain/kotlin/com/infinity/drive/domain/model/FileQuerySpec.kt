@@ -25,5 +25,6 @@ data class FileQuerySpec(
     val scopeToChat:Boolean=false,
     val respectHiddenLock:Boolean=true,
     val excludeHiddenAncestors:Boolean=false,
-    val excludeNotes: Boolean = false
+    val excludeNotes: Boolean = false,
+    val tag: String? = null
 )

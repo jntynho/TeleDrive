@@ -47,13 +47,15 @@ class SearchViewModel(private val fileRepository: FileRepository) : ViewModel() 
             else {
                 flow {
                 val filter=request.filters
+                val tag = FileTags.searchTag(request.text)
                 val files=fileRepository.observeFiles(FileQuerySpec(
-                    nameQuery=request.text.takeIf(String::isNotBlank),
+                    nameQuery=request.text.takeIf { it.isNotBlank() && tag == null },
+                    tag = tag,
                     categories=filter.category?.let{listOf(it)}.orEmpty(),
                     backedUpOnly=filter.backedUpOnly,notBackedUpOnly=filter.notBackedUpOnly,
                     minSizeBytes=filter.minSizeMb?.toLong()?.times(1024*1024),
                     sortField=filter.sortField,sortDirection=filter.sortDirection))
-                val folders=if(request.text.isBlank()||filter.hasCriteria())flowOf(emptyList())
+                val folders=if(request.text.isBlank()||tag != null||filter.hasCriteria())flowOf(emptyList())
                     else fileRepository.searchFolders(request.text)
                 emitAll(combine(files,folders){fileRows,folderRows->SearchSnapshot(request,fileRows.take(500),folderRows.take(500))})
                 }.onStart{emit(SearchSnapshot(request,loading=true))}

@@ -66,6 +66,10 @@ object FileQueryBuilder {
             where.append(" AND (name LIKE ? ESCAPE '\\' OR EXISTS (SELECT 1 FROM audio_tags a WHERE a.fileId = files.id AND a.modifiedAt = files.modifiedAt AND (a.sizeBytes < 0 OR (a.sizeBytes = files.sizeBytes AND a.contentHash IS files.contentHash)) AND (a.title LIKE ? ESCAPE '\\' OR a.artist LIKE ? ESCAPE '\\')))")
             repeat(3){_->args.add("%${escapeLike(it)}%") }
         }
+        spec.tag?.let { tag ->
+            where.append(" AND tagsEncoded LIKE ? ESCAPE '\\'")
+            args.add("%|${escapeLike(tag)}|%")
+        }
         if (spec.excludeNotes) where.append(" AND lower(name) NOT LIKE '%.md'")
         spec.extension?.takeIf { it.isNotBlank() }?.let {
             where.append(" AND name LIKE ? ESCAPE '\\'")

@@ -37,6 +37,7 @@ import com.infinity.drive.domain.model.BulkRenamePreview
 import com.infinity.drive.domain.model.BulkRenameStatus
 import com.infinity.drive.domain.model.DriveFile
 import com.infinity.drive.domain.model.DriveFolder
+import com.infinity.drive.domain.model.FileTags
 import com.infinity.drive.domain.model.FileCategory
 import com.infinity.drive.domain.model.FileQuerySpec
 import com.infinity.drive.domain.model.FileSortField
@@ -406,6 +407,24 @@ class FileRepositoryImpl(
         return AppResult.Success(folder.toDomain())
     }
 
+    override suspend fun setTags(ids: List<String>, tags: List<String>): AppResult<Int> {
+        val normalized = FileTags.normalize(tags) ?: return AppResult.Failure(AppError.UnsupportedOperation())
+        val drive = activeChannel.id()
+        val selected = ids.distinct()
+        val result = database.inImmediateTransaction {
+            val rows = selected.chunked(SQL_BATCH).flatMap { fileDao.byIds(it) }
+            if (rows.size != selected.size || rows.any { it.chatId != drive || it.trashedAt != null || !hiddenAccess.canRead(it.id) }) {
+                return@inImmediateTransaction AppResult.Failure(AppError.PermissionDenied())
+            }
+            val encoded = FileTags.encode(normalized)
+            val changed = rows.filter { it.tagsEncoded != encoded }.map { it.id }
+            changed.chunked(SQL_BATCH).forEach { fileDao.updateTags(it, encoded) }
+            AppResult.Success(changed.size)
+        }
+        if (result is AppResult.Success && result.value > 0) publishScheduler.kick()
+        return result
+    }
+
     override suspend fun renameFile(id: String, newName: String): AppResult<Unit> {
         val file = fileDao.byId(id) ?: return AppResult.Failure(AppError.NotFound)
         val sanitized = FileNameUtils.sanitize(newName)
@@ -574,7 +593,8 @@ class FileRepositoryImpl(
             modifiedAt = copy.modifiedAt,
             width = copy.width,
             height = copy.height,
-            durationMs = copy.durationMs
+            durationMs = copy.durationMs,
+            tags = FileTags.decode(copy.tagsEncoded)
         )
         val document = telegramClient.copyDocument(
             chatId = chatId,
