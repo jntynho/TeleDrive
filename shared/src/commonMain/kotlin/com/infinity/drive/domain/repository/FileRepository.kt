@@ -67,6 +67,9 @@ interface FileRepository {
     /** Storage taken by each file category in the active drive, largest first. */
     fun observeStorageByCategory(): Flow<List<StorageSlice>>
 
+    /** Emits a plain-text tree of accessible indexed names. A null folder means the drive root. */
+    suspend fun exportDirectoryTree(folderId: String?, onLine: (String) -> Unit): AppResult<Int>
+
     /** Logical size of accessible files in this folder and all of its descendants. */
     fun observeFolderStatistics(id: String): Flow<FolderStatistics?>
 

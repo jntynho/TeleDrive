@@ -104,6 +104,7 @@ import com.infinity.drive.presentation.navigation.FabBottomBarInset
 import com.infinity.drive.presentation.navigation.LocalBottomBarInset
 import com.infinity.drive.presentation.platform.FileDropArea
 import com.infinity.drive.presentation.platform.LocalDeleteConsentLauncher
+import com.infinity.drive.presentation.platform.LocalDirectoryTreeDocument
 import com.infinity.drive.presentation.platform.LocalFileRevealer
 import com.infinity.drive.presentation.platform.LocalFileSharer
 import com.infinity.drive.presentation.platform.LocalFolderPicker
@@ -111,6 +112,7 @@ import com.infinity.drive.presentation.platform.LocalMultiFilePicker
 import com.infinity.drive.presentation.platform.PickResult
 import com.infinity.drive.presentation.preview.PreviewSequence
 import com.infinity.drive.resources.Res
+import com.infinity.drive.resources.files_tree_export
 import com.infinity.drive.resources.common_actions
 import com.infinity.drive.resources.common_add
 import com.infinity.drive.resources.common_add_favorites
@@ -213,6 +215,9 @@ fun FilesScreen(
     var showCopyPicker by remember { mutableStateOf(false) }
     var showSelectionOverflow by remember { mutableStateOf(false) }
     var confirmTrash by remember { mutableStateOf(false) }
+    val treeDocument = LocalDirectoryTreeDocument.current
+    var exportingTree by remember { mutableStateOf(false) }
+
     val uploadPicker = LocalMultiFilePicker.current
     val onPickUploads = {
         uploadPicker.pick { references ->
@@ -504,6 +509,24 @@ fun FilesScreen(
                                     DropdownMenu(fileActions,{fileActions=false}){
                                         DropdownMenuItem(text={Text("Refresh")},enabled=!refreshing,onClick={fileActions=false;viewModel.refresh()})
                                         if(!audioOnly)DropdownMenuItem(text={Text("New folder")},onClick={fileActions=false;showCreateFolder=true})
+                                        if (!audioOnly && treeDocument != null) {
+                                            DropdownMenuItem(
+                                                text = { Text(stringResource(Res.string.files_tree_export)) },
+                                                enabled = !exportingTree,
+                                                onClick = {
+                                                    fileActions = false
+                                                    exportingTree = true
+                                                    val folder = state.folderId
+                                                    treeDocument.save(
+                                                        write = { output -> viewModel.exportDirectoryTree(folder, output) },
+                                                        onResult = { result ->
+                                                            exportingTree = false
+                                                            viewModel.onDirectoryTreeExported(result)
+                                                        }
+                                                    )
+                                                }
+                                            )
+                                        }
                                         DropdownMenuItem(text={Text("New note")},onClick={fileActions=false;onNewNote(state.folderId)})
                                     }
                                 }

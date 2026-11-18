@@ -999,4 +999,6 @@
     <string name="folder_info_size">Total size</string>
     <string name="folder_info_local">With a local copy</string>
     <string name="folder_info_backed_up">Backed up to Telegram</string>
+    <string name="files_tree_export">Export directory tree</string>
+    <string name="files_tree_saved">Directory tree saved with %d entries.</string>
 </resources>

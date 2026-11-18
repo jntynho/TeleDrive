@@ -34,6 +34,7 @@ import com.infinity.drive.presentation.components.zoomedIn
 import com.infinity.drive.presentation.components.zoomedOut
 import com.infinity.drive.presentation.navigation.Route
 import com.infinity.drive.resources.Res
+import com.infinity.drive.resources.files_tree_saved
 import com.infinity.drive.resources.files_copied_all
 import com.infinity.drive.resources.files_copied_partial
 import com.infinity.drive.resources.files_import_copied
@@ -662,6 +663,18 @@ class FilesViewModel(
             }
             clearSelection()
         }
+    }
+
+    suspend fun exportDirectoryTree(folderId: String?, write: (String) -> Unit): AppResult<Int> =
+        fileRepository.exportDirectoryTree(folderId, write)
+
+    fun onDirectoryTreeExported(result: AppResult<Int>?) {
+        val message = when (result) {
+            is AppResult.Success -> UiText.Resource(Res.string.files_tree_saved, result.value)
+            is AppResult.Failure -> result.error.toUiText()
+            null -> return
+        }
+        _messages.tryEmit(message)
     }
 
     fun observeFolderStatistics(id: String) = fileRepository.observeFolderStatistics(id)

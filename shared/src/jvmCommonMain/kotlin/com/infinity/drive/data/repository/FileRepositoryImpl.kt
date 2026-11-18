@@ -43,7 +43,10 @@ import com.infinity.drive.domain.model.FolderStatistics
 import com.infinity.drive.domain.repository.FileRepository
 import com.infinity.drive.domain.repository.SettingsRepository
 import com.infinity.drive.domain.usecase.FolderCycleCheck
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.onStart
@@ -264,6 +267,77 @@ class FileRepositoryImpl(
                 rows.map { StorageSlice(it.category, it.fileCount, it.totalBytes) }
             }
         }
+
+    override suspend fun exportDirectoryTree(
+        folderId: String?,
+        onLine: (String) -> Unit
+    ): AppResult<Int> = withContext(Dispatchers.IO) {
+        val drive = activeChannel.id()
+        val root = folderId?.let { id ->
+            folderDao.byId(id)?.takeIf { it.chatId == drive && it.trashedAt == null }
+                ?: return@withContext AppResult.Failure(AppError.NotFound)
+        }
+        hiddenAccess.lock.awaitReady()
+        hiddenAccess.notesLock?.awaitReady()
+        if (!hiddenAccess.canReadFolder(folderId)) {
+            return@withContext AppResult.Failure(AppError.PermissionDenied())
+        }
+
+        val restrictions = hiddenAccess.lock.state.value.restricted to
+            (hiddenAccess.notesLock?.state?.value?.restricted == true)
+        val stack = ArrayDeque<DirectoryTreeFolder>()
+        val visited = mutableSetOf<String>()
+        stack.add(DirectoryTreeFolder(folderId, root?.name, 0))
+        var written = 0
+        while (stack.isNotEmpty()) {
+            ensureActive()
+            if (activeChannel.id() != drive ||
+                restrictions.first != hiddenAccess.lock.state.value.restricted ||
+                restrictions.second != (hiddenAccess.notesLock?.state?.value?.restricted == true)
+            ) return@withContext AppResult.Failure(AppError.PermissionDenied())
+            val current = stack.removeLast()
+            if (current.id != null && !visited.add(current.id)) continue
+            if (current.depth > MAX_FOLDER_DEPTH) {
+                return@withContext AppResult.Failure(AppError.UnsupportedOperation())
+            }
+            if (!hiddenAccess.canReadFolder(current.id)) continue
+            if (current.name != null) {
+                onLine(directoryTreeLine(current.name, current.depth, folder = true))
+                written++
+            }
+            val depth = if (current.name == null) 0 else current.depth + 1
+            val files = fileDao.observeList(FileQueryBuilder.build(
+                hiddenAccess.query(FileQuerySpec(
+                    folderId = current.id,
+                    filterByFolder = true,
+                    showHidden = true,
+                    showArchived = true,
+                    chatId = drive,
+                    scopeToChat = true
+                ))
+            )).first()
+            for (file in files) {
+                ensureActive()
+                if (!hiddenAccess.canReadSnapshot(file.toDomain())) continue
+                onLine(directoryTreeLine(file.name, depth, folder = false))
+                written++
+            }
+            val children = folderDao.childrenOf(current.id, drive)
+                .sortedWith(compareBy<FolderEntity, String>(String.CASE_INSENSITIVE_ORDER) { it.name }.thenBy { it.id })
+            for (child in children.asReversed()) {
+                if (hiddenAccess.canReadFolder(child.id)) {
+                    stack.add(DirectoryTreeFolder(child.id, child.name, depth))
+                }
+            }
+        }
+        if (activeChannel.id() != drive ||
+            restrictions.first != hiddenAccess.lock.state.value.restricted ||
+            restrictions.second != (hiddenAccess.notesLock?.state?.value?.restricted == true)
+        ) return@withContext AppResult.Failure(AppError.PermissionDenied())
+        AppResult.Success(written)
+    }
+
+    private data class DirectoryTreeFolder(val id: String?, val name: String?, val depth: Int)
 
     override fun observeFolderStatistics(id: String): Flow<FolderStatistics?> =
         combine(activeChannel.observe(), visibility, folderDao.observeById(id)) { chatId, restrictions, row ->
