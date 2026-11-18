@@ -60,6 +60,11 @@ import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.infinity.drive.resources.files_import_preparing
 import com.infinity.drive.resources.Res
+import com.infinity.drive.resources.transfers_retry_batch
+import com.infinity.drive.resources.transfers_retry_batch_all
+import com.infinity.drive.presentation.common.load
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import com.infinity.drive.resources.common_actions
 import com.infinity.drive.resources.common_back
 import com.infinity.drive.resources.common_cancel
@@ -113,6 +118,10 @@ fun TransfersScreen(
     onOpenFile:(String,PreviewSequence)->Unit={_,_->}
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbar = remember { SnackbarHostState() }
+    LaunchedEffect(viewModel) {
+        viewModel.retryMessages.collect { snackbar.showSnackbar(it.load()) }
+    }
     var confirmClearFinished by remember { mutableStateOf(false) }
     var confirmCancelAll by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
@@ -129,11 +138,18 @@ fun TransfersScreen(
         }
         if(file==null){selectedTransfer=null;actionError="This transfer no longer has a file in your library."}else selectedFile=task.id to file
     }
+    val retryBatchLabel = stringResource(Res.string.transfers_retry_batch)
     val actionFile=selectedFile?.takeIf{it.first==selectedTransfer?.id}?.second
     val actionTransfer=selectedTransfer
     if(actionFile!=null&&actionTransfer!=null)FileActionsSheet(actionFile,onDismiss={selectedTransfer=null;selectedFile=null},
         onOpen={onOpenFile(actionFile.id,PreviewSequence())},extraActions={
             val closeThen=com.infinity.drive.presentation.components.LocalSheetCloseThen.current
+            val batchId = actionTransfer.batchId
+            if (actionTransfer.state == TransferState.FAILED && actionTransfer.retryableFailure && batchId != null) {
+                com.infinity.drive.presentation.components.SheetActionRow(retryBatchLabel, DriveIcons.Refresh) {
+                    closeThen { viewModel.retryFailedBatch(batchId) }
+                }
+            }
             if(actionTransfer.state!=TransferState.COMPLETED)com.infinity.drive.presentation.components.SheetActionRow(
                 if(actionTransfer.state.isTerminal)"Dismiss transfer"else"Cancel transfer",DriveIcons.Close){closeThen{viewModel.cancel(actionTransfer.id)}}
         })
@@ -172,6 +188,7 @@ fun TransfersScreen(
     val lifted by rememberToolbarLift(listState)
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             PageHeader(
                 colors = liftedTopAppBarColors(lifted),
@@ -197,6 +214,11 @@ fun TransfersScreen(
                     ) {
                         DropdownMenuItem(text={Text("Pause all")},enabled=state.active.isNotEmpty(),onClick={showMenu=false;viewModel.pauseAll()})
                         DropdownMenuItem(text={Text("Resume all")},enabled=state.paused.isNotEmpty(),onClick={showMenu=false;viewModel.resumeAll()})
+                        DropdownMenuItem(
+                            text = { Text(stringResource(Res.string.transfers_retry_batch_all)) },
+                            enabled = state.failedTotal > 0,
+                            onClick = { showMenu = false; viewModel.retryFailedBatch() }
+                        )
                         DropdownMenuItem(
                             text = { Text(stringResource(Res.string.transfers_cancel)) },
                             enabled = state.active.isNotEmpty() ||

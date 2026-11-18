@@ -944,4 +944,9 @@
     <string name="recovery_import_invalid">The file or password could not be verified.</string>
     <string name="recovery_import_confirm">Continue with account ending in %1$s</string>
     <string name="recovery_import_configure">Set up Telegram API credentials first, then choose Restore sign-in from file.</string>
+    <string name="transfers_retry_batch">Retry this batch’s failed transfers</string>
+    <string name="transfers_retry_batch_all">Retry failed transfers</string>
+    <string name="transfers_retry_batch_error">Could not requeue failed transfers.</string>
+    <string name="transfers_retry_batch_none">No failed transfers are eligible for batch retry.</string>
+    <string name="transfers_retry_batch_queued">Transfers requeued: %1$d</string>
 </resources>

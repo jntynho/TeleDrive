@@ -41,8 +41,35 @@ interface TransferDao {
     suspend fun requeueRunningExcept(now:Long,liveIds:List<String>)
     @Query("UPDATE transfers SET state = :state, updatedAt = :now WHERE id = :id AND state = 'RUNNING'")
     suspend fun setRunningState(id:String,state:TransferState,now:Long)
-    @Query("UPDATE transfers SET state = 'FAILED', errorMessage = :error, updatedAt = :now WHERE id = :id AND state = 'RUNNING'")
-    suspend fun failRunning(id:String,error:String,now:Long):Int
+    @Query("UPDATE transfers SET state = 'FAILED', errorMessage = :error, retryableFailure = :retryable, updatedAt = :now WHERE id = :id AND state = 'RUNNING'")
+    suspend fun failRunning(id: String, error: String, now: Long, retryable: Boolean): Int
+
+    @Query(
+        """SELECT failed.id, failed.fileId, failed.type, failed.backupSessionId
+           FROM transfers AS failed
+           JOIN files ON files.id = failed.fileId AND files.trashedAt IS NULL
+           WHERE failed.state = 'FAILED' AND failed.retryableFailure = 1
+             AND (:batchId IS NULL OR COALESCE(failed.backupSessionId, failed.uploadBatchId) = :batchId)
+             AND NOT EXISTS (
+                SELECT 1 FROM transfers AS other
+                WHERE other.fileId = failed.fileId AND other.id != failed.id
+                  AND (other.type = failed.type OR
+                    (other.type IN ('UPLOAD','BACKUP') AND failed.type IN ('UPLOAD','BACKUP')))
+                  AND (other.state IN ('QUEUED','RUNNING','PAUSED') OR
+                    (other.state IN ('FAILED','COMPLETED','CANCELLED') AND
+                      (other.createdAt > failed.createdAt OR
+                        (other.createdAt = failed.createdAt AND other.id > failed.id))))
+             )"""
+    )
+    suspend fun failedBatchCandidates(batchId: String?): List<FailedTransferRetryCandidate>
+
+    @Query(
+        """UPDATE transfers SET state = 'QUEUED', retryableFailure = 0, errorMessage = NULL,
+             transferredBytes = 0, speedBytesPerSecond = 0, retryCount = 0, nextAttemptAt = 0,
+             updatedAt = :now
+           WHERE id IN (:ids) AND state = 'FAILED' AND retryableFailure = 1"""
+    )
+    suspend fun resetFailedBatch(ids: List<String>, now: Long): Int
 
     @Query("SELECT COUNT(*) FROM transfers WHERE state = 'COMPLETED' AND completedAt >= :startedAt")
     suspend fun completedSince(startedAt:Long):Int
@@ -181,3 +208,10 @@ interface TransferDao {
     @Query("SELECT * FROM transfers WHERE backupSessionId = :sessionId")
     suspend fun bySession(sessionId: String): List<TransferEntity>
 }
+
+data class FailedTransferRetryCandidate(
+    val id: String,
+    val fileId: String,
+    val type: com.infinity.drive.domain.model.TransferType,
+    val backupSessionId: String?
+)

@@ -27,6 +27,8 @@ interface TransferRepository {
 
     suspend fun enqueueUploads(fileIds: List<String>): AppResult<Int> = AppResult.Success(fileIds.count { enqueueUpload(it) is AppResult.Success })
 
+    suspend fun enqueueUploads(fileIds: List<String>, batchId: String): AppResult<Int> = enqueueUploads(fileIds)
+
     /** Queues every file held only on this device. Returns how many were added. */
     suspend fun enqueuePendingUploads(): AppResult<Int>
 
@@ -52,6 +54,9 @@ interface TransferRepository {
     suspend fun cancelForFiles(fileIds: List<String>)
 
     suspend fun retry(id: String)
+
+    /** Requeues eligible, temporarily failed transfers, optionally scoped to one batch. */
+    suspend fun retryFailedBatch(batchId: String? = null): Int = 0
 
     /** Bulk controls applied in one database write so the list updates at once. */
     suspend fun pauseAll()

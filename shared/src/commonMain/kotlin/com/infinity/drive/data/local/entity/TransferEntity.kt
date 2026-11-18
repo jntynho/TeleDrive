@@ -38,5 +38,7 @@ data class TransferEntity(
     val updatedAt: Long,
     val completedAt: Long? = null,
     @androidx.room.ColumnInfo(defaultValue = "0") val nextAttemptAt: Long = 0,
-    @androidx.room.ColumnInfo(defaultValue = "0") val retryCount: Int = 0
+    @androidx.room.ColumnInfo(defaultValue = "0") val retryCount: Int = 0,
+    @androidx.room.ColumnInfo(defaultValue = "0") val retryableFailure: Boolean = false,
+    val uploadBatchId: String? = null
 )

@@ -13,6 +13,8 @@ import com.infinity.drive.core.transfer.TransferScheduler
 import com.infinity.drive.data.local.dao.FileDao
 import com.infinity.drive.data.local.dao.TransferDao
 import com.infinity.drive.data.local.entity.TransferEntity
+import com.infinity.drive.data.local.database.DriveInfinityDatabase
+import com.infinity.drive.data.local.database.inImmediateTransaction
 import com.infinity.drive.data.mapper.toDomain
 import com.infinity.drive.domain.model.BackupState
 import com.infinity.drive.domain.model.TransferSection
@@ -37,7 +39,8 @@ class TransferRepositoryImpl(
     private val settingsRepository: SettingsRepository,
     private val validateUpload: ValidateUploadUseCase,
     private val storageInspector: StorageInspector,
-    private val backupSessionTracker: BackupSessionTracker
+    private val backupSessionTracker: BackupSessionTracker,
+    private val database: DriveInfinityDatabase
 ) : TransferRepository {
 
     override fun observeSection(
@@ -69,6 +72,9 @@ class TransferRepositoryImpl(
 
     override suspend fun enqueueUploads(fileIds: List<String>): AppResult<Int> =
         AppResult.Success(enqueueBatch(fileIds, TransferType.UPLOAD, sessionId = null))
+
+    override suspend fun enqueueUploads(fileIds: List<String>, batchId: String): AppResult<Int> =
+        AppResult.Success(enqueueBatch(fileIds, TransferType.UPLOAD, sessionId = null, batchId = batchId))
 
     /**
      * A file can be left marked queued with no transfer behind it when the
@@ -134,13 +140,15 @@ class TransferRepositoryImpl(
     private suspend fun enqueueBatch(
         fileIds: List<String>,
         type: TransferType,
-        sessionId: String?
+        sessionId: String?,
+        batchId: String? = null
     ): Int = outgoingLock.withLock {
         if (fileIds.isEmpty()) return 0
 
         val limits = currentLimits()
         val prefs = settingsRepository.preferences.first()
         val availableBytes = storageInspector.availableBytes()
+        val uploadBatchId = batchId ?: if (sessionId == null && fileIds.size > 1) UUID.randomUUID().toString() else null
         var queued = 0
 
         for (chunk in fileIds.chunked(SQL_BATCH)) {
@@ -179,6 +187,7 @@ class TransferRepositoryImpl(
                     state = TransferState.QUEUED,
                     priority = 0,
                     backupSessionId = sessionId,
+                    uploadBatchId = uploadBatchId,
                     createdAt = now,
                     updatedAt = now
                 )
@@ -313,20 +322,53 @@ class TransferRepositoryImpl(
     }
 
     override suspend fun retry(id: String) {
-        val transfer = transferDao.byId(id) ?: return
-        if (transfer.state == TransferState.FAILED || transfer.state == TransferState.CANCELLED) {
-            if(!transfer.type.isIncoming)transfer.fileId?.let{fileDao.setUploadRequested(listOf(it),true)}
+        val queued = database.inImmediateTransaction {
+            val transfer = transferDao.byId(id) ?: return@inImmediateTransaction false
+            if (transfer.state != TransferState.FAILED && transfer.state != TransferState.CANCELLED) {
+                return@inImmediateTransaction false
+            }
+            if (!transfer.type.isIncoming) {
+                transfer.fileId?.let { fileDao.setUploadRequested(listOf(it), true) }
+            }
             transferDao.upsert(
                 transfer.copy(
                     state = TransferState.QUEUED,
                     transferredBytes = 0,
                     errorMessage = null,
-                    retryCount = 0, nextAttemptAt = 0,
+                    retryCount = 0,
+                    retryableFailure = false,
+                    nextAttemptAt = 0,
                     updatedAt = System.currentTimeMillis()
                 )
             )
-            kickWorker()
+            true
         }
+        if (queued) kickWorker()
+    }
+
+    override suspend fun retryFailedBatch(batchId: String?): Int {
+        val retried = outgoingLock.withLock {
+            incomingLock.withLock {
+                database.inImmediateTransaction {
+                    val candidates = transferDao.failedBatchCandidates(batchId)
+                    val now = System.currentTimeMillis()
+                    for (batch in candidates.chunked(SQL_BATCH)) {
+                        transferDao.resetFailedBatch(batch.map { it.id }, now)
+                        val outgoing = batch.filterNot { it.type.isIncoming }.map { it.fileId }.distinct()
+                        if (outgoing.isNotEmpty()) {
+                            fileDao.setUploadRequested(outgoing, true)
+                            outgoing.forEach { fileDao.setBackupStateIfLocalOnly(it, BackupState.QUEUED) }
+                        }
+                    }
+                    candidates
+                }
+            }
+        }
+        if (retried.isNotEmpty()) {
+            kickWorker()
+            retried.mapNotNull { it.backupSessionId }.distinct().forEach { backupSessionTracker.refresh(it) }
+        }
+        return retried.size
     }
 
     override suspend fun clearFinished() {

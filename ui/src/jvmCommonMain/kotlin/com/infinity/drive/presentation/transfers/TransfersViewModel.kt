@@ -5,6 +5,14 @@ import androidx.lifecycle.viewModelScope
 import com.infinity.drive.domain.model.TransferSection
 import com.infinity.drive.domain.model.TransferTask
 import com.infinity.drive.domain.repository.TransferRepository
+import com.infinity.drive.presentation.common.UiText
+import com.infinity.drive.resources.Res
+import com.infinity.drive.resources.transfers_retry_batch_error
+import com.infinity.drive.resources.transfers_retry_batch_none
+import com.infinity.drive.resources.transfers_retry_batch_queued
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -75,6 +83,22 @@ class TransfersViewModel(
     fun cancel(id: String) = launch { transferRepository.cancel(id) }
 
     fun retry(id: String) = launch { transferRepository.retry(id) }
+
+    private val retryResults = Channel<UiText>(Channel.CONFLATED)
+    val retryMessages = retryResults.receiveAsFlow()
+
+    fun retryFailedBatch(batchId: String? = null) = launch {
+        val message = try {
+            val count = transferRepository.retryFailedBatch(batchId)
+            if (count == 0) UiText.Resource(Res.string.transfers_retry_batch_none)
+            else UiText.Resource(Res.string.transfers_retry_batch_queued, count)
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            UiText.Resource(Res.string.transfers_retry_batch_error)
+        }
+        retryResults.trySend(message)
+    }
 
     fun pauseAll() = launch { transferRepository.pauseAll() }
 

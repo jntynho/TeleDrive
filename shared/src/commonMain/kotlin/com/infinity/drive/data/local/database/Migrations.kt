@@ -179,3 +179,10 @@ val MIGRATION_13_14 = object : Migration(13,14) {
         connection.execSQL("ALTER TABLE audio_tags ADD COLUMN inspected INTEGER NOT NULL DEFAULT 1")
     }
 }
+
+val MIGRATION_14_15 = object : Migration(14, 15) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE transfers ADD COLUMN retryableFailure INTEGER NOT NULL DEFAULT 0")
+        connection.execSQL("ALTER TABLE transfers ADD COLUMN uploadBatchId TEXT")
+    }
+}

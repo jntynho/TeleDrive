@@ -247,6 +247,11 @@ interface FileDao {
         AND (messageId IS NULL OR (lower(name) LIKE '%.md' AND backupState != 'BACKED_UP'))""")
     suspend fun setBackupStateIfLocalOnly(id: String, state: BackupState)
 
+    @Query("""UPDATE files SET backupState = 'FAILED' WHERE id = :id
+        AND (messageId IS NULL OR (lower(name) LIKE '%.md' AND backupState != 'BACKED_UP'))
+        AND EXISTS (SELECT 1 FROM transfers WHERE transfers.id = :transferId AND state = 'FAILED')""")
+    suspend fun markLocalFailureIfTransferStillFailed(id: String, transferId: String)
+
     @Query(
         """UPDATE files SET backupState = 'BACKED_UP'
            WHERE messageId IS NOT NULL

@@ -72,8 +72,8 @@ class TransferQueueDrainer(
                                     transferDao.defer(current.id, nowMillis()+seconds*1000L, attempt,
                                         if(serverWait != null) "Waiting for Telegram ($seconds seconds)" else outcome.message, nowMillis())
                                 } else {
-                                    if(transferDao.failRunning(current.id,outcome.message,nowMillis())==1){
-                                        current.fileId?.let { fileDao.setBackupStateIfLocalOnly(it, BackupState.FAILED) }
+                                    if(transferDao.failRunning(current.id, outcome.message, nowMillis(), outcome.retryable)==1){
+                                        current.fileId?.let { fileDao.markLocalFailureIfTransferStillFailed(it, current.id) }
                                         onTerminalFailure(current); refreshSession(current.backupSessionId)
                                     }
                                 }

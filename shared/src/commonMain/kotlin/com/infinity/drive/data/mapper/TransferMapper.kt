@@ -17,5 +17,7 @@ fun TransferEntity.toDomain(): TransferTask = TransferTask(
     stage = stage,
     createdAt = createdAt,
     updatedAt = updatedAt,
-    completedAt = completedAt
+    completedAt = completedAt,
+    batchId = backupSessionId ?: uploadBatchId,
+    retryableFailure = retryableFailure
 )

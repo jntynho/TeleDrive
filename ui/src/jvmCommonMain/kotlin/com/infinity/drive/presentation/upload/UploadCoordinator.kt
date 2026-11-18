@@ -61,9 +61,10 @@ class UploadCoordinator(private val fileRepository:FileRepository,
             var imported=0;var skipped=0;var failed=0
             var apply:Answer?=null
             val pending=mutableListOf<String>()
+            val batchId = java.util.UUID.randomUUID().toString()
             suspend fun flush(){
                 if(pending.isEmpty())return
-                when(val result=transferRepository.enqueueUploads(pending.toList())){
+                when(val result=transferRepository.enqueueUploads(pending.toList(), batchId)){
                     is AppResult.Success -> {imported+=result.value;failed+=pending.size-result.value}
                     is AppResult.Failure -> failed+=pending.size
                 }
