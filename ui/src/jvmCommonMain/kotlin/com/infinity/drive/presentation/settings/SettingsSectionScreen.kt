@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -27,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import com.infinity.drive.presentation.components.PageHeader
+import com.infinity.drive.presentation.common.resolve
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,6 +48,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.infinity.drive.domain.model.AppLanguage
 import com.infinity.drive.resources.collection_hidden_title
 import com.infinity.drive.resources.Res
+import com.infinity.drive.resources.common_cancel
+import com.infinity.drive.resources.library_restore_close
+import com.infinity.drive.resources.library_restore_done
+import com.infinity.drive.resources.library_restore_hint
+import com.infinity.drive.resources.library_restore_pause
+import com.infinity.drive.resources.library_restore_progress
+import com.infinity.drive.resources.library_restore_start
+import com.infinity.drive.resources.library_restore_subtitle
+import com.infinity.drive.resources.library_restore_title
 import com.infinity.drive.resources.recovery_export_auth_prompt
 import com.infinity.drive.resources.recovery_export_subtitle
 import com.infinity.drive.resources.recovery_export_title
@@ -320,6 +331,50 @@ fun SettingsSectionScreen(
     }
 }
 
+@Composable
+private fun LibraryRestoreDialog(
+    state: LibraryRestoreState,
+    onStart: () -> Unit,
+    onPause: () -> Unit,
+    onClose: () -> Unit
+) {
+    val progress = state.progress
+    AlertDialog(
+        onDismissRequest = { if (!state.running) onClose() },
+        title = { Text(stringResource(Res.string.library_restore_title)) },
+        text = {
+            Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(if (state.completed) Res.string.library_restore_done else Res.string.library_restore_hint))
+                if (state.running || state.completed || progress.scanned > 0) {
+                    Text(stringResource(
+                        Res.string.library_restore_progress, progress.scanned, progress.restored, progress.locked
+                    ))
+                }
+                if (state.running) androidx.compose.material3.LinearProgressIndicator(Modifier.fillMaxWidth())
+                state.error?.let { Text(it.resolve(), color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            when {
+                state.running -> TextButton(onClick = onPause) {
+                    Text(stringResource(Res.string.library_restore_pause))
+                }
+                state.completed -> TextButton(onClick = onClose) {
+                    Text(stringResource(Res.string.library_restore_close))
+                }
+                else -> TextButton(onClick = onStart) {
+                    Text(stringResource(Res.string.library_restore_start))
+                }
+            }
+        },
+        dismissButton = {
+            if (!state.running && !state.completed) TextButton(onClick = onClose) {
+                Text(stringResource(Res.string.common_cancel))
+            }
+        }
+    )
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun AccountSection(
@@ -343,6 +398,16 @@ private fun AccountSection(
             openRecovery = false
             openExport()
         }
+    }
+    var showLibraryRestore by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    val libraryRestore by viewModel.libraryRestore.collectAsStateWithLifecycle()
+    if (showLibraryRestore) {
+        LibraryRestoreDialog(
+            state = libraryRestore,
+            onStart = viewModel::restoreLibrary,
+            onPause = viewModel::pauseLibraryRestore,
+            onClose = { showLibraryRestore = false }
+        )
     }
     val indexedSoFar by viewModel.indexedSoFar.collectAsStateWithLifecycle()
     val authorization by viewModel.authorization.collectAsStateWithLifecycle()
@@ -380,6 +445,17 @@ private fun AccountSection(
                 trailing = if (state.syncing) {
                     { LoadingIndicator(modifier = Modifier.size(24.dp)) }
                 } else null
+            )
+        }
+        add {
+            SettingsClickRow(
+                title = stringResource(Res.string.library_restore_title),
+                subtitle = stringResource(Res.string.library_restore_subtitle),
+                enabled = !state.syncing || libraryRestore.running,
+                onClick = {
+                    viewModel.resetLibraryRestore()
+                    showLibraryRestore = true
+                }
             )
         }
         add {

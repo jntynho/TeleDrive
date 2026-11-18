@@ -19,6 +19,15 @@ interface SyncRepository {
      */
     suspend fun fullResync(): AppResult<SyncStats>
 
+    /** Restores missing local entries from the selected drive with a durable cursor. */
+    suspend fun restoreLibrary(onProgress: (RestoreProgress) -> Unit): AppResult<RestoreProgress>
+
+    data class RestoreProgress(
+        val scanned: Int = 0,
+        val restored: Int = 0,
+        val locked: Int = 0
+    )
+
     /** Fetches only messages newer than the last known message id. */
     suspend fun incrementalSync(): AppResult<SyncStats>
 

@@ -1098,15 +1098,15 @@ class DesktopTelegramClient(
         }
 
         val documents = found.messages.mapNotNull { it.toRemoteDocument() }
-        val oldest = found.messages.lastOrNull()?.id ?: 0L
+        val next = found.nextFromMessageId
         SafeLog.d(
             TAG,
             "Page from=$fromMessageId messages=${found.messages.size} " +
-                    "mapped=${documents.size} next=$oldest"
+                    "mapped=${documents.size} next=$next"
         )
         return RemoteDocumentPage(
             documents = documents,
-            nextFromMessageId = if (found.messages.isEmpty()) 0L else oldest
+            nextFromMessageId = next
         )
     }
 

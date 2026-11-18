@@ -110,9 +110,9 @@ class FolderStateSynchronizer(
      * Skipped while local changes wait to publish, so callers should kick
      * the publisher first or a stalled outbox blocks pulling forever.
      */
-    suspend fun pull(): Int {
+    suspend fun pull(selectedChatId: Long? = null): Int {
         if (folderDao.pendingPublishCount() > 0) return 0
-        val chatId = storageChatId()
+        val chatId = selectedChatId ?: storageChatId()
         val document = findStateDocument(chatId) ?: return 0
         var localPath: String? = null
         telegramClient.downloadDocument(document.remoteFileId).collect { event ->
@@ -127,6 +127,7 @@ class FolderStateSynchronizer(
         var restored = 0
         for (entry in state.folders.sortedBy { depthOf(it, state.folders) }) {
             val existing = folderDao.byId(entry.id)
+            if (selectedChatId != null && existing != null) continue
             if (existing != null && existing.modifiedAt >= entry.modifiedAt) continue
             folderDao.upsert(
                 FolderEntity(

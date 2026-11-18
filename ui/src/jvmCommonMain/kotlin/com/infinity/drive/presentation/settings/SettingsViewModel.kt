@@ -55,6 +55,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 import com.infinity.drive.core.update.AppRelease
 import com.infinity.drive.core.update.UpdateChecker
@@ -64,6 +65,13 @@ sealed interface UpdateState {
     data object Checking : UpdateState
     data class Available(val release: AppRelease) : UpdateState
 }
+
+data class LibraryRestoreState(
+    val running: Boolean = false,
+    val progress: SyncRepository.RestoreProgress = SyncRepository.RestoreProgress(),
+    val completed: Boolean = false,
+    val error: UiText? = null
+)
 
 data class SettingsUiState(
     val preferences: UserPreferences = UserPreferences(),
@@ -387,6 +395,41 @@ class SettingsViewModel(
 
     fun dismissUpdate() {
         _updateState.value = UpdateState.Idle
+    }
+
+    private val _libraryRestore = MutableStateFlow(LibraryRestoreState())
+    val libraryRestore = _libraryRestore.asStateFlow()
+    private var libraryRestoreJob: Job? = null
+
+    fun restoreLibrary() {
+        if (libraryRestoreJob?.isActive == true) return
+        _libraryRestore.value = LibraryRestoreState(running = true)
+        libraryRestoreJob = viewModelScope.launch {
+            try {
+                when (val result = syncRepository.restoreLibrary { progress ->
+                    _libraryRestore.value = LibraryRestoreState(running = true, progress = progress)
+                }) {
+                    is AppResult.Success -> {
+                        _libraryRestore.value = LibraryRestoreState(progress = result.value, completed = true)
+                    }
+                    is AppResult.Failure -> {
+                        _libraryRestore.value = _libraryRestore.value.copy(
+                            running = false, error = result.error.toUiText()
+                        )
+                    }
+                }
+            } finally {
+                _libraryRestore.value = _libraryRestore.value.copy(running = false)
+            }
+        }
+    }
+
+    fun pauseLibraryRestore() {
+        libraryRestoreJob?.cancel()
+    }
+
+    fun resetLibraryRestore() {
+        if (libraryRestoreJob?.isActive != true) _libraryRestore.value = LibraryRestoreState()
     }
 
     fun resync() {

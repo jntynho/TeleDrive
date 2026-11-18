@@ -949,4 +949,12 @@
     <string name="transfers_retry_batch_error">Could not requeue failed transfers.</string>
     <string name="transfers_retry_batch_none">No failed transfers are eligible for batch retry.</string>
     <string name="transfers_retry_batch_queued">Transfers requeued: %1$d</string>
+    <string name="library_restore_title">Restore library</string>
+    <string name="library_restore_subtitle">Recover missing files and folders from this drive</string>
+    <string name="library_restore_hint">TeleDrive scans the selected Telegram drive and restores missing library entries. You can continue a paused scan from the last saved page. Restore your encryption key to recover locked items.</string>
+    <string name="library_restore_progress">%1$d documents checked · %2$d entries restored · %3$d locked</string>
+    <string name="library_restore_start">Start or resume</string>
+    <string name="library_restore_pause">Pause</string>
+    <string name="library_restore_close">Close</string>
+    <string name="library_restore_done">Library scan complete.</string>
 </resources>
