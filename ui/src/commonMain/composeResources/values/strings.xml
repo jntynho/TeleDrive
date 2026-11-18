@@ -1008,4 +1008,8 @@
     <string name="files_duplicates_group">%1$d copies · %2$s each</string>
     <string name="files_sort_natural_name">Name with numeric order</string>
     <string name="files_sort_extension">File extension</string>
+    <string name="preview_zip_entry_save">Save entry</string>
+    <string name="preview_zip_entry_saved">ZIP entry saved.</string>
+    <string name="preview_zip_entry_password">ZIP password</string>
+    <string name="preview_zip_entry_error">TeleDrive could not save this ZIP entry. Check the file and its password.</string>
 </resources>

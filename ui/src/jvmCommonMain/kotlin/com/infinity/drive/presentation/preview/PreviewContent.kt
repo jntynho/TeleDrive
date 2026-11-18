@@ -29,13 +29,21 @@ sealed interface PreviewContent {
 
     data class PlainText(val text: String, val truncated: Boolean) : PreviewContent
 
-    data class Archive(val entries: List<ArchiveEntry>, val format: String) : PreviewContent
+    data class Archive(
+        val entries: List<ArchiveEntry>,
+        val format: String,
+        val path: String,
+        val sourceFileId: String
+    ) : PreviewContent
 
     data class ArchiveEntry(
         val name: String,
         val sizeBytes: Long,
         val compressedBytes: Long,
-        val isDirectory: Boolean
+        val isDirectory: Boolean,
+        val index: Int,
+        val isEncrypted: Boolean,
+        val crc: Long
     )
 
     /** Too large to fetch inline; user must download explicitly. */

@@ -32,6 +32,9 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import net.lingala.zip4j.ZipFile
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
 
 /**
  * Turns a [DriveFile] into displayable preview content, fetching remote files
@@ -118,6 +121,7 @@ class PreviewContentResolver(
         val autoFetchable = file.sizeBytes <= AUTO_PREVIEW_LIMIT &&
                 (MimeTypes.isImage(file.mimeType) ||
                         MimeTypes.isText(file.mimeType) ||
+                        file.mimeType == "application/zip" ||
                         MimeTypes.isApk(file.mimeType, file.name))
         if (!autoFetchable) {
             emit(PreviewContent.RequiresDownload(file.sizeBytes))
@@ -129,7 +133,7 @@ class PreviewContentResolver(
         }
         if (cached == null) {
             emit(PreviewContent.Failed(Res.string.preview_fetch_failed))
-        } else {
+        } else if (hiddenAccess.canRead(file.id)) {
             emit(fromLocal(file, cached.absolutePath))
         }
     }
@@ -181,15 +185,21 @@ class PreviewContentResolver(
             return PreviewContent.Unsupported(Res.string.preview_only_zip)
         }
         return runCatching {
-            val entries = ZipFile(path).fileHeaders.map { header ->
-                PreviewContent.ArchiveEntry(
-                    name = header.fileName,
-                    sizeBytes = header.uncompressedSize,
-                    compressedBytes = header.compressedSize,
-                    isDirectory = header.isDirectory
-                )
+            val entries = ZipFile(path).use { zip ->
+                zip.fileHeaders.mapIndexed { index, header ->
+                    check(header.fileName.count { it == '/' } <= MAX_ARCHIVE_DEPTH)
+                    PreviewContent.ArchiveEntry(
+                        name = header.fileName,
+                        sizeBytes = header.uncompressedSize,
+                        compressedBytes = header.compressedSize,
+                        isDirectory = header.isDirectory,
+                        index = index,
+                        isEncrypted = header.isEncrypted,
+                        crc = header.crc
+                    )
+                }
             }
-            PreviewContent.Archive(entries, "ZIP")
+            PreviewContent.Archive(entries, "ZIP", path, file.id)
         }.getOrElse { PreviewContent.Failed(Res.string.preview_archive_failed) }
     }
 
@@ -198,7 +208,10 @@ class PreviewContentResolver(
         onProgress: suspend (Long, Long) -> Unit
     ): File? {
         val previewDir = File(storagePaths.cacheDir, "previews").apply { mkdirs() }
-        val target = File(previewDir, "${file.id}-${file.name}")
+        val revision = listOf(file.id, file.remoteFileId.orEmpty(), file.modifiedAt.toString()).joinToString("\u0000")
+        val cacheName = MessageDigest.getInstance("SHA-256").digest(revision.toByteArray())
+            .joinToString("") { "%02x".format(it) }
+        val target = File(previewDir, cacheName)
         if (target.exists() && target.length() > 0) {
             cacheDao.touch(target.absolutePath, System.currentTimeMillis())
             return target
@@ -216,24 +229,29 @@ class PreviewContentResolver(
             }
         val source = tdlibPath?.let(::File)?.takeIf { it.exists() } ?: return null
 
-        val success = runCatching {
+        val staging = File.createTempFile("preview-", ".tmp", previewDir)
+        val success = try {
             if (file.isEncrypted) {
                 val key = wrappedKeyRepository.get(CryptoKeys.CONTENT)
                     ?: error("Encryption key missing")
                 source.inputStream().buffered().use { input ->
-                    target.outputStream().buffered().use { output ->
+                    staging.outputStream().buffered().use { output ->
                         streamCrypto.decryptStream(key, input, output)
                     }
                 }
             } else {
-                source.copyTo(target, overwrite = true)
+                source.copyTo(staging, overwrite = true)
             }
-        }.isSuccess
-
-        if (!success) {
-            target.delete()
-            return null
+            if (file.sizeBytes > 0 && staging.length() != file.sizeBytes) return null
+            Files.move(staging.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            true
+        } catch (_: java.io.IOException) {
+            false
+        } finally {
+            staging.delete()
         }
+
+        if (!success) return null
         val now = System.currentTimeMillis()
         cacheDao.upsert(
             CacheEntryEntity(
@@ -253,5 +271,6 @@ class PreviewContentResolver(
         private const val TAG = "PreviewContent"
         private const val AUTO_PREVIEW_LIMIT = 10L * 1024 * 1024
         private const val TEXT_LIMIT = 256 * 1024
+        private const val MAX_ARCHIVE_DEPTH = 64
     }
 }

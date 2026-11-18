@@ -120,7 +120,6 @@ import com.infinity.drive.resources.preview_archive_packed_summary_saved
 import com.infinity.drive.resources.preview_chevron
 import com.infinity.drive.resources.preview_confirm_trash_file_message
 import com.infinity.drive.resources.preview_download_view
-import com.infinity.drive.resources.preview_extraction_supported_yet_download
 import com.infinity.drive.resources.preview_file_info
 import com.infinity.drive.resources.preview_move_to_trash
 import com.infinity.drive.resources.preview_no_preview
@@ -602,6 +601,10 @@ private fun previewContentPadding(): PaddingValues =
 private fun ArchiveList(archive: PreviewContent.Archive) {
     val root = remember(archive) { buildArchiveTree(archive.entries) }
     var expanded by remember(archive) { mutableStateOf(emptySet<String>()) }
+    var selectedEntry by remember(archive) { mutableStateOf<PreviewContent.ArchiveEntry?>(null) }
+    selectedEntry?.let { entry ->
+        ArchiveEntrySaveDialog(archive, entry, onClose = { selectedEntry = null })
+    }
     val rows = remember(root, expanded) { flattenArchive(root, expanded) }
     val files = remember(archive) { archive.entries.filterNot { it.isDirectory } }
     val folderCount = remember(root) { countFolders(root) }
@@ -684,7 +687,10 @@ private fun ArchiveList(archive: PreviewContent.Archive) {
             ArchiveRow(
                 row = row,
                 onToggle = {
-                    expanded = if (row.node.path in expanded) {
+                    val entry = row.node.entry
+                    if (entry != null) {
+                        selectedEntry = entry
+                    } else expanded = if (row.node.path in expanded) {
                         expanded - row.node.path
                     } else {
                         expanded + row.node.path
@@ -698,14 +704,6 @@ private fun ArchiveList(archive: PreviewContent.Archive) {
                         visibilityThreshold = IntOffset.VisibilityThreshold
                     )
                 )
-            )
-        }
-        item {
-            Text(
-                text = stringResource(Res.string.preview_extraction_supported_yet_download),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 16.dp)
             )
         }
     }
@@ -736,7 +734,7 @@ private fun ArchiveRow(
             .padding(start = INDENT_STEP * row.depth)
             .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .then(if (node.isDirectory) Modifier.clickable { onToggle() } else Modifier)
+            .clickable(onClick = onToggle)
             .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
         Box(
@@ -819,13 +817,15 @@ private fun buildArchiveTree(entries: List<PreviewContent.ArchiveEntry>): Archiv
         var current = root
         segments.forEachIndexed { index, segment ->
             val leaf = index == segments.lastIndex && !entry.isDirectory
-            val path = if (current.path.isEmpty()) segment else current.path + SEPARATOR + segment
-            val child = current.children.getOrPut(segment) {
+            val key = if (leaf) "file-${entry.index}" else "folder-$segment"
+            val path = if (current.path.isEmpty()) key else current.path + SEPARATOR + key
+            val child = current.children.getOrPut(key) {
                 ArchiveNode(path = path, name = segment, isDirectory = !leaf)
             }
             if (leaf) {
                 child.sizeBytes = entry.sizeBytes
                 child.compressedBytes = entry.compressedBytes
+                child.entry = entry
             }
             current = child
         }
@@ -877,6 +877,7 @@ private class ArchiveNode(
     val isDirectory: Boolean,
     var sizeBytes: Long = 0,
     var compressedBytes: Long = 0,
+    var entry: PreviewContent.ArchiveEntry? = null,
     val children: LinkedHashMap<String, ArchiveNode> = LinkedHashMap()
 )
 
