@@ -34,6 +34,7 @@ val repositoryModule = module {
     single<TelegramAuthRepository> { TelegramAuthRepositoryImpl(get(), get(), get(), getOrNull()) }
     singleOf(::ProxyRepositoryImpl) bind ProxyRepository::class
     singleOf(::SyncRepositoryImpl) bind SyncRepository::class
+    singleOf(::DriveIntegrityChecker)
     singleOf(::ChannelRepositoryImpl) bind ChannelRepository::class
     singleOf(::CacheRepositoryImpl) bind CacheRepository::class
     singleOf(::KeyBackupRepositoryImpl) bind KeyBackupRepository::class

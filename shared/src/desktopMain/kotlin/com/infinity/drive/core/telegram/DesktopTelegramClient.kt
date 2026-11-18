@@ -1131,6 +1131,12 @@ class DesktopTelegramClient(
         runCatching { send(TdApi.GetMessage(chatId, messageId)).toRemoteDocument() }
             .getOrNull()
 
+    override suspend fun getDocuments(chatId: Long, messageIds: List<Long>): List<RemoteDocument> {
+        require(messageIds.size in 1..100)
+        val response = send(TdApi.GetMessages(chatId, messageIds.toLongArray()))
+        return response.messages.mapNotNull { it?.toRemoteDocument() }
+    }
+
     override suspend fun editCaption(chatId: Long, messageId: Long, caption: String) {
         paced {
             send(

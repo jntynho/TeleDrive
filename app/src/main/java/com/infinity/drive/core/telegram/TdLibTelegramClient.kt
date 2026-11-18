@@ -1312,6 +1312,12 @@ internal class TdLibTelegramClient(
         runCatching { send(TdApi.GetMessage(chatId, messageId)).toRemoteDocument() }
             .getOrNull()
 
+    override suspend fun getDocuments(chatId: Long, messageIds: List<Long>): List<RemoteDocument> {
+        require(messageIds.size in 1..100)
+        val response = send(TdApi.GetMessages(chatId, messageIds.toLongArray()))
+        return response.messages.mapNotNull { it?.toRemoteDocument() }
+    }
+
     override suspend fun listChats(query:String):List<TelegramChat> {
         val ids=if(query.isNotBlank()) send<TdApi.Chats>(TdApi.SearchChats(query,null,100)).chatIds else {
             runCatching { send<TdApi.Ok>(TdApi.LoadChats(TdApi.ChatListMain(),100)) }

@@ -24,6 +24,7 @@ import com.infinity.drive.core.telegram.TelegramConnectionState
 import com.infinity.drive.core.telegram.TelegramUser
 import com.infinity.drive.core.transfer.MaintenanceScheduler
 import com.infinity.drive.core.transfer.TransferScheduler
+import com.infinity.drive.data.repository.DriveIntegrityChecker
 import com.infinity.drive.data.repository.LocalDataWiper
 import com.infinity.drive.domain.model.BackupTrigger
 import com.infinity.drive.domain.model.UserPreferences
@@ -98,6 +99,7 @@ class SettingsViewModel(
     private val maintenanceScheduler: MaintenanceScheduler,
     private val transferScheduler: TransferScheduler,
     val permissionChecker: PermissionChecker,
+    private val integrityChecker: DriveIntegrityChecker,
     private val updateChecker: UpdateChecker
 ) : ViewModel() {
 
@@ -430,6 +432,37 @@ class SettingsViewModel(
 
     fun resetLibraryRestore() {
         if (libraryRestoreJob?.isActive != true) _libraryRestore.value = LibraryRestoreState()
+    }
+
+    private val _integrity = MutableStateFlow(IntegrityUiState())
+    internal val integrity = _integrity.asStateFlow()
+    private var integrityJob: Job? = null
+
+    fun checkDriveIntegrity(sample: Boolean) {
+        if (integrityJob?.isActive == true) return
+        _integrity.value = IntegrityUiState(running = true)
+        integrityJob = viewModelScope.launch {
+            try {
+                when (val result = integrityChecker.check(sample) { report ->
+                    _integrity.value = IntegrityUiState(running = true, report = report)
+                }) {
+                    is AppResult.Success -> _integrity.value = IntegrityUiState(report = result.value, complete = true)
+                    is AppResult.Failure -> _integrity.value = _integrity.value.copy(
+                        running = false, error = result.error.toUiText()
+                    )
+                }
+            } finally {
+                _integrity.value = _integrity.value.copy(running = false)
+            }
+        }
+    }
+
+    fun stopIntegrityCheck() {
+        integrityJob?.cancel()
+    }
+
+    fun resetIntegrityCheck() {
+        if (integrityJob?.isActive != true) _integrity.value = IntegrityUiState()
     }
 
     fun resync() {

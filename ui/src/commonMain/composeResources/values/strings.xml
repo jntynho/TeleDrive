@@ -957,4 +957,12 @@
     <string name="library_restore_pause">Pause</string>
     <string name="library_restore_close">Close</string>
     <string name="library_restore_done">Library scan complete.</string>
+    <string name="drive_integrity_title">Check drive integrity</string>
+    <string name="drive_integrity_subtitle">Verify the Telegram copies indexed in this drive</string>
+    <string name="drive_integrity_hint">TeleDrive checks file references and missing or inconsistent parts in the selected drive.</string>
+    <string name="drive_integrity_sample">Verify the contents of up to 8 samples (up to 64 MB)</string>
+    <string name="drive_integrity_start">Run check</string>
+    <string name="drive_integrity_progress">%1$d checked · %2$d available · %3$d missing · %4$d inconsistent</string>
+    <string name="drive_integrity_details">%1$d unverified · %2$d need the encryption key · %3$d samples verified</string>
+    <string name="drive_integrity_problems">Some files to review</string>
 </resources>

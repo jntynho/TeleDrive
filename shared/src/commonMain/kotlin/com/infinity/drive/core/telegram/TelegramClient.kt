@@ -180,6 +180,9 @@ interface TelegramClient {
 
     suspend fun getDocument(chatId: Long, messageId: Long): RemoteDocument?
 
+    /** Looks up at most 100 messages in one chat, propagating a failed request. */
+    suspend fun getDocuments(chatId: Long, messageIds: List<Long>): List<RemoteDocument>
+
     suspend fun listChats(query:String=""):List<TelegramChat> = emptyList()
     fun copyMessageEvents(chatId:Long,fromChatId:Long,messageId:Long,caption:String):Flow<TelegramUploadEvent> = kotlinx.coroutines.flow.flow { emit(TelegramUploadEvent.Completed(copyMessage(chatId,fromChatId,messageId,caption))) }
     suspend fun copyMessage(chatId:Long,fromChatId:Long,messageId:Long,caption:String):RemoteDocument = error("Copying chat messages is unavailable")

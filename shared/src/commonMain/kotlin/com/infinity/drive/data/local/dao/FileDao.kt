@@ -369,6 +369,16 @@ interface FileDao {
     @Query("SELECT * FROM files WHERE messageId IS NOT NULL")
     suspend fun filesWithRemote(): List<FileEntity>
 
+    @Query(
+        """SELECT f.* FROM files f
+           WHERE f.id > :afterId AND f.trashedAt IS NULL AND
+             ((f.chatId = :chatId AND (f.messageId IS NOT NULL OR f.partCount > 0)) OR
+              (f.chatId IS NULL AND EXISTS (
+                 SELECT 1 FROM file_parts p WHERE p.fileId = f.id AND p.chatId = :chatId)))
+           ORDER BY f.id LIMIT :limit"""
+    )
+    suspend fun integrityPage(chatId: Long, afterId: String, limit: Int): List<FileEntity>
+
     @Query("SELECT localPath FROM files WHERE localPath IS NOT NULL")
     suspend fun allLocalPaths(): List<String>
 

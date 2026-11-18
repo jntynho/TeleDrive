@@ -57,6 +57,8 @@ import com.infinity.drive.resources.library_restore_progress
 import com.infinity.drive.resources.library_restore_start
 import com.infinity.drive.resources.library_restore_subtitle
 import com.infinity.drive.resources.library_restore_title
+import com.infinity.drive.resources.drive_integrity_subtitle
+import com.infinity.drive.resources.drive_integrity_title
 import com.infinity.drive.resources.recovery_export_auth_prompt
 import com.infinity.drive.resources.recovery_export_subtitle
 import com.infinity.drive.resources.recovery_export_title
@@ -409,6 +411,16 @@ private fun AccountSection(
             onClose = { showLibraryRestore = false }
         )
     }
+    var showIntegrity by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    val integrity by viewModel.integrity.collectAsStateWithLifecycle()
+    if (showIntegrity) {
+        DriveIntegrityDialog(
+            state = integrity,
+            onStart = viewModel::checkDriveIntegrity,
+            onStop = viewModel::stopIntegrityCheck,
+            onClose = { showIntegrity = false }
+        )
+    }
     val indexedSoFar by viewModel.indexedSoFar.collectAsStateWithLifecycle()
     val authorization by viewModel.authorization.collectAsStateWithLifecycle()
 
@@ -455,6 +467,17 @@ private fun AccountSection(
                 onClick = {
                     viewModel.resetLibraryRestore()
                     showLibraryRestore = true
+                }
+            )
+        }
+        add {
+            SettingsClickRow(
+                title = stringResource(Res.string.drive_integrity_title),
+                subtitle = stringResource(Res.string.drive_integrity_subtitle),
+                enabled = !state.syncing || integrity.running,
+                onClick = {
+                    viewModel.resetIntegrityCheck()
+                    showIntegrity = true
                 }
             )
         }
