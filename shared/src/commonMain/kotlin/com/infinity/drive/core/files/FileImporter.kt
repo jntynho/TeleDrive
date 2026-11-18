@@ -10,6 +10,9 @@ interface FileImporter {
     fun import(reference: String): ImportedFile?
     fun describe(reference:String):ImportedFile? = import(reference)
     suspend fun prepare(reference:String,onProgress:suspend()->Unit):ImportedFile? {onProgress();return import(reference)}
+    suspend fun prepare(reference: String, importId: String, onProgress: suspend () -> Unit): ImportedFile? =
+        prepare(reference, onProgress)
+
 
     /**
      * Splits a picked reference into the files to import. A folder yields one
@@ -29,4 +32,6 @@ interface FileImporter {
 
     /** Deletes staged copies that no drive row references. */
     fun sweepOrphans(referencedPaths: Set<String>)
+    fun sweepOrphans(referencedPaths: Set<String>, pendingImportIds: Set<String>) =
+        sweepOrphans(referencedPaths)
 }

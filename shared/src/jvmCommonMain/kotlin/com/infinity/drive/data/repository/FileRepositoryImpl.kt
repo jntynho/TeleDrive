@@ -110,7 +110,7 @@ class FileRepositoryImpl(
                 File(ref.localPath).delete()
                 fileDao.setLocalPath(ref.id, null)
             }
-        fileImporter.sweepOrphans(fileDao.allLocalPaths().toSet())
+        fileImporter.sweepOrphans(fileDao.allLocalPaths().toSet(), fileDao.pendingImportIds().toSet())
     }
 
     override fun pagedFiles(spec: FileQuerySpec): Flow<PagingData<DriveFile>> =

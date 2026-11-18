@@ -424,6 +424,9 @@ interface FileDao {
     @Query("SELECT localPath FROM files WHERE localPath IS NOT NULL")
     suspend fun allLocalPaths(): List<String>
 
+    @Query("SELECT id FROM files WHERE importReference IS NOT NULL AND localPath IS NULL AND uploadRequested = 1 AND trashedAt IS NULL")
+    suspend fun pendingImportIds(): List<String>
+
     @Query(
         """SELECT COALESCE(SUM(sizeBytes), 0) FROM files
            WHERE localPath IS NOT NULL

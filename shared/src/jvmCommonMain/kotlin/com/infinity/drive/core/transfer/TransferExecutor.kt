@@ -141,7 +141,7 @@ class TransferExecutor(
         if(entity.localPath==null&&entity.importReference!=null){
             transferDao.setStage(transfer.id,TransferStage.PREPARING,System.currentTimeMillis())
             var lastControlCheck=0L
-            val prepared=fileImporter.prepare(entity.importReference!!){
+            val prepared=fileImporter.prepare(entity.importReference!!, entity.id) {
                 currentCoroutineContext().ensureActive()
                 val now=System.currentTimeMillis()
                 if(now-lastControlCheck>=250){checkControl(transfer.id);lastControlCheck=now}

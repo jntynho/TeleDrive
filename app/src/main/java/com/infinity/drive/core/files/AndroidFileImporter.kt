@@ -65,6 +65,36 @@ class AndroidFileImporter(
         }catch(error:Throwable){target.delete();preparingPaths.remove(target.absolutePath);directory.delete();throw error}
     }
 
+    override suspend fun prepare(reference: String, importId: String, onProgress: suspend () -> Unit): ImportedFile? {
+        onProgress()
+        val direct = File(reference).takeIf { it.isFile && it.canRead() }
+            ?: runCatching { readablePath(Uri.parse(reference)) }.getOrNull()
+        if (direct != null) return ImportedFile(direct.absolutePath, direct.name, direct.length())
+        val original = describe(reference) ?: return null
+        val directory = File(File(storagePaths.filesDir, RESUME_DIR), checkpointName(importId)).apply { mkdirs() }
+        val partial = File(directory, "partial")
+        val complete = File(directory, "prepared")
+        reserve(partial.path)
+        reserve(complete.path)
+        try {
+            // A crash between completing the copy and recording its new path can
+            // resume at the end after verifying the retained bytes.
+            if (complete.isFile) java.nio.file.Files.move(
+                complete.toPath(), partial.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING
+            )
+            CheckpointedImport.copy(partial, original.sizeBytes, open = {
+                context.contentResolver.openInputStream(Uri.parse(reference))
+                    ?: throw java.io.IOException("The selected document could not be opened")
+            }, onProgress = onProgress)
+            java.nio.file.Files.move(partial.toPath(), complete.toPath(),
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            return ImportedFile(complete.absolutePath, original.name, complete.length(), original.mimeType)
+        } finally {
+            preparingPaths.remove(partial.path)
+            if (!complete.exists()) preparingPaths.remove(complete.path)
+        }
+    }
+
     private fun import(uri: Uri): ImportedFile? {
         if (uri.scheme == ContentResolver.SCHEME_FILE) {
             val direct = uri.path?.let(::File)?.takeIf { it.isFile }
@@ -138,7 +168,10 @@ class AndroidFileImporter(
     override fun registered(path:String) {preparingPaths.remove(path)}
 
     override fun isStaged(path: String): Boolean =
-        runCatching { File(path).canonicalFile.toPath().startsWith(File(storagePaths.filesDir,IMPORT_DIR).canonicalFile.toPath()) }.getOrDefault(false)
+        runCatching {
+            val canonical = File(path).canonicalFile.toPath()
+            listOf(IMPORT_DIR, RESUME_DIR).any { canonical.startsWith(File(storagePaths.filesDir, it).canonicalFile.toPath()) }
+        }.getOrDefault(false)
 
     override fun sweepOrphans(referencedPaths: Set<String>) {
         val root=File(storagePaths.filesDir,IMPORT_DIR)
@@ -149,6 +182,25 @@ class AndroidFileImporter(
             else if(file.isDirectory && file!=root && file.list()?.isEmpty()==true)file.delete()
         }
     }
+
+    override fun sweepOrphans(referencedPaths: Set<String>, pendingImportIds: Set<String>) {
+        sweepOrphans(referencedPaths)
+        val active = pendingImportIds.mapTo(mutableSetOf(), ::checkpointName)
+        val root = File(storagePaths.filesDir, RESUME_DIR)
+        for (directory in root.listFiles().orEmpty()) {
+            if (directory.name in active) continue
+            val cutoff = System.currentTimeMillis() - ORPHAN_GRACE_MS
+            for (file in directory.listFiles().orEmpty()) {
+                if (file.path !in preparingPaths && file.path !in referencedPaths && file.lastModified() < cutoff) {
+                    file.delete()
+                }
+            }
+            if (directory.list()?.isEmpty() == true) directory.delete()
+        }
+    }
+
+    private fun checkpointName(importId: String): String =
+        java.util.UUID.nameUUIDFromBytes(importId.toByteArray()).toString()
 
     /**
      * SAF providers do not always expose a real filesystem path. Walk the tree
@@ -206,5 +258,7 @@ class AndroidFileImporter(
     companion object {
         private const val TAG = "FileImporter"
         private const val IMPORT_DIR = "imports"
+        private const val RESUME_DIR = "resumable-imports"
+        private const val ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000L
     }
 }
