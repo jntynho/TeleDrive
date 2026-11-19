@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -150,7 +151,7 @@ internal fun RecoveryExportScreen(onBack: () -> Unit) {
         ) {
             if (!saved) {
                 Text(
-                    stringResource(Res.string.recovery_export_instructions),
+                    stringResource(Res.string.recovery_export_instructions, LoginRecoveryFile.MIN_PASSPHRASE_LENGTH),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -162,8 +163,7 @@ internal fun RecoveryExportScreen(onBack: () -> Unit) {
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                 Button(
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = editable && match && passphrase.isNotBlank() &&
-                        passphrase.length >= LoginRecoveryFile.MIN_PASSPHRASE_LENGTH,
+                    enabled = editable && match && LoginRecoveryFile.isValidPassphrase(passphrase),
                     onClick = {
                         if (!busy && pendingFile == null) {
                             busy = true
@@ -222,6 +222,8 @@ internal fun RecoveryPassphraseField(
     label: StringResource,
     enabled: Boolean
 ) {
+    var revealed by remember(enabled) { mutableStateOf(false) }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { revealed = false }
     OutlinedTextField(
         value = value,
         onValueChange = { onChange(it.take(LoginRecoveryFile.MAX_PASSPHRASE_LENGTH)) },
@@ -229,7 +231,15 @@ internal fun RecoveryPassphraseField(
         modifier = Modifier.fillMaxWidth(),
         enabled = enabled,
         singleLine = true,
-        visualTransformation = PasswordVisualTransformation(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+        visualTransformation = if (revealed) VisualTransformation.None else PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
+        trailingIcon = {
+            IconButton(onClick = { revealed = !revealed }, enabled = enabled) {
+                Icon(
+                    if (revealed) DriveIcons.VisibilityOff else DriveIcons.Visibility,
+                    stringResource(if (revealed) Res.string.recovery_hide_password else Res.string.recovery_show_password)
+                )
+            }
+        }
     )
 }

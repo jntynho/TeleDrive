@@ -2,6 +2,7 @@ package com.infinity.drive.core.crypto
 
 import com.infinity.drive.core.telegram.TelegramLoginRecovery
 import java.nio.ByteBuffer
+import java.nio.CharBuffer
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
@@ -11,7 +12,7 @@ import org.bouncycastle.crypto.params.Argon2Parameters
 
 /** Version 1: authenticated magic/version, 16-byte salt, 12-byte nonce, ciphertext and GCM tag. */
 internal object LoginRecoveryFile {
-    const val MIN_PASSPHRASE_LENGTH = 16
+    const val MIN_PASSPHRASE_LENGTH = 4
     const val MAX_PASSPHRASE_LENGTH = 256
     const val FILE_NAME = "TeleDrive-recovery.tgdr"
 
@@ -26,8 +27,13 @@ internal object LoginRecoveryFile {
     private val random = SecureRandom()
     private val magic = byteArrayOf('T'.code.toByte(), 'G'.code.toByte(), 'D'.code.toByte(), 'R'.code.toByte(), 1)
 
+    fun isValidPassphrase(passphrase: CharSequence): Boolean =
+        passphrase.length in MIN_PASSPHRASE_LENGTH..MAX_PASSPHRASE_LENGTH &&
+            Character.codePointCount(passphrase, 0, passphrase.length) >= MIN_PASSPHRASE_LENGTH &&
+            passphrase.isNotBlank()
+
     fun encrypt(recovery: TelegramLoginRecovery, passphrase: CharArray): ByteArray {
-        require(passphrase.size in MIN_PASSPHRASE_LENGTH..MAX_PASSPHRASE_LENGTH && passphrase.any { !it.isWhitespace() })
+        require(isValidPassphrase(CharBuffer.wrap(passphrase)))
         val phone = recovery.phoneNumber.encodeToByteArray()
         val token = recovery.token.encodeToByteArray()
         val key = ByteArray(32)
@@ -60,7 +66,7 @@ internal object LoginRecoveryFile {
     }
 
     fun decrypt(file: ByteArray, passphrase: CharArray): TelegramLoginRecovery {
-        require(passphrase.size in MIN_PASSPHRASE_LENGTH..MAX_PASSPHRASE_LENGTH)
+        require(isValidPassphrase(CharBuffer.wrap(passphrase)))
         val saltEnd = magic.size + SALT_SIZE
         val headerEnd = saltEnd + NONCE_SIZE
         require(file.size in (headerEnd + PAYLOAD_PREFIX_SIZE + 2 + TAG_SIZE)..MAX_FILE_SIZE)

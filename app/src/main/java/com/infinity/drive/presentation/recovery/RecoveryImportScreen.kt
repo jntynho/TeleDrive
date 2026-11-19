@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -88,8 +89,9 @@ internal fun RecoveryImportScreen(onBack: () -> Unit, onImport: (TelegramLoginRe
                 if (invalid) {
                     Text(stringResource(Res.string.recovery_import_invalid), color = MaterialTheme.colorScheme.error)
                 }
+                if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                 Button(
-                    enabled = document != null && !busy && password.length >= LoginRecoveryFile.MIN_PASSPHRASE_LENGTH,
+                    enabled = document != null && !busy && LoginRecoveryFile.isValidPassphrase(password),
                     modifier = Modifier.fillMaxWidth(),
                     onClick = {
                         val uri = document ?: return@Button

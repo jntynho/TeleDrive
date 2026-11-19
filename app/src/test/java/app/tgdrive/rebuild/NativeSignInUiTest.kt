@@ -1,15 +1,21 @@
 package app.tgdrive.rebuild
 
+import android.app.Activity
 import android.app.Application
+import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.ViewModelStore
 import com.infinity.drive.core.common.AppResult
 import com.infinity.drive.core.crypto.CredentialCipher
+import com.infinity.drive.core.crypto.LoginRecoveryFile
 import com.infinity.drive.core.telegram.*
 import com.infinity.drive.domain.model.*
 import com.infinity.drive.domain.repository.*
@@ -28,6 +34,7 @@ import org.koin.dsl.module
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.controller.ActivityController
 import org.robolectric.annotation.*
 import java.lang.reflect.Proxy
@@ -110,6 +117,42 @@ class NativeSignInUiTest {
         compose.onNodeWithText("Open recovery file", substring = false).assertIsNotEnabled()
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Get started", substring = false).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test fun recoveryFileOpensWithFourDigitsAndPasswordVisibilityCanBeToggled() {
+        val phone = "+447700900123"
+        val uri = Uri.parse("content://recovery.test/backup.tgdr")
+        val bytes = LoginRecoveryFile.encrypt(TelegramLoginRecovery(42, phone, "test-token"), "1234".toCharArray())
+        shadowOf(activity.get().contentResolver).registerInputStream(uri, bytes.inputStream())
+
+        compose.onNodeWithText("Restore sign-in from file", substring = false).performScrollTo().performClick()
+        compose.onNodeWithText("Choose recovery file", substring = false).performClick()
+        compose.runOnIdle {
+            val picker = shadowOf(activity.get())
+            val request = picker.nextStartedActivityForResult
+            assertEquals(Intent.ACTION_OPEN_DOCUMENT, request.intent.action)
+            activity.get().activityResultRegistry.dispatchResult(request.requestCode, Activity.RESULT_OK, Intent().setData(uri))
+        }
+        compose.onNodeWithText("Recovery file selected", substring = false).assertIsDisplayed()
+
+        val field = compose.onNode(hasSetTextAction())
+        field.performTextInput("123")
+        val open = compose.onNodeWithText("Open recovery file", substring = false)
+        open.assertIsNotEnabled()
+        field.performTextInput("4")
+        open.assertIsEnabled()
+
+        val masked = SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("••••"))
+        field.assert(masked)
+        compose.onNodeWithContentDescription("Show password").performClick()
+        field.assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("1234")))
+        compose.onNodeWithContentDescription("Hide password").performClick()
+        field.assert(masked)
+
+        open.performClick()
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithText("Continue with account ending in ••••0123").fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     @Test fun nativePhoneAndCodeEditorsSupportPasteAndImeSubmissionWithoutAnEmbeddedKeyboard(){

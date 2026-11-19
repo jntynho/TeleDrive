@@ -11,11 +11,36 @@ import org.bouncycastle.crypto.params.Argon2Parameters
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LoginRecoveryFileTest {
     private val recovery = TelegramLoginRecovery(1234, "+00000000000", "synthetic-test-token")
     private val passphrase = "rain river cedar morning".toCharArray()
+
+    @Test
+    fun acceptsFourDigitsAndRejectsShortOrBlankPasswords() {
+        val pin = "1234".toCharArray()
+        val file = LoginRecoveryFile.encrypt(recovery, pin)
+        val restored = LoginRecoveryFile.decrypt(file, pin)
+        assertEquals(recovery.accountId, restored.accountId)
+        assertEquals(recovery.phoneNumber, restored.phoneNumber)
+        assertEquals(recovery.token, restored.token)
+        assertTrue(LoginRecoveryFile.isValidPassphrase("١٢٣٤"))
+
+        for (invalid in listOf("123", "    ", "🔐🔐")) {
+            assertFalse(LoginRecoveryFile.isValidPassphrase(invalid))
+            assertThrows(IllegalArgumentException::class.java) {
+                LoginRecoveryFile.encrypt(recovery, invalid.toCharArray())
+            }
+            assertThrows(IllegalArgumentException::class.java) {
+                LoginRecoveryFile.decrypt(file, invalid.toCharArray())
+            }
+        }
+        assertThrows(AEADBadTagException::class.java) {
+            LoginRecoveryFile.decrypt(file, "4321".toCharArray())
+        }
+    }
 
     @Test
     fun restoresOnlyTheEncryptedAccountAndToken() {
