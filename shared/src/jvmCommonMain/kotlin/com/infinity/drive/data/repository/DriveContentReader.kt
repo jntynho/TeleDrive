@@ -8,6 +8,7 @@ import com.infinity.drive.core.telegram.TelegramClient
 import com.infinity.drive.core.telegram.TelegramDownloadEvent
 import com.infinity.drive.data.local.dao.FilePartDao
 import com.infinity.drive.data.local.entity.FileEntity
+import com.infinity.drive.data.local.entity.FilePartEntity
 import kotlinx.coroutines.ensureActive
 import java.io.File
 import java.io.IOException
@@ -22,10 +23,15 @@ class DriveContentReader(
     private val keys: WrappedKeyRepository,
     private val crypto: StreamCrypto
 ) {
-    suspend fun copyRemote(file: FileEntity, output: OutputStream, checkAccess: suspend () -> Unit): String {
+    suspend fun copyRemote(file: FileEntity, output: OutputStream, checkAccess: suspend () -> Unit): String =
+        copyRemote(file, output, if (file.partCount > 0) parts.partsOf(file.id) else emptyList(), checkAccess)
+
+    internal suspend fun copyRemote(
+        file: FileEntity, output: OutputStream, revisions: List<FilePartEntity>, checkAccess: suspend () -> Unit
+    ): String {
         checkAccess()
         val chat = file.chatId ?: throw IOException("No remote copy")
-        val layout = layoutFor(chat, file, if (file.partCount > 0) parts.partsOf(file.id) else emptyList())
+        val layout = layoutFor(chat, file, revisions)
             ?: throw IOException("Incomplete remote layout")
         val documents = layout.map { it.messageId }.distinct().chunked(100)
             .flatMap { telegram.getDocuments(chat, it) }.associateBy { it.messageId }

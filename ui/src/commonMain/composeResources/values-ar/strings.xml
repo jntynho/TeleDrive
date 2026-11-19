@@ -159,4 +159,11 @@
     <string name="files_zip_select">اختيار الملفات</string>
     <string name="files_zip_preparing">جارٍ ضغط الملفات المحددة…</string>
     <string name="files_zip_failed">تعذّر ضغط الملفات المحددة أو إضافتها إلى قائمة الرفع.</string>
+    <string name="versions_title">سجل الإصدارات</string>
+    <string name="versions_error">تعذّر إتمام عملية الإصدار. تحقّق من الاتصال ونوع الملف.</string>
+    <string name="versions_empty">لا توجد إصدارات سابقة محفوظة.</string>
+    <string name="versions_replace">الاستبدال بإصدار جديد</string>
+    <string name="versions_restore">استعادة</string>
+    <string name="versions_restore_message">استعادة محتوى هذا الإصدار كإصدار جديد؟ تُحفظ النسخة الاحتياطية الحالية في السجل.</string>
+    <string name="versions_done">تم</string>
 </resources>

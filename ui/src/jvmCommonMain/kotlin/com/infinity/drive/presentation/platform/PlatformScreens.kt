@@ -21,6 +21,15 @@ interface PlatformScreens {
     @Composable
     fun RecoveryExport(onBack: () -> Unit) = Unit
 
+    @Composable
+    fun AccountProfilesSetting(compact: Boolean = false) = Unit
+
+    @Composable
+    fun WorkspacesSetting() = Unit
+
+    @Composable
+    fun FolderSyncSetting() = Unit
+
     val supportsPublicLinks: Boolean get() = false
 
     @Composable

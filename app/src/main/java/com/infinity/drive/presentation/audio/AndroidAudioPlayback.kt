@@ -1,5 +1,7 @@
 package com.infinity.drive.presentation.audio
 
+import com.infinity.drive.core.accounts.DeviceAccounts
+
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -432,7 +434,7 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
         }
     }
 
-    private val sessionPrefs by lazy { appContext.getSharedPreferences("audio-playback-session",Context.MODE_PRIVATE) }
+    private val sessionPrefs by lazy { appContext.getSharedPreferences(DeviceAccounts.scoped("audio-playback-session"),Context.MODE_PRIVATE) }
     private suspend fun restoreSession(chatId:Long?){
         if(mutable.value.file!=null)return
         val saved=withContext(ioDispatcher){

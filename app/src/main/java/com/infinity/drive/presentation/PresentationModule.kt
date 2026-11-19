@@ -1,6 +1,8 @@
 package com.infinity.drive.presentation
 
 import com.infinity.drive.presentation.hidden.HiddenLockViewModel
+import com.infinity.drive.presentation.sync.AndroidFolderSync
+import com.infinity.drive.presentation.workspaces.AndroidWorkspaces
 import com.infinity.drive.presentation.gallery.AndroidPhotoHistory
 import com.infinity.drive.presentation.sharing.AndroidPublicLinks
 import com.infinity.drive.presentation.sharing.ReceivedRequestIntake
@@ -29,5 +31,7 @@ val presentationModule = module {
     singleOf(::ReceivedRequestIntake)
     single { AndroidPublicLinks(androidContext(), get(), get(), get(), get(), get(), get(), get()) }
     single { AndroidPhotoHistory(androidContext(), get(), get(), get(), get(), get()) }
+    single { AndroidWorkspaces(androidContext(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    single { AndroidFolderSync(androidContext(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     includes(sharedUiModule)
 }

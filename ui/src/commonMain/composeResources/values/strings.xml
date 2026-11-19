@@ -1112,4 +1112,11 @@
     <string name="files_zip_select">Select files</string>
     <string name="files_zip_preparing">Compressing selected files…</string>
     <string name="files_zip_failed">Couldn’t compress or queue the selected files.</string>
+    <string name="versions_title">Version history</string>
+    <string name="versions_error">The version operation could not finish. Check the connection and file type.</string>
+    <string name="versions_empty">No previous saved versions.</string>
+    <string name="versions_replace">Replace with a new version</string>
+    <string name="versions_restore">Restore</string>
+    <string name="versions_restore_message">Restore these bytes as the next version? The current backed-up version stays in history.</string>
+    <string name="versions_done">Done</string>
 </resources>

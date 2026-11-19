@@ -36,6 +36,7 @@ val repositoryModule = module {
     singleOf(::SyncRepositoryImpl) bind SyncRepository::class
     singleOf(::DriveIntegrityChecker)
     singleOf(::DriveContentReader)
+    singleOf(::TelegramFileVersions)
     singleOf(::VerifiedLocalCleanup)
     singleOf(::FolderArchiveExporter)
     singleOf(::ChannelRepositoryImpl) bind ChannelRepository::class

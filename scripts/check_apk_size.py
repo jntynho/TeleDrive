@@ -25,7 +25,12 @@ def main(paths):
             seen.add(abi)
             if f"lib/{abi}/libtdjni.so" not in names:
                 raise SystemExit(f"Telegram native library is missing: {path.name}")
-            forbidden = [name for name in names if ("mlkit" in name.lower() and name != "play-services-mlkit-document-scanner.properties") or "ocr-models" in name.lower() or name.endswith("libsqliteJni.so")]
+            forbidden = [
+                name for name in names
+                if "ocr-models" in name.lower()
+                or name.endswith(("libsqliteJni.so", "libmlkit_google_ocr_pipeline.so"))
+                or (name.startswith("assets/") and "mlkit" in name.lower())
+            ]
             if forbidden:
                 raise SystemExit(f"Retired bundled libraries reappeared: {forbidden}")
             if any(entry.compress_type != zipfile.ZIP_DEFLATED for entry in native):
@@ -36,7 +41,7 @@ def main(paths):
             rows.append(f"| {abi} | {size / 1048576:.2f} MiB |")
     if seen != EXPECTED:
         raise SystemExit(f"Missing architectures: {EXPECTED - seen}")
-    report = "## APK size validation\n\n| Architecture | APK size |\n|---|---:|\n" + "\n".join(rows) + "\n\nBoth ARM APKs retain TDLib, use compressed native libraries and exclude retired OCR/models and bundled SQLite.\n"
+    report = "## APK size validation\n\n| Architecture | APK size |\n|---|---:|\n" + "\n".join(rows) + "\n\nBoth ARM APKs retain TDLib, use compressed native libraries and exclude bundled OCR models and bundled SQLite.\n"
     print(report)
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:

@@ -1,6 +1,8 @@
 // Modified for TG Drive: Android integration, safety fixes and visual adaptation; see third_party/driveinfinity/SOURCE.md.
 package com.infinity.drive.presentation.preview
 
+import com.infinity.drive.core.accounts.DeviceAccounts
+
 import app.tgdrive.ui.DriveIcons
 import android.graphics.BitmapFactory
 import android.graphics.Color
@@ -97,7 +99,7 @@ internal fun MediaPlayer(
 
     val checkpointKey=remember(fileId,contentRevision){"$fileId:$contentRevision"}
     val checkpoint = rememberSaveable(checkpointKey, saver = VideoPlaybackCheckpoint.Saver) { VideoPlaybackCheckpoint() }
-    val checkpointPrefs=remember(context){context.applicationContext.getSharedPreferences("video-checkpoints",android.content.Context.MODE_PRIVATE)}
+    val checkpointPrefs=remember(context){context.applicationContext.getSharedPreferences(DeviceAccounts.scoped("video-checkpoints"),android.content.Context.MODE_PRIVATE)}
     var checkpointReady by remember(checkpointKey){mutableStateOf(false)}
     LaunchedEffect(checkpointKey){
         val saved=withContext(Dispatchers.IO){runCatching{checkpointPrefs.getString(checkpointKey,null)?.let{org.json.JSONObject(it)}}.getOrNull()}

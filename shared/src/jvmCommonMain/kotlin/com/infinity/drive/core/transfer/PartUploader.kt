@@ -62,16 +62,17 @@ class PartUploader(
         source: File,
         chatId: Long,
         manifest: RemoteFileManifest,
-        encrypt: Boolean
+        encrypt: Boolean,
+        attemptId: String = entity.id
     ): Flow<Event> = flow {
         val totalSize = source.length()
         val partCount = FileParts.countFor(totalSize)
-        val done = filePartDao.partsOf(entity.id)
+        val done = filePartDao.partsOf(attemptId)
             .filter { it.messageId != null && it.remoteFileId != null }
             .associateBy { it.partIndex }
             .toMutableMap()
 
-        val pendingParts=filePartDao.partsOf(entity.id).filter{it.messageId!=null&&it.remoteFileId==null}.associateBy{it.partIndex}
+        val pendingParts=filePartDao.partsOf(attemptId).filter{it.messageId!=null&&it.remoteFileId==null}.associateBy{it.partIndex}
         var uploadedBefore = done.values.sumOf { it.plainSize }
         emit(Event.Progress(uploadedBefore))
 
@@ -123,7 +124,7 @@ class PartUploader(
                 )).failWhenIdle("Part upload stalled").collect { event ->
                     when (event) {
                         is TelegramUploadEvent.Started -> filePartDao.upsert(FilePartEntity(
-                            fileId=entity.id,partIndex=index,chatId=chatId,messageId=event.temporaryMessageId,
+                            fileId=attemptId,partIndex=index,chatId=chatId,messageId=event.temporaryMessageId,
                             remoteFileId=null,remoteUniqueId=null,plainOffset=plainOffset,plainSize=plainSize,
                             storedSize=scratch.length(),uploadedAt=0))
                         is TelegramUploadEvent.Progress -> {
@@ -135,7 +136,7 @@ class PartUploader(
                         is TelegramUploadEvent.Completed -> {
                             val document = event.document
                             stored = FilePartEntity(
-                                fileId = entity.id,
+                                fileId = attemptId,
                                 partIndex = index,
                                 chatId = document.chatId,
                                 messageId = document.messageId,

@@ -1,5 +1,7 @@
 package com.infinity.drive.core.security
 
+import com.infinity.drive.core.accounts.DeviceAccounts
+
 import android.content.Context
 import android.util.AtomicFile
 import com.infinity.drive.core.crypto.CredentialCipher
@@ -8,7 +10,7 @@ import java.io.File
 
 /** Outside backup; the atomic record (including retry counters) is authenticated with Keystore AES-GCM. */
 class AndroidHiddenLockStore(context:Context,private val cipher:CredentialCipher,recordName:String="hidden-lock.bin"):HiddenLockStore {
-    private val file=AtomicFile(File(context.noBackupFilesDir,recordName))
+    private val file=AtomicFile(File(context.noBackupFilesDir,DeviceAccounts.scoped(recordName)))
     override suspend fun read():HiddenLockRecord? {
         val candidates=listOf(file.baseFile,File(file.baseFile.path+".bak"),File(file.baseFile.path+".new")).filter{it.exists()}
         if(candidates.isEmpty())return null

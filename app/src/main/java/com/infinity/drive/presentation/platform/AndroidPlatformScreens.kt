@@ -26,6 +26,16 @@ object AndroidPlatformScreens : PlatformScreens {
         com.infinity.drive.presentation.recovery.RecoveryExportScreen(onBack)
     }
 
+    @Composable
+    override fun AccountProfilesSetting(compact: Boolean) =
+        com.infinity.drive.presentation.platform.AccountProfilesSetting(compact)
+
+    @Composable
+    override fun WorkspacesSetting() = com.infinity.drive.presentation.workspaces.WorkspacesSetting()
+
+    @Composable
+    override fun FolderSyncSetting() = com.infinity.drive.presentation.sync.FolderSyncSetting()
+
     override val supportsPublicLinks = true
 
     @Composable

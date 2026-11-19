@@ -180,7 +180,7 @@ class SyncRepositoryImpl(
                         if (reconcile(document, folderCache, current) == ReconcileResult.INSERTED) {
                             restored++
                         }
-                    } else if (manifest?.isPart == true && (existing.chatId == null || existing.chatId == chatId) &&
+                    } else if (manifest?.isPart == true && !manifest.replaces && (existing.chatId == null || existing.chatId == chatId) &&
                         partIndexes.add(manifest.fileId to manifest.partIndex)
                     ) recordPart(document, manifest)
                 }
@@ -332,7 +332,8 @@ class SyncRepositoryImpl(
                 document.fileName == KeyBackupCodec.BACKUP_FILE_NAME ||
                 document.caption.startsWith(RemoteFolderState.MARKER) ||
                 document.caption.startsWith(KEY_BACKUP_MARKER) ||
-                document.caption.startsWith(ICON_MARKER)
+                document.caption.startsWith(ICON_MARKER) ||
+                document.caption.startsWith(TelegramFileVersions.PREFIX)
 
     private fun isNewToLocal(document: RemoteDocument, known: KnownRows): Boolean {
         val existing = known.byUniqueId[document.uniqueFileId] ?: return true
@@ -391,25 +392,54 @@ class SyncRepositoryImpl(
     }
 
     private suspend fun reconcile(
-        document: RemoteDocument,
+        incoming: RemoteDocument,
         folderCache: MutableMap<String, String?>,
         known: KnownRows
     ): ReconcileResult {
-        val manifest = known.manifests[document]
-        val note = manifest?.takeIf { it.name.endsWith(".md", ignoreCase = true) && !it.isPart }
-        val existing = if (note != null) fileDao.byId(note.fileId)
-            else manifest?.let { known.byId[it.fileId] } ?: known.byUniqueId[document.uniqueFileId]
-        if (note != null && existing != null &&
-            (existing.modifiedAt > note.modifiedAt ||
-                existing.modifiedAt == note.modifiedAt && (existing.messageId ?: 0L) > document.messageId)
+        var document = incoming
+        var manifest = known.manifests[document]
+        val existing = manifest?.let { fileDao.byId(it.fileId) }
+            ?: known.byUniqueId[document.uniqueFileId]
+        if (manifest != null && existing != null && existing.chatId == document.chatId &&
+            (existing.modifiedAt > manifest.modifiedAt ||
+                !manifest.isPart && existing.modifiedAt == manifest.modifiedAt &&
+                    (existing.messageId ?: 0L) > document.messageId)
         ) return ReconcileResult.UNCHANGED
 
-        if (manifest != null && manifest.isPart) {
-            recordPart(document, manifest)
+        val remote = manifest
+        if (remote?.isPart == true && remote.replaces &&
+            (existing?.messageId == null || remote.modifiedAt > existing.modifiedAt)
+        ) {
+            val key = "revision:${document.chatId}:${remote.fileId}:${remote.modifiedAt}"
+            recordPart(document, remote, key)
+            val staged = filePartDao.partsOf(key)
+            if (staged.size != remote.partCount || staged.withIndex().any { (index, part) ->
+                part.partIndex != index || part.chatId != document.chatId || part.messageId == null || part.remoteFileId == null
+            }) return ReconcileResult.UNCHANGED
+            var offset = 0L
+            for (part in staged) {
+                if (part.plainOffset != offset || part.plainSize !in 1..(remote.sizeBytes - offset)) {
+                    return ReconcileResult.UNCHANGED
+                }
+                offset += part.plainSize
+            }
+            if (offset != remote.sizeBytes) return ReconcileResult.UNCHANGED
+            filePartDao.deleteFor(listOf(remote.fileId, key))
+            staged.forEach { filePartDao.upsert(it.copy(fileId = remote.fileId)) }
+            val first = staged.first()
+            document = document.copy(messageId = requireNotNull(first.messageId),
+                remoteFileId = requireNotNull(first.remoteFileId), uniqueFileId = first.remoteUniqueId.orEmpty(),
+                sizeBytes = first.storedSize)
+            manifest = remote.copy(partIndex = 0, partOffset = 0, partSize = first.plainSize)
+        } else if (remote?.isPart == true) {
+            recordPart(document, remote)
+        } else if (remote != null && existing?.partCount?.let { it > 0 } == true) {
+            filePartDao.deleteFor(listOf(existing.id))
         }
 
+        val installed = manifest
         val local = existing?.takeIf {
-            it.pendingPublish && (manifest == null || it.modifiedAt >= manifest.modifiedAt)
+            it.pendingPublish && (installed == null || it.modifiedAt >= installed.modifiedAt)
         }
 
         val remoteFolderId = manifest?.let { resolveFolder(it, folderCache) } ?: existing?.folderId
@@ -439,7 +469,9 @@ class SyncRepositoryImpl(
             sizeBytes = manifest?.sizeBytes ?: document.sizeBytes,
             mimeType = mime,
             category = FileCategory.fromMimeType(mime),
-            localPath = existing?.localPath,
+            localPath = existing?.localPath?.takeUnless {
+                installed?.replaces == true && installed.modifiedAt > existing.modifiedAt
+            },
             contentHash = manifest?.contentHash ?: existing?.contentHash,
             chatId = document.chatId,
             messageId = document.messageId,
@@ -510,10 +542,10 @@ class SyncRepositoryImpl(
         }
     }
 
-    private suspend fun recordPart(document: RemoteDocument, manifest: RemoteFileManifest) {
+    private suspend fun recordPart(document: RemoteDocument, manifest: RemoteFileManifest, fileId: String = manifest.fileId) {
         filePartDao.upsert(
             FilePartEntity(
-                fileId = manifest.fileId,
+                fileId = fileId,
                 partIndex = manifest.partIndex,
                 chatId = document.chatId,
                 messageId = document.messageId,

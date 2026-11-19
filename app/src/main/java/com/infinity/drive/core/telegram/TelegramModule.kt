@@ -1,6 +1,8 @@
 // Modified for TG Drive: Android integration, safety fixes and visual adaptation; see third_party/driveinfinity/SOURCE.md.
 package com.infinity.drive.core.telegram
 
+import com.infinity.drive.core.accounts.DeviceAccounts
+
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.bind
 import org.koin.dsl.module
@@ -15,7 +17,7 @@ val telegramModule = module {
     }
     single<TelegramClient> { TdLibTelegramClient(androidContext(),get(),get(),get()) }
     single {
-        val store = androidContext().getSharedPreferences("telegram-transfer-policy", android.content.Context.MODE_PRIVATE)
+        val store = androidContext().getSharedPreferences(DeviceAccounts.scoped("telegram-transfer-policy"), android.content.Context.MODE_PRIVATE)
         TelegramPacer(initialDeadline = store.getLong("flood-until", 0L),
             persistDeadline = { store.edit().putLong("flood-until", it).commit() })
     }

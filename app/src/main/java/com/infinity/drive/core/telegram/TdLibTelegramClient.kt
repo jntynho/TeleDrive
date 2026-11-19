@@ -1,6 +1,8 @@
 // Modified for TG Drive: Android integration, safety fixes and visual adaptation; see third_party/driveinfinity/SOURCE.md.
 package com.infinity.drive.core.telegram
 
+import com.infinity.drive.core.accounts.DeviceAccounts
+
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -67,7 +69,7 @@ internal class TdLibTelegramClient(
     private val clientMutex = Mutex()
     private val phoneAuthMutex = Mutex()
     private val recoveryPreferences by lazy {
-        context.getSharedPreferences("telegram-login-recovery", Context.MODE_PRIVATE)
+        context.getSharedPreferences(DeviceAccounts.scoped("telegram-login-recovery"), Context.MODE_PRIVATE)
     }
 
     private fun clearRecoveryAccount() = recoveryPreferences.edit().remove("expected-account").commit()

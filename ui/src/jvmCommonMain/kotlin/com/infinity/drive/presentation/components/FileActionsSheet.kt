@@ -1,5 +1,7 @@
 package com.infinity.drive.presentation.components
 
+import com.infinity.drive.resources.versions_title
+
 import app.tgdrive.ui.DriveIcons
 import app.tgdrive.ui.elasticVerticalScroll as verticalScroll
 import app.tgdrive.ui.ElasticLazyColumn as LazyColumn
@@ -36,6 +38,9 @@ val LocalFileFolderNavigation=staticCompositionLocalOf<(String?)->Unit>{{}}
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Boolean=false,extraActions:@Composable ()->Unit={}) {
+    var versionsOpen by remember(file.id) { mutableStateOf(false) }
+    if (versionsOpen) FileVersionsDialog(file) { versionsOpen = false }
+
     val privacy=com.infinity.drive.presentation.platform.LocalHiddenContentAccess.current
     val privacyState=privacy?.lock?.state?.collectAsStateWithLifecycle()?.value
     var readable by remember(file.id,privacyState?.epoch,privacyState?.restricted){mutableStateOf(privacy==null||privacyState?.restricted==false)}
@@ -184,6 +189,11 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Bo
                     }
                     SheetActionRow("Share",DriveIcons.Share,enabled=!working){run{val path=obtain();sharer.share(listOf(path),current.mimeType,"Share ${current.name}")}}
                     SheetActionRow(if(current.isFavorite)"Remove from Favourite"else"Add To Favourite",if(current.isFavorite)DriveIcons.StarFilled else DriveIcons.Star,enabled=!working){run(close=false){repository.setFilesFavorite(listOf(current.id),!current.isFavorite)}}
+                    if (current.hasRemoteCopy) {
+                        SheetActionRow(org.jetbrains.compose.resources.stringResource(
+                            com.infinity.drive.resources.Res.string.versions_title
+                        ), DriveIcons.History, enabled = !working) { versionsOpen = true }
+                    }
                     SheetActionRow("Rename",DriveIcons.Edit,enabled=!working){page="rename"}
                     SheetActionRow("Move",DriveIcons.DriveFileMove,enabled=!working){page="move"}
                     SheetActionRow("Show in folder",DriveIcons.FolderOpen,enabled=!working){closeThen{if(revealFile!=null)revealFile(current)else navigateFolder(current.folderId)}}

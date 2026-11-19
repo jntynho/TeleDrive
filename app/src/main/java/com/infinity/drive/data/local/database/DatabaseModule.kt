@@ -1,12 +1,14 @@
 package com.infinity.drive.data.local.database
 
+import com.infinity.drive.core.accounts.DeviceAccounts
+
 import androidx.room.Room
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 
 val databaseModule = module {
     single {
-        Room.databaseBuilder(androidContext(), DriveInfinityDatabase::class.java, DriveInfinityDatabase.NAME)
+        Room.databaseBuilder(androidContext(), DriveInfinityDatabase::class.java, DeviceAccounts.scoped(DriveInfinityDatabase.NAME))
             .addMigrations(
                 MIGRATION_1_2,
                 MIGRATION_2_3,

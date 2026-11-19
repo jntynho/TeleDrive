@@ -278,6 +278,7 @@ fun OnboardingScreen(
                     IconButton(viewModel::backFromSignIn,enabled=!state.working){Icon(DriveIcons.ArrowBack,"Back")}
                     Text("TeleDrive",style=MaterialTheme.typography.titleMedium)
                 }
+                if (!state.working) recoveryScreens?.AccountProfilesSetting(compact = true)
                 BoxWithConstraints(Modifier.weight(1f)){
                     val body:@Composable (Modifier)->Unit={modifier->
                         val scroll=rememberScrollState()

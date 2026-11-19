@@ -3,6 +3,7 @@ package com.infinity.drive
 
 import android.app.Application
 import app.tgdrive.BuildConfig
+import com.infinity.drive.core.accounts.DeviceAccounts
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
@@ -62,6 +63,8 @@ open class DriveInfinityApplication : Application(), SingletonImageLoader.Factor
 
     override fun onCreate() {
         super.onCreate()
+        if (!DeviceAccounts.isApplicationProcess(this)) return
+        DeviceAccounts.initialise(this)
         SafeLog.verbose = BuildConfig.DEBUG
         startKoin {
             androidContext(this@DriveInfinityApplication)
@@ -87,7 +90,7 @@ open class DriveInfinityApplication : Application(), SingletonImageLoader.Factor
         mediaStoreWatcher.start()
         proxyFailover.start(applicationScope)
         applicationScope.launch {
-            app.tgdrive.migration.retirePreviousQueue(this@DriveInfinityApplication)
+            if (DeviceAccounts.primary) app.tgdrive.migration.retirePreviousQueue(this@DriveInfinityApplication)
             settingsRepository.preferences
                 .map { it.debugLogging }
                 .distinctUntilChanged()

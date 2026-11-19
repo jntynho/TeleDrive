@@ -24,6 +24,9 @@ import com.infinity.drive.data.local.entity.TransferEntity
 import com.infinity.drive.data.remote.telegram.ManifestCodec
 import com.infinity.drive.data.remote.telegram.RemoteFileManifest
 import com.infinity.drive.data.repository.FolderPathResolver
+import com.infinity.drive.data.repository.TelegramFileVersions
+import com.infinity.drive.data.local.database.DriveInfinityDatabase
+import com.infinity.drive.data.local.database.inImmediateTransaction
 import com.infinity.drive.domain.model.FileTags
 import com.infinity.drive.domain.model.BackupState
 import com.infinity.drive.domain.model.TransferStage
@@ -69,7 +72,9 @@ class TransferExecutor(
     private val partUploader: PartUploader,
     private val partDownloader: PartDownloader,
     private val apkIconUploader: ApkIconUploader,
-    private val backupSessionTracker: BackupSessionTracker
+    private val backupSessionTracker: BackupSessionTracker,
+    private val versions: TelegramFileVersions,
+    private val database: DriveInfinityDatabase
 ) : TransferRunner {
 
     /**
@@ -196,8 +201,7 @@ class TransferExecutor(
         if (!sourceFile.exists()) return Outcome.Failed(messages.localFileGone)
 
         val prefs = settingsRepository.preferences.first()
-        val noteChatId = entity.chatId.takeIf { entity.name.endsWith(".md", ignoreCase = true) }
-        val chatId = transfer.chatId ?: noteChatId ?: prefs.storageChatId
+        val chatId = transfer.chatId ?: entity.chatId ?: prefs.storageChatId
             ?: telegramClient.ensureStorageChat(null).also { resolved ->
                 if (resolved != prefs.storageChatId) {
                     settingsRepository.update { it.copy(storageChatId = resolved) }
@@ -209,8 +213,9 @@ class TransferExecutor(
         val sizeChanged = entity.sizeBytes != uploadSize
         val contentHash = entity.contentHash.takeUnless { sizeChanged }
         if(sizeChanged) fileDao.upsert(entity.copy(sizeBytes=uploadSize,contentHash=null))
-        val supersededMessageId = entity.messageId
-            ?.takeIf { entity.chatId == chatId && filePartDao.countOf(entity.id) == 0 }
+        val superseded = versions.retain(entity, chatId)
+        checkControl(transfer.id)
+        val partAttemptId = if (superseded.isEmpty()) entity.id else transfer.id
 
         val rawIconPath = if(encrypt||entity.category==com.infinity.drive.domain.model.FileCategory.IMAGE)null else thumbnailStore.uploadThumbnailFile(entity.id)?.absolutePath
         val iconFileId = apkIconUploader.uploadPreviewDocument(entity, chatId, encrypt)
@@ -233,13 +238,14 @@ class TransferExecutor(
             height = entity.height,
             durationMs = entity.durationMs,
             iconFileId = iconFileId,
-            tags = FileTags.decode(entity.tagsEncoded)
+            tags = FileTags.decode(entity.tagsEncoded),
+            replaces = superseded.isNotEmpty()
         )
         val caption = manifestCodec.encode(manifest, encrypt)
 
         fileDao.setBackupState(entity.id, BackupState.UPLOADING)
 
-        if (splitsIntoParts(entity, sourceFile, encrypt)) {
+        if (splitsIntoParts(partAttemptId, sourceFile, encrypt)) {
             return uploadInParts(
                 transfer = transfer,
                 entity = entity,
@@ -249,7 +255,8 @@ class TransferExecutor(
                 manifest = manifest,
                 encrypt = encrypt,
                 contentHash = contentHash,
-                supersededMessageId = supersededMessageId
+                superseded = superseded,
+                partAttemptId = partAttemptId
             )
         }
 
@@ -302,16 +309,23 @@ class TransferExecutor(
 
                     is TelegramUploadEvent.Completed -> {
                         val document = event.document
-                        fileDao.setRemoteMapping(
-                            id = entity.id,
-                            chatId = document.chatId,
-                            messageId = document.messageId,
-                            remoteFileId = document.remoteFileId,
-                            remoteUniqueId = document.uniqueFileId,
-                            state = BackupState.BACKED_UP,
-                            iconFileId = iconFileId,
-                            encrypted = encrypt
-                        )
+                        database.inImmediateTransaction {
+                            if (superseded.isNotEmpty()) {
+                                filePartDao.deleteFor(listOf(entity.id, partAttemptId))
+                                fileDao.setPartCount(entity.id, 0)
+                            }
+                            fileDao.setRemoteMapping(
+                                id = entity.id,
+                                chatId = document.chatId,
+                                messageId = document.messageId,
+                                remoteFileId = document.remoteFileId,
+                                remoteUniqueId = document.uniqueFileId,
+                                state = BackupState.BACKED_UP,
+                                iconFileId = iconFileId,
+                                encrypted = encrypt
+                            )
+                            transferDao.setCompleted(transfer.id, System.currentTimeMillis())
+                        }
                         if (transfer.type == TransferType.BACKUP) {
                             backupDao.upsertRecord(
                                 BackupRecordEntity(
@@ -325,15 +339,8 @@ class TransferExecutor(
                                 )
                             )
                         }
-                        supersededMessageId
-                            ?.takeIf { it != document.messageId }
-                            ?.let { stale ->
-                                runCatching {
-                                    telegramClient.deleteMessages(chatId, listOf(stale))
-                                }
-                            }
+                        retireOldMessages(chatId, superseded.filter { it != document.messageId })
                         dropStagedSource(entity.id, localPath)
-                        transferDao.setCompleted(transfer.id, System.currentTimeMillis())
                         outcome = Outcome.Completed
                     }
                 }
@@ -364,11 +371,11 @@ class TransferExecutor(
      * otherwise be sent whole and come back rejected.
      */
     private suspend fun splitsIntoParts(
-        entity: FileEntity,
+        attemptId: String,
         source: File,
         encrypt: Boolean
     ): Boolean {
-        if (filePartDao.countOf(entity.id) > 0) return true
+        if (filePartDao.countOf(attemptId) > 0) return true
         val limit = runCatching { telegramClient.getLimits() }
             .getOrDefault(TelegramLimits.REGULAR)
             .maxFileBytes
@@ -386,14 +393,15 @@ class TransferExecutor(
         manifest: RemoteFileManifest,
         encrypt: Boolean,
         contentHash: String?,
-        supersededMessageId: Long?
+        superseded: List<Long>,
+        partAttemptId: String
     ): Outcome {
         val ticker = ProgressTicker().apply { start(0, System.currentTimeMillis()) }
         var outcome: Outcome =
             Outcome.Failed(messages.uploadEnded)
 
         return try {
-            partUploader.upload(entity, sourceFile, chatId, manifest, encrypt)
+            partUploader.upload(entity, sourceFile, chatId, manifest, encrypt, partAttemptId)
                 .collect { event ->
                     currentCoroutineContext().ensureActive()
                     when (event) {
@@ -422,17 +430,24 @@ class TransferExecutor(
                         is PartUploader.Event.Completed -> {
                             val first = event.parts.firstOrNull()
                                 ?: error("Upload finished with no parts")
-                            fileDao.setPartCount(entity.id, event.parts.size)
-                            fileDao.setRemoteMapping(
-                                id = entity.id,
-                                chatId = first.chatId,
-                                messageId = first.messageId,
-                                remoteFileId = first.remoteFileId,
-                                remoteUniqueId = first.remoteUniqueId,
-                                state = BackupState.BACKED_UP,
-                                iconFileId = manifest.iconFileId,
-                                encrypted = encrypt
-                            )
+                            database.inImmediateTransaction {
+                                if (partAttemptId != entity.id) {
+                                    filePartDao.deleteFor(listOf(entity.id, partAttemptId))
+                                    event.parts.forEach { filePartDao.upsert(it.copy(fileId = entity.id)) }
+                                }
+                                fileDao.setPartCount(entity.id, event.parts.size)
+                                fileDao.setRemoteMapping(
+                                    id = entity.id,
+                                    chatId = first.chatId,
+                                    messageId = first.messageId,
+                                    remoteFileId = first.remoteFileId,
+                                    remoteUniqueId = first.remoteUniqueId,
+                                    state = BackupState.BACKED_UP,
+                                    iconFileId = manifest.iconFileId,
+                                    encrypted = encrypt
+                                )
+                                transferDao.setCompleted(transfer.id, System.currentTimeMillis())
+                            }
                             if (transfer.type == TransferType.BACKUP) {
                                 backupDao.upsertRecord(
                                     BackupRecordEntity(
@@ -446,13 +461,9 @@ class TransferExecutor(
                                     )
                                 )
                             }
-                            supersededMessageId?.let { stale ->
-                                runCatching {
-                                    telegramClient.deleteMessages(chatId, listOf(stale))
-                                }
-                            }
+                            val newMessages = event.parts.mapNotNull { it.messageId }.toSet()
+                            retireOldMessages(chatId, superseded.filterNot(newMessages::contains))
                             dropStagedSource(entity.id, localPath)
-                            transferDao.setCompleted(transfer.id, System.currentTimeMillis())
                             outcome = Outcome.Completed
                         }
                     }
@@ -463,7 +474,7 @@ class TransferExecutor(
                 entity.id,
                 if (e.paused) BackupState.QUEUED else BackupState.NONE
             )
-            if (!e.paused) partUploader.discardParts(entity.id)
+            if (!e.paused) partUploader.discardParts(partAttemptId)
             if (e.paused) Outcome.Paused else Outcome.Canceled
         } catch (e: TelegramException) {
             fileDao.setBackupStateIfLocalOnly(entity.id, BackupState.FAILED)
@@ -568,6 +579,18 @@ class TransferExecutor(
             if (e.paused) Outcome.Paused else Outcome.Canceled
         } catch (e: TelegramException) {
             Outcome.Failed(e.message, if(e.isRateLimit) e.retryAfterSeconds ?: 5 else null,retryable=e.code>=500||e.code==408)
+        }
+    }
+
+    private suspend fun retireOldMessages(chat: Long, ids: List<Long>) {
+        for (batch in ids.chunked(100)) {
+            try {
+                telegramClient.deleteMessages(chat, batch)
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (_: Exception) {
+                // The newest manifest remains authoritative even when Telegram postpones cleanup.
+            }
         }
     }
 

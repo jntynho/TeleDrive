@@ -1,5 +1,7 @@
 package com.infinity.drive.core.security
 
+import com.infinity.drive.core.accounts.DeviceAccounts
+
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -58,5 +60,5 @@ class AndroidHiddenBiometrics(private val activity:FragmentActivity):HiddenBiome
         val cipher=Cipher.getInstance("AES/GCM/NoPadding").apply{init(Cipher.DECRYPT_MODE,key(),GCMParameterSpec(128,iv))}
         return authenticate(cipher)?.doFinal(ciphertext)
     }
-    companion object {private const val ALIAS="teledrive_hidden_biometric_v1"}
+    companion object {private val ALIAS get() = DeviceAccounts.scoped("teledrive_hidden_biometric_v1")}
 }

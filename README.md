@@ -145,6 +145,8 @@ Local release outputs are unsigned unless the Next signing configuration is supp
 
 ## Contributing
 
+[Workspaces, version history and folder synchronization](docs/WORKSPACES-AND-SYNC.md)
+
 [Report a bug](https://github.com/jntynho/TeleDrive/issues) with your app version, Android version, device architecture and steps to reproduce. Remove phone numbers, login codes, API credentials and private file details from reports and screenshots.
 
 For code contributions, keep changes focused and run the checks relevant to the change. See [Testing](docs/TESTING.md) for the full validation guide.

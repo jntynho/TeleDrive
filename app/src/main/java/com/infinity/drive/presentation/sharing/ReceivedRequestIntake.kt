@@ -29,11 +29,19 @@ internal class ReceivedRequestIntake(
         drive: Long,
         validate: suspend () -> Unit,
         copy: suspend (OutputStream) -> Unit
+    ) = save(request.id, requireNotNull(request.incoming), drive, validate, copy)
+
+    suspend fun save(
+        id: String,
+        incoming: ReceivedFile,
+        drive: Long,
+        validate: suspend () -> Unit,
+        copy: suspend (OutputStream) -> Unit
     ) = serial.withLock {
-        val incoming = requireNotNull(request.incoming)
+        require(id.matches(Regex("[A-Za-z0-9_-]{43}")))
         require(incoming.size in 1..AndroidPublicLinks.MAX_SHARE_BYTES)
         val digest = MessageDigest.getInstance("SHA-256")
-        val folder = File(paths.filesDir, "imports/request-${request.id}").apply { mkdirs() }
+        val folder = File(paths.filesDir, "imports/request-$id").apply { mkdirs() }
         val destination = File(folder, FileNameUtils.sanitize(incoming.name))
         val partial = File(folder, "receiving.partial")
             .takeUnless { it == destination } ?: File(folder, "receiving-other.partial")

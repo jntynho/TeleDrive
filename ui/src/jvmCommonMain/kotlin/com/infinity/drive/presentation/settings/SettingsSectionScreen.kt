@@ -495,6 +495,8 @@ private fun AccountSection(
                 onClick = onPickChannel
             )
         }
+        add { platform.AccountProfilesSetting() }
+        add { platform.WorkspacesSetting() }
         if (platform.supportsPublicLinks) add { platform.PublicLinksSetting() }
         add {
             SettingsClickRow(
@@ -592,7 +594,9 @@ private fun BackupSection(
         )
     }
 
+    val platform = com.infinity.drive.presentation.platform.LocalPlatformScreens.current
     SettingsGroup {
+        add { platform.FolderSyncSetting() }
         add {
             SettingsClickRow(
                 title = stringResource(Res.string.backup_preview_title),

@@ -186,6 +186,7 @@ fun PreviewScreen(
     var recognitionTarget by remember { mutableStateOf<DriveFile?>(null) }
     val recognizer = koinInject<AndroidTextRecognition>()
     val publicLinks = koinInject<AndroidPublicLinks>()
+    var workspaceFile by remember { mutableStateOf<DriveFile?>(null) }
     var publicLinkFile by remember { mutableStateOf<DriveFile?>(null) }
 
     val deleteConsentLauncher = rememberLauncherForActivityResult(
@@ -467,6 +468,17 @@ fun PreviewScreen(
         if (canStreamExternally) {
             com.infinity.drive.presentation.components.SheetActionRow(externalTitle, DriveIcons.OpenInNew, onClick = ::openInPlayer)
         }
+        if (canUseExtraActions && currentFile.backupState == BackupState.BACKED_UP &&
+            currentFile.sizeBytes in 1..com.infinity.drive.presentation.workspaces.AndroidWorkspaces.MAX_BYTES
+        ) {
+            com.infinity.drive.presentation.components.SheetActionRow(
+                androidx.compose.ui.res.stringResource(app.tgdrive.R.string.workspaces_publish),
+                DriveIcons.CloudSync
+            ) {
+                showOverflow = false
+                workspaceFile = currentFile
+            }
+        }
         if (canSharePublicly) {
             com.infinity.drive.presentation.components.SheetActionRow(
                 androidx.compose.ui.res.stringResource(app.tgdrive.R.string.live_links_create),
@@ -485,6 +497,9 @@ fun PreviewScreen(
                 recognitionTarget = currentFile
             }
         }
+    }
+    workspaceFile?.takeIf { canUseExtraActions && it.id == currentFile.id }?.let {
+        com.infinity.drive.presentation.workspaces.WorkspacesDialog(it) { workspaceFile = null }
     }
     val configuredShare = shareConnection
     publicLinkFile?.takeIf { it.id == currentFile.id && canSharePublicly }?.let {
