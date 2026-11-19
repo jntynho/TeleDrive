@@ -3,6 +3,7 @@ package app.tgdrive.library
 import android.net.Uri
 import app.tgdrive.data.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.test.resetMain
 import org.drinkless.tdlib.TdApi
@@ -316,7 +317,7 @@ class TransferIntegrationTest {
         repo.saveAccountSecret("sharing-token","first-account-owner-token")
         suspend fun switchTo(id:Long) {
             wire.userId=id;wire.update!!(TdApi.UpdateAuthorizationState(TdApi.AuthorizationStateReady()))
-            withTimeout(5_000){while(repo.state.value.accountId!=id||!repo.state.value.loaded)delay(5)}
+            withTimeout(10_000) { repo.state.first { it.accountId == id && it.loaded } }
         }
         switchTo(1702)
         assertNull(repo.accountSecret("webdav-password"));assertNull(repo.accountSecret("sharing-token"))

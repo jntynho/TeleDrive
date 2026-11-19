@@ -9,7 +9,9 @@ import app.tgdrive.data.TelegramDrive
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -20,6 +22,7 @@ import java.util.UUID
 class LibraryRepository(val context: Context, val session: TelegramDrive, val scope: CoroutineScope, private val rowCodec: (Long) -> RowCodec = { LocalRowCipher(it) }, private val allowAccount: (Long)->Boolean = {true}) {
     private val mutable = MutableStateFlow(LibraryState())
     private val initializationRevision = MutableStateFlow(0)
+    private data class AccountSelection(val login: LoginStep, val accountId: Long, val name: String, val retry: Int)
     val state = mutable.asStateFlow()
     val vaults = VaultManager()
     val thumbnails = ThumbnailLoader(this)
@@ -40,7 +43,9 @@ class LibraryRepository(val context: Context, val session: TelegramDrive, val sc
     init {
         session.libraryManaged = true
         scope.launch {
-            combine(session.state,initializationRevision){auth,_->auth}.collect { auth ->
+            combine(session.state, initializationRevision) { auth, retry ->
+                AccountSelection(auth.login, auth.accountId, auth.account, retry)
+            }.distinctUntilChanged().collectLatest { auth ->
                 try {
                 if (auth.login == LoginStep.READY && auth.accountId != 0L && (state.value.accountId != auth.accountId || !state.value.loaded)) {
                     withContext(Dispatchers.IO) {
@@ -48,7 +53,7 @@ class LibraryRepository(val context: Context, val session: TelegramDrive, val sc
                             require(allowAccount(auth.accountId)) { "This Telegram account is already open in another profile. Switch to that profile; sign out of this duplicate profile to use a different account." }
                             thumbnails.clear();database?.close(); vaults.lock()
                             database = LibraryDatabase(context, auth.accountId, rowCodec(auth.accountId))
-                            mutable.value = LibraryState(accountId = auth.accountId, accountName = auth.account)
+                            mutable.value = LibraryState(accountId = auth.accountId, accountName = auth.name)
                             deviceId = db().get("settings", "deviceId") ?: newId().also { db().put("settings", "deviceId", it) }
                             cache = ContentCache(context, auth.accountId, remote, vaults)
                             migrateLegacy()
