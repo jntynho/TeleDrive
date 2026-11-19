@@ -166,8 +166,10 @@ internal class AndroidWorkspaces(
         require(row.sizeBytes in 1..MAX_BYTES && row.backupState == BackupState.BACKED_UP && row.trashedAt == null)
         suspend fun validate() {
             ensureActive()
-            check(drive() == active && row.chatId == active && fileDao.byId(file.id)?.messageId == row.messageId &&
-                hidden.canRead(file.id) && !hidden.protectedFile(file) && connection() == access)
+            val latest = fileDao.byId(file.id)
+            check(drive() == active && latest?.chatId == active && latest.messageId == row.messageId &&
+                latest.modifiedAt == row.modifiedAt && latest.trashedAt == null && !latest.isHidden &&
+                !hidden.protectedFolder(latest.folderId) && hidden.canRead(file.id) && connection() == access)
         }
         validate()
         val temporary = File.createTempFile("workspace-copy-", ".tmp", context.cacheDir)

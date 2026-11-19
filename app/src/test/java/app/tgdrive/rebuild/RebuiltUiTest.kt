@@ -657,6 +657,9 @@ class RebuiltUiTest {
         compose.onNodeWithText("Changed draft",substring=false).assertIsDisplayed()
         compose.runOnUiThread{activity.get().onBackPressedDispatcher.onBackPressed()}
         compose.onNodeWithText("Discard",substring=false).performClick()
+        compose.waitUntil(5_000) {
+            compose.onNodeWithContentDescription("Edit text").isDisplayed()
+        }
         compose.onNodeWithContentDescription("Edit text").assertIsDisplayed()
         org.junit.Assert.assertEquals("Original text",runBlocking{(repo.readNote(id) as com.infinity.drive.core.common.AppResult.Success).value})
     }

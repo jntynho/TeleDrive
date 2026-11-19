@@ -165,6 +165,8 @@ class NoteEditorViewModel(
     }
 
     fun leaveEditor(keepDraft: Boolean, onDone: () -> Unit) {
+        if (_uiState.value.saving) return
+        _uiState.update { it.copy(saving = true) }
         viewModelScope.launch {
             try {
                 draftJob?.cancelAndJoin()
@@ -176,6 +178,8 @@ class NoteEditorViewModel(
                 throw e
             } catch (_: Exception) {
                 _messages.tryEmit(UiText.Resource(Res.string.note_draft_failed))
+            } finally {
+                _uiState.update { it.copy(saving = false) }
             }
         }
     }

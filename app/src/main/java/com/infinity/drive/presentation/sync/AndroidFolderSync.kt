@@ -106,8 +106,12 @@ internal class AndroidFolderSync(
                 check(remoteRows.size < MAX_ITEMS) { "Choose a smaller folder." }
                 val path = join(relative, file.name)
                 val key = path.lowercase()
+                if (file.isHidden || !access.canRead(file.id)) {
+                    blocked.add(key)
+                    continue
+                }
                 remotePaths[key] = path
-                if (remoteRows.containsKey(key) || file.isHidden || !access.canRead(file.id)) blocked.add(key)
+                if (remoteRows.containsKey(key)) blocked.add(key)
                 remoteRows[key] = file
             }
         }
