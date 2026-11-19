@@ -91,3 +91,49 @@ test('upload requests expire and cannot submit via a different browser origin', 
   assert.equal((await fetch(url)).status, 404);
   assert.deepEqual(await (await fetch(collection, { headers: authorize })).json(), []);
 });
+
+test('workspace roles scope file access, WebDAV and revoked credentials', async t => {
+  const f = await fixture(t);
+  const owner = { Authorization: 'Bearer ' + token };
+  const base = f.base + '/api/workspaces';
+  const create = async name => (await fetch(base, {
+    method: 'POST', headers: owner, body: JSON.stringify({ name })
+  })).json();
+  const one = await create('Team room');
+  const two = await create('Other room');
+  const address = base + '/' + one.id;
+  const invite = async role => (await fetch(address + '/members', {
+    method: 'POST', headers: owner, body: JSON.stringify({ name: role, role })
+  })).json();
+  const member = await invite('viewer');
+  const editor = await invite('editor');
+  const view = { Authorization: 'Bearer ' + member.token };
+  const write = { Authorization: 'Bearer ' + editor.token };
+  const url = address + '/file?path=report.txt';
+  assert.equal((await fetch(base + '/' + two.id, { headers: view })).status, 401);
+  assert.equal((await fetch(url, { method: 'PUT', headers: view, body: 'secret' })).status, 403);
+  assert.equal((await fetch(url, { method: 'PUT', headers: { ...write, 'If-None-Match': '*' }, body: 'hello' })).status, 201);
+  assert.equal((await fetch(url, { method: 'PUT', headers: { ...write, 'If-Match': '"stale"' }, body: 'overwrite' })).status, 412);
+  assert.equal(await (await fetch(url, { headers: view })).text(), 'hello');
+  const partial = await fetch(url, { headers: { ...view, Range: 'bytes=1-3' } });
+  assert.equal(partial.status, 206);
+  assert.equal(await partial.text(), 'ell');
+  const dav = f.base + '/dav/' + one.id + '/';
+  const basic = { Authorization: 'Basic ' + Buffer.from('member:' + member.token).toString('base64') };
+  const listing = await fetch(dav, { method: 'PROPFIND', headers: { ...basic, Depth: '1' } });
+  assert.equal(listing.status, 207);
+  assert.match(await listing.text(), /report\.txt/);
+  assert.equal((await fetch(dav + 'folder', { method: 'MKCOL', headers: basic })).status, 403);
+  assert.equal((await fetch(address + '/members/' + member.id, { method: 'DELETE', headers: owner })).status, 204);
+  assert.equal((await fetch(url, { headers: view })).status, 401);
+});
+
+test('workspace browser serves a same-origin app while files require credentials', async t => {
+  const f = await fixture(t);
+  const page = await fetch(f.base + '/drive');
+  assert.equal(page.status, 200);
+  assert.match(page.headers.get('content-security-policy'), /connect-src 'self'/);
+  assert.match(await page.text(), /TeleDrive Workspaces/);
+  assert.equal((await fetch(f.base + '/drive/app.js')).status, 200);
+  assert.equal((await fetch(f.base + '/api/workspaces')).status, 401);
+});

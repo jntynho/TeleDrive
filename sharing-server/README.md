@@ -33,3 +33,13 @@ Local tests use loopback HTTP to exercise the server. They do not establish depl
 Open Public links → File requests to make a single-use upload link. The recipient can open the link in a browser and submit one file. Only the authenticated owner can list or download the incoming copy. Use Save to drive to verify its SHA-256 and queue it for the current Telegram drive.
 
 The owner controls the size limit and expiry. The service reserves at most 100 requests and at most 2 GiB in total (or four times the configured server file limit, whichever is smaller). Expiry or revocation removes the server copy. Use Save to drive before expiry. The recipient can submit arbitrary data, so use the normal file preview safeguards when opening the received file.
+
+## Team workspaces and WebDAV
+
+Open **Settings → Account → Team workspaces** in the Android app or visit `https://your-server.example/drive` in a browser. A server owner can create workspaces and issue member tokens with viewer or editor permissions. Copy the workspace ID and the member's access token for them. Revoking the membership stops future requests made with that token.
+
+Android can copy a backed-up file to a selected team workspace or verify and import a team file into the active Telegram drive. Shared workspace copies live on the HTTPS server. Team authorization uses separate tokens. The server receives neither Telegram sign-in credentials nor a content encryption key.
+
+For rclone, configure a **WebDAV** remote against `https://your-server.example/dav/<workspace-id>/`. Use the **Other** vendor, any nonempty username and the member's token as the password. A viewer can list and download files. An editor can also create folders, upload files, move into unoccupied destinations and delete files. HTTP range downloads are supported.
+
+For the desktop window, use [TeleDrive desktop](../desktop/README.md). The web and desktop clients connect to the team workspace service independently of the Android app.

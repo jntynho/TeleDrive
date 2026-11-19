@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TeleDrive Workspaces</title>
+  <link rel="stylesheet" href="/drive/ui.css">
+  <script type="module" src="/drive/app.js"></script>
+</head>
+<body>
+  <header><a href="/drive" class="brand"><span aria-hidden="true">T</span>TeleDrive Workspaces</a><button id="sign-out" class="secondary" hidden>Disconnect</button></header>
+  <main>
+    <section id="login">
+      <h1>Open a workspace</h1>
+      <form id="login-form">
+        <label>Workspace ID <small>Leave blank for owner access</small><input id="workspace" autocomplete="off"></label>
+        <label>Access token<input id="access" type="password" required autocomplete="off"></label>
+        <button>Connect</button>
+      </form>
+    </section>
+    <section id="owner" hidden>
+      <h1>Your workspaces</h1>
+      <form id="new-space" class="inline"><label>Workspace name<input name="name" maxlength="180" required></label><button>Create</button></form>
+      <ul id="spaces"></ul>
+    </section>
+    <section id="files" hidden>
+      <button id="back-owner" class="secondary" hidden>All workspaces</button>
+      <h1 id="name"></h1>
+      <nav id="path" aria-label="Folder path"></nav>
+      <div id="editing" class="toolbar" hidden>
+        <label class="upload">Upload file<input id="upload" type="file"></label>
+        <form id="mkdir" class="inline"><label>New folder<input name="name" maxlength="180" required></label><button>Create folder</button></form>
+      </div>
+      <ul id="entries"></ul>
+      <details id="members" hidden>
+        <summary>Members</summary>
+        <form id="invite" class="inline">
+          <label>Name<input name="name" required maxlength="180"></label>
+          <label>Role<select name="role"><option value="viewer">Viewer</option><option value="editor">Editor</option></select></label>
+          <button>Create invite</button>
+        </form>
+        <div id="invite-result" hidden><label>Member access token<input id="member-token" readonly></label><button id="copy-invite" class="secondary">Copy access token</button></div>
+        <ul id="member-list"></ul>
+      </details>
+    </section>
+    <p role="status" id="status" aria-live="polite"></p>
+  </main>
+</body>
+</html>

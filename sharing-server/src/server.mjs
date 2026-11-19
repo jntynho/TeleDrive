@@ -1,5 +1,6 @@
 import http from 'node:http';
 import { uploadRequests } from './upload-requests.mjs';
+import { createWorkspaceRouter } from './workspaces.mjs';
 import { randomBytes, createHash, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { mkdir, readFile, writeFile, rename, unlink, readdir } from 'node:fs/promises';
@@ -47,10 +48,23 @@ export async function createSharingServer({ directory, ownerToken, publicOrigin,
   }
   async function body(req,max=4096) {let bytes=0;const chunks=[];for await(const c of req){bytes+=c.length;if(bytes>max)throw Object.assign(new Error('Body too large'),{status:413});chunks.push(c);}return Buffer.concat(chunks).toString('utf8');}
   const incoming = await uploadRequests({ directory, origin, maxBytes, clock, reply, headers, body, rate });
+  const workspace = await createWorkspaceRouter({ directory, origin, clock, maxBytes, authenticated, body, reply, headers });
+  const portal = new Map(await Promise.all([
+    ['index.html','text/html'],['app.js','text/javascript'],['ui.css','text/css']
+  ].map(async ([file,type]) => [file, [type, await readFile(new URL('../web/'+file, import.meta.url), 'utf8')]])));
   const server=http.createServer(async(req,res)=>{
     try {
       const url=new URL(req.url,'http://local');const segments=url.pathname.split('/').filter(Boolean);
       if(req.method==='GET'&&url.pathname==='/health'){reply(res,200,{ok:true});return;}
+      if (req.method === 'GET' && segments[0] === 'drive' && segments.length <= 2) {
+        const asset = portal.get(segments[1] || 'index.html');
+        if (asset) {
+          res.writeHead(200, {...headers, 'Content-Type': asset[0]+'; charset=utf-8',
+            'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'"});
+          return res.end(asset[1]);
+        }
+      }
+      if(await workspace(req,res,url,segments))return;
       if(segments[0]==='u'){await incoming.publicEndpoint(req,res,segments);return;}
       if(segments[0]==='api'){
         if(!authenticated(req)){reply(res,401,{error:'Unauthorized'});return;}
