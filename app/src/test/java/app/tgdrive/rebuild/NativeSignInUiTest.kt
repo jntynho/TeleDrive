@@ -22,6 +22,7 @@ import com.infinity.drive.domain.repository.*
 import com.infinity.drive.di.appModules
 import com.infinity.drive.presentation.onboarding.*
 import com.infinity.drive.presentation.platform.ProvidePlatformActions
+import com.infinity.drive.presentation.recovery.RecoveryExportScreen
 import com.infinity.drive.presentation.theme.DriveInfinityTheme
 import kotlinx.coroutines.flow.*
 import org.junit.*
@@ -153,6 +154,31 @@ class NativeSignInUiTest {
         compose.waitUntil(10_000) {
             compose.onAllNodesWithText("Continue with account ending in ••••0123").fetchSemanticsNodes().isNotEmpty()
         }
+    }
+
+    @Test fun recoveryExportChecksForATokenBeforeShowingPasswordFields() {
+        val ready = MutableStateFlow<TelegramAuthState>(TelegramAuthState.Ready)
+        var recovery: TelegramLoginRecovery? = null
+        val client = Proxy.newProxyInstance(
+            TelegramClient::class.java.classLoader, arrayOf(TelegramClient::class.java)
+        ) { _, method, _ ->
+            when (method.name) {
+                "getAuthState" -> ready
+                "getLoginRecovery" -> recovery
+                else -> error("Unexpected Telegram method ${method.name}")
+            }
+        } as TelegramClient
+        loadKoinModules(module { single<TelegramClient> { client } })
+        activity.get().setContent { DriveInfinityTheme { RecoveryExportScreen(onBack = {}) } }
+
+        compose.onNodeWithText("This Telegram session has no recovery token to export.", substring = true)
+            .assertIsDisplayed()
+        compose.onNode(hasSetTextAction()).assertDoesNotExist()
+
+        compose.runOnIdle { recovery = TelegramLoginRecovery(42, "+447700900123", "test-token") }
+        compose.onNodeWithText("Check again", substring = false).performClick()
+        compose.onNodeWithText("File password", substring = false).assertIsDisplayed()
+        compose.onNodeWithText("Confirm password", substring = false).assertIsDisplayed()
     }
 
     @Test fun nativePhoneAndCodeEditorsSupportPasteAndImeSubmissionWithoutAnEmbeddedKeyboard(){

@@ -10,6 +10,8 @@ Content keys, API credentials and the local TDLib key are wrapped with Android K
 
 Use the key backup/passphrase and recovery options before relying on encrypted uploads. The reference passphrase KDF is PBKDF2-HMAC-SHA256 (310,000 iterations, random salt); keep recovery material outside the phone. Telegram login cannot recover a lost content key. This derivative has not received an independent cryptographic audit.
 
+The separate sign-in recovery file requires a future authentication token from Telegram. TeleDrive checks for this token before asking for a file password. If it is unavailable, keep your active session and use QR sign-in from another signed-in device if you need to reconnect. Telegram may still require its two-step verification password. [Telegram authorization documentation](https://core.telegram.org/api/auth#future-auth-tokens)
+
 ## Local access and permissions
 
 App lock uses device authentication and a configurable timeout. Screen-capture blocking is available. A UI lock is not a promise to stop uploads: the reference background workers can continue with device-held keys. Biometric verification itself is implemented by Android.

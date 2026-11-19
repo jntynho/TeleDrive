@@ -20,10 +20,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -57,6 +59,8 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import kotlin.coroutines.coroutineContext
 
+private enum class RecoveryAvailability { Checking, Available, Unavailable, Failed }
+
 @Composable
 internal fun RecoveryExportScreen(onBack: () -> Unit) {
     SensitiveScreen()
@@ -73,6 +77,8 @@ internal fun RecoveryExportScreen(onBack: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var saved by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<StringResource?>(null) }
+    var availability by remember { mutableStateOf(RecoveryAvailability.Checking) }
+    var checkAttempt by remember { mutableIntStateOf(0) }
 
     fun clearPassphrases() {
         passphrase = ""
@@ -85,10 +91,20 @@ internal fun RecoveryExportScreen(onBack: () -> Unit) {
     }
     DisposableEffect(appLock) { onDispose { finishPicker() } }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { clearPassphrases() }
-    LaunchedEffect(auth) {
+    LaunchedEffect(auth, checkAttempt) {
         if (auth != TelegramAuthState.Ready) {
+            availability = RecoveryAvailability.Checking
             pendingFile = null
             clearPassphrases()
+        } else if (!saved) {
+            availability = try {
+                if (telegram.getLoginRecovery() == null) RecoveryAvailability.Unavailable
+                else RecoveryAvailability.Available
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (_: Exception) {
+                RecoveryAvailability.Failed
+            }
         }
     }
 
@@ -129,7 +145,8 @@ internal fun RecoveryExportScreen(onBack: () -> Unit) {
         }
     }
 
-    val editable = !busy && pendingFile == null && !saved && auth == TelegramAuthState.Ready
+    val canEnterPassword = auth == TelegramAuthState.Ready && availability == RecoveryAvailability.Available
+    val editable = !busy && pendingFile == null && !saved && canEnterPassword
     val match = passphrase == confirmation
     AppBackHandler(busy || pendingFile != null) {}
     Scaffold(
@@ -149,7 +166,7 @@ internal fun RecoveryExportScreen(onBack: () -> Unit) {
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            if (!saved) {
+            if (!saved && canEnterPassword) {
                 Text(
                     stringResource(Res.string.recovery_export_instructions, LoginRecoveryFile.MIN_PASSPHRASE_LENGTH),
                     style = MaterialTheme.typography.bodyMedium,
@@ -175,7 +192,7 @@ internal fun RecoveryExportScreen(onBack: () -> Unit) {
                                 try {
                                     val recovery = telegram.getLoginRecovery()
                                     if (recovery == null) {
-                                        message = Res.string.recovery_export_no_token
+                                        availability = RecoveryAvailability.Unavailable
                                     } else {
                                         val bytes = withContext(Dispatchers.Default) {
                                             LoginRecoveryFile.encrypt(recovery, secret)
@@ -203,13 +220,35 @@ internal fun RecoveryExportScreen(onBack: () -> Unit) {
                     Text(stringResource(if (busy) Res.string.recovery_export_working else Res.string.recovery_export_next))
                 }
             }
-            val status = if (auth != TelegramAuthState.Ready)
-                Res.string.recovery_export_sign_in else message
+            val status = when {
+                auth != TelegramAuthState.Ready -> Res.string.recovery_export_sign_in
+                saved -> message
+                availability == RecoveryAvailability.Checking -> Res.string.recovery_export_checking
+                availability == RecoveryAvailability.Unavailable -> Res.string.recovery_export_no_token
+                availability == RecoveryAvailability.Failed -> Res.string.recovery_export_check_error
+                else -> message
+            }
             if (status != null) {
                 Text(
                     stringResource(status),
-                    color = if (saved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                    color = when (status) {
+                        Res.string.recovery_export_saved -> MaterialTheme.colorScheme.primary
+                        Res.string.recovery_export_checking -> MaterialTheme.colorScheme.onSurfaceVariant
+                        else -> MaterialTheme.colorScheme.error
+                    }
                 )
+            }
+            if (status == Res.string.recovery_export_checking) {
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
+            if (status == Res.string.recovery_export_no_token || status == Res.string.recovery_export_check_error) {
+                TextButton(onClick = {
+                    availability = RecoveryAvailability.Checking
+                    message = null
+                    checkAttempt++
+                }, enabled = !busy) {
+                    Text(stringResource(Res.string.recovery_export_check_again))
+                }
             }
         }
     }

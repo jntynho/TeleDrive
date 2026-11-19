@@ -118,7 +118,7 @@
     <string name="key_file_export">تصدير مفتاح التشفير</string>
     <string name="key_file_import">استيراد مفتاح التشفير</string>
     <string name="recovery_export_title">إنشاء ملف استرداد تسجيل الدخول</string>
-    <string name="recovery_export_subtitle">احفظ رمز تسجيل دخول Telegram في ملف مشفّر</string>
+    <string name="recovery_export_subtitle">متاح عندما يوفّر Telegram رمزًا لتسجيل الدخول</string>
     <string name="recovery_export_auth_prompt">أكّد هويتك لإنشاء ملف الاسترداد</string>
     <string name="recovery_export_instructions">استخدم %1$d أحرف أو أرقام على الأقل، وأدخل كلمة السر نفسها مرتين. يصعب تخمين كلمة السر الأطول.</string>
     <string name="recovery_export_passphrase">كلمة سر الملف</string>
@@ -127,7 +127,10 @@
     <string name="recovery_hide_password">إخفاء كلمة السر</string>
     <string name="recovery_export_mismatch">يجب أن تتطابق كلمتا السر</string>
     <string name="recovery_export_next">التالي</string>
-    <string name="recovery_export_no_token">لم يوفّر Telegram رمز استرداد لهذه الجلسة.</string>
+    <string name="recovery_export_checking">جارٍ التحقق من توفر رمز استرداد من Telegram…</string>
+    <string name="recovery_export_check_error">تعذّر التحقق من توفر رمز الاسترداد. حاول مرة أخرى.</string>
+    <string name="recovery_export_check_again">التحقق مجددًا</string>
+    <string name="recovery_export_no_token">لا يتوفر رمز استرداد يمكن تصديره من جلسة Telegram الحالية. إذا احتجت إلى تسجيل الدخول مجددًا، يمكنك استخدام رمز QR عبر جلسة Telegram نشطة على جهاز آخر.</string>
     <string name="recovery_export_prepare_error">تعذّر تجهيز ملف الاسترداد. حاول مرة أخرى.</string>
     <string name="recovery_export_save_error">تعذّر حفظ ملف الاسترداد. جرّب مكانًا آخر.</string>
     <string name="recovery_export_saved">تم حفظ ملف الاسترداد</string>

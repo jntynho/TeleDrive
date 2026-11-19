@@ -925,7 +925,7 @@
     <string name="settings_dashboard_style">Dashboard Style</string>
     <string name="settings_skip_files_smaller_than">Skip files smaller than</string>
     <string name="recovery_export_title">Create sign-in recovery file</string>
-    <string name="recovery_export_subtitle">Save an encrypted Telegram sign-in token</string>
+    <string name="recovery_export_subtitle">Available when Telegram provides a sign-in token</string>
     <string name="recovery_export_auth_prompt">Verify your identity to create a recovery file</string>
     <string name="recovery_export_instructions">Use at least %1$d characters and enter the same password twice. A longer password is harder to guess.</string>
     <string name="recovery_export_passphrase">File password</string>
@@ -934,7 +934,10 @@
     <string name="recovery_hide_password">Hide password</string>
     <string name="recovery_export_mismatch">The passwords must match</string>
     <string name="recovery_export_next">Next</string>
-    <string name="recovery_export_no_token">Telegram hasn’t provided a recovery token for this session.</string>
+    <string name="recovery_export_checking">Checking for a Telegram recovery token…</string>
+    <string name="recovery_export_check_error">Couldn’t check for a recovery token. Try again.</string>
+    <string name="recovery_export_check_again">Check again</string>
+    <string name="recovery_export_no_token">This Telegram session has no recovery token to export. If you need to sign in again, you can use a QR code with an active Telegram session on another device.</string>
     <string name="recovery_export_prepare_error">Couldn’t prepare the recovery file. Try again.</string>
     <string name="recovery_export_save_error">Couldn’t save the recovery file. Try another location.</string>
     <string name="recovery_export_saved">Recovery file saved</string>
