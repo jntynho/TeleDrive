@@ -27,6 +27,11 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import java.io.File
 import java.io.InputStream
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.time.format.ResolverStyle
 
 internal data class PhotoPlace(val latitude: Double, val longitude: Double)
 internal data class DatedPhoto(val file: DriveFile, val capturedAt: Long?, val place: PhotoPlace?) {
@@ -123,7 +128,10 @@ internal class AndroidPhotoHistory(
 
     private fun metadata(file: DriveFile, exif: ExifInterface): DatedPhoto = DatedPhoto(
         file,
-        exif.dateTimeOriginal?.takeIf { it > 0 },
+        exifCaptureTime(
+            exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL),
+            exif.getAttribute(ExifInterface.TAG_OFFSET_TIME_ORIGINAL)
+        ),
         exif.latLong?.takeIf { it.size >= 2 && it[0] in -90.0..90.0 && it[1] in -180.0..180.0 }
             ?.let { PhotoPlace(it[0], it[1]) }
     )
@@ -133,3 +141,15 @@ internal class AndroidPhotoHistory(
         const val MAX_REMOTE_BYTES = 48L * 1024 * 1024
     }
 }
+
+private val originalExifTime = DateTimeFormatter.ofPattern("uuuu:MM:dd HH:mm:ss", java.util.Locale.ROOT)
+    .withResolverStyle(ResolverStyle.STRICT)
+
+internal fun exifCaptureTime(value: String?, offset: String?, localZone: ZoneId = ZoneId.systemDefault()): Long? =
+    value?.let { raw ->
+        runCatching {
+            val time = LocalDateTime.parse(raw.trim(), originalExifTime)
+            val zone = offset?.trim()?.takeIf(String::isNotEmpty)?.let(ZoneOffset::of) ?: localZone
+            time.atZone(zone).toInstant().toEpochMilli()
+        }.getOrNull()
+    }
