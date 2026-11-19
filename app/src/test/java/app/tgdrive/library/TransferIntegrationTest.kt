@@ -14,6 +14,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 /** Real repository/SQLite/queue/cache with a fake Telegram wire; never contacts a real account. */
 @OptIn(ExperimentalCoroutinesApi::class,DelicateCoroutinesApi::class,ObsoleteCoroutinesApi::class)
@@ -353,13 +355,15 @@ class TransferIntegrationTest {
         open();wire.holdUploads=true
         engine.enqueueUpload(listOf(source("first native upload".toByteArray(),"a.jpg"),source("second native upload".toByteArray(),"b.jpg"),source("third native upload".toByteArray(),"c.jpg")))
         val running=launch{engine.drain(20_000)}
-        withTimeout(5_000){while(wire.inFlightUploads.size<2)delay(10)}
+        // A preliminary upload is cancellable by the engine once it has received its native ID.
+        withTimeout(5_000){while(wire.observedUploads.size<2)delay(10)}
         assertEquals(2,wire.maxConcurrentUploads);assertEquals(0,wire.sendCalls)
         val first=repo.state.value.tasks.first{it.state==TaskState.TRANSFERRING}
         val originalText=File(Uri.parse(first.source).path!!).readText()
         val firstNative=wire.files.values.first{File(it.local.path).readText()==originalText}.id
         engine.pause(first.id)
         assertTrue(firstNative in wire.cancelledUploads)
+        assertEquals(1,wire.inFlightUploads.size)
         assertEquals(TaskState.PAUSED,engine.task(first.id).state)
         wire.holdUploads=false;wire.readyUploads.addAll(wire.inFlightUploads)
         running.join()
@@ -508,7 +512,7 @@ class TransferIntegrationTest {
         engine.completed={callbacks.incrementAndGet()}
         engine.enqueueUpload(listOf(source("first content".toByteArray(),"first.bin"),source("second content".toByteArray(),"second.bin")))
         val run=launch{engine.drain(20_000)}
-        withTimeout(5_000){while(wire.inFlightUploads.size<2||wire.getFileCalls<2)delay(5)}
+        withTimeout(5_000){while(wire.observedUploads.size<2)delay(5)}
         val first=wire.inFlightUploads.first()
         wire.completeUpload(first)
         withTimeout(5_000){while(repo.state.value.tasks.none{it.state==TaskState.COMPLETED}||callbacks.get()==0)delay(5)}
@@ -587,7 +591,7 @@ class TransferIntegrationTest {
         assertTrue(repo.state.value.tasks.isEmpty())
     }
     private class MemorySettings:SessionSettings {
-        private val values=java.util.concurrent.ConcurrentHashMap<String,String>()
+        private val values=ConcurrentHashMap<String,String>()
         override fun get(name:String)=values[name]
         override fun put(name:String,value:String){values[name]=value}
         override fun databaseKey()=ByteArray(32)
@@ -598,70 +602,77 @@ class TransferIntegrationTest {
         var userId=1701L;var next=100L;var failPart:Int?=null;var stall=false;var stallDownload=false
         @Volatile var downloading=false
         val cancelledDownloads=mutableListOf<Int>()
-        val cancelledUploads=mutableListOf<Int>()
-        var holdUploads=false;var preliminaryWait=0;var holdUploadRelease=false
-        var historyCalls=0;var getFileCalls=0;var forbidGetFile=false
+        val cancelledUploads=CopyOnWriteArrayList<Int>()
+        @Volatile var holdUploads=false
+        var preliminaryWait=0;var holdUploadRelease=false
+        var historyCalls=0
+        @Volatile var getFileCalls=0
+        @Volatile var forbidGetFile=false
         var partSent:((Int)->Unit)?=null
         fun completeUpload(id:Int){
             val file=files.getValue(id);file.remote.isUploadingCompleted=true;file.remote.isUploadingActive=false;file.remote.uploadedSize=file.size
             readyUploads.add(id);inFlightUploads.remove(id);update!!(TdApi.UpdateFile(file))
         }
         var maxConcurrentUploads=0
-        val inFlightUploads=java.util.concurrent.ConcurrentHashMap.newKeySet<Int>()
-        val readyUploads=java.util.concurrent.ConcurrentHashMap.newKeySet<Int>()
-        val messages=mutableMapOf<Long,TdApi.Message>();val files=mutableMapOf<Int,TdApi.File>()
+        val inFlightUploads=ConcurrentHashMap.newKeySet<Int>()
+        val readyUploads=ConcurrentHashMap.newKeySet<Int>()
+        val observedUploads=ConcurrentHashMap.newKeySet<Int>()
+        val messages=mutableMapOf<Long,TdApi.Message>();val files=ConcurrentHashMap<Int,TdApi.File>()
         val uploadedIndices=mutableListOf<Int>();val deleted=mutableListOf<Long>();var history=emptyList<TdApi.Message>()
         override fun create(onUpdate:(TdApi.Object)->Unit,onError:()->Unit):TdConnection {
             update=onUpdate
             return object:TdConnection {override fun send(function:TdApi.Function<*>,result:(TdApi.Object)->Unit) {
-                if(function is TdApi.SendMessage){sendCalls++;if(sendWait>0){result(TdApi.Error(429,"Too Many Requests: retry after $sendWait"));return}}
-                if(failMetadata && function is TdApi.SendMessage && function.inputMessageContent is TdApi.InputMessageText){result(TdApi.Error(500,"metadata temporary failure"));return}
-                if(function is TdApi.DownloadFile&&stallDownload){downloading=true;return}
-                if(function is TdApi.CancelPreliminaryUploadFile&&holdUploadRelease){cancelledUploads.add(function.fileId);inFlightUploads.remove(function.fileId);return}
-                if(stall&&function is TdApi.SendMessage&&function.inputMessageContent is TdApi.InputMessageDocument)return
-                val answer:TdApi.Object=when(function){
-                    is TdApi.GetMe->TdApi.User().apply{id=this@Wire.userId;firstName="Test"}
-                    is TdApi.CreatePrivateChat->TdApi.Chat().apply{id=this@Wire.userId}
-                    is TdApi.GetChatHistory->{historyCalls++;TdApi.Messages().apply{messages=if(function.fromMessageId==0L)history.toTypedArray() else emptyArray()}}
-                    is TdApi.GetMessage->messages[function.messageId]?:TdApi.Error(404,"message not found")
-                    is TdApi.PreliminaryUploadFile->{
-                        if(preliminaryWait>0)TdApi.Error(429,"Too Many Requests: retry after $preliminaryWait")else {
-                            val source=File((function.file as TdApi.InputFileLocal).path)
-                            val id=(++next).toInt();val copy=File(directory,"upload-$id.bin");source.copyTo(copy,true)
-                            TdApi.File().apply{this.id=id;size=copy.length();expectedSize=size;local=TdApi.LocalFile().apply{path=copy.absolutePath;isDownloadingCompleted=true;downloadedSize=size};remote=TdApi.RemoteFile().apply{isUploadingActive=holdUploads;isUploadingCompleted=!holdUploads;uploadedSize=if(holdUploads)0 else size}}.also{
-                                files[id]=it
-                                if(holdUploads){inFlightUploads.add(id);maxConcurrentUploads=maxOf(maxConcurrentUploads,inFlightUploads.size)}
-                            }
-                        }
-                    }
-                    is TdApi.GetFile->{
-                        getFileCalls++;check(!forbidGetFile){"Completion event should not require another poll"}
-                        files[function.fileId]?.also{file->
-                        if(function.fileId in readyUploads){file.remote.isUploadingCompleted=true;file.remote.isUploadingActive=false;file.remote.uploadedSize=file.size;inFlightUploads.remove(function.fileId)}
-                    }?:TdApi.Error(404,"file not found")}
-                    is TdApi.CancelPreliminaryUploadFile->{cancelledUploads.add(function.fileId);inFlightUploads.remove(function.fileId);TdApi.Ok()}
-                    is TdApi.DownloadFile->files[function.fileId]!!
-                    is TdApi.CancelDownloadFile->{cancelledDownloads.add(function.fileId);TdApi.Ok()}
-                    is TdApi.DeleteMessages->{deleted.addAll(function.messageIds.toList());function.messageIds.forEach{messages.remove(it)};TdApi.Ok()}
-                    is TdApi.SendMessage->when(val content=function.inputMessageContent){
-                        is TdApi.InputMessageText->text(++next,content.text.text).also{messages[it.id]=it}
-                        is TdApi.InputMessageDocument->{
-                            val caption=content.caption.text
-                            val part=if(caption.startsWith(CloudCodec.PART))caption.removePrefix(CloudCodec.PART).model<PartCaption>().index else if(caption.startsWith(EmbeddedUpload.PREFIX))0 else null
-                            if(part==failPart&&part!=null)TdApi.Error(500,"simulated temporary failure") else {
-                                if(part!=null){uploadedIndices.add(part);partSent?.invoke(part)}
-                                val id=++next;val source=when(val input=content.document.document){is TdApi.InputFileId->File(files[input.id]!!.local.path);is TdApi.InputFileLocal->File(input.path);else->error("Unexpected input file") };val target=File(directory,"$id.bin");source.copyTo(target,true)
-                                val native=TdApi.File().apply{this.id=id.toInt();size=target.length();expectedSize=size;local=TdApi.LocalFile().apply{path=target.absolutePath;isDownloadingCompleted=true;downloadedSize=size};remote=TdApi.RemoteFile()}
-                                files[native.id]=native
-                                TdApi.Message().apply{this.id=id;chatId=1701;this.content=TdApi.MessageDocument().apply{document=TdApi.Document().apply{fileName=target.name;mimeType="application/octet-stream";document=native};this.caption=TdApi.FormattedText(caption,emptyArray())}}.also{messages[id]=it}
-                            }
-                        }
-                        else->TdApi.Error(400,"unsupported test content")
-                    }
-                    else->TdApi.Ok()
-                }
-                result(answer)
+                result(response(function) ?: return)
             }}
+        }
+        private fun response(function:TdApi.Function<*>):TdApi.Object?=synchronized(this) {
+            if(function is TdApi.SendMessage){sendCalls++;if(sendWait>0)return@synchronized TdApi.Error(429,"Too Many Requests: retry after $sendWait")}
+            if(failMetadata && function is TdApi.SendMessage && function.inputMessageContent is TdApi.InputMessageText)return@synchronized TdApi.Error(500,"metadata temporary failure")
+            if(function is TdApi.DownloadFile&&stallDownload){downloading=true;return@synchronized null}
+            if(function is TdApi.CancelPreliminaryUploadFile&&holdUploadRelease){cancelledUploads.add(function.fileId);inFlightUploads.remove(function.fileId);return@synchronized null}
+            if(stall&&function is TdApi.SendMessage&&function.inputMessageContent is TdApi.InputMessageDocument)return@synchronized null
+            when(function){
+                is TdApi.GetMe->TdApi.User().apply{id=this@Wire.userId;firstName="Test"}
+                is TdApi.CreatePrivateChat->TdApi.Chat().apply{id=this@Wire.userId}
+                is TdApi.GetChatHistory->{historyCalls++;TdApi.Messages().apply{messages=if(function.fromMessageId==0L)history.toTypedArray() else emptyArray()}}
+                is TdApi.GetMessage->messages[function.messageId]?:TdApi.Error(404,"message not found")
+                is TdApi.PreliminaryUploadFile->{
+                    if(preliminaryWait>0)TdApi.Error(429,"Too Many Requests: retry after $preliminaryWait")else {
+                        val source=File((function.file as TdApi.InputFileLocal).path)
+                        val id=(++next).toInt();val copy=File(directory,"upload-$id.bin");source.copyTo(copy,true)
+                        TdApi.File().apply{this.id=id;size=copy.length();expectedSize=size;local=TdApi.LocalFile().apply{path=copy.absolutePath;isDownloadingCompleted=true;downloadedSize=size};remote=TdApi.RemoteFile().apply{isUploadingActive=holdUploads;isUploadingCompleted=!holdUploads;uploadedSize=if(holdUploads)0 else size}}.also{
+                            files[id]=it
+                            if(holdUploads){inFlightUploads.add(id);maxConcurrentUploads=maxOf(maxConcurrentUploads,inFlightUploads.size)}
+                        }
+                    }
+                }
+                is TdApi.GetFile->{
+                    getFileCalls++;check(!forbidGetFile){"Completion event should not require another poll"}
+                    files[function.fileId]?.also{file->
+                    if(function.fileId in inFlightUploads)observedUploads.add(function.fileId)
+                    if(function.fileId in readyUploads){file.remote.isUploadingCompleted=true;file.remote.isUploadingActive=false;file.remote.uploadedSize=file.size;inFlightUploads.remove(function.fileId)}
+                }?:TdApi.Error(404,"file not found")}
+                is TdApi.CancelPreliminaryUploadFile->{cancelledUploads.add(function.fileId);inFlightUploads.remove(function.fileId);TdApi.Ok()}
+                is TdApi.DownloadFile->files[function.fileId]!!
+                is TdApi.CancelDownloadFile->{cancelledDownloads.add(function.fileId);TdApi.Ok()}
+                is TdApi.DeleteMessages->{deleted.addAll(function.messageIds.toList());function.messageIds.forEach{messages.remove(it)};TdApi.Ok()}
+                is TdApi.SendMessage->when(val content=function.inputMessageContent){
+                    is TdApi.InputMessageText->text(++next,content.text.text).also{messages[it.id]=it}
+                    is TdApi.InputMessageDocument->{
+                        val caption=content.caption.text
+                        val part=if(caption.startsWith(CloudCodec.PART))caption.removePrefix(CloudCodec.PART).model<PartCaption>().index else if(caption.startsWith(EmbeddedUpload.PREFIX))0 else null
+                        if(part==failPart&&part!=null)TdApi.Error(500,"simulated temporary failure") else {
+                            if(part!=null){uploadedIndices.add(part);partSent?.invoke(part)}
+                            val id=++next;val source=when(val input=content.document.document){is TdApi.InputFileId->File(files[input.id]!!.local.path);is TdApi.InputFileLocal->File(input.path);else->error("Unexpected input file") };val target=File(directory,"$id.bin");source.copyTo(target,true)
+                            val native=TdApi.File().apply{this.id=id.toInt();size=target.length();expectedSize=size;local=TdApi.LocalFile().apply{path=target.absolutePath;isDownloadingCompleted=true;downloadedSize=size};remote=TdApi.RemoteFile()}
+                            files[native.id]=native
+                            TdApi.Message().apply{this.id=id;chatId=1701;this.content=TdApi.MessageDocument().apply{document=TdApi.Document().apply{fileName=target.name;mimeType="application/octet-stream";document=native};this.caption=TdApi.FormattedText(caption,emptyArray())}}.also{messages[id]=it}
+                        }
+                    }
+                    else->TdApi.Error(400,"unsupported test content")
+                }
+                else->TdApi.Ok()
+            }
         }
         fun text(id:Long,text:String)=TdApi.Message().apply{this.id=id;chatId=1701;content=TdApi.MessageText().apply{this.text=TdApi.FormattedText(text,emptyArray())}}
     }
