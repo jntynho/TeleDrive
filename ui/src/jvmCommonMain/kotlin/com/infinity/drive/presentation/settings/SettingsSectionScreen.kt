@@ -995,7 +995,7 @@ private fun AppearanceSection(
                 title = stringResource(Res.string.settings_icon_style),
                 subtitle = iconStyleLabel(prefs.iconStyle),
                 onClick = { showIconStyleDialog = true },
-                trailing = { Icon(DriveIcons.Folder, contentDescription = null, modifier = Modifier.size(24.dp)) }
+                trailing = { Icon(DriveIcons.IconStyle, contentDescription = null, modifier = Modifier.size(24.dp)) }
             )
         }
 

@@ -97,7 +97,7 @@ import kotlin.math.min
     val toolbar: @Composable ()->Unit = {
         TopAppBar(modifier=Modifier.onSizeChanged{toolbarPixels=it.height},title={Text(item.name,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,style=MaterialTheme.typography.titleSmall.copy(shadow=if(visual)androidx.compose.ui.graphics.Shadow(androidx.compose.ui.graphics.Color.Black,Offset(0f,1f),6f)else null))},
             navigationIcon={IconButton(onBack,Modifier.padding(start=8.dp)){ContrastIcon(DriveIcons.ArrowBack,"Back",visual)}},
-            actions={IconButton({menu=true}){ContrastIcon(DriveIcons.MoreHoriz,"File actions",visual)}},
+            actions={IconButton({menu=true}){ContrastIcon(DriveIcons.MoreVert,"File actions",visual)}},
             colors=TopAppBarDefaults.topAppBarColors(containerColor=if(visual)androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.background,
                 titleContentColor=if(visual)androidx.compose.ui.graphics.Color.White else MaterialTheme.colorScheme.onBackground,
                 navigationIconContentColor=if(visual)androidx.compose.ui.graphics.Color.White else MaterialTheme.colorScheme.onBackground,

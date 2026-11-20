@@ -97,7 +97,7 @@ fun FilesPage(state: LibraryState,bundle: SessionBundle,system: SystemActions,on
             if(folder.isNotEmpty())item{TextButton(onClick={folder=current?.parentId?:"";storedSelection=emptySet()}){Icon(DriveIcons.ArrowBack,null);Spacer(Modifier.width(6.dp));Text("Parent folder")}}
             if(state.syncing)item{LinearProgressIndicator(Modifier.fillMaxWidth());Text("Reconciling your Telegram index…",style=MaterialTheme.typography.labelSmall)}
             items(folders,key={"folder:${it.id}"}){f->Surface(shape=DriveStyle.CardShape,color=MaterialTheme.colorScheme.surface,modifier=Modifier.animateItem().combinedClickable(role=Role.Button,onClickLabel="Open folder ${f.name}",onClick={folder=f.id},onLongClick={folderActionId=f.id},onLongClickLabel="Folder actions")){
-                Row(Modifier.fillMaxWidth().padding(16.dp),verticalAlignment=Alignment.CenterVertically){Icon(DriveIcons.Folder,null,tint=MaterialTheme.colorScheme.primary);Spacer(Modifier.width(14.dp));Text(f.name,Modifier.weight(1f),fontWeight=FontWeight.Medium);IconButton(onClick={folderActionId=f.id}){Icon(DriveIcons.MoreHoriz,"Actions for folder ${f.name}")}}
+                Row(Modifier.fillMaxWidth().padding(16.dp),verticalAlignment=Alignment.CenterVertically){Icon(DriveIcons.Folder,null,tint=MaterialTheme.colorScheme.primary);Spacer(Modifier.width(14.dp));Text(f.name,Modifier.weight(1f),fontWeight=FontWeight.Medium);IconButton(onClick={folderActionId=f.id}){Icon(DriveIcons.MoreVert,"Actions for folder ${f.name}")}}
             }}
             if(computed==null)item{LinearProgressIndicator(Modifier.fillMaxWidth())}
             if(query.isNotBlank())item{Text("Searching all unlocked files",style=MaterialTheme.typography.labelSmall)}
@@ -166,12 +166,12 @@ fun folderPath(id:String,folders:List<Folder>):String {
 @Composable fun NativeFileCard(item:Item,local:LocalItem?,encrypted:Boolean,selected:Boolean,grid:Boolean,modifier:Modifier=Modifier,onClick:()->Unit,onLongClick:()->Unit,onMenu:()->Unit,bundle:SessionBundle?=null,selecting:Boolean=false){
     Surface(modifier=modifier.fillMaxWidth().semantics{this.selected=selected}.combinedClickable(role=Role.Button,onClickLabel=if(selecting)if(selected)"Deselect ${item.name}"else"Select ${item.name}"else"Open ${item.name}",onClick=onClick,onLongClick=onLongClick,onLongClickLabel="Select file"),shape=DriveStyle.CardShape,color=if(selected)MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface){
         if(grid)Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(9.dp)){
-            Row(verticalAlignment=Alignment.CenterVertically){FileThumbnail(item,bundle,Modifier.size(72.dp));Spacer(Modifier.weight(1f));IconButton(onClick=onMenu){Icon(DriveIcons.MoreHoriz,"Actions for ${item.name}")}}
+            Row(verticalAlignment=Alignment.CenterVertically){FileThumbnail(item,bundle,Modifier.size(72.dp));Spacer(Modifier.weight(1f));IconButton(onClick=onMenu){Icon(DriveIcons.MoreVert,"Actions for ${item.name}")}}
             Text(item.name,maxLines=2,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.titleSmall);Text(formatBytes(item.size),style=MaterialTheme.typography.labelSmall);FileIndicators(item,local,encrypted)
         }else Row(Modifier.fillMaxWidth().padding(start=15.dp,end=6.dp,top=11.dp,bottom=11.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(13.dp)){
             if(selected)Icon(DriveIcons.CheckCircle,null,Modifier.size(38.dp),tint=MaterialTheme.colorScheme.primary) else FileThumbnail(item,bundle,Modifier.size(44.dp))
             Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)){Text(item.name,maxLines=2,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.titleSmall);Text("${formatBytes(item.size)} · ${DateFormat.getDateInstance(DateFormat.SHORT).format(Date(item.createdAt))}",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant);FileIndicators(item,local,encrypted)}
-            IconButton(onClick=onMenu){Icon(DriveIcons.MoreHoriz,"Actions for ${item.name}")}
+            IconButton(onClick=onMenu){Icon(DriveIcons.MoreVert,"Actions for ${item.name}")}
         }
     }
 }

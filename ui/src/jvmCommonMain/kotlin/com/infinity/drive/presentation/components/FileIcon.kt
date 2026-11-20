@@ -36,14 +36,14 @@ fun iconFor(category: FileCategory): ImageVector = when (category) {
 fun fileTypeIcon(name: String, mime: String, category: FileCategory = FileCategory.fromMimeType(mime)): ImageVector =
     when (fileExtension(name)) {
         "pdf" -> DriveIcons.PictureAsPdf
-        "apk", "apks", "xapk", "aab" -> DriveIcons.PhoneAndroid
+        "apk", "apks", "xapk", "aab" -> DriveIcons.PackageAndroid
         "zip", "7z", "rar", "tar", "gz", "bz2", "xz", "tgz" -> DriveIcons.Archive
-        "csv", "xls", "xlsx", "ods", "tsv" -> DriveIcons.GridView
-        "ppt", "pptx", "odp" -> DriveIcons.PhotoLibrary
+        "csv", "xls", "xlsx", "ods", "tsv" -> DriveIcons.SpreadsheetFile
+        "ppt", "pptx", "odp" -> DriveIcons.PresentationFile
         "txt", "doc", "docx", "odt", "rtf", "md", "epub" -> DriveIcons.Description
         "json", "xml", "html", "css", "js", "kt", "py", "sh", "sql", "yaml", "yml" -> DriveIcons.Code
         else -> when {
-            MimeTypes.isApk(mime, name) -> DriveIcons.PhoneAndroid
+            MimeTypes.isApk(mime, name) -> DriveIcons.PackageAndroid
             mime == "application/pdf" -> DriveIcons.PictureAsPdf
             else -> iconFor(FileCategory.fromMimeType(MimeTypes.fromFileName(name)).takeUnless { it == FileCategory.OTHER } ?: category)
         }

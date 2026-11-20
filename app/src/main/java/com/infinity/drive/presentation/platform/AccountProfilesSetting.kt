@@ -74,7 +74,7 @@ internal fun AccountProfilesSetting(
         TextButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) { Text(title) }
     } else {
         IconButton(onClick = { open = true }) {
-            Icon(DriveIcons.SwapVert, contentDescription = stringResource(R.string.device_accounts_switch))
+            Icon(DriveIcons.AccountSwitcher, contentDescription = stringResource(R.string.device_accounts_switch))
         }
     }
 

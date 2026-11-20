@@ -40,7 +40,7 @@ enum class SettingsSectionType(
     BACKUP(
         Res.string.settings_section_backup_title,
         Res.string.settings_section_backup_subtitle,
-        { DriveIcons.CloudUpload }
+        { DriveIcons.Backup }
     ),
     STORAGE(
         Res.string.settings_section_storage_title,

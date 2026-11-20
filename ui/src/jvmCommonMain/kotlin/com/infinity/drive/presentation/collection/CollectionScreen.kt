@@ -115,7 +115,7 @@ fun CollectionScreen(
                     }
                 },
                 actions = {
-                    if(!selectionMode)IconButton(onManageHidden){Icon(DriveIcons.MoreVert,"${viewModel.type.name.lowercase().replaceFirstChar(Char::uppercase)} settings")}
+                    if(!selectionMode)IconButton(onManageHidden){Icon(DriveIcons.Settings,"${viewModel.type.name.lowercase().replaceFirstChar(Char::uppercase)} settings")}
                     if (selectionMode) {
                         IconButton(
                             onClick = {

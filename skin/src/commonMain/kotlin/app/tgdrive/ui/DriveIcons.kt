@@ -13,15 +13,17 @@ import androidx.compose.ui.unit.dp
 
 object DriveIcons {
     val AccountCircle: ImageVector @Composable get() = IconsaxVectors.iconProfileCircle.current()
+    val AccountSwitcher: ImageVector @Composable get() = IconsaxVectors.iconProfile2User.current()
     val Add: ImageVector @Composable get() = IconsaxVectors.iconAdd.current()
-    val Archive: ImageVector @Composable get() = IconsaxVectors.iconDocumentCode2.current()
+    val AddMedia: ImageVector @Composable get() = IconsaxVectors.iconGalleryAdd.current()
+    val Archive: ImageVector @Composable get() = IconsaxVectors.iconBox.current()
     val ArrowBack: ImageVector @Composable get() = IconsaxVectors.iconArrowLeft.current()
     val ArrowDownward: ImageVector @Composable get() = IconsaxVectors.iconArrowDown.current()
-    val ArrowUpward: ImageVector @Composable get() = IconsaxVectors.iconArrowUp3.current()
+    val ArrowUpward: ImageVector @Composable get() = IconsaxVectors.iconArrowUp.current()
     val AudioFile: ImageVector @Composable get() = IconsaxVectors.iconAudioSquare.current()
     val Autorenew: ImageVector @Composable get() = IconsaxVectors.iconRefresh2.current()
     val Backspace: ImageVector @Composable get() = IconsaxVectors.iconEraser.current()
-    val Backup: ImageVector @Composable get() = IconsaxVectors.iconDirectboxSend.current()
+    val Backup: ImageVector @Composable get() = IconsaxVectors.iconDocumentCloud.current()
     val Block: ImageVector @Composable get() = IconsaxVectors.iconForbidden.current()
     val Bolt: ImageVector @Composable get() = IconsaxVectors.iconFlash.current()
     val BrokenImage: ImageVector @Composable get() = IconsaxVectors.iconGallerySlash.current()
@@ -33,11 +35,11 @@ object DriveIcons {
     val ChevronRight: ImageVector @Composable get() = IconsaxVectors.iconArrowRight3.current()
     val CleaningServices: ImageVector @Composable get() = IconsaxVectors.iconBroom.current()
     val Close: ImageVector @Composable get() = IconsaxVectors.iconCloseSquare.current()
-    val CloudDone: ImageVector @Composable get() = IconsaxVectors.iconShieldTick.current()
+    val CloudDone: ImageVector @Composable get() = IconsaxVectors.iconCloudAdd.current()
     val CloudOff: ImageVector @Composable get() = IconsaxVectors.iconCloudCross.current()
     val CloudQueue: ImageVector @Composable get() = IconsaxVectors.iconCloud.current()
     val CloudSync: ImageVector @Composable get() = IconsaxVectors.iconCloudChange.current()
-    val CloudUpload: ImageVector @Composable get() = IconsaxVectors.iconDirectboxSend.current()
+    val CloudUpload: ImageVector @Composable get() = IconsaxVectors.iconCloudPlus.current()
     val Code: ImageVector @Composable get() = IconsaxVectors.iconCode.current()
     val ContentPaste: ImageVector @Composable get() = IconsaxVectors.iconClipboardText.current()
     val CreateNewFolder: ImageVector @Composable get() = IconsaxVectors.iconFolderAdd.current()
@@ -48,10 +50,10 @@ object DriveIcons {
     val Description: ImageVector @Composable get() = IconsaxVectors.iconDocumentText.current()
     val Deselect: ImageVector @Composable get() = IconsaxVectors.iconCloseSquare.current()
     val DocumentScanner: ImageVector @Composable get() = IconsaxVectors.iconScanner.current()
-    val Download: ImageVector @Composable get() = IconsaxVectors.iconDirectboxReceive.current()
+    val Download: ImageVector @Composable get() = IconsaxVectors.iconDocumentDownload.current()
     val DriveFileMove: ImageVector @Composable get() = IconsaxVectors.iconFolderConnection.current()
     val DriveFileRenameOutline: ImageVector @Composable get() = IconsaxVectors.iconEdit2.current()
-    val DriveFolderUpload: ImageVector @Composable get() = IconsaxVectors.iconSendSquare.current()
+    val DriveFolderUpload: ImageVector @Composable get() = IconsaxVectors.iconFolderCloud.current()
     val Edit: ImageVector @Composable get() = IconsaxVectors.iconEdit2.current()
     val EditNote: ImageVector @Composable get() = IconsaxVectors.iconNoteAdd.current()
     val Email: ImageVector @Composable get() = IconsaxVectors.iconSms.current()
@@ -62,7 +64,7 @@ object DriveIcons {
     val FactCheck: ImageVector @Composable get() = IconsaxVectors.iconClipboardTick.current()
     val Favorite: ImageVector @Composable get() = IconsaxVectors.iconHeart.current()
     val FileOpen: ImageVector @Composable get() = IconsaxVectors.iconFolderOpen.current()
-    val FileUpload: ImageVector @Composable get() = IconsaxVectors.iconDirectboxSend.current()
+    val FileUpload: ImageVector @Composable get() = IconsaxVectors.iconDocumentUpload.current()
     val Fingerprint: ImageVector @Composable get() = IconsaxVectors.iconFingerScan.current()
     val Folder: ImageVector @Composable get() = IconsaxVectors.iconFolder2.current()
     val FolderOff: ImageVector @Composable get() = IconsaxVectors.iconFolderCross.current()
@@ -77,6 +79,7 @@ object DriveIcons {
     val HelpOutline: ImageVector @Composable get() = IconsaxVectors.iconMessageQuestion.current()
     val History: ImageVector @Composable get() = IconsaxVectors.iconClock.current()
     val Home: ImageVector @Composable get() = IconsaxVectors.iconHome2.current()
+    val IconStyle: ImageVector @Composable get() = IconsaxVectors.iconShapes.current()
     val Image: ImageVector @Composable get() = IconsaxVectors.iconGallery.current()
     val Info: ImageVector @Composable get() = IconsaxVectors.iconInfoCircle.current()
     val InsertDriveFile: ImageVector @Composable get() = IconsaxVectors.iconDocument.current()
@@ -90,15 +93,15 @@ object DriveIcons {
     val LockOpen: ImageVector @Composable get() = IconsaxVectors.iconUnlock.current()
     val Logout: ImageVector @Composable get() = IconsaxVectors.iconLogout.current()
     val ManageSearch: ImageVector @Composable get() = IconsaxVectors.iconSearchNormal.current()
-    val MoreHoriz: ImageVector @Composable get() = IconsaxVectors.iconMore.current()
-    val MoreVert: ImageVector @Composable get() = IconsaxVectors.iconMore2.current()
+    val MoreVert: ImageVector @Composable get() = IconsaxVectors.iconMore.current()
     val MoveToInbox: ImageVector @Composable get() = IconsaxVectors.iconDirectInbox.current()
     val MusicNote: ImageVector @Composable get() = IconsaxVectors.iconMusicnote.current()
     val MusicNotes: ImageVector @Composable get() = IconsaxVectors.iconMusic.current()
-    val NetworkCheck: ImageVector @Composable get() = IconsaxVectors.iconGlobal.current()
+    val NetworkCheck: ImageVector @Composable get() = IconsaxVectors.iconWifiSquare.current()
     val Notifications: ImageVector @Composable get() = IconsaxVectors.iconNotification.current()
     val OfflinePin: ImageVector @Composable get() = IconsaxVectors.iconReceiveSquare.current()
     val OpenInNew: ImageVector @Composable get() = IconsaxVectors.iconExport1.current()
+    val PackageAndroid: ImageVector @Composable get() = IconsaxVectors.iconMobileProgramming.current()
     val Palette: ImageVector @Composable get() = IconsaxVectors.iconColorSwatch.current()
     val Pause: ImageVector @Composable get() = IconsaxVectors.iconPause.current()
     val PauseCircle: ImageVector @Composable get() = IconsaxVectors.iconPauseCircle.current()
@@ -108,9 +111,10 @@ object DriveIcons {
     val Photo: ImageVector @Composable get() = IconsaxVectors.iconGallery.current()
     val PhotoCamera: ImageVector @Composable get() = IconsaxVectors.iconCamera.current()
     val PhotoLibrary: ImageVector @Composable get() = IconsaxVectors.iconGallery.current()
-    val PictureAsPdf: ImageVector @Composable get() = IconsaxVectors.iconDocumentText.current()
+    val PictureAsPdf: ImageVector @Composable get() = IconsaxVectors.iconDocumentText1.current()
     val PlayArrow: ImageVector @Composable get() = IconsaxVectors.iconPlay.current()
     val PlayCircle: ImageVector @Composable get() = IconsaxVectors.iconPlayCircle.current()
+    val PresentationFile: ImageVector @Composable get() = IconsaxVectors.iconPresentionChart.current()
     val QrCode2: ImageVector @Composable get() = IconsaxVectors.iconScanBarcode.current()
     val Refresh: ImageVector @Composable get() = IconsaxVectors.iconRefresh2.current()
     val RemoveCircleOutline: ImageVector @Composable get() = IconsaxVectors.iconMinusCirlce.current()
@@ -118,7 +122,7 @@ object DriveIcons {
     val RepeatOne: ImageVector @Composable get() = IconsaxVectors.iconRepeateOne.current()
     val Replay10: ImageVector @Composable get() = IconsaxVectors.iconBackward10Seconds.current()
     val Restore: ImageVector @Composable get() = IconsaxVectors.iconClock.current()
-    val RestoreFromTrash: ImageVector @Composable get() = IconsaxVectors.iconClock.current()
+    val RestoreFromTrash: ImageVector @Composable get() = IconsaxVectors.iconUndo.current()
     val SaveAlt: ImageVector @Composable get() = IconsaxVectors.iconImport1.current()
     val Search: ImageVector @Composable get() = IconsaxVectors.iconSearchNormal.current()
     val SearchOff: ImageVector @Composable get() = IconsaxVectors.iconSearchStatus.current()
@@ -129,10 +133,11 @@ object DriveIcons {
     val SlowMotionVideo: ImageVector @Composable get() = IconsaxVectors.iconSpeedometer.current()
     val Sms: ImageVector @Composable get() = IconsaxVectors.iconMessageText.current()
     val Sort: ImageVector @Composable get() = IconsaxVectors.iconSort.current()
+    val SpreadsheetFile: ImageVector @Composable get() = IconsaxVectors.iconGrid8.current()
     val Star: ImageVector @Composable get() = IconsaxVectors.iconStar.current()
     val StarFilled: ImageVector @Composable get() = IconsaxVectors.iconStar.current()
     val StarOutline: ImageVector @Composable get() = IconsaxVectors.iconStar.current()
-    val Storage: ImageVector @Composable get() = IconsaxVectors.iconData.current()
+    val Storage: ImageVector @Composable get() = IconsaxVectors.iconDriver.current()
     val StrikethroughS: ImageVector @Composable get() = IconsaxVectors.iconTextBlock.current()
     val Subtitles: ImageVector @Composable get() = IconsaxVectors.iconSubtitle.current()
     val SwapVert: ImageVector @Composable get() = IconsaxVectors.iconArrowSwap.current()
@@ -280,23 +285,23 @@ private object IconsaxVectors {
         } }
     )
 
+    val iconArrowUp = IconVariants(
+        outline = { vector("iconsax:outline/arrow-up") {
+            filled("M14.6698 18.75H9.3298C7.4498 18.75 6.0198 18.07 5.3098 16.84C4.5998 15.61 4.7298 14.03 5.6698 12.4L8.3398 7.77C9.2798 6.15 10.5798 5.25 11.9998 5.25C13.4198 5.25 14.7198 6.15 15.6598 7.78L18.3298 12.41C19.2698 14.04 19.3998 15.62 18.6898 16.85C17.9798 18.07 16.5498 18.75 14.6698 18.75ZM11.9998 6.75C11.1398 6.75 10.2998 7.38 9.6398 8.53L6.9698 13.16C6.3098 14.31 6.1798 15.35 6.6098 16.1C7.0398 16.85 8.0098 17.26 9.3298 17.26H14.6698C15.9898 17.26 16.9598 16.85 17.3898 16.1C17.8198 15.35 17.6898 14.31 17.0298 13.16L14.3598 8.53C13.6998 7.38 12.8598 6.75 11.9998 6.75Z")
+        } },
+        broken = { vector("iconsax:broken/arrow-up") {
+            stroked(1.5f, "M18.0697 9.57L11.9997 3.5L5.92969 9.57", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M12 11.9999V3.66992", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M12 20.5V15.97", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+        } }
+    )
+
     val iconArrowUp2 = IconVariants(
         outline = { vector("iconsax:outline/arrow-up-2") {
             filled("M19.9195 15.8001C19.7295 15.8001 19.5395 15.7301 19.3895 15.5801L12.8695 9.06008C12.3895 8.58008 11.6095 8.58008 11.1295 9.06008L4.60953 15.5801C4.31953 15.8701 3.83953 15.8701 3.54953 15.5801C3.25953 15.2901 3.25953 14.8101 3.54953 14.5201L10.0695 8.00008C11.1295 6.94008 12.8595 6.94008 13.9295 8.00008L20.4495 14.5201C20.7395 14.8101 20.7395 15.2901 20.4495 15.5801C20.2995 15.7201 20.1095 15.8001 19.9195 15.8001Z")
         } },
         broken = { vector("iconsax:broken/arrow-up-2") {
             stroked(1.5f, "M17.6897 12.7801C19.3497 15.6501 17.9897 18.0001 14.6797 18.0001H11.9997H9.32968C6.01968 18.0001 4.65968 15.6501 6.31968 12.7801L7.65968 10.4701L8.99968 8.16007C10.6597 5.29007 13.3697 5.29007 15.0297 8.16007", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
-        } }
-    )
-
-    val iconArrowUp3 = IconVariants(
-        outline = { vector("iconsax:outline/arrow-up-3") {
-            filled("M18.0691 10.3199C17.8791 10.3199 17.6891 10.2499 17.5391 10.0999L11.9991 4.55994L6.45914 10.0999C6.16914 10.3899 5.68914 10.3899 5.39914 10.0999C5.10914 9.80994 5.10914 9.32994 5.39914 9.03994L11.4691 2.96994C11.7591 2.67994 12.2391 2.67994 12.5291 2.96994L18.5991 9.03994C18.8891 9.32994 18.8891 9.80994 18.5991 10.0999C18.4591 10.2499 18.2591 10.3199 18.0691 10.3199Z")
-            filled("M12 21.2499C11.59 21.2499 11.25 20.9099 11.25 20.4999V3.66992C11.25 3.25992 11.59 2.91992 12 2.91992C12.41 2.91992 12.75 3.25992 12.75 3.66992V20.4999C12.75 20.9099 12.41 21.2499 12 21.2499Z")
-        } },
-        broken = { vector("iconsax:broken/arrow-up-3") {
-            stroked(1.5f, "M16.0101 11.1499L13.4001 8.52989C12.6301 7.75989 11.3701 7.75989 10.6001 8.52989L4.08008 15.0499", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
-            stroked(1.5f, "M19.9209 15.05L18.8809 14.01", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
         } }
     )
 
@@ -328,6 +333,21 @@ private object IconsaxVectors {
             stroked(1.5f, "M4.90939 7.80005C3.79939 9.28005 3.10938 11.11 3.10938 13.11", cap = StrokeCap.Round, join = StrokeJoin.Round)
             stroked(1.5f, "M9.53906 15.92V10.5801L8.03906 12.2501", cap = StrokeCap.Round, join = StrokeJoin.Round)
             stroked(1.5f, "M14 10.5801C15.1 10.5801 16 11.4801 16 12.5801V13.9301C16 15.0301 15.1 15.9301 14 15.9301C12.9 15.9301 12 15.0301 12 13.9301V12.5801C12 11.4701 12.9 10.5801 14 10.5801Z", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } }
+    )
+
+    val iconBox = IconVariants(
+        outline = { vector("iconsax:outline/box") {
+            filled("M11.9994 13.2999C11.8694 13.2999 11.7394 13.2699 11.6194 13.1999L2.78936 8.0899C2.42936 7.8799 2.30934 7.41987 2.51934 7.05987C2.72934 6.69987 3.17934 6.57985 3.54934 6.78985L11.9994 11.6799L20.3993 6.81988C20.7593 6.60988 21.2193 6.7399 21.4293 7.0899C21.6393 7.4499 21.5094 7.90987 21.1594 8.11987L12.3894 13.1999C12.2594 13.2599 12.1294 13.2999 11.9994 13.2999Z")
+            filled("M12 22.36C11.59 22.36 11.25 22.02 11.25 21.61V12.54C11.25 12.13 11.59 11.79 12 11.79C12.41 11.79 12.75 12.13 12.75 12.54V21.61C12.75 22.02 12.41 22.36 12 22.36Z")
+            filled("M12.0006 22.75C11.1206 22.75 10.2506 22.56 9.56061 22.18L4.22061 19.21C2.77061 18.41 1.64062 16.48 1.64062 14.82V9.16998C1.64062 7.50998 2.77061 5.59002 4.22061 4.78002L9.56061 1.82C10.9306 1.06 13.0706 1.06 14.4406 1.82L19.7806 4.78997C21.2306 5.58997 22.3606 7.51999 22.3606 9.17999V14.83C22.3606 16.49 21.2306 18.41 19.7806 19.22L14.4406 22.18C13.7506 22.56 12.8806 22.75 12.0006 22.75ZM12.0006 2.74999C11.3706 2.74999 10.7506 2.88 10.2906 3.13L4.95062 6.09997C3.99062 6.63997 3.14062 8.06999 3.14062 9.17999V14.83C3.14062 15.93 3.99062 17.37 4.95062 17.91L10.2906 20.88C11.2006 21.39 12.8006 21.39 13.7106 20.88L19.0506 17.91C20.0106 17.37 20.8606 15.94 20.8606 14.83V9.17999C20.8606 8.07999 20.0106 6.63997 19.0506 6.09997L13.7106 3.13C13.2506 2.88 12.6306 2.74999 12.0006 2.74999Z")
+            filled("M17.0012 13.99C16.5912 13.99 16.2512 13.65 16.2512 13.24V10.0201L7.13116 4.76007C6.77116 4.55007 6.65114 4.09005 6.86114 3.74005C7.07114 3.38005 7.52116 3.26003 7.88116 3.47003L17.3712 8.95007C17.6012 9.08007 17.7512 9.33003 17.7512 9.60003V13.2601C17.7512 13.6501 17.4112 13.99 17.0012 13.99Z")
+        } },
+        broken = { vector("iconsax:broken/box") {
+            stroked(1.5f, "M3.16992 7.43994L11.9999 12.5499L20.7699 7.46991", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M12 21.61V12.54", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M2.39062 9.17007C2.39062 7.79007 3.38061 6.11009 4.59061 5.44009L9.9306 2.47006C11.0706 1.84006 12.9406 1.84006 14.0806 2.47006L19.4206 5.44009C20.6306 6.11009 21.6206 7.79007 21.6206 9.17007V14.8201C21.6206 16.2001 20.6306 17.8801 19.4206 18.5501L14.0806 21.5201C12.9406 22.1501 11.0706 22.1501 9.9306 21.5201L4.59061 18.5501C3.38061 17.8801 2.39062 16.2001 2.39062 14.8201V14.0001", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M16.9998 13.2401V9.58014L10.9297 6.07013L9.87976 5.47009L7.50977 4.1001", cap = StrokeCap.Round, join = StrokeJoin.Round)
         } }
     )
 
@@ -460,6 +480,22 @@ private object IconsaxVectors {
         } }
     )
 
+    val iconCloudAdd = IconVariants(
+        outline = { vector("iconsax:outline/cloud-add") {
+            filled("M7.46027 19.3401H5.54022C2.60022 19.1301 1.28027 16.8701 1.28027 14.8601C1.28027 12.8501 2.60023 10.5801 5.49023 10.3801C5.90023 10.3401 6.26022 10.6601 6.29022 11.0801C6.32022 11.4901 6.01027 11.8501 5.59027 11.8801C3.65027 12.0201 2.78027 13.4801 2.78027 14.8701C2.78027 16.2601 3.65027 17.7201 5.59027 17.8601H7.46027C7.87027 17.8601 8.21027 18.2001 8.21027 18.6101C8.21027 19.0201 7.87027 19.3401 7.46027 19.3401Z")
+            filled("M16.6699 19.34C16.6499 19.34 16.6399 19.34 16.6199 19.34C16.2099 19.34 15.8299 19 15.8299 18.59C15.8299 18.16 16.1499 17.84 16.5699 17.84C17.7999 17.84 18.8999 17.41 19.7599 16.64C21.3199 15.28 21.4199 13.32 20.9999 11.94C20.5799 10.57 19.4099 9 17.3699 8.75C17.0399 8.71 16.7799 8.46001 16.7199 8.13001C16.3199 5.73001 15.0299 4.07 13.0699 3.47C11.0499 2.84 8.68989 3.46 7.21988 5C5.78988 6.49 5.45989 8.58001 6.28989 10.88C6.42989 11.27 6.22994 11.7 5.83994 11.84C5.44994 11.98 5.01992 11.78 4.87992 11.39C3.86992 8.57 4.32993 5.87 6.13993 3.97C7.98993 2.03 10.9599 1.26 13.5099 2.04C15.8499 2.76 17.4999 4.69 18.0999 7.37C20.1399 7.83 21.7799 9.38001 22.4299 11.52C23.1399 13.85 22.4999 16.25 20.7499 17.77C19.6399 18.77 18.1899 19.34 16.6699 19.34Z")
+            filled("M12 22.28C9.99 22.28 8.11002 21.21 7.08002 19.48C6.97002 19.31 6.86002 19.11 6.77002 18.89C6.43002 18.18 6.25 17.37 6.25 16.53C6.25 13.36 8.83 10.78 12 10.78C15.17 10.78 17.75 13.36 17.75 16.53C17.75 17.38 17.57 18.18 17.21 18.92C17.13 19.11 17.02 19.31 16.9 19.5C15.89 21.21 14.01 22.28 12 22.28ZM12 12.28C9.66 12.28 7.75 14.19 7.75 16.53C7.75 17.15 7.88 17.73 8.13 18.26C8.21 18.43 8.27999 18.57 8.35999 18.7C9.11999 19.99 10.51 20.78 11.99 20.78C13.47 20.78 14.86 19.99 15.61 18.72C15.7 18.57 15.78 18.43 15.84 18.29C16.11 17.74 16.24 17.16 16.24 16.54C16.25 14.19 14.34 12.28 12 12.28Z")
+            filled("M11.4299 18.2698C11.2399 18.2698 11.0499 18.1998 10.8999 18.0498L9.90988 17.0598C9.61988 16.7698 9.61988 16.2898 9.90988 15.9998C10.1999 15.7098 10.6799 15.7098 10.9699 15.9998L11.4499 16.4798L13.0499 14.9998C13.3599 14.7198 13.8299 14.7398 14.1099 15.0398C14.3899 15.3398 14.3699 15.8198 14.0699 16.0998L11.9399 18.0698C11.7899 18.1998 11.6099 18.2698 11.4299 18.2698Z")
+        } },
+        broken = { vector("iconsax:broken/cloud-add") {
+            stroked(1.5f, "M5.5393 11.1199C0.859297 11.4499 0.859297 18.2599 5.5393 18.5899H7.45934", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M17.4691 8C21.7991 8.55 23.5491 14.32 20.2691 17.19C19.2691 18.1 17.9791 18.6 16.6291 18.59H16.5391", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M5.58881 11.12C3.05881 4.08998 10.9188 0.379982 15.1288 3.69998", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M17 16.53C17 17.27 16.84 17.97 16.54 18.59C16.46 18.77 16.37 18.94 16.27 19.1C15.41 20.55 13.82 21.53 12 21.53C10.18 21.53 8.58998 20.55 7.72998 19.1C7.62998 18.94 7.54002 18.77 7.46002 18.59C7.16002 17.97 7 17.27 7 16.53C7 13.77 9.24 11.53 12 11.53C14.76 11.53 17 13.77 17 16.53Z", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M10.4395 16.53L11.4294 17.5201L13.5594 15.55", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } }
+    )
+
     val iconCloudChange = IconVariants(
         outline = { vector("iconsax:outline/cloud-change") {
             filled("M14.81 17.0999C14.8 17.0999 14.79 17.0999 14.78 17.0999H8.10999C6.12999 16.9599 5.25 15.45 5.25 14.0999C5.25 12.9699 5.87001 11.73 7.20001 11.27C6.90001 9.76999 7.27001 8.36999 8.26001 7.32999C9.45001 6.07999 11.36 5.59 13 6.09C14.46 6.54 15.51 7.71 15.92 9.34C17.17 9.69 18.16 10.67 18.57 12C19.03 13.52 18.61 15.08 17.47 16.07C16.75 16.73 15.8 17.0999 14.81 17.0999ZM8.14001 12.5999C7.12001 12.6899 6.75 13.4599 6.75 14.0999C6.75 14.7499 7.12 15.53 8.16 15.5999H14.78C15.43 15.5999 16 15.38 16.46 14.95C17.3 14.22 17.35 13.17 17.13 12.43C16.91 11.69 16.28 10.8499 15.19 10.7199C14.86 10.6799 14.6 10.4299 14.54 10.0999C14.32 8.76995 13.61 7.86 12.55 7.53C11.46 7.19 10.13 7.53997 9.34 8.36997C8.56 9.17997 8.39 10.3299 8.84 11.5999C8.98 11.9899 8.78001 12.42 8.39001 12.56C8.31001 12.59 8.18001 12.61 8.14001 12.5999Z")
@@ -485,6 +521,24 @@ private object IconsaxVectors {
         broken = { vector("iconsax:broken/cloud-cross") {
             stroked(1.5f, "M12.3905 18.5901L9.56055 21.4101", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
             stroked(1.5f, "M12.3905 21.4101L9.56055 18.5901", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M12.0001 3.98007C8.01007 3.64007 3.66007 7.09007 5.62007 12.5601", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M16.6109 20C17.9509 20.01 19.2409 19.51 20.2309 18.61C23.5009 15.75 21.7509 10.01 17.4409 9.47002C17.2009 8.02002 16.6709 6.88002 15.9609 6.02002", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M7.27938 12.9701C6.74938 12.7001 6.15938 12.5601 5.56938 12.5701C0.909376 12.9001 0.919376 19.6801 5.56938 20.0101", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M15.8203 9.88998C16.3403 9.62998 16.9003 9.48998 17.4803 9.47998", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+        } }
+    )
+
+    val iconCloudPlus = IconVariants(
+        outline = { vector("iconsax:outline/cloud-plus") {
+            filled("M16.6497 20.75C16.6397 20.75 16.6197 20.75 16.6097 20.75C16.1997 20.75 15.8597 20.41 15.8697 19.99C15.8697 19.58 16.2097 19.25 16.6197 19.25C16.6297 19.25 16.6497 19.25 16.6597 19.25C17.7997 19.25 18.8897 18.83 19.7297 18.05C21.2797 16.69 21.3897 14.75 20.9697 13.38C20.5497 12.01 19.3897 10.46 17.3597 10.2C17.0297 10.16 16.7697 9.91001 16.7097 9.58001C16.3097 7.19001 15.0197 5.54001 13.0797 4.94001C11.0597 4.32001 8.72973 4.93001 7.26973 6.46001C5.84973 7.95002 5.51973 10.02 6.33973 12.31C6.47973 12.7 6.27973 13.13 5.88973 13.27C5.49973 13.41 5.06973 13.21 4.92973 12.82C3.91973 10.01 4.37973 7.32001 6.18973 5.43001C8.03973 3.50001 10.9797 2.73001 13.5297 3.52001C15.8597 4.24001 17.5097 6.16001 18.0997 8.82001C20.1397 9.28001 21.7697 10.82 22.4197 12.95C23.1297 15.27 22.4797 17.65 20.7497 19.17C19.6097 20.19 18.1597 20.75 16.6497 20.75Z")
+            filled("M5.57008 20.75C5.55008 20.75 5.53008 20.75 5.52008 20.75C2.64008 20.55 1.33008 18.29 1.33008 16.28C1.33008 14.27 2.64008 12.02 5.52008 11.81C6.26008 11.8 6.99008 11.97 7.63008 12.29C8.00008 12.48 8.14008 12.93 7.96008 13.3C7.77008 13.67 7.32008 13.81 6.95008 13.63C6.53008 13.41 6.05008 13.32 5.59008 13.31C3.70008 13.45 2.84008 14.9 2.84008 16.28C2.84008 17.66 3.70008 19.11 5.64008 19.25C6.05008 19.28 6.36008 19.64 6.33008 20.05C6.29008 20.45 5.96008 20.75 5.57008 20.75Z")
+            filled("M15.8206 10.64C15.5506 10.64 15.2806 10.49 15.1506 10.22C14.9606 9.84997 15.1106 9.39997 15.4906 9.20997C16.1006 8.89997 16.7906 8.72997 17.4706 8.71997C17.8606 8.73997 18.2306 9.03997 18.2306 9.45997C18.2406 9.86997 17.9106 10.22 17.4906 10.22C17.0306 10.23 16.5706 10.34 16.1506 10.55C16.0506 10.62 15.9306 10.64 15.8206 10.64Z")
+            filled("M12.9707 20.75H8.9707C8.5607 20.75 8.2207 20.41 8.2207 20C8.2207 19.59 8.5607 19.25 8.9707 19.25H12.9707C13.3807 19.25 13.7207 19.59 13.7207 20C13.7207 20.41 13.3907 20.75 12.9707 20.75Z")
+            filled("M10.9707 22.75C10.5607 22.75 10.2207 22.41 10.2207 22V18C10.2207 17.59 10.5607 17.25 10.9707 17.25C11.3807 17.25 11.7207 17.59 11.7207 18V22C11.7207 22.41 11.3907 22.75 10.9707 22.75Z")
+        } },
+        broken = { vector("iconsax:broken/cloud-plus") {
+            stroked(1.5f, "M12.9707 20H8.9707", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M10.9707 22V18", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
             stroked(1.5f, "M12.0001 3.98007C8.01007 3.64007 3.66007 7.09007 5.62007 12.5601", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
             stroked(1.5f, "M16.6109 20C17.9509 20.01 19.2409 19.51 20.2309 18.61C23.5009 15.75 21.7509 10.01 17.4409 9.47002C17.2009 8.02002 16.6709 6.88002 15.9609 6.02002", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
             stroked(1.5f, "M7.27938 12.9701C6.74938 12.7001 6.15938 12.5601 5.56938 12.5701C0.909376 12.9001 0.919376 19.6801 5.56938 20.0101", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
@@ -540,26 +594,6 @@ private object IconsaxVectors {
         } }
     )
 
-    val iconData = IconVariants(
-        outline = { vector("iconsax:outline/data") {
-            filled("M20 14.75C18.48 14.75 17.25 13.52 17.25 12C17.25 10.48 18.48 9.25 20 9.25C21.52 9.25 22.75 10.48 22.75 12C22.75 13.52 21.52 14.75 20 14.75ZM20 10.75C19.31 10.75 18.75 11.31 18.75 12C18.75 12.69 19.31 13.25 20 13.25C20.69 13.25 21.25 12.69 21.25 12C21.25 11.31 20.69 10.75 20 10.75Z")
-            filled("M20 6.75C18.48 6.75 17.25 5.52 17.25 4C17.25 2.48 18.48 1.25 20 1.25C21.52 1.25 22.75 2.48 22.75 4C22.75 5.52 21.52 6.75 20 6.75ZM20 2.75C19.31 2.75 18.75 3.31 18.75 4C18.75 4.69 19.31 5.25 20 5.25C20.69 5.25 21.25 4.69 21.25 4C21.25 3.31 20.69 2.75 20 2.75Z")
-            filled("M20 22.75C18.48 22.75 17.25 21.52 17.25 20C17.25 18.48 18.48 17.25 20 17.25C21.52 17.25 22.75 18.48 22.75 20C22.75 21.52 21.52 22.75 20 22.75ZM20 18.75C19.31 18.75 18.75 19.31 18.75 20C18.75 20.69 19.31 21.25 20 21.25C20.69 21.25 21.25 20.69 21.25 20C21.25 19.31 20.69 18.75 20 18.75Z")
-            filled("M4 14.75C2.48 14.75 1.25 13.52 1.25 12C1.25 10.48 2.48 9.25 4 9.25C5.52 9.25 6.75 10.48 6.75 12C6.75 13.52 5.52 14.75 4 14.75ZM4 10.75C3.31 10.75 2.75 11.31 2.75 12C2.75 12.69 3.31 13.25 4 13.25C4.69 13.25 5.25 12.69 5.25 12C5.25 11.31 4.69 10.75 4 10.75Z")
-            filled("M18 12.75H6C5.59 12.75 5.25 12.41 5.25 12C5.25 11.59 5.59 11.25 6 11.25H18C18.41 11.25 18.75 11.59 18.75 12C18.75 12.41 18.41 12.75 18 12.75Z")
-            filled("M18 20.75H14C11.58 20.75 10.25 19.42 10.25 17V7C10.25 4.58 11.58 3.25 14 3.25H18C18.41 3.25 18.75 3.59 18.75 4C18.75 4.41 18.41 4.75 18 4.75H14C12.42 4.75 11.75 5.42 11.75 7V17C11.75 18.58 12.42 19.25 14 19.25H18C18.41 19.25 18.75 19.59 18.75 20C18.75 20.41 18.41 20.75 18 20.75Z")
-        } },
-        broken = { vector("iconsax:broken/data") {
-            stroked(1.5f, "M20 14C21.1046 14 22 13.1046 22 12C22 10.8954 21.1046 10 20 10C18.8954 10 18 10.8954 18 12C18 13.1046 18.8954 14 20 14Z", cap = StrokeCap.Round, join = StrokeJoin.Round)
-            stroked(1.5f, "M20 6C21.1046 6 22 5.10457 22 4C22 2.89543 21.1046 2 20 2C18.8954 2 18 2.89543 18 4C18 5.10457 18.8954 6 20 6Z", cap = StrokeCap.Round, join = StrokeJoin.Round)
-            stroked(1.5f, "M20 22C21.1046 22 22 21.1046 22 20C22 18.8954 21.1046 18 20 18C18.8954 18 18 18.8954 18 20C18 21.1046 18.8954 22 20 22Z", cap = StrokeCap.Round, join = StrokeJoin.Round)
-            stroked(1.5f, "M4 14C5.10457 14 6 13.1046 6 12C6 10.8954 5.10457 10 4 10C2.89543 10 2 10.8954 2 12C2 13.1046 2.89543 14 4 14Z", cap = StrokeCap.Round, join = StrokeJoin.Round)
-            stroked(1.5f, "M6 12H18", cap = StrokeCap.Round, join = StrokeJoin.Round)
-            stroked(1.5f, "M11 12V17C11 19 12 20 14 20H18", cap = StrokeCap.Round, join = StrokeJoin.Round)
-            stroked(1.5f, "M18 4H14C12 4 11 5 11 7V7.97998", cap = StrokeCap.Round, join = StrokeJoin.Round)
-        } }
-    )
-
     val iconDirectInbox = IconVariants(
         outline = { vector("iconsax:outline/direct-inbox") {
             filled("M12 9.75C11.9 9.75 11.81 9.73 11.71 9.69C11.43 9.58 11.25 9.3 11.25 9V2C11.25 1.59 11.59 1.25 12 1.25C12.41 1.25 12.75 1.59 12.75 2V7.19L13.47 6.47C13.76 6.18 14.24 6.18 14.53 6.47C14.82 6.76 14.82 7.24 14.53 7.53L12.53 9.53C12.39 9.67 12.2 9.75 12 9.75Z")
@@ -573,23 +607,6 @@ private object IconsaxVectors {
             stroked(1.5f, "M1.98047 13H6.39047C6.77047 13 7.11047 13.21 7.28047 13.55L8.45047 15.89C8.79047 16.57 9.48047 17 10.2405 17H13.7705C14.5305 17 15.2205 16.57 15.5605 15.89L16.7305 13.55C16.9005 13.21 17.2505 13 17.6205 13H21.9805", cap = StrokeCap.Round, join = StrokeJoin.Round)
             stroked(1.5f, "M2.68945 18.9999C3.64945 21.0999 5.64945 21.9999 8.99945 21.9999H14.9995C19.9995 21.9999 21.9995 19.9999 21.9995 14.9999V10.9999C21.9995 6.72988 20.5395 4.64988 16.9995 4.12988", cap = StrokeCap.Round, join = StrokeJoin.Round)
             stroked(1.5f, "M7 4.12988C3.46 4.64988 2 6.72988 2 10.9999V14.9999", cap = StrokeCap.Round, join = StrokeJoin.Round)
-        } }
-    )
-
-    val iconDirectboxReceive = IconVariants(
-        outline = { vector("iconsax:outline/directbox-receive") {
-            filled("M12 8.75C11.9 8.75 11.81 8.73 11.71 8.69C11.43 8.58 11.25 8.3 11.25 8V2C11.25 1.59 11.59 1.25 12 1.25C12.41 1.25 12.75 1.59 12.75 2V6.19L13.47 5.47C13.76 5.18 14.24 5.18 14.53 5.47C14.82 5.76 14.82 6.24 14.53 6.53L12.53 8.53C12.39 8.67 12.19 8.75 12 8.75Z")
-            filled("M11.9995 8.74994C11.8095 8.74994 11.6195 8.67994 11.4695 8.52994L9.46945 6.52994C9.17945 6.23994 9.17945 5.75994 9.46945 5.46994C9.75945 5.17994 10.2395 5.17994 10.5295 5.46994L12.5295 7.46994C12.8195 7.75994 12.8195 8.23994 12.5295 8.52994C12.3795 8.67994 12.1895 8.74994 11.9995 8.74994Z")
-            filled("M16 22.75H8C2.25 22.75 2.25 19.7 2.25 17V16C2.25 13.77 2.25 11.25 7 11.25C8.19 11.25 8.63 11.54 9.25 12C9.28 12.03 9.32 12.05 9.35 12.09L10.37 13.17C11.23 14.08 12.79 14.08 13.65 13.17L14.67 12.09C14.7 12.06 14.73 12.03 14.77 12C15.39 11.53 15.83 11.25 17.02 11.25C21.77 11.25 21.77 13.77 21.77 16V17C21.75 20.82 19.82 22.75 16 22.75ZM7 12.75C3.75 12.75 3.75 13.77 3.75 16V17C3.75 19.74 3.75 21.25 8 21.25H16C18.98 21.25 20.25 19.98 20.25 17V16C20.25 13.77 20.25 12.75 17 12.75C16.28 12.75 16.13 12.84 15.7 13.16L14.73 14.19C14.01 14.95 13.04 15.37 12 15.37C10.96 15.37 9.99 14.95 9.27 14.19L8.3 13.16C7.87 12.84 7.72 12.75 7 12.75Z")
-            filled("M5 12.75C4.59 12.75 4.25 12.41 4.25 12V7.99996C4.25 6.05996 4.25 3.64996 7.93 3.29996C8.34 3.25996 8.71 3.55996 8.75 3.97996C8.79 4.38996 8.49 4.75996 8.07 4.79996C5.75 5.00996 5.75 5.94996 5.75 7.99996V12C5.75 12.41 5.41 12.75 5 12.75Z")
-            filled("M18.9994 12.7502C18.5894 12.7502 18.2494 12.4102 18.2494 12.0002V8.00022C18.2494 5.95022 18.2494 5.01022 15.9294 4.79022C15.5194 4.75022 15.2194 4.38022 15.2594 3.97022C15.2994 3.56022 15.6594 3.25022 16.0794 3.30022C19.7594 3.65022 19.7594 6.06022 19.7594 8.00022V12.0002C19.7494 12.4102 19.4094 12.7502 18.9994 12.7502Z")
-        } },
-        broken = { vector("iconsax:broken/directbox-receive") {
-            stroked(1.5f, "M12 2V8L14 6", cap = StrokeCap.Round, join = StrokeJoin.Round)
-            stroked(1.5f, "M12 8L10 6", cap = StrokeCap.Round, join = StrokeJoin.Round)
-            stroked(1.5f, "M12 22H16C20 22 21 19.76 21 17V16C21 13.79 21 12 17 12C16 12 15.72 12.21 15.2 12.6L14.18 13.68C13 14.94 11 14.94 9.81 13.68L8.8 12.6C8.28 12.21 8 12 7 12C3 12 3 13.79 3 16V17C3 19.76 3 22 8 22", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
-            stroked(1.5f, "M5 12V8.00004C5 5.99004 5 4.33004 8 4.04004", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
-            stroked(1.5f, "M19 12V8.00004C19 5.99004 19 4.33004 16 4.04004", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
         } }
     )
 
@@ -623,19 +640,36 @@ private object IconsaxVectors {
         } }
     )
 
-    val iconDocumentCode2 = IconVariants(
-        outline = { vector("iconsax:outline/document-code-2") {
-            filled("M16 22.75H11C10.59 22.75 10.25 22.41 10.25 22C10.25 21.59 10.59 21.25 11 21.25H16C18.86 21.25 20.25 19.86 20.25 17V7C20.25 4.14 18.86 2.75 16 2.75H8C5.14 2.75 3.75 4.14 3.75 7V14C3.75 14.41 3.41 14.75 3 14.75C2.59 14.75 2.25 14.41 2.25 14V7C2.25 3.35 4.35 1.25 8 1.25H16C19.65 1.25 21.75 3.35 21.75 7V17C21.75 20.65 19.65 22.75 16 22.75Z")
-            filled("M18.5 9.25H16.5C14.98 9.25 13.75 8.02 13.75 6.5V4.5C13.75 4.09 14.09 3.75 14.5 3.75C14.91 3.75 15.25 4.09 15.25 4.5V6.5C15.25 7.19 15.81 7.75 16.5 7.75H18.5C18.91 7.75 19.25 8.09 19.25 8.5C19.25 8.91 18.91 9.25 18.5 9.25Z")
-            filled("M3.99945 21.75C3.80945 21.75 3.61945 21.68 3.46945 21.53L1.46945 19.53C1.17945 19.24 1.17945 18.7599 1.46945 18.4699L3.46945 16.4699C3.75945 16.1799 4.23945 16.1799 4.52945 16.4699C4.81945 16.7599 4.81945 17.24 4.52945 17.53L3.05945 19L4.52945 20.4699C4.81945 20.7599 4.81945 21.24 4.52945 21.53C4.37945 21.68 4.18945 21.75 3.99945 21.75Z")
-            filled("M6.99945 21.75C6.80945 21.75 6.61945 21.68 6.46945 21.53C6.17945 21.24 6.17945 20.7599 6.46945 20.4699L7.93945 19L6.46945 17.53C6.17945 17.24 6.17945 16.7599 6.46945 16.4699C6.75945 16.1799 7.23945 16.1799 7.52945 16.4699L9.52945 18.4699C9.81945 18.7599 9.81945 19.24 9.52945 19.53L7.52945 21.53C7.37945 21.68 7.18945 21.75 6.99945 21.75Z")
+    val iconDocumentCloud = IconVariants(
+        outline = { vector("iconsax:outline/document-cloud") {
+            filled("M9 22.75C3.57 22.75 1.25 20.43 1.25 15V9C1.25 3.57 3.57 1.25 9 1.25H14C14.41 1.25 14.75 1.59 14.75 2C14.75 2.41 14.41 2.75 14 2.75H9C4.39 2.75 2.75 4.39 2.75 9V15C2.75 19.61 4.39 21.25 9 21.25C9.41 21.25 9.75 21.59 9.75 22C9.75 22.41 9.41 22.75 9 22.75Z")
+            filled("M22 13.75C21.59 13.75 21.25 13.41 21.25 13V10C21.25 9.59 21.59 9.25 22 9.25C22.41 9.25 22.75 9.59 22.75 10V13C22.75 13.41 22.41 13.75 22 13.75Z")
+            filled("M22 10.75H18C14.58 10.75 13.25 9.41999 13.25 5.99999V1.99999C13.25 1.69999 13.43 1.41999 13.71 1.30999C13.99 1.18999 14.31 1.25999 14.53 1.46999L22.53 9.46999C22.74 9.67999 22.81 10.01 22.69 10.29C22.57 10.57 22.3 10.75 22 10.75ZM14.75 3.80999V5.99999C14.75 8.57999 15.42 9.24999 18 9.24999H20.19L14.75 3.80999Z")
+            filled("M19.34 22.7503C19.33 22.7503 19.32 22.7503 19.32 22.7503H13.76C12.09 22.6303 11.25 21.3503 11.25 20.1303C11.25 19.1503 11.8 18.1203 12.86 17.7003C12.64 16.4503 12.96 15.2903 13.79 14.4203C14.81 13.3503 16.45 12.9203 17.87 13.3603C19.11 13.7403 20 14.7203 20.37 16.0803C21.42 16.4003 22.25 17.2303 22.59 18.3603C22.99 19.6703 22.62 21.0103 21.63 21.8703C21.02 22.4303 20.2 22.7503 19.34 22.7503ZM13.79 19.0103C13.03 19.0803 12.75 19.6503 12.75 20.1303C12.75 20.6103 13.03 21.1903 13.81 21.2503H19.32C19.83 21.2203 20.28 21.0703 20.64 20.7503C21.29 20.1803 21.34 19.3703 21.16 18.7903C20.98 18.2103 20.49 17.5603 19.65 17.4503C19.32 17.4103 19.06 17.1603 19 16.8303C18.78 15.4803 18.02 14.9803 17.43 14.8003C16.56 14.5303 15.51 14.8003 14.88 15.4703C14.45 15.9203 14.03 16.7303 14.5 18.0203C14.64 18.4103 14.44 18.8403 14.05 18.9803C13.96 19.0003 13.87 19.0103 13.79 19.0103Z")
         } },
-        broken = { vector("iconsax:broken/document-code-2") {
-            stroked(1.5f, "M21 13.03V7C21 4 19.5 2 16 2H8C4.5 2 3 4 3 7V14", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
-            stroked(1.5f, "M11 22H16C19.5 22 21 20 21 17", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
-            stroked(1.5f, "M14.5 4.5V6.5C14.5 7.6 15.4 8.5 16.5 8.5H18.5", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
-            stroked(1.5f, "M4 17L2 19L4 21", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
-            stroked(1.5f, "M7 17L9 19L7 21", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+        broken = { vector("iconsax:broken/document-cloud") {
+            stroked(1.5f, "M2 13V15C2 20 4 22 9 22", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M14 2H9C4 2 2 4 2 9", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M22 10V13", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M22 10H18C15 10 14 9 14 6V2L22 10Z", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M13.7605 18.2598C11.4105 18.4298 11.4105 21.8298 13.7605 21.9998H19.3205C19.9905 21.9998 20.6505 21.7498 21.1405 21.2998C22.7905 19.8598 21.9105 16.9798 19.7405 16.7098C18.9605 12.0198 12.1805 13.7998 13.7805 18.2698", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+        } }
+    )
+
+    val iconDocumentDownload = IconVariants(
+        outline = { vector("iconsax:outline/document-download") {
+            filled("M9 17.75C8.9 17.75 8.81 17.73 8.71 17.69C8.43 17.58 8.25 17.3 8.25 17V11C8.25 10.59 8.59 10.25 9 10.25C9.41 10.25 9.75 10.59 9.75 11V15.19L10.47 14.47C10.76 14.18 11.24 14.18 11.53 14.47C11.82 14.76 11.82 15.24 11.53 15.53L9.53 17.53C9.39 17.67 9.19 17.75 9 17.75Z")
+            filled("M8.99945 17.7499C8.80945 17.7499 8.61945 17.6799 8.46945 17.5299L6.46945 15.5299C6.17945 15.2399 6.17945 14.7599 6.46945 14.4699C6.75945 14.1799 7.23945 14.1799 7.52945 14.4699L9.52945 16.4699C9.81945 16.7599 9.81945 17.2399 9.52945 17.5299C9.37945 17.6799 9.18945 17.7499 8.99945 17.7499Z")
+            filled("M15 22.75H9C3.57 22.75 1.25 20.43 1.25 15V9C1.25 3.57 3.57 1.25 9 1.25H14C14.41 1.25 14.75 1.59 14.75 2C14.75 2.41 14.41 2.75 14 2.75H9C4.39 2.75 2.75 4.39 2.75 9V15C2.75 19.61 4.39 21.25 9 21.25H15C19.61 21.25 21.25 19.61 21.25 15V10C21.25 9.59 21.59 9.25 22 9.25C22.41 9.25 22.75 9.59 22.75 10V15C22.75 20.43 20.43 22.75 15 22.75Z")
+            filled("M22 10.75H18C14.58 10.75 13.25 9.41999 13.25 5.99999V1.99999C13.25 1.69999 13.43 1.41999 13.71 1.30999C13.99 1.18999 14.31 1.25999 14.53 1.46999L22.53 9.46999C22.74 9.67999 22.81 10.01 22.69 10.29C22.57 10.57 22.3 10.75 22 10.75ZM14.75 3.80999V5.99999C14.75 8.57999 15.42 9.24999 18 9.24999H20.19L14.75 3.80999Z")
+        } },
+        broken = { vector("iconsax:broken/document-download") {
+            stroked(1.5f, "M9 14.3501V17.0001L11 15.0001", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M9 11V12", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M9 17L7 15", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M2 9C2 4 4 2 9 2H14", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M22 10V15C22 20 20 22 15 22H9C4 22 2 20 2 15V12.98", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M18 10C15 10 14 9 14 6V2L22 10", cap = StrokeCap.Round, join = StrokeJoin.Round)
         } }
     )
 
@@ -653,6 +687,61 @@ private object IconsaxVectors {
             stroked(1.5f, "M2 9C2 4 4 2 9 2H14", cap = StrokeCap.Round, join = StrokeJoin.Round)
             stroked(1.5f, "M22 10V15C22 20 20 22 15 22H9C4 22 2 20 2 15V12.98", cap = StrokeCap.Round, join = StrokeJoin.Round)
             stroked(1.5f, "M18 10C15 10 14 9 14 6V2L22 10", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } }
+    )
+
+    val iconDocumentText1 = IconVariants(
+        outline = { vector("iconsax:outline/document-text-1") {
+            filled("M15 22.75H9C3.57 22.75 1.25 20.43 1.25 15V9C1.25 3.57 3.57 1.25 9 1.25H14C14.41 1.25 14.75 1.59 14.75 2C14.75 2.41 14.41 2.75 14 2.75H9C4.39 2.75 2.75 4.39 2.75 9V15C2.75 19.61 4.39 21.25 9 21.25H15C19.61 21.25 21.25 19.61 21.25 15V10C21.25 9.59 21.59 9.25 22 9.25C22.41 9.25 22.75 9.59 22.75 10V15C22.75 20.43 20.43 22.75 15 22.75Z")
+            filled("M22 10.75H18C14.58 10.75 13.25 9.41999 13.25 5.99999V1.99999C13.25 1.69999 13.43 1.41999 13.71 1.30999C13.99 1.18999 14.31 1.25999 14.53 1.46999L22.53 9.46999C22.74 9.67999 22.81 10.01 22.69 10.29C22.57 10.57 22.3 10.75 22 10.75ZM14.75 3.80999V5.99999C14.75 8.57999 15.42 9.24999 18 9.24999H20.19L14.75 3.80999Z")
+            filled("M13 13.75H7C6.59 13.75 6.25 13.41 6.25 13C6.25 12.59 6.59 12.25 7 12.25H13C13.41 12.25 13.75 12.59 13.75 13C13.75 13.41 13.41 13.75 13 13.75Z")
+            filled("M11 17.75H7C6.59 17.75 6.25 17.41 6.25 17C6.25 16.59 6.59 16.25 7 16.25H11C11.41 16.25 11.75 16.59 11.75 17C11.75 17.41 11.41 17.75 11 17.75Z")
+        } },
+        broken = { vector("iconsax:broken/document-text-1") {
+            stroked(1.5f, "M3 7C3 4 4.5 2 8 2H16C19.5 2 21 4 21 7V17C21 20 19.5 22 16 22H8C4.5 22 3 20 3 17V11.02", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M14.5 4.5V6.5C14.5 7.6 15.4 8.5 16.5 8.5H18.5", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M8 13H12", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M8 17H16", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+        } }
+    )
+
+    val iconDocumentUpload = IconVariants(
+        outline = { vector("iconsax:outline/document-upload") {
+            filled("M8.99945 17.75C8.58945 17.75 8.24945 17.41 8.24945 17V12.81L7.52945 13.53C7.23945 13.82 6.75945 13.82 6.46945 13.53C6.17945 13.24 6.17945 12.76 6.46945 12.47L8.46945 10.47C8.67945 10.26 9.00945 10.19 9.28945 10.31C9.56945 10.42 9.74945 10.7 9.74945 11V17C9.74945 17.41 9.40945 17.75 8.99945 17.75Z")
+            filled("M10.9995 13.7499C10.8095 13.7499 10.6195 13.6799 10.4695 13.5299L8.46945 11.5299C8.17945 11.2399 8.17945 10.7599 8.46945 10.4699C8.75945 10.1799 9.23945 10.1799 9.52945 10.4699L11.5295 12.4699C11.8195 12.7599 11.8195 13.2399 11.5295 13.5299C11.3795 13.6799 11.1895 13.7499 10.9995 13.7499Z")
+            filled("M15 22.75H9C3.57 22.75 1.25 20.43 1.25 15V9C1.25 3.57 3.57 1.25 9 1.25H14C14.41 1.25 14.75 1.59 14.75 2C14.75 2.41 14.41 2.75 14 2.75H9C4.39 2.75 2.75 4.39 2.75 9V15C2.75 19.61 4.39 21.25 9 21.25H15C19.61 21.25 21.25 19.61 21.25 15V10C21.25 9.59 21.59 9.25 22 9.25C22.41 9.25 22.75 9.59 22.75 10V15C22.75 20.43 20.43 22.75 15 22.75Z")
+            filled("M22 10.75H18C14.58 10.75 13.25 9.41999 13.25 5.99999V1.99999C13.25 1.69999 13.43 1.41999 13.71 1.30999C13.99 1.18999 14.31 1.25999 14.53 1.46999L22.53 9.46999C22.74 9.67999 22.81 10.01 22.69 10.29C22.57 10.57 22.3 10.75 22 10.75ZM14.75 3.80999V5.99999C14.75 8.57999 15.42 9.24999 18 9.24999H20.19L14.75 3.80999Z")
+        } },
+        broken = { vector("iconsax:broken/document-upload") {
+            stroked(1.5f, "M9 13.65V11L11 13", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M9 17V16", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M9 11L7 13", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M2 9C2 4 4 2 9 2H14", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M22 10V15C22 20 20 22 15 22H9C4 22 2 20 2 15V12.98", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M18 10C15 10 14 9 14 6V2L22 10", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } }
+    )
+
+    val iconDriver = IconVariants(
+        outline = { vector("iconsax:outline/driver") {
+            filled("M19.3198 10.75H4.68977C2.79977 10.75 1.25977 9.21002 1.25977 7.32002V4.69002C1.25977 2.80002 2.79977 1.26001 4.68977 1.26001H19.3198C21.2098 1.26001 22.7498 2.80002 22.7498 4.69002V7.32002C22.7498 9.21002 21.2098 10.75 19.3198 10.75ZM4.67976 2.75002C3.60976 2.75002 2.74977 3.62001 2.74977 4.68001V7.31001C2.74977 8.38001 3.61976 9.24002 4.67976 9.24002H19.3098C20.3798 9.24002 21.2398 8.37001 21.2398 7.31001V4.68001C21.2398 3.61001 20.3698 2.75002 19.3098 2.75002H4.67976Z")
+            filled("M19.3198 22.75H4.68977C2.79977 22.75 1.25977 21.21 1.25977 19.32V16.69C1.25977 14.8 2.79977 13.26 4.68977 13.26H19.3198C21.2098 13.26 22.7498 14.8 22.7498 16.69V19.32C22.7498 21.21 21.2098 22.75 19.3198 22.75ZM4.67976 14.75C3.60976 14.75 2.74977 15.62 2.74977 16.68V19.31C2.74977 20.38 3.61976 21.24 4.67976 21.24H19.3098C20.3798 21.24 21.2398 20.37 21.2398 19.31V16.68C21.2398 15.61 20.3698 14.75 19.3098 14.75H4.67976Z")
+            filled("M6 7.75C5.59 7.75 5.25 7.41 5.25 7V5C5.25 4.59 5.59 4.25 6 4.25C6.41 4.25 6.75 4.59 6.75 5V7C6.75 7.41 6.41 7.75 6 7.75Z")
+            filled("M10 7.75C9.59 7.75 9.25 7.41 9.25 7V5C9.25 4.59 9.59 4.25 10 4.25C10.41 4.25 10.75 4.59 10.75 5V7C10.75 7.41 10.41 7.75 10 7.75Z")
+            filled("M6 19.75C5.59 19.75 5.25 19.41 5.25 19V17C5.25 16.59 5.59 16.25 6 16.25C6.41 16.25 6.75 16.59 6.75 17V19C6.75 19.41 6.41 19.75 6 19.75Z")
+            filled("M10 19.75C9.59 19.75 9.25 19.41 9.25 19V17C9.25 16.59 9.59 16.25 10 16.25C10.41 16.25 10.75 16.59 10.75 17V19C10.75 19.41 10.41 19.75 10 19.75Z")
+            filled("M18 6.75H14C13.59 6.75 13.25 6.41 13.25 6C13.25 5.59 13.59 5.25 14 5.25H18C18.41 5.25 18.75 5.59 18.75 6C18.75 6.41 18.41 6.75 18 6.75Z")
+            filled("M18 18.75H14C13.59 18.75 13.25 18.41 13.25 18C13.25 17.59 13.59 17.25 14 17.25H18C18.41 17.25 18.75 17.59 18.75 18C18.75 18.41 18.41 18.75 18 18.75Z")
+        } },
+        broken = { vector("iconsax:broken/driver") {
+            stroked(1.5f, "M17.3198 10H4.68977C3.20977 10 2.00977 8.79002 2.00977 7.32002V4.69002C2.00977 3.21002 3.21977 2.01001 4.68977 2.01001H19.3198C20.7998 2.01001 21.9998 3.22002 21.9998 4.69002V7.32002", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M19.3198 22H4.68977C3.20977 22 2.00977 20.79 2.00977 19.32V16.69C2.00977 15.21 3.21977 14.01 4.68977 14.01H19.3198C20.7998 14.01 21.9998 15.22 21.9998 16.69V19.32C21.9998 20.79 20.7898 22 19.3198 22Z", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M6 5V7", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M10 5V7", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M6 17V19", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M10 17V19", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M14 6H18", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M14 18H18", cap = StrokeCap.Round, join = StrokeJoin.Round)
         } }
     )
 
@@ -817,6 +906,18 @@ private object IconsaxVectors {
         } }
     )
 
+    val iconFolderCloud = IconVariants(
+        outline = { vector("iconsax:outline/folder-cloud") {
+            filled("M9 22.75H7C2.59 22.75 1.25 21.41 1.25 17V7C1.25 2.59 2.59 1.25 7 1.25H8.5C10.25 1.25 10.8 1.82 11.5 2.75L13 4.75C13.33 5.19 13.38 5.25 14 5.25H17C21.41 5.25 22.75 6.59 22.75 11V13C22.75 13.41 22.41 13.75 22 13.75C21.59 13.75 21.25 13.41 21.25 13V11C21.25 7.43 20.58 6.75 17 6.75H14C12.72 6.75 12.3 6.30999 11.8 5.64999L10.3 3.64999C9.77999 2.95999 9.62 2.75 8.5 2.75H7C3.42 2.75 2.75 3.43 2.75 7V17C2.75 20.57 3.42 21.25 7 21.25H9C9.41 21.25 9.75 21.59 9.75 22C9.75 22.41 9.41 22.75 9 22.75Z")
+            filled("M19.3403 22.81C19.3303 22.81 19.3202 22.81 19.3102 22.81H13.7502C12.0802 22.69 11.2402 21.41 11.2402 20.19C11.2402 19.21 11.7902 18.18 12.8502 17.76C12.6302 16.51 12.9503 15.35 13.7803 14.48C14.8003 13.41 16.4402 12.98 17.8602 13.41C19.1002 13.79 19.9902 14.77 20.3602 16.13C21.4102 16.45 22.2403 17.28 22.5803 18.41C22.9803 19.72 22.6102 21.06 21.6202 21.92C21.0202 22.49 20.2003 22.81 19.3403 22.81ZM13.7902 19.07C13.0302 19.14 12.7502 19.71 12.7502 20.19C12.7502 20.67 13.0302 21.25 13.8102 21.31H19.3203C19.8003 21.35 20.2803 21.13 20.6403 20.81C21.2903 20.24 21.3302 19.43 21.1602 18.85C20.9902 18.27 20.4903 17.62 19.6503 17.51C19.3203 17.47 19.0602 17.22 19.0002 16.89C18.7802 15.54 18.0202 15.04 17.4302 14.85C16.5502 14.58 15.5102 14.86 14.8802 15.52C14.4502 15.97 14.0302 16.78 14.5002 18.07C14.6402 18.46 14.4402 18.89 14.0502 19.03C13.9602 19.06 13.8702 19.07 13.7902 19.07Z")
+        } },
+        broken = { vector("iconsax:broken/folder-cloud") {
+            stroked(1.5f, "M2 7C2 3 3 2 7 2H8.5C10 2 10.33 2.44001 10.9 3.20001L12.4 5.20001C12.78 5.70001 13 6 14 6H17C21 6 22 7 22 11V13", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M9 22H7C3 22 2 21 2 17V12.03", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M13.7605 18.3199C11.4105 18.4899 11.4105 21.8899 13.7605 22.0599H19.3205C19.9905 22.0599 20.6506 21.8099 21.1406 21.3599C22.7906 19.9199 21.9105 17.0399 19.7405 16.7699C18.9605 12.0799 12.1806 13.8599 13.7806 18.3299", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+        } }
+    )
+
     val iconFolderConnection = IconVariants(
         outline = { vector("iconsax:outline/folder-connection") {
             filled("M12 19.75C11.59 19.75 11.25 19.41 11.25 19V16C11.25 15.59 11.59 15.25 12 15.25C12.41 15.25 12.75 15.59 12.75 16V19C12.75 19.41 12.41 19.75 12 19.75Z")
@@ -901,6 +1002,24 @@ private object IconsaxVectors {
         } }
     )
 
+    val iconGalleryAdd = IconVariants(
+        outline = { vector("iconsax:outline/gallery-add") {
+            filled("M9 10.75C7.48 10.75 6.25 9.52 6.25 8C6.25 6.48 7.48 5.25 9 5.25C10.52 5.25 11.75 6.48 11.75 8C11.75 9.52 10.52 10.75 9 10.75ZM9 6.75C8.31 6.75 7.75 7.31 7.75 8C7.75 8.69 8.31 9.25 9 9.25C9.69 9.25 10.25 8.69 10.25 8C10.25 7.31 9.69 6.75 9 6.75Z")
+            filled("M15 22.75H9C3.57 22.75 1.25 20.43 1.25 15V9C1.25 3.57 3.57 1.25 9 1.25H13C13.41 1.25 13.75 1.59 13.75 2C13.75 2.41 13.41 2.75 13 2.75H9C4.39 2.75 2.75 4.39 2.75 9V15C2.75 19.61 4.39 21.25 9 21.25H15C19.61 21.25 21.25 19.61 21.25 15V10C21.25 9.59 21.59 9.25 22 9.25C22.41 9.25 22.75 9.59 22.75 10V15C22.75 20.43 20.43 22.75 15 22.75Z")
+            filled("M21.25 5.75H15.75C15.34 5.75 15 5.41 15 5C15 4.59 15.34 4.25 15.75 4.25H21.25C21.66 4.25 22 4.59 22 5C22 5.41 21.66 5.75 21.25 5.75Z")
+            filled("M18.5 8.5C18.09 8.5 17.75 8.16 17.75 7.75V2.25C17.75 1.84 18.09 1.5 18.5 1.5C18.91 1.5 19.25 1.84 19.25 2.25V7.75C19.25 8.16 18.91 8.5 18.5 8.5Z")
+            filled("M2.66932 19.7001C2.42932 19.7001 2.18932 19.5801 2.04932 19.3701C1.81932 19.0301 1.90932 18.5601 2.24932 18.3301L7.17932 15.0201C8.25932 14.3001 9.74932 14.3801 10.7293 15.2101L11.0593 15.5001C11.5593 15.9301 12.4093 15.9301 12.8993 15.5001L17.0593 11.9301C18.1293 11.0201 19.7893 11.0201 20.8593 11.9301L22.4893 13.3301C22.7993 13.6001 22.8393 14.0701 22.5693 14.3901C22.2993 14.7001 21.8293 14.7401 21.5093 14.4701L19.8793 13.0701C19.3793 12.6401 18.5293 12.6401 18.0393 13.0701L13.8793 16.6401C12.8193 17.5501 11.1493 17.5501 10.0793 16.6401L9.74932 16.3501C9.28932 15.9601 8.52932 15.9201 8.01932 16.2701L3.09932 19.5801C2.95932 19.6601 2.80932 19.7001 2.66932 19.7001Z")
+        } },
+        broken = { vector("iconsax:broken/gallery-add") {
+            stroked(1.5f, "M9 6C7.9 6 7 6.9 7 8C7 9.1 7.9 10 9 10C10.1 10 11 9.1 11 8", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M2 12.99V15C2 20 4 22 9 22H15C20 22 22 20 22 15V10", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M13 2H9C4 2 2 4 2 9", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M15.75 5H21.25", cap = StrokeCap.Round)
+            stroked(1.5f, "M18.5 7.75V2.25", cap = StrokeCap.Round)
+            stroked(1.5f, "M2.66992 18.9501L7.59992 15.6401C8.38992 15.1101 9.52992 15.1701 10.2399 15.7801L10.5699 16.0701C11.3499 16.7401 12.6099 16.7401 13.3899 16.0701L17.5499 12.5001C18.3299 11.8301 19.5899 11.8301 20.3699 12.5001L21.9999 13.9001", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } }
+    )
+
     val iconGallerySlash = IconVariants(
         outline = { vector("iconsax:outline/gallery-slash") {
             filled("M3.38 20.85C3.17 20.85 2.95 20.76 2.81 20.58C1.74 19.33 1.25 17.55 1.25 15V9C1.25 3.57 3.57 1.25 9 1.25H15C17.39 1.25 19.14 1.7 20.38 2.63C20.71 2.88 20.78 3.35 20.53 3.68C20.28 4.01 19.81 4.08 19.48 3.83C18.51 3.1 17.05 2.75 15 2.75H9C4.39 2.75 2.75 4.39 2.75 9V15C2.75 17.15 3.14 18.66 3.95 19.62C4.22 19.94 4.18 20.41 3.86 20.68C3.72 20.79 3.55 20.85 3.38 20.85Z")
@@ -935,6 +1054,25 @@ private object IconsaxVectors {
             stroked(1.5f, "M15 3C15.97 5.92 16.46 8.96 16.46 12", cap = StrokeCap.Round, join = StrokeJoin.Round)
             stroked(1.5f, "M3 16V15C8.84 16.95 15.16 16.95 21 15V16", cap = StrokeCap.Round, join = StrokeJoin.Round)
             stroked(1.5f, "M3 9.0001C8.84 7.0501 15.16 7.0501 21 9.0001", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } }
+    )
+
+    val iconGrid8 = IconVariants(
+        outline = { vector("iconsax:outline/grid-8") {
+            filled("M15 22.75H9C3.57 22.75 1.25 20.43 1.25 15V9C1.25 3.57 3.57 1.25 9 1.25H15C20.43 1.25 22.75 3.57 22.75 9V15C22.75 20.43 20.43 22.75 15 22.75ZM9 2.75C4.39 2.75 2.75 4.39 2.75 9V15C2.75 19.61 4.39 21.25 9 21.25H15C19.61 21.25 21.25 19.61 21.25 15V9C21.25 4.39 19.61 2.75 15 2.75H9Z")
+            filled("M22 12.75H2C1.59 12.75 1.25 12.41 1.25 12C1.25 11.59 1.59 11.25 2 11.25H22C22.41 11.25 22.75 11.59 22.75 12C22.75 12.41 22.41 12.75 22 12.75Z")
+            filled("M8.25 22.25C7.84 22.25 7.5 21.91 7.5 21.5V12C7.5 11.59 7.84 11.25 8.25 11.25C8.66 11.25 9 11.59 9 12V21.5C9 21.91 8.66 22.25 8.25 22.25Z")
+            filled("M15.75 22.75C15.34 22.75 15 22.41 15 22V12C15 11.59 15.34 11.25 15.75 11.25C16.16 11.25 16.5 11.59 16.5 12V22C16.5 22.41 16.16 22.75 15.75 22.75Z")
+            filled("M8.25 12.75C7.84 12.75 7.5 12.41 7.5 12V2C7.5 1.59 7.84 1.25 8.25 1.25C8.66 1.25 9 1.59 9 2V12C9 12.41 8.66 12.75 8.25 12.75Z")
+            filled("M15.75 12.75C15.34 12.75 15 12.41 15 12V2.54004C15 2.13004 15.34 1.79004 15.75 1.79004C16.16 1.79004 16.5 2.13004 16.5 2.54004V12C16.5 12.41 16.16 12.75 15.75 12.75Z")
+        } },
+        broken = { vector("iconsax:broken/grid-8") {
+            stroked(1.5f, "M2.52 5.41C2.16 6.38 2 7.57 2 9V15C2 20 4 22 9 22H15C20 22 22 20 22 15V9C22 4 20 2 15 2H9C7.82 2 6.82 2.11 5.96 2.34", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M2 12H22", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M8.25 12V18", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M15.75 22V12", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M8.25 12V2", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M15.75 12V2.54004", cap = StrokeCap.Round, join = StrokeJoin.Round)
         } }
     )
 
@@ -1113,6 +1251,22 @@ private object IconsaxVectors {
         } }
     )
 
+    val iconMobileProgramming = IconVariants(
+        outline = { vector("iconsax:outline/mobile-programming") {
+            filled("M13.4994 5.75024H10.4794C9.25944 5.75024 8.24944 4.76022 8.22944 3.54022L8.19944 2.01025C8.18944 1.60025 8.51942 1.25023 8.92942 1.24023C8.93942 1.24023 8.93944 1.24023 8.94944 1.24023C9.35944 1.24023 9.68944 1.57021 9.69944 1.97021L9.72944 3.50024C9.73944 3.90024 10.0794 4.24023 10.4794 4.24023H13.4994C13.9194 4.24023 14.2494 3.90023 14.2494 3.49023V2.00024C14.2494 1.59024 14.5894 1.25024 14.9994 1.25024C15.4094 1.25024 15.7494 1.59024 15.7494 2.00024V3.50024C15.7494 4.74024 14.7394 5.75024 13.4994 5.75024Z")
+            filled("M16.9995 21.75C16.8095 21.75 16.6195 21.68 16.4695 21.53L14.4695 19.53C14.1795 19.24 14.1795 18.7599 14.4695 18.4699L16.4695 16.4699C16.7595 16.1799 17.2395 16.1799 17.5295 16.4699C17.8195 16.7599 17.8195 17.24 17.5295 17.53L16.0594 19L17.5295 20.4699C17.8195 20.7599 17.8195 21.24 17.5295 21.53C17.3795 21.68 17.1895 21.75 16.9995 21.75Z")
+            filled("M19.9995 21.75C19.8095 21.75 19.6195 21.68 19.4695 21.53C19.1795 21.24 19.1795 20.7599 19.4695 20.4699L20.9395 19L19.4695 17.53C19.1795 17.24 19.1795 16.7599 19.4695 16.4699C19.7595 16.1799 20.2395 16.1799 20.5295 16.4699L22.5295 18.4699C22.8195 18.7599 22.8195 19.24 22.5295 19.53L20.5295 21.53C20.3795 21.68 20.1895 21.75 19.9995 21.75Z")
+            filled("M13 22.75H8C4.35 22.75 2.25 20.65 2.25 17V7C2.25 3.35 4.35 1.25 8 1.25H16C19.65 1.25 21.75 3.35 21.75 7V14C21.75 14.41 21.41 14.75 21 14.75C20.59 14.75 20.25 14.41 20.25 14V7C20.25 4.14 18.86 2.75 16 2.75H8C5.14 2.75 3.75 4.14 3.75 7V17C3.75 19.86 5.14 21.25 8 21.25H13C13.41 21.25 13.75 21.59 13.75 22C13.75 22.41 13.41 22.75 13 22.75Z")
+        } },
+        broken = { vector("iconsax:broken/mobile-programming") {
+            stroked(1.5f, "M8.92969 2L8.95969 3.53003C8.97969 4.34003 9.64969 5 10.4597 5H13.4797C14.3097 5 14.9797 4.32 14.9797 3.5V2", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M17 17L15 19L17 21", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M20 17L22 19L20 21", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M3 12.98V7C3 4 4.5 2 8 2H16C19.5 2 21 4 21 7V14", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M13 22H8C4.5 22 3 20 3 17", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+        } }
+    )
+
     val iconMoon = IconVariants(
         outline = { vector("iconsax:outline/moon") {
             filled("M12.4604 22.7501C12.2904 22.7501 12.1204 22.7501 11.9504 22.7401C6.35044 22.4901 1.67044 17.9801 1.28044 12.4801C0.940437 7.76011 3.67044 3.35011 8.07044 1.50011C9.32044 0.980114 9.98044 1.38011 10.2604 1.67011C10.5404 1.95011 10.9304 2.60011 10.4104 3.79011C9.95044 4.85011 9.72044 5.98011 9.73044 7.14011C9.75044 11.5701 13.4304 15.3301 17.9204 15.5101C18.5704 15.5401 19.2104 15.4901 19.8304 15.3801C21.1504 15.1401 21.7004 15.6701 21.9104 16.0101C22.1204 16.3501 22.3604 17.0801 21.5604 18.1601C19.4404 21.0601 16.0704 22.7501 12.4604 22.7501ZM2.77044 12.3701C3.11044 17.1301 7.17044 21.0301 12.0104 21.2401C15.3004 21.4001 18.4204 19.9001 20.3404 17.2801C20.4904 17.0701 20.5604 16.9201 20.5904 16.8401C20.5004 16.8301 20.3404 16.8201 20.0904 16.8701C19.3604 17.0001 18.6004 17.0501 17.8504 17.0201C12.5704 16.8101 8.25044 12.3801 8.22044 7.16011C8.22044 5.78011 8.49044 4.45011 9.04044 3.20011C9.14044 2.98011 9.16044 2.83011 9.17044 2.75011C9.08044 2.75011 8.92044 2.77011 8.66044 2.88011C4.85044 4.48011 2.49044 8.30011 2.77044 12.3701Z")
@@ -1124,27 +1278,18 @@ private object IconsaxVectors {
 
     val iconMore = IconVariants(
         outline = { vector("iconsax:outline/more") {
+            addGroup(rotate = 90f, pivotX = 12f, pivotY = 12f)
             filled("M5 14.75C3.48 14.75 2.25 13.52 2.25 12C2.25 10.48 3.48 9.25 5 9.25C6.52 9.25 7.75 10.48 7.75 12C7.75 13.52 6.52 14.75 5 14.75ZM5 10.75C4.31 10.75 3.75 11.31 3.75 12C3.75 12.69 4.31 13.25 5 13.25C5.69 13.25 6.25 12.69 6.25 12C6.25 11.31 5.69 10.75 5 10.75Z")
             filled("M19 14.75C17.48 14.75 16.25 13.52 16.25 12C16.25 10.48 17.48 9.25 19 9.25C20.52 9.25 21.75 10.48 21.75 12C21.75 13.52 20.52 14.75 19 14.75ZM19 10.75C18.31 10.75 17.75 11.31 17.75 12C17.75 12.69 18.31 13.25 19 13.25C19.69 13.25 20.25 12.69 20.25 12C20.25 11.31 19.69 10.75 19 10.75Z")
             filled("M12 14.75C10.48 14.75 9.25 13.52 9.25 12C9.25 10.48 10.48 9.25 12 9.25C13.52 9.25 14.75 10.48 14.75 12C14.75 13.52 13.52 14.75 12 14.75ZM12 10.75C11.31 10.75 10.75 11.31 10.75 12C10.75 12.69 11.31 13.25 12 13.25C12.69 13.25 13.25 12.69 13.25 12C13.25 11.31 12.69 10.75 12 10.75Z")
+            clearGroup()
         } },
         broken = { vector("iconsax:broken/more") {
+            addGroup(rotate = 90f, pivotX = 12f, pivotY = 12f)
             stroked(1.5f, "M5 10C3.9 10 3 10.9 3 12C3 13.1 3.9 14 5 14C6.1 14 7 13.1 7 12C7 10.9 6.1 10 5 10Z")
             stroked(1.5f, "M19 10C17.9 10 17 10.9 17 12C17 13.1 17.9 14 19 14C20.1 14 21 13.1 21 12C21 10.9 20.1 10 19 10Z")
             stroked(1.5f, "M10 12C10 13.1 10.9 14 12 14C13.1 14 14 13.1 14 12C14 10.9 13.1 10 12 10", cap = StrokeCap.Round, join = StrokeJoin.Round)
-        } }
-    )
-
-    val iconMore2 = IconVariants(
-        outline = { vector("iconsax:outline/more-2") {
-            filled("M11.9998 10.07C10.3998 10.07 9.08984 8.76 9.08984 7.16C9.08984 5.56 10.3998 4.25 11.9998 4.25C13.5998 4.25 14.9098 5.56 14.9098 7.16C14.9098 8.76 13.5998 10.07 11.9998 10.07ZM11.9998 5.75C11.2198 5.75 10.5898 6.38 10.5898 7.16C10.5898 7.94 11.2198 8.57 11.9998 8.57C12.7798 8.57 13.4098 7.94 13.4098 7.16C13.4098 6.38 12.7798 5.75 11.9998 5.75Z")
-            filled("M6.78988 19.7502C5.18988 19.7502 3.87988 18.4402 3.87988 16.8402C3.87988 15.2402 5.18988 13.9302 6.78988 13.9302C8.38988 13.9302 9.69988 15.2402 9.69988 16.8402C9.69988 18.4402 8.38988 19.7502 6.78988 19.7502ZM6.78988 15.4302C6.00988 15.4302 5.37988 16.0602 5.37988 16.8402C5.37988 17.6202 6.00988 18.2502 6.78988 18.2502C7.56988 18.2502 8.19988 17.6202 8.19988 16.8402C8.19988 16.0602 7.55988 15.4302 6.78988 15.4302Z")
-            filled("M17.2098 19.7502C15.6098 19.7502 14.2998 18.4402 14.2998 16.8402C14.2998 15.2402 15.6098 13.9302 17.2098 13.9302C18.8098 13.9302 20.1198 15.2402 20.1198 16.8402C20.1198 18.4402 18.8198 19.7502 17.2098 19.7502ZM17.2098 15.4302C16.4298 15.4302 15.7998 16.0602 15.7998 16.8402C15.7998 17.6202 16.4298 18.2502 17.2098 18.2502C17.9898 18.2502 18.6198 17.6202 18.6198 16.8402C18.6198 16.0602 17.9898 15.4302 17.2098 15.4302Z")
-        } },
-        broken = { vector("iconsax:broken/more-2") {
-            stroked(1.5f, "M9.83984 7.16C9.83984 8.35 10.8098 9.32 11.9998 9.32C13.1898 9.32 14.1598 8.35 14.1598 7.16C14.1598 5.97 13.1898 5 11.9998 5", cap = StrokeCap.Round, join = StrokeJoin.Round)
-            stroked(1.5f, "M6.79086 18.9999C7.98086 18.9999 8.95086 18.0299 8.95086 16.8399C8.95086 15.6499 7.98086 14.6799 6.79086 14.6799C5.60086 14.6799 4.63086 15.6499 4.63086 16.8399C4.63086 18.0299 5.59086 18.9999 6.79086 18.9999Z", cap = StrokeCap.Round, join = StrokeJoin.Round)
-            stroked(1.5f, "M17.2108 18.9999C18.4008 18.9999 19.3708 18.0299 19.3708 16.8399C19.3708 15.6499 18.4008 14.6799 17.2108 14.6799C16.0208 14.6799 15.0508 15.6499 15.0508 16.8399C15.0508 18.0299 16.0208 18.9999 17.2108 18.9999Z", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            clearGroup()
         } }
     )
 
@@ -1263,6 +1408,23 @@ private object IconsaxVectors {
         } }
     )
 
+    val iconPresentionChart = IconVariants(
+        outline = { vector("iconsax:outline/presention-chart") {
+            filled("M18.1 17.75H5.89999C3.57999 17.75 2.25 16.42 2.25 14.1V2C2.25 1.59 2.59 1.25 3 1.25H21C21.41 1.25 21.75 1.59 21.75 2V14.1C21.75 16.42 20.42 17.75 18.1 17.75ZM3.75 2.75V14.1C3.75 15.59 4.40999 16.25 5.89999 16.25H18.09C19.58 16.25 20.24 15.59 20.24 14.1V2.75H3.75Z")
+            filled("M22 2.75H2C1.59 2.75 1.25 2.41 1.25 2C1.25 1.59 1.59 1.25 2 1.25H22C22.41 1.25 22.75 1.59 22.75 2C22.75 2.41 22.41 2.75 22 2.75Z")
+            filled("M8.00027 22.75C7.72027 22.75 7.46025 22.6 7.33025 22.34C7.14025 21.97 7.29028 21.52 7.67028 21.33L11.2503 19.54V17C11.2503 16.59 11.5903 16.25 12.0003 16.25C12.4103 16.25 12.7503 16.59 12.7503 17V20C12.7503 20.28 12.5903 20.54 12.3303 20.67L8.33025 22.67C8.23025 22.72 8.11027 22.75 8.00027 22.75Z")
+            filled("M15.9999 22.7502C15.8899 22.7502 15.77 22.7202 15.67 22.6702L11.67 20.6702C11.3 20.4802 11.1499 20.0302 11.3299 19.6602C11.5199 19.2902 11.9699 19.1402 12.3399 19.3202L16.3399 21.3202C16.7099 21.5102 16.8599 21.9602 16.6799 22.3302C16.5399 22.6002 16.2699 22.7502 15.9999 22.7502Z")
+            filled("M7.49993 11.7502C7.28993 11.7502 7.06994 11.6602 6.91994 11.4802C6.64994 11.1602 6.69992 10.6902 7.01992 10.4202L10.1699 7.79018C10.4599 7.55018 10.8299 7.45018 11.1799 7.51018C11.5399 7.57018 11.8499 7.79016 12.0399 8.11016L13.0899 9.86016L16.0199 7.42019C16.3399 7.16019 16.8099 7.20016 17.0799 7.52016C17.3499 7.84016 17.2999 8.31016 16.9799 8.58016L13.8299 11.2102C13.5399 11.4502 13.1699 11.5502 12.8199 11.4902C12.4599 11.4302 12.1499 11.2102 11.9599 10.8902L10.9099 9.14019L7.97994 11.5802C7.83994 11.6902 7.66993 11.7502 7.49993 11.7502Z")
+        } },
+        broken = { vector("iconsax:broken/presention-chart") {
+            stroked(1.5f, "M21 10V2H3V14.1C3 14.81 3.14001 15.4 3.42001 15.86C3.88001 16.62 4.72 17.01 5.91 17.01H18.1C20 17.01 21 16.01 21 14.11", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M2 2H22", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M8 22L12 20V17", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M16 22L12 20", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M7.5 11L10.65 8.37C10.9 8.16 11.23 8.22 11.4 8.5L12.6 10.5C12.77 10.78 13.1 10.83 13.35 10.63L16.5 8", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+        } }
+    )
+
     val iconPrevious = IconVariants(
         outline = { vector("iconsax:outline/previous") {
             filled("M17.6896 20.0902C17.1196 20.0902 16.5596 19.9402 16.0396 19.6402L7.7496 14.8602C6.7196 14.2602 6.09961 13.1902 6.09961 12.0002C6.09961 10.8102 6.7196 9.74019 7.7496 9.14019L16.0396 4.36016C17.0696 3.76016 18.2996 3.76016 19.3396 4.36016C20.3796 4.96016 20.9896 6.02017 20.9896 7.22017V16.7902C20.9896 17.9802 20.3696 19.0502 19.3396 19.6502C18.8196 19.9402 18.2596 20.0902 17.6896 20.0902ZM17.6896 5.41017C17.3796 5.41017 17.0696 5.49016 16.7896 5.65016L8.4996 10.4302C7.9396 10.7602 7.59961 11.3402 7.59961 11.9902C7.59961 12.6402 7.9396 13.2202 8.4996 13.5502L16.7896 18.3302C17.3496 18.6602 18.0296 18.6602 18.5896 18.3302C19.1496 18.0002 19.4896 17.4202 19.4896 16.7702V7.20018C19.4896 6.55018 19.1496 5.97019 18.5896 5.64019C18.3096 5.50019 17.9996 5.41017 17.6896 5.41017Z")
@@ -1272,6 +1434,21 @@ private object IconsaxVectors {
             stroked(1.5f, "M12.2707 7.39006L16.4207 5.00005C18.1207 4.02005 20.2507 5.24004 20.2507 7.21004V16.78C20.2507 18.74 18.1207 19.97 16.4207 18.99L12.2707 16.6001L8.1207 14.2001C6.4207 13.2201 6.4207 10.7701 8.1207 9.79006", cap = StrokeCap.Round, join = StrokeJoin.Round)
             stroked(1.5f, "M3.75977 18.18V17", cap = StrokeCap.Round, join = StrokeJoin.Round)
             stroked(1.5f, "M3.75977 14.0001V5.82007", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } }
+    )
+
+    val iconProfile2User = IconVariants(
+        outline = { vector("iconsax:outline/profile-2user") {
+            filled("M9.16055 11.62C9.13055 11.62 9.11055 11.62 9.08055 11.62C9.03055 11.61 8.96055 11.61 8.90055 11.62C6.00055 11.53 3.81055 9.25 3.81055 6.44C3.81055 3.58 6.14055 1.25 9.00055 1.25C11.8605 1.25 14.1905 3.58 14.1905 6.44C14.1805 9.25 11.9805 11.53 9.19055 11.62C9.18055 11.62 9.17055 11.62 9.16055 11.62ZM9.00055 2.75C6.97055 2.75 5.31055 4.41 5.31055 6.44C5.31055 8.44 6.87055 10.05 8.86055 10.12C8.92055 10.11 9.05055 10.11 9.18055 10.12C11.1405 10.03 12.6805 8.42 12.6905 6.44C12.6905 4.41 11.0305 2.75 9.00055 2.75Z")
+            filled("M16.5404 11.75C16.5104 11.75 16.4804 11.75 16.4504 11.74C16.0404 11.78 15.6204 11.49 15.5804 11.08C15.5404 10.67 15.7904 10.3 16.2004 10.25C16.3204 10.24 16.4504 10.24 16.5604 10.24C18.0204 10.16 19.1604 8.96 19.1604 7.49C19.1604 5.97 17.9304 4.74 16.4104 4.74C16.0004 4.75 15.6604 4.41 15.6604 4C15.6604 3.59 16.0004 3.25 16.4104 3.25C18.7504 3.25 20.6604 5.16 20.6604 7.5C20.6604 9.8 18.8604 11.66 16.5704 11.75C16.5604 11.75 16.5504 11.75 16.5404 11.75Z")
+            filled("M9.16961 22.55C7.20961 22.55 5.23961 22.05 3.74961 21.05C2.35961 20.13 1.59961 18.87 1.59961 17.5C1.59961 16.13 2.35961 14.86 3.74961 13.93C6.74961 11.94 11.6096 11.94 14.5896 13.93C15.9696 14.85 16.7396 16.11 16.7396 17.48C16.7396 18.85 15.9796 20.12 14.5896 21.05C13.0896 22.05 11.1296 22.55 9.16961 22.55ZM4.57961 15.19C3.61961 15.83 3.09961 16.65 3.09961 17.51C3.09961 18.36 3.62961 19.18 4.57961 19.81C7.06961 21.48 11.2696 21.48 13.7596 19.81C14.7196 19.17 15.2396 18.35 15.2396 17.49C15.2396 16.64 14.7096 15.82 13.7596 15.19C11.2696 13.53 7.06961 13.53 4.57961 15.19Z")
+            filled("M18.3402 20.75C17.9902 20.75 17.6802 20.51 17.6102 20.15C17.5302 19.74 17.7902 19.35 18.1902 19.26C18.8202 19.13 19.4002 18.88 19.8502 18.53C20.4202 18.1 20.7302 17.56 20.7302 16.99C20.7302 16.42 20.4202 15.88 19.8602 15.46C19.4202 15.12 18.8702 14.88 18.2202 14.73C17.8202 14.64 17.5602 14.24 17.6502 13.83C17.7402 13.43 18.1402 13.17 18.5502 13.26C19.4102 13.45 20.1602 13.79 20.7702 14.26C21.7002 14.96 22.2302 15.95 22.2302 16.99C22.2302 18.03 21.6902 19.02 20.7602 19.73C20.1402 20.21 19.3602 20.56 18.5002 20.73C18.4402 20.75 18.3902 20.75 18.3402 20.75Z")
+        } },
+        broken = { vector("iconsax:broken/profile-2user") {
+            stroked(1.5f, "M12.6805 3.96C13.1605 4.67 13.4405 5.52 13.4405 6.44C13.4305 8.84 11.5405 10.79 9.16055 10.87C9.06055 10.86 8.94055 10.86 8.83055 10.87C6.45055 10.79 4.56055 8.84 4.56055 6.44C4.56055 3.99 6.54055 2 9.00055 2", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M16.4093 4C18.3493 4 19.9093 5.57 19.9093 7.5C19.9093 9.39 18.4093 10.93 16.5393 11C16.4593 10.99 16.3693 10.99 16.2793 11", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M4.1607 14.56C1.7407 16.18 1.7407 18.82 4.1607 20.43C6.9107 22.27 11.4207 22.27 14.1707 20.43C16.5907 18.81 16.5907 16.17 14.1707 14.56C11.4307 12.73 6.9207 12.73 4.1607 14.56Z", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M18.3398 20C19.0598 19.85 19.7398 19.56 20.2998 19.13C21.8598 17.96 21.8598 16.03 20.2998 14.86C19.7498 14.44 19.0798 14.16 18.3698 14", cap = StrokeCap.Round, join = StrokeJoin.Round)
         } }
     )
 
@@ -1450,21 +1627,6 @@ private object IconsaxVectors {
         } }
     )
 
-    val iconSendSquare = IconVariants(
-        outline = { vector("iconsax:outline/send-square") {
-            filled("M15 22.75H9C3.57 22.75 1.25 20.43 1.25 15V9C1.25 3.57 3.57 1.25 9 1.25H15C20.43 1.25 22.75 3.57 22.75 9V15C22.75 20.43 20.43 22.75 15 22.75ZM9 2.75C4.39 2.75 2.75 4.39 2.75 9V15C2.75 19.61 4.39 21.25 9 21.25H15C19.61 21.25 21.25 19.61 21.25 15V9C21.25 4.39 19.61 2.75 15 2.75H9Z")
-            filled("M14.9995 10.26C14.8095 10.26 14.6195 10.1899 14.4695 10.0399L11.9995 7.56996L9.52945 10.0399C9.23945 10.3299 8.75945 10.3299 8.46945 10.0399C8.17945 9.74995 8.17945 9.26995 8.46945 8.97995L11.4695 5.97995C11.7595 5.68995 12.2395 5.68995 12.5295 5.97995L15.5295 8.97995C15.8195 9.26995 15.8195 9.74995 15.5295 10.0399C15.3795 10.1899 15.1895 10.26 14.9995 10.26Z")
-            filled("M12 15.26C11.59 15.26 11.25 14.92 11.25 14.51V6.51001C11.25 6.10001 11.59 5.76001 12 5.76001C12.41 5.76001 12.75 6.10001 12.75 6.51001V14.51C12.75 14.93 12.41 15.26 12 15.26Z")
-            filled("M12.0004 18.2302C9.89044 18.2302 7.77043 17.8902 5.76043 17.2202C5.37043 17.0902 5.16043 16.6602 5.29043 16.2702C5.42043 15.8802 5.85045 15.6602 6.24045 15.8002C9.96045 17.0402 14.0504 17.0402 17.7704 15.8002C18.1604 15.6702 18.5904 15.8802 18.7204 16.2702C18.8504 16.6602 18.6404 17.0902 18.2504 17.2202C16.2304 17.9002 14.1104 18.2302 12.0004 18.2302Z")
-        } },
-        broken = { vector("iconsax:broken/send-square") {
-            stroked(1.5f, "M2 13.05V15C2 20 4 22 9 22H15C20 22 22 20 22 15V9C22 4 20 2 15 2H9C4 2 2 4 2 9", cap = StrokeCap.Round, join = StrokeJoin.Round)
-            stroked(1.5f, "M9 9.51001L12 6.51001L15 9.51001", cap = StrokeCap.Round, join = StrokeJoin.Round)
-            stroked(1.5f, "M12 6.51001V14.51", cap = StrokeCap.Round, join = StrokeJoin.Round)
-            stroked(1.5f, "M6 16.51C9.89 17.81 14.11 17.81 18 16.51", cap = StrokeCap.Round, join = StrokeJoin.Round)
-        } }
-    )
-
     val iconSetting2 = IconVariants(
         outline = { vector("iconsax:outline/setting-2") {
             filled("M12 15.75C9.93 15.75 8.25 14.07 8.25 12C8.25 9.93 9.93 8.25 12 8.25C14.07 8.25 15.75 9.93 15.75 12C15.75 14.07 14.07 15.75 12 15.75ZM12 9.75C10.76 9.75 9.75 10.76 9.75 12C9.75 13.24 10.76 14.25 12 14.25C13.24 14.25 14.25 13.24 14.25 12C14.25 10.76 13.24 9.75 12 9.75Z")
@@ -1493,6 +1655,17 @@ private object IconsaxVectors {
             stroked(1.5f, "M22 17.5H18", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
             stroked(1.5f, "M8 17.5H2", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
             stroked(1.5f, "M14 21C15.933 21 17.5 19.433 17.5 17.5C17.5 15.567 15.933 14 14 14C12.067 14 10.5 15.567 10.5 17.5C10.5 19.433 12.067 21 14 21Z", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+        } }
+    )
+
+    val iconShapes = IconVariants(
+        outline = { vector("iconsax:outline/shapes") {
+            filled("M13.4297 15.7502H4.39971C3.27971 15.7502 2.25971 15.1703 1.68971 14.2003C1.11971 13.2303 1.09971 12.0702 1.63971 11.0802L6.14971 2.87024C6.70971 1.85024 7.73971 1.24023 8.90971 1.24023C10.0797 1.24023 11.1097 1.85024 11.6697 2.87024L16.1897 11.0802C16.7297 12.0602 16.7097 13.2303 16.1397 14.2003C15.5697 15.1703 14.5497 15.7502 13.4297 15.7502ZM8.90971 2.75024C8.29971 2.75024 7.75971 3.07025 7.46971 3.60025L2.95971 11.8102C2.67971 12.3302 2.68971 12.9302 2.97971 13.4402C3.27971 13.9502 3.80971 14.2502 4.39971 14.2502H13.4297C14.0197 14.2502 14.5497 13.9502 14.8497 13.4402C15.1497 12.9302 15.1597 12.3302 14.8697 11.8102L10.3497 3.60025C10.0597 3.07025 9.51971 2.75024 8.90971 2.75024Z")
+            filled("M15.5 22.75C11.5 22.75 8.25 19.5 8.25 15.5C8.25 15.32 8.26 15.14 8.27 14.96C8.29 14.56 8.62 14.25 9.02 14.25H13.43C14.02 14.25 14.55 13.95 14.85 13.44C15.15 12.93 15.16 12.33 14.87 11.81L13.59 9.48001C13.47 9.27001 13.47 9.01999 13.57 8.79999C13.67 8.57999 13.87 8.43 14.1 8.38C14.55 8.29 15.02 8.25 15.5 8.25C19.5 8.25 22.75 11.5 22.75 15.5C22.75 19.5 19.5 22.75 15.5 22.75ZM9.76 15.75C9.89 18.81 12.42 21.25 15.5 21.25C18.67 21.25 21.25 18.67 21.25 15.5C21.25 12.33 18.67 9.75 15.5 9.75C15.48 9.75 15.47 9.75 15.45 9.75L16.19 11.09C16.73 12.07 16.71 13.24 16.14 14.21C15.57 15.18 14.56 15.76 13.43 15.76H9.76V15.75Z")
+        } },
+        broken = { vector("iconsax:broken/shapes") {
+            stroked(1.5f, "M6.81034 3.23994C7.72034 1.58994 10.1003 1.58994 11.0103 3.23994L13.2003 7.20994L14.2503 9.11995L15.5303 11.45C16.4103 13.05 15.2503 15 13.4303 15H4.40034C2.58034 15 1.42034 13.05 2.30034 11.45L4.63034 7.20994", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M22 15.5C22 19.09 19.09 22 15.5 22C11.91 22 9 19.09 9 15.5C9 15.33 9.01 15.17 9.02 15H13.43C15.25 15 16.41 13.05 15.53 11.45L14.25 9.12C14.65 9.04 15.07 9 15.5 9C19.09 9 22 11.91 22 15.5Z", cap = StrokeCap.Round, join = StrokeJoin.Round)
         } }
     )
 
@@ -1734,6 +1907,18 @@ private object IconsaxVectors {
         } }
     )
 
+    val iconUndo = IconVariants(
+        outline = { vector("iconsax:outline/undo") {
+            filled("M15.1309 19.0601H7.13086C6.72086 19.0601 6.38086 18.7201 6.38086 18.3101C6.38086 17.9001 6.72086 17.5601 7.13086 17.5601H15.1309C17.4709 17.5601 19.3809 15.6501 19.3809 13.3101C19.3809 10.9701 17.4709 9.06006 15.1309 9.06006H4.13086C3.72086 9.06006 3.38086 8.72006 3.38086 8.31006C3.38086 7.90006 3.72086 7.56006 4.13086 7.56006H15.1309C18.3009 7.56006 20.8809 10.1401 20.8809 13.3101C20.8809 16.4801 18.3009 19.0601 15.1309 19.0601Z")
+            filled("M6.43055 11.5599C6.24055 11.5599 6.05055 11.4899 5.90055 11.3399L3.34055 8.77988C3.05055 8.48988 3.05055 8.00988 3.34055 7.71988L5.90055 5.15988C6.19055 4.86988 6.67055 4.86988 6.96055 5.15988C7.25055 5.44988 7.25055 5.92988 6.96055 6.21988L4.93055 8.24988L6.96055 10.2799C7.25055 10.5699 7.25055 11.0499 6.96055 11.3399C6.82055 11.4899 6.62055 11.5599 6.43055 11.5599Z")
+        } },
+        broken = { vector("iconsax:broken/undo") {
+            stroked(1.5f, "M10.9809 8.31006H4.13086", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M7.13086 18.3101H15.1309C17.8909 18.3101 20.1309 16.0701 20.1309 13.3101C20.1309 10.5501 17.8909 8.31006 15.1309 8.31006", cap = StrokeCap.Round, join = StrokeJoin.Round, miter = 10f)
+            stroked(1.5f, "M6.42914 10.8099L3.86914 8.24994L6.42914 5.68994", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } }
+    )
+
     val iconUnlock = IconVariants(
         outline = { vector("iconsax:outline/unlock") {
             filled("M17 22.75H7C2.59 22.75 1.25 21.41 1.25 17V15C1.25 10.59 2.59 9.25 7 9.25H17C21.41 9.25 22.75 10.59 22.75 15V17C22.75 21.41 21.41 22.75 17 22.75ZM7 10.75C3.42 10.75 2.75 11.43 2.75 15V17C2.75 20.57 3.42 21.25 7 21.25H17C20.58 21.25 21.25 20.57 21.25 17V15C21.25 11.43 20.58 10.75 17 10.75H7Z")
@@ -1820,6 +2005,21 @@ private object IconsaxVectors {
             stroked(1.5f, "M12 7.75V13", cap = StrokeCap.Round, join = StrokeJoin.Round)
             stroked(1.5f, "M2.91992 8.58003C2.91992 7.46003 3.51993 6.41999 4.48993 5.84999L10.4299 2.42C11.3999 1.86 12.6 1.86 13.58 2.42L19.52 5.84999C20.49 6.40999 21.09 7.45003 21.09 8.58003V15.42C21.09 16.54 20.49 17.58 19.52 18.15L13.58 21.58C12.61 22.14 11.4099 22.14 10.4299 21.58L4.48993 18.15C3.51993 17.59 2.91992 16.55 2.91992 15.42V12.66", cap = StrokeCap.Round, join = StrokeJoin.Round)
             stroked(2f, "M12 16.2V16.2999", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } }
+    )
+
+    val iconWifiSquare = IconVariants(
+        outline = { vector("iconsax:outline/wifi-square") {
+            filled("M18.0005 10.7099C17.8405 10.7099 17.6805 10.6599 17.5405 10.5499C14.1705 7.94992 9.82051 7.94992 6.46051 10.5499C6.13051 10.7999 5.66052 10.7399 5.41052 10.4199C5.16052 10.0899 5.22052 9.61991 5.54052 9.36991C9.46052 6.33991 14.5305 6.33991 18.4605 9.36991C18.7905 9.61991 18.8505 10.0899 18.5905 10.4199C18.4505 10.6099 18.2205 10.7099 18.0005 10.7099Z")
+            filled("M16.4004 13.8C16.2404 13.8 16.0804 13.75 15.9404 13.64C13.5404 11.79 10.4504 11.79 8.05037 13.64C7.72037 13.89 7.25036 13.83 7.00036 13.51C6.75036 13.18 6.81036 12.71 7.13036 12.46C10.0804 10.18 13.9004 10.18 16.8504 12.46C17.1804 12.71 17.2404 13.18 16.9804 13.51C16.8504 13.7 16.6304 13.8 16.4004 13.8Z")
+            filled("M14.1996 16.8899C14.0396 16.8899 13.8796 16.8399 13.7396 16.7299C12.6796 15.9099 11.3096 15.9099 10.2496 16.7299C9.91958 16.9799 9.44958 16.9199 9.19958 16.5999C8.94958 16.2699 9.00958 15.7999 9.32958 15.5499C10.9196 14.3199 13.0596 14.3199 14.6496 15.5499C14.9796 15.7999 15.0396 16.2699 14.7796 16.5999C14.6496 16.7899 14.4296 16.8899 14.1996 16.8899Z")
+            filled("M15 22.75H9C3.57 22.75 1.25 20.43 1.25 15V9C1.25 3.57 3.57 1.25 9 1.25H15C20.43 1.25 22.75 3.57 22.75 9V15C22.75 20.43 20.43 22.75 15 22.75ZM9 2.75C4.39 2.75 2.75 4.39 2.75 9V15C2.75 19.61 4.39 21.25 9 21.25H15C19.61 21.25 21.25 19.61 21.25 15V9C21.25 4.39 19.61 2.75 15 2.75H9Z")
+        } },
+        broken = { vector("iconsax:broken/wifi-square") {
+            stroked(1.5f, "M6 9.96004C9.63 7.15004 14.37 7.15004 18 9.96004", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M7.59961 13.0501C10.2696 10.9901 13.7396 10.9901 16.4096 13.0501", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M9.80078 16.1399C11.1308 15.1099 12.8708 15.1099 14.2008 16.1399", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M2 13.05V15C2 20 4 22 9 22H15C20 22 22 20 22 15V9C22 4 20 2 15 2H9C4 2 2 4 2 9", cap = StrokeCap.Round, join = StrokeJoin.Round)
         } }
     )
 

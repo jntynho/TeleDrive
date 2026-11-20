@@ -71,6 +71,9 @@ def kotlin_name(icon):
 
 def emit_vector(style, icon, paths, suffix=""):
     yield f'        {style} = {{ vector("iconsax:{style}/{icon}") {{'
+    # Iconsax's horizontal ellipsis rotates to a vertical overflow control.
+    if icon == "more":
+        yield "            addGroup(rotate = 90f, pivotX = 12f, pivotY = 12f)"
     for path in paths:
         data = json.dumps(path["d"])
         if "strokeWidth" in path:
@@ -84,6 +87,8 @@ def emit_vector(style, icon, paths, suffix=""):
             yield f'            stroked({path["strokeWidth"]:g}f, {data}{"".join(attributes)})'
         else:
             yield f"            filled({data})"
+    if icon == "more":
+        yield "            clearGroup()"
     yield "        } }" + suffix
 
 

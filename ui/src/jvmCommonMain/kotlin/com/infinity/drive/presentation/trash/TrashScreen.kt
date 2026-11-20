@@ -199,7 +199,7 @@ fun TrashScreen(
                                 )
                             }
                         }
-                        IconButton(onManageLock){Icon(DriveIcons.MoreVert,"Trash settings")}
+                        IconButton(onManageLock){Icon(DriveIcons.Settings,"Trash settings")}
                     }
                 )
             }

@@ -7,6 +7,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.VectorGroup
+import androidx.compose.ui.graphics.vector.VectorPath
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
@@ -41,6 +43,33 @@ class IconsaxIconsTest {
             checkVectors(rendered, "broken")
             outline.zip(rendered).forEach { (before, after) ->
                 assertNotEquals(before.name, before.root, after.root)
+            }
+        }
+    }
+
+    @Test fun overflowKeepsThreeVerticalDotsInBothStyles() {
+        val style = mutableStateOf(IconStyle.Outline)
+        var rendered: ImageVector? = null
+        compose.setContent {
+            CompositionLocalProvider(LocalIconStyle provides style.value) {
+                val overflow = DriveIcons.MoreVert
+                Icon(overflow, contentDescription = "More actions")
+                SideEffect { rendered = overflow }
+            }
+        }
+
+        IconStyle.entries.forEach { choice ->
+            compose.runOnIdle { style.value = choice }
+            compose.runOnIdle {
+                val icon = requireNotNull(rendered)
+                assertEquals("iconsax:${choice.name.lowercase()}/more", icon.name)
+                assertEquals(1, icon.root.size)
+                val dots = icon.root[0] as VectorGroup
+                assertEquals(3, dots.size)
+                assertTrue(dots.all { it is VectorPath })
+                assertEquals(90f, dots.rotation, 0f)
+                assertEquals(12f, dots.pivotX, 0f)
+                assertEquals(12f, dots.pivotY, 0f)
             }
         }
     }
