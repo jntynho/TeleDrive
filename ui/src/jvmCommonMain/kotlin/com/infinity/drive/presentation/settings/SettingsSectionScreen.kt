@@ -14,12 +14,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -27,38 +25,32 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import com.infinity.drive.presentation.components.PageHeader
-import com.infinity.drive.presentation.common.resolve
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.infinity.drive.domain.model.AppIconStyle
+import com.infinity.drive.domain.model.deleteCustomTheme
+import com.infinity.drive.domain.model.saveCustomTheme
+import com.infinity.drive.domain.model.selectAccentColour
+import com.infinity.drive.domain.model.selectCustomTheme
+import com.infinity.drive.domain.model.selectDynamicAccent
+import com.infinity.drive.resources.settings_icon_style
+import com.infinity.drive.resources.settings_icon_outline
+import com.infinity.drive.resources.settings_icon_broken
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import org.jetbrains.compose.resources.StringArrayResource
 import org.jetbrains.compose.resources.stringArrayResource
-import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.unit.dp
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.infinity.drive.domain.model.AppLanguage
-import com.infinity.drive.resources.collection_hidden_title
 import com.infinity.drive.resources.Res
-import com.infinity.drive.resources.common_cancel
-import com.infinity.drive.resources.library_restore_close
-import com.infinity.drive.resources.library_restore_done
-import com.infinity.drive.resources.library_restore_hint
-import com.infinity.drive.resources.library_restore_pause
-import com.infinity.drive.resources.library_restore_progress
-import com.infinity.drive.resources.library_restore_start
-import com.infinity.drive.resources.library_restore_subtitle
-import com.infinity.drive.resources.library_restore_title
-import com.infinity.drive.resources.drive_integrity_subtitle
-import com.infinity.drive.resources.drive_integrity_title
 import com.infinity.drive.resources.recovery_export_auth_prompt
 import com.infinity.drive.resources.recovery_export_subtitle
 import com.infinity.drive.resources.recovery_export_title
@@ -85,7 +77,6 @@ import com.infinity.drive.resources.common_clear
 import com.infinity.drive.resources.common_free_space
 import com.infinity.drive.resources.common_storage_channels
 import com.infinity.drive.resources.lock_timeout_labels
-import com.infinity.drive.resources.rebuild_indexed_files
 import com.infinity.drive.resources.settings_add_another_folder
 import com.infinity.drive.resources.settings_app_lock
 import com.infinity.drive.resources.settings_archived_shortcut
@@ -110,22 +101,15 @@ import com.infinity.drive.resources.settings_clear_thumbnails_title
 import com.infinity.drive.resources.settings_compact_layout
 import com.infinity.drive.resources.settings_confirm_removing_lock
 import com.infinity.drive.resources.settings_debug_logging
-import com.infinity.drive.resources.settings_dynamic_color
-import com.infinity.drive.resources.settings_encrypt_thumbnails
-import com.infinity.drive.resources.settings_encrypt_uploads
-import com.infinity.drive.resources.settings_encryption_stays_off
 import com.infinity.drive.resources.settings_exclusions
 import com.infinity.drive.resources.settings_failures
 import com.infinity.drive.resources.settings_files_folders_skipped_backup
-import com.infinity.drive.resources.settings_files_sealed_leaving_device
 import com.infinity.drive.resources.settings_files_stay_telegram_channel
 import com.infinity.drive.resources.settings_folder_unreadable
 import com.infinity.drive.resources.settings_verified_cleanup_title
 import com.infinity.drive.resources.settings_gallery_previews_regenerated_browse
 import com.infinity.drive.resources.settings_gallery_grid_columns
 import com.infinity.drive.resources.settings_gallery_grid_view
-import com.infinity.drive.resources.settings_grid_columns
-import com.infinity.drive.resources.settings_grid_view
 import com.infinity.drive.resources.settings_hidden_shortcut
 import com.infinity.drive.resources.settings_hides_app_screenshots_screen
 import com.infinity.drive.resources.settings_key_backup_stored
@@ -140,11 +124,8 @@ import com.infinity.drive.resources.settings_no_recovery_passphrase
 import com.infinity.drive.resources.settings_only_charging
 import com.infinity.drive.resources.settings_parallel_transfers
 import com.infinity.drive.resources.settings_play_videos_load_instead
-import com.infinity.drive.resources.settings_protects_cached_previews_device
 import com.infinity.drive.resources.settings_proxy
 import com.infinity.drive.resources.settings_proxy_subtitle
-import com.infinity.drive.resources.settings_reading_channel
-import com.infinity.drive.resources.settings_rebuild_index_telegram
 import com.infinity.drive.resources.settings_recent_files
 import com.infinity.drive.resources.settings_recent_files_subtitle
 import com.infinity.drive.resources.settings_remove
@@ -152,8 +133,6 @@ import com.infinity.drive.resources.settings_remove_backup_folder
 import com.infinity.drive.resources.settings_removes_session_stored_api
 import com.infinity.drive.resources.settings_require_fingerprint_screen_lock
 import com.infinity.drive.resources.settings_required_before_encrypt
-import com.infinity.drive.resources.settings_restore_encryption_key
-import com.infinity.drive.resources.settings_restores_file_list
 import com.infinity.drive.resources.settings_retry_attempts
 import com.infinity.drive.resources.settings_set
 import com.infinity.drive.resources.settings_set_passphrase
@@ -161,22 +140,15 @@ import com.infinity.drive.resources.settings_shown_channels_private_owned
 import com.infinity.drive.resources.settings_shows_archived_collection_home
 import com.infinity.drive.resources.settings_shows_hidden_collection_home
 import com.infinity.drive.resources.settings_skip_files_larger_than
-import com.infinity.drive.resources.settings_state_connected
-import com.infinity.drive.resources.settings_state_connecting
-import com.infinity.drive.resources.settings_state_syncing
-import com.infinity.drive.resources.settings_state_waiting_network
 import com.infinity.drive.resources.settings_stream_downloading
 import com.infinity.drive.resources.settings_switch_drives_create_another
-import com.infinity.drive.resources.settings_telegram_account
 import com.infinity.drive.resources.settings_theme
 import com.infinity.drive.resources.settings_tighter_list_rows_without
 import com.infinity.drive.resources.settings_transfers_wi_fi_only
 import com.infinity.drive.resources.settings_transfers_wi_fi_only_summary
 import com.infinity.drive.resources.settings_turn_off_app_lock
-import com.infinity.drive.resources.settings_unlock_files_encrypted_earlier
 import com.infinity.drive.resources.settings_uploads_photos_videos_soon
 import com.infinity.drive.resources.settings_uploads_stay_unencrypted_set
-import com.infinity.drive.resources.settings_use_wallpaper_colors_available
 import com.infinity.drive.resources.settings_wi_fi_only
 import com.infinity.drive.resources.settings_wi_fi_only_summary
 import com.infinity.drive.resources.theme_dark
@@ -185,7 +157,6 @@ import com.infinity.drive.resources.theme_labels
 import com.infinity.drive.resources.theme_light
 import com.infinity.drive.resources.theme_system
 import com.infinity.drive.resources.trash_clear_labels
-import com.infinity.drive.core.telegram.TelegramConnectionState
 import com.infinity.drive.domain.model.AppTheme
 import com.infinity.drive.domain.model.LayoutDensity
 import com.infinity.drive.domain.model.ViewMode
@@ -207,7 +178,6 @@ import com.infinity.drive.presentation.common.Formatters
 import com.infinity.drive.presentation.components.ChoiceDialog
 import com.infinity.drive.presentation.components.ConfirmDialog
 import com.infinity.drive.presentation.components.LoadingState
-import com.infinity.drive.presentation.components.liftedTopAppBarColors
 import com.infinity.drive.presentation.components.rememberToolbarLift
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -220,12 +190,25 @@ fun SettingsSectionScreen(
     onOpenExclusions: () -> Unit,
     onOpenProxy: () -> Unit,
     onLoggedOut: () -> Unit,
-    onOpenHidden:()->Unit={},
     onDashboardStyles:()->Unit={},
     onOpenRecoveryExport: () -> Unit = {},
     viewModel: SettingsViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var customThemePage by rememberSaveable { mutableStateOf<String?>(null) }
+    val customTheme = customThemePage
+    if (section == SettingsSectionType.APPEARANCE && customTheme != null) {
+        CustomThemeEditorScreen(
+            preferences = state.preferences,
+            themeId = customTheme.takeIf(String::isNotEmpty),
+            onBack = { customThemePage = null },
+            onSave = { theme ->
+                viewModel.update { it.saveCustomTheme(theme) }
+                customThemePage = null
+            }
+        )
+        return
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     var navigationOptions by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     com.infinity.drive.presentation.common.AppBackHandler(navigationOptions){navigationOptions=false}
@@ -295,9 +278,11 @@ fun SettingsSectionScreen(
                 SettingsSectionType.PERMISSIONS ->
                     PermissionsSection(viewModel.permissionChecker)
 
-                SettingsSectionType.SECURITY -> SecuritySection(state, viewModel,onOpenHidden)
+                SettingsSectionType.SECURITY -> SecuritySection(state, viewModel)
                 SettingsSectionType.APPEARANCE -> androidx.compose.animation.Crossfade(navigationOptions,animationSpec=androidx.compose.animation.core.tween(240),label="navigationPreferencesPage"){open->
-                    if(open)NavigationBarSection(state,viewModel)else AppearanceSection(state,viewModel,onDashboardStyles){navigationOptions=true}
+                    if (open) NavigationBarSection(state, viewModel)
+                    else AppearanceSection(state, viewModel, onDashboardStyles,
+                        onNavigation = { navigationOptions = true }, onCustomTheme = { customThemePage = it.orEmpty() })
                 }
                 SettingsSectionType.PLAYBACK -> PlaybackSection(state, viewModel)
                 SettingsSectionType.NOTIFICATIONS -> NotificationsSection(state, viewModel)
@@ -339,50 +324,6 @@ fun SettingsSectionScreen(
     }
 }
 
-@Composable
-private fun LibraryRestoreDialog(
-    state: LibraryRestoreState,
-    onStart: () -> Unit,
-    onPause: () -> Unit,
-    onClose: () -> Unit
-) {
-    val progress = state.progress
-    AlertDialog(
-        onDismissRequest = { if (!state.running) onClose() },
-        title = { Text(stringResource(Res.string.library_restore_title)) },
-        text = {
-            Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
-                Text(stringResource(if (state.completed) Res.string.library_restore_done else Res.string.library_restore_hint))
-                if (state.running || state.completed || progress.scanned > 0) {
-                    Text(stringResource(
-                        Res.string.library_restore_progress, progress.scanned, progress.restored, progress.locked
-                    ))
-                }
-                if (state.running) androidx.compose.material3.LinearProgressIndicator(Modifier.fillMaxWidth())
-                state.error?.let { Text(it.resolve(), color = MaterialTheme.colorScheme.error) }
-            }
-        },
-        confirmButton = {
-            when {
-                state.running -> TextButton(onClick = onPause) {
-                    Text(stringResource(Res.string.library_restore_pause))
-                }
-                state.completed -> TextButton(onClick = onClose) {
-                    Text(stringResource(Res.string.library_restore_close))
-                }
-                else -> TextButton(onClick = onStart) {
-                    Text(stringResource(Res.string.library_restore_start))
-                }
-            }
-        },
-        dismissButton = {
-            if (!state.running && !state.completed) TextButton(onClick = onClose) {
-                Text(stringResource(Res.string.common_cancel))
-            }
-        }
-    )
-}
-
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun AccountSection(
@@ -407,86 +348,34 @@ private fun AccountSection(
             openExport()
         }
     }
-    var showLibraryRestore by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-    val libraryRestore by viewModel.libraryRestore.collectAsStateWithLifecycle()
-    if (showLibraryRestore) {
-        LibraryRestoreDialog(
-            state = libraryRestore,
-            onStart = viewModel::restoreLibrary,
-            onPause = viewModel::pauseLibraryRestore,
-            onClose = { showLibraryRestore = false }
-        )
-    }
-    var showIntegrity by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-    val integrity by viewModel.integrity.collectAsStateWithLifecycle()
-    if (showIntegrity) {
-        DriveIntegrityDialog(
-            state = integrity,
-            onStart = viewModel::checkDriveIntegrity,
-            onStop = viewModel::stopIntegrityCheck,
-            onClose = { showIntegrity = false }
-        )
-    }
     val platform = com.infinity.drive.presentation.platform.LocalPlatformScreens.current
-    val indexedSoFar by viewModel.indexedSoFar.collectAsStateWithLifecycle()
     val authorization by viewModel.authorization.collectAsStateWithLifecycle()
+    val profileName = state.user?.let { user ->
+        listOf(user.firstName, user.lastName).filter(String::isNotBlank).joinToString(" ")
+    }?.takeIf(String::isNotBlank)
 
     SettingsGroup {
         add {
             androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(20.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
                 com.infinity.drive.presentation.components.TelegramProfileAvatar(state.user?.photoPath,Modifier.size(56.dp))
                 Column(Modifier.weight(1f).padding(start=16.dp)){
-                    Text(state.user?.let{listOf(it.firstName,it.lastName).filter(String::isNotBlank).joinToString(" ")}?.takeIf(String::isNotBlank)?:"Telegram account",style=MaterialTheme.typography.titleLarge,maxLines=2,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Text(profileName ?: "Telegram account", style=MaterialTheme.typography.titleLarge,maxLines=2,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     Text(state.user?.username?.takeIf(String::isNotBlank)?.let{"@$it"}?:"Your personal cloud",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 }
+                platform.AccountProfilesSetting(
+                    profileName = profileName,
+                    username = state.user?.username,
+                    photoPath = state.user?.photoPath
+                )
             }
         }
-        add { Text(buildString {
-                    append(
-                        accountConnectionLabel(authorization,state.connection)
-                    )
-                    if (state.user?.isPremium == true) append(" · Premium (4 GB uploads)")
-                },style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant,modifier=Modifier.padding(20.dp)) }
-        add {
-            SettingsClickRow(
-                title = stringResource(Res.string.settings_rebuild_index_telegram),
-                subtitle = when {
-                    state.syncing && indexedSoFar > 0 -> pluralStringResource(
-                        Res.plurals.rebuild_indexed_files,
-                        indexedSoFar,
-                        indexedSoFar
-                    )
-                    state.syncing -> stringResource(Res.string.settings_reading_channel)
-                    else -> stringResource(Res.string.settings_restores_file_list)
-                },
-                onClick = { if (!state.syncing) viewModel.resync() },
-                enabled = !state.syncing,
-                trailing = if (state.syncing) {
-                    { LoadingIndicator(modifier = Modifier.size(24.dp)) }
-                } else null
-            )
-        }
-        add {
-            SettingsClickRow(
-                title = stringResource(Res.string.library_restore_title),
-                subtitle = stringResource(Res.string.library_restore_subtitle),
-                enabled = !state.syncing || libraryRestore.running,
-                onClick = {
-                    viewModel.resetLibraryRestore()
-                    showLibraryRestore = true
-                }
-            )
-        }
-        add {
-            SettingsClickRow(
-                title = stringResource(Res.string.drive_integrity_title),
-                subtitle = stringResource(Res.string.drive_integrity_subtitle),
-                enabled = !state.syncing || integrity.running,
-                onClick = {
-                    viewModel.resetIntegrityCheck()
-                    showIntegrity = true
-                }
-            )
+        val detail = listOfNotNull(
+            accountConnectionLabel(authorization, state.connection),
+            "Premium (4 GB uploads)".takeIf { state.user?.isPremium == true }
+        ).joinToString(" · ")
+        add(visible = detail.isNotEmpty()) {
+            Text(detail, style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(20.dp))
         }
         add {
             SettingsClickRow(
@@ -495,9 +384,6 @@ private fun AccountSection(
                 onClick = onPickChannel
             )
         }
-        add { platform.AccountProfilesSetting() }
-        add { platform.WorkspacesSetting() }
-        if (platform.supportsPublicLinks) add { platform.PublicLinksSetting() }
         add {
             SettingsClickRow(
                 title = recoveryTitle,
@@ -904,8 +790,7 @@ private fun StorageSection(
 }
 
 @Composable
-private fun SecuritySection(state: SettingsUiState, viewModel: SettingsViewModel,onOpenHidden:()->Unit) {
-    val encryptionOffMessage = UiText.Resource(Res.string.settings_encryption_stays_off)
+private fun SecuritySection(state: SettingsUiState, viewModel: SettingsViewModel) {
     val prefs = state.preferences
     val deviceOwnerGate = LocalDeviceOwnerGate.current
     val keyBackupWorking by viewModel.keyBackupWorking.collectAsStateWithLifecycle()
@@ -913,45 +798,20 @@ private fun SecuritySection(state: SettingsUiState, viewModel: SettingsViewModel
     val lockPromptSubtitle = stringResource(Res.string.settings_confirm_removing_lock)
     var showLockTimeoutDialog by remember { mutableStateOf(false) }
     var showKeyBackupDialog by remember { mutableStateOf(false) }
-    var showKeyRestoreDialog by remember { mutableStateOf(false) }
-    val keyHint by viewModel.keyHint.collectAsStateWithLifecycle()
-    val keyFileActions = rememberKeyFileActions(viewModel, keyBackupWorking)
-    var enablingEncryption by remember { mutableStateOf(false) }
-
     if (showKeyBackupDialog) {
         KeyBackupDialog(
             working = keyBackupWorking,
             onConfirm = { passphrase, hint ->
                 showKeyBackupDialog = false
-                viewModel.backUpEncryptionKey(passphrase, hint, enablingEncryption)
-                enablingEncryption = false
+                viewModel.backUpEncryptionKey(passphrase, hint)
             },
-            onDismiss = {
-                showKeyBackupDialog = false
-                if (enablingEncryption) {
-                    enablingEncryption = false
-                    viewModel.notify(encryptionOffMessage)
-                }
-            }
-        )
-    }
-    if (showKeyRestoreDialog) {
-        KeyRestoreDialog(
-            working = keyBackupWorking,
-            hint = keyHint,
-            onShowHint = viewModel::loadKeyHint,
-            onConfirm = { passphrase ->
-                showKeyRestoreDialog = false
-                viewModel.restoreEncryptionKey(passphrase)
-            },
-            onDismiss = { showKeyRestoreDialog = false }
+            onDismiss = { showKeyBackupDialog = false }
         )
     }
 
     if (prefs.encryptFiles && !prefs.keyBackupCreated) {
         KeyBackupWarning(
             onSetPassphrase = {
-                enablingEncryption = false
                 showKeyBackupDialog = true
             }
         )
@@ -995,9 +855,6 @@ private fun SecuritySection(state: SettingsUiState, viewModel: SettingsViewModel
                 }
             )
         }
-        add(visible = capabilities.supportsAppLock) {
-            com.infinity.drive.presentation.hidden.HiddenLockSettingRow()
-        }
         add(visible = capabilities.supportsAppLock && prefs.appLockEnabled) {
             SettingsClickRow(
                 title = stringResource(Res.string.settings_auto_lock),
@@ -1015,25 +872,6 @@ private fun SecuritySection(state: SettingsUiState, viewModel: SettingsViewModel
                 }
             )
         }
-        add {
-            SettingsSwitchRow(
-                title = stringResource(Res.string.settings_encrypt_uploads),
-                subtitle = stringResource(Res.string.settings_files_sealed_leaving_device),
-                checked = prefs.encryptFiles,
-                onChange = { value ->
-                    if (value) {
-                        if (prefs.keyBackupCreated) {
-                            viewModel.enableEncryption()
-                        } else {
-                            enablingEncryption = true
-                            showKeyBackupDialog = true
-                        }
-                    } else {
-                        viewModel.disableEncryption()
-                    }
-                }
-            )
-        }
         add(visible = prefs.encryptFiles) {
             SettingsClickRow(
                 title = if (prefs.keyBackupCreated) {
@@ -1047,49 +885,7 @@ private fun SecuritySection(state: SettingsUiState, viewModel: SettingsViewModel
                     stringResource(Res.string.settings_required_before_encrypt)
                 },
                 onClick = {
-                    enablingEncryption = false
                     showKeyBackupDialog = true
-                }
-            )
-        }
-        add {
-            SettingsClickRow(
-                title = stringResource(Res.string.settings_restore_encryption_key),
-                subtitle = stringResource(Res.string.settings_unlock_files_encrypted_earlier),
-                onClick = { showKeyRestoreDialog = true }
-            )
-        }
-        add {
-            SettingsClickRow(
-                title = keyFileActions.verifyTitle,
-                subtitle = keyFileActions.verifySubtitle,
-                enabled = !keyBackupWorking,
-                onClick = keyFileActions.verify
-            )
-        }
-        add(visible = keyFileActions.export != null) {
-            SettingsClickRow(
-                title = keyFileActions.exportTitle,
-                subtitle = keyFileActions.exportSubtitle,
-                enabled = !keyBackupWorking,
-                onClick = { keyFileActions.export?.invoke() }
-            )
-        }
-        add(visible = keyFileActions.importKey != null) {
-            SettingsClickRow(
-                title = keyFileActions.importTitle,
-                subtitle = keyFileActions.importSubtitle,
-                enabled = !keyBackupWorking,
-                onClick = { keyFileActions.importKey?.invoke() }
-            )
-        }
-        add {
-            SettingsSwitchRow(
-                title = stringResource(Res.string.settings_encrypt_thumbnails),
-                subtitle = stringResource(Res.string.settings_protects_cached_previews_device),
-                checked = prefs.encryptThumbnails,
-                onChange = { value ->
-                    viewModel.update { it.copy(encryptThumbnails = value) }
                 }
             )
         }
@@ -1139,11 +935,31 @@ private fun KeyBackupWarning(onSetPassphrase: () -> Unit) {
 }
 
 @Composable
-private fun AppearanceSection(state: SettingsUiState, viewModel: SettingsViewModel,onDashboardStyles:()->Unit,onNavigation:()->Unit) {
+private fun AppearanceSection(
+    state: SettingsUiState,
+    viewModel: SettingsViewModel,
+    onDashboardStyles: () -> Unit,
+    onNavigation: () -> Unit,
+    onCustomTheme: (String?) -> Unit
+) {
     val prefs = state.preferences
     val capabilities = LocalPlatformCapabilities.current
     var showThemeDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
+    var showIconStyleDialog by rememberSaveable { mutableStateOf(false) }
+
+    if (showIconStyleDialog) {
+        ChoiceDialog(
+            title = stringResource(Res.string.settings_icon_style),
+            options = AppIconStyle.entries.map { it to iconStyleLabel(it) },
+            selected = prefs.iconStyle,
+            onSelect = { style ->
+                showIconStyleDialog = false
+                viewModel.update { it.copy(iconStyle = style) }
+            },
+            onDismiss = { showIconStyleDialog = false }
+        )
+    }
 
     if (showThemeDialog) {
         ChoiceDialog(
@@ -1173,7 +989,26 @@ private fun AppearanceSection(state: SettingsUiState, viewModel: SettingsViewMod
 
     SettingsGroup {
         add{SettingsClickRow("Dashboard Style",onDashboardStyles,subtitle=prefs.dashboardStyle.label+" · "+(if(prefs.dashboardStyle.name in prefs.dashboardDarkStyles)"Dark"else"Light"))}
-        add{AccentColourPicker(prefs.accentColour,prefs.dynamicColor){colour->viewModel.update{it.copy(accentColour=colour,dynamicColor=false)}}}
+        add {
+            AccentColourPicker(
+                preferences = prefs,
+                supportsDynamicColor = capabilities.supportsDynamicColor,
+                onSelect = { colour -> viewModel.update { it.selectAccentColour(colour) } },
+                onSelectDynamic = { viewModel.update { it.selectDynamicAccent() } },
+                onSelectCustom = { id -> viewModel.update { it.selectCustomTheme(id) } },
+                onEditCustom = onCustomTheme,
+                onDeleteCustom = { id -> viewModel.update { it.deleteCustomTheme(id) } },
+                onAddCustom = { onCustomTheme(null) }
+            )
+        }
+        add {
+            SettingsClickRow(
+                title = stringResource(Res.string.settings_icon_style),
+                subtitle = iconStyleLabel(prefs.iconStyle),
+                onClick = { showIconStyleDialog = true },
+                trailing = { Icon(DriveIcons.Folder, contentDescription = null, modifier = Modifier.size(24.dp)) }
+            )
+        }
 
         add{SettingsClickRow("Floating navigation bar",onNavigation,subtitle="Style and appearance of your bottom navigation")}
         add {
@@ -1199,14 +1034,6 @@ private fun AppearanceSection(state: SettingsUiState, viewModel: SettingsViewMod
                     AppLanguage.ARABIC -> stringResource(Res.string.language_arabic)
                 },
                 onClick = { showLanguageDialog = true }
-            )
-        }
-        add(visible = capabilities.supportsDynamicColor) {
-            SettingsSwitchRow(
-                title = stringResource(Res.string.settings_dynamic_color),
-                subtitle = stringResource(Res.string.settings_use_wallpaper_colors_available),
-                checked = prefs.dynamicColor,
-                onChange = { value -> viewModel.update { it.copy(dynamicColor = value) } }
             )
         }
         add {
@@ -1279,6 +1106,14 @@ private fun AppearanceSection(state: SettingsUiState, viewModel: SettingsViewMod
         }
     }
 }
+
+@Composable
+private fun iconStyleLabel(style: AppIconStyle): String = stringResource(
+    when (style) {
+        AppIconStyle.OUTLINE -> Res.string.settings_icon_outline
+        AppIconStyle.BROKEN -> Res.string.settings_icon_broken
+    }
+)
 
 @Composable
 private fun PlaybackSection(state: SettingsUiState, viewModel: SettingsViewModel) {

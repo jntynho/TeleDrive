@@ -4,6 +4,7 @@ import com.infinity.drive.core.crypto.CryptoKeys
 import com.infinity.drive.core.crypto.KeyUnavailableException
 import com.infinity.drive.core.crypto.StreamCrypto
 import com.infinity.drive.core.crypto.WrappedKeyRepository
+import com.infinity.drive.core.telegram.RemoteDocument
 import com.infinity.drive.core.telegram.TelegramClient
 import com.infinity.drive.core.telegram.TelegramDownloadEvent
 import com.infinity.drive.data.local.dao.FilePartDao
@@ -35,7 +36,7 @@ class DriveContentReader(
             ?: throw IOException("Incomplete remote layout")
         val documents = layout.map { it.messageId }.distinct().chunked(100)
             .flatMap { telegram.getDocuments(chat, it) }.associateBy { it.messageId }
-        if (referenceStatus(layout, documents, emptySet()) != Status.AVAILABLE) {
+        if (layout.any { !it.matches(documents[it.messageId]) }) {
             throw IOException("Remote document or part has changed")
         }
         val digest = MessageDigest.getInstance("SHA-256")
@@ -91,4 +92,41 @@ class DriveContentReader(
         }
         if (bytes != expectedBytes) throw IOException("File is truncated")
     }
+}
+
+private data class RemotePartReference(
+    val messageId: Long,
+    val uniqueId: String?,
+    val remoteBytes: Long?,
+    val plaintextBytes: Long
+) {
+    fun matches(document: RemoteDocument?): Boolean = document != null &&
+        (uniqueId == null || uniqueId == document.uniqueFileId) &&
+        (remoteBytes == null || document.sizeBytes <= 0 || remoteBytes == document.sizeBytes)
+}
+
+private fun layoutFor(chatId: Long, file: FileEntity, parts: List<FilePartEntity>): List<RemotePartReference>? {
+    if (file.partCount == 0) {
+        return listOf(RemotePartReference(
+            file.messageId ?: return null,
+            file.remoteUniqueId,
+            file.sizeBytes.takeUnless { file.isEncrypted },
+            file.sizeBytes
+        ))
+    }
+    if (parts.size != file.partCount) return null
+    var offset = 0L
+    val layout = parts.mapIndexed { index, part ->
+        if (part.partIndex != index || part.chatId != chatId || part.plainOffset != offset ||
+            part.plainSize <= 0 || part.plainSize > file.sizeBytes - offset
+        ) return null
+        offset += part.plainSize
+        RemotePartReference(
+            part.messageId ?: return null,
+            part.remoteUniqueId,
+            part.storedSize.takeIf { it > 0 },
+            part.plainSize
+        )
+    }
+    return layout.takeIf { offset == file.sizeBytes }
 }

@@ -12,16 +12,7 @@ import com.infinity.drive.resources.home_backup_nothing_to_back_up
 import com.infinity.drive.resources.message_backing_up_new_folder
 import com.infinity.drive.resources.message_cache_cleared
 import com.infinity.drive.resources.message_key_backup_saved
-import com.infinity.drive.resources.message_key_restored
-import com.infinity.drive.resources.message_rebuild_done
 import com.infinity.drive.resources.message_thumbnails_cleared
-import com.infinity.drive.resources.message_wrong_passphrase
-import com.infinity.drive.resources.rebuild_locked_files
-import com.infinity.drive.resources.key_backup_verified
-import com.infinity.drive.resources.key_file_invalid
-import com.infinity.drive.resources.key_file_other_account
-import com.infinity.drive.resources.key_file_conflict
-import com.infinity.drive.resources.key_file_reindex_incomplete
 import com.infinity.drive.core.files.DeleteConsentRequest
 import com.infinity.drive.core.common.AppResult
 import com.infinity.drive.core.permissions.PermissionChecker
@@ -31,7 +22,6 @@ import com.infinity.drive.core.telegram.TelegramConnectionState
 import com.infinity.drive.core.telegram.TelegramUser
 import com.infinity.drive.core.transfer.MaintenanceScheduler
 import com.infinity.drive.core.transfer.TransferScheduler
-import com.infinity.drive.data.repository.DriveIntegrityChecker
 import com.infinity.drive.data.repository.LocalDataWiper
 import com.infinity.drive.domain.model.BackupTrigger
 import com.infinity.drive.domain.model.UserPreferences
@@ -40,9 +30,7 @@ import com.infinity.drive.domain.repository.CacheRepository
 import com.infinity.drive.domain.repository.ChannelRepository
 import com.infinity.drive.domain.repository.FileRepository
 import com.infinity.drive.domain.repository.KeyBackupRepository
-import com.infinity.drive.domain.repository.KeyBackupRepository.KeyVerification
 import com.infinity.drive.domain.repository.SettingsRepository
-import com.infinity.drive.domain.repository.SyncRepository
 import com.infinity.drive.domain.repository.TelegramAuthRepository
 import com.infinity.drive.presentation.common.UiText
 import com.infinity.drive.presentation.common.toUiText
@@ -75,19 +63,11 @@ sealed interface UpdateState {
     data class Available(val release: AppRelease) : UpdateState
 }
 
-data class LibraryRestoreState(
-    val running: Boolean = false,
-    val progress: SyncRepository.RestoreProgress = SyncRepository.RestoreProgress(),
-    val completed: Boolean = false,
-    val error: UiText? = null
-)
-
 data class SettingsUiState(
     val preferences: UserPreferences = UserPreferences(),
     val user: TelegramUser? = null,
     val connection: TelegramConnectionState = TelegramConnectionState.CONNECTING,
     val cacheStats: CacheRepository.CacheStats = CacheRepository.CacheStats(0, 0, 0, 0, 0),
-    val syncing: Boolean = false,
     val loading: Boolean = true
 )
 
@@ -99,7 +79,6 @@ class SettingsViewModel(
     private val cacheRepository: CacheRepository,
     private val fileRepository: FileRepository,
     private val keyBackupRepository: KeyBackupRepository,
-    private val syncRepository: SyncRepository,
     private val localDataWiper: LocalDataWiper,
     private val channelRepository: ChannelRepository,
     private val backupRepository: BackupRepository,
@@ -107,7 +86,6 @@ class SettingsViewModel(
     private val maintenanceScheduler: MaintenanceScheduler,
     private val transferScheduler: TransferScheduler,
     val permissionChecker: PermissionChecker,
-    private val integrityChecker: DriveIntegrityChecker,
     private val updateChecker: UpdateChecker
 ) : ViewModel() {
 
@@ -132,15 +110,13 @@ class SettingsViewModel(
         editablePreferences,
         user,
         telegramAuthRepository.connectionState,
-        cacheRepository.observeStats(),
-        syncRepository.syncing
-    ) { prefs, currentUser, connection, cacheStats, syncing ->
+        cacheRepository.observeStats()
+    ) { prefs, currentUser, connection, cacheStats ->
         SettingsUiState(
             preferences = prefs ?: UserPreferences(),
             user = currentUser,
             connection = connection,
             cacheStats = cacheStats,
-            syncing = syncing,
             loading = prefs==null
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
@@ -313,11 +289,7 @@ class SettingsViewModel(
         _messages.tryEmit(message)
     }
 
-    /**
-     * Saves the key backup and only then turns encryption on, so uploads can
-     * never be sealed with a key the user has no way to recover.
-     */
-    fun backUpEncryptionKey(passphrase: String, hint: String, enableEncryption: Boolean) {
+    fun backUpEncryptionKey(passphrase: String, hint: String) {
         _keyBackupWorking.value = true
         viewModelScope.launch {
             val result = keyBackupRepository.createBackup(
@@ -328,10 +300,7 @@ class SettingsViewModel(
             when (result) {
                 is AppResult.Success -> {
                     settingsRepository.update {
-                        it.copy(
-                            keyBackupCreated = true,
-                            encryptFiles = if (enableEncryption) true else it.encryptFiles
-                        )
+                        it.copy(keyBackupCreated = true)
                     }
                     _messages.tryEmit(UiText.Resource(Res.string.message_key_backup_saved))
                 }
@@ -341,112 +310,11 @@ class SettingsViewModel(
         }
     }
 
-    /** Only callable once a key backup exists; see [backUpEncryptionKey]. */
-    fun enableEncryption() {
-        update { it.copy(encryptFiles = true) }
-    }
-
-    fun disableEncryption() {
-        update { it.copy(encryptFiles = false) }
-    }
-
-    private val _keyHint = MutableStateFlow<KeyHint>(KeyHint.Unknown)
-    val keyHint: StateFlow<KeyHint> = _keyHint.asStateFlow()
-
-    /** Reads the stored hint so a forgotten passphrase has something to go on. */
-    fun loadKeyHint() {
-        _keyHint.value = KeyHint.Loading
-        viewModelScope.launch {
-            _keyHint.value = when (val result = keyBackupRepository.backupHint()) {
-                is AppResult.Success -> KeyHint.Loaded(result.value)
-                is AppResult.Failure -> KeyHint.Missing
-            }
-        }
-    }
-
-    fun restoreEncryptionKey(passphrase: String) {
-        _keyBackupWorking.value = true
-        viewModelScope.launch {
-            val result = keyBackupRepository.restore(passphrase.toCharArray())
-            _keyBackupWorking.value = false
-            when (result) {
-                is AppResult.Success -> {
-                    if (result.value) {
-                        settingsRepository.update { it.copy(keyBackupCreated = true) }
-                        _messages.tryEmit(UiText.Resource(Res.string.message_key_restored))
-                        syncRepository.fullResync()
-                    } else {
-                        _messages.tryEmit(UiText.Resource(Res.string.message_wrong_passphrase))
-                    }
-                }
-
-                is AppResult.Failure -> _messages.tryEmit(result.error.toUiText())
-            }
-        }
-    }
-
-    fun verifyKeyBackup(password: String) {
-        runKeyFileAction(password, keyBackupRepository::verifyBackup) {
-            announceKeyVerification(it, imported = false)
-        }
-    }
-
-    fun exportPortableKey(password: String, save: (ByteArray) -> Unit) {
-        runKeyFileAction(password, keyBackupRepository::exportPortable, save)
-    }
-
-    fun importPortableKey(blob: ByteArray, password: String) {
-        runKeyFileAction(password, { keyBackupRepository.importPortable(blob, it) }) {
-            announceKeyVerification(it, imported = true)
-        }
-    }
-
-    private fun <T> runKeyFileAction(
-        password: String,
-        action: suspend (CharArray) -> AppResult<T>,
-        onSuccess: suspend (T) -> Unit
-    ) {
-        if (_keyBackupWorking.value) return
-        _keyBackupWorking.value = true
-        val secret = password.toCharArray()
-        viewModelScope.launch {
-            try {
-                when (val result = action(secret)) {
-                    is AppResult.Success -> onSuccess(result.value)
-                    is AppResult.Failure -> _messages.tryEmit(result.error.toUiText())
-                }
-            } finally {
-                secret.fill('\u0000')
-                _keyBackupWorking.value = false
-            }
-        }
-    }
-
-    private suspend fun announceKeyVerification(result: KeyVerification, imported: Boolean) {
-        val message = when (result) {
-            KeyVerification.VERIFIED -> if (imported) Res.string.message_key_restored else Res.string.key_backup_verified
-            KeyVerification.INVALID_FILE_OR_PASSWORD -> Res.string.key_file_invalid
-            KeyVerification.OTHER_ACCOUNT -> Res.string.key_file_other_account
-            KeyVerification.DIFFERENT_LOCAL_KEY -> Res.string.key_file_conflict
-        }
-        _messages.tryEmit(UiText.Resource(message))
-        if (imported && result == KeyVerification.VERIFIED) {
-            when (syncRepository.restoreLibrary(restart = true) {}) {
-                is AppResult.Success -> Unit
-                is AppResult.Failure -> _messages.tryEmit(UiText.Resource(Res.string.key_file_reindex_incomplete))
-            }
-        }
-    }
-
     val reclaimableBytes: StateFlow<Long> = fileRepository.observeReclaimableBytes()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
 
     private val _deleteConsentRequests = MutableSharedFlow<DeleteConsentRequest>(extraBufferCapacity = 1)
     val deleteConsentRequests = _deleteConsentRequests.asSharedFlow()
-
-    /** Files indexed so far, so a long rebuild shows movement. */
-    val indexedSoFar: StateFlow<Int> = syncRepository.indexedSoFar
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     private val _cleaningLocal = MutableStateFlow(false)
     val cleaningLocal = _cleaningLocal.asStateFlow()
@@ -529,95 +397,6 @@ class SettingsViewModel(
         _updateState.value = UpdateState.Idle
     }
 
-    private val _libraryRestore = MutableStateFlow(LibraryRestoreState())
-    val libraryRestore = _libraryRestore.asStateFlow()
-    private var libraryRestoreJob: Job? = null
-
-    fun restoreLibrary() {
-        if (libraryRestoreJob?.isActive == true) return
-        _libraryRestore.value = LibraryRestoreState(running = true)
-        libraryRestoreJob = viewModelScope.launch {
-            try {
-                when (val result = syncRepository.restoreLibrary { progress ->
-                    _libraryRestore.value = LibraryRestoreState(running = true, progress = progress)
-                }) {
-                    is AppResult.Success -> {
-                        _libraryRestore.value = LibraryRestoreState(progress = result.value, completed = true)
-                    }
-                    is AppResult.Failure -> {
-                        _libraryRestore.value = _libraryRestore.value.copy(
-                            running = false, error = result.error.toUiText()
-                        )
-                    }
-                }
-            } finally {
-                _libraryRestore.value = _libraryRestore.value.copy(running = false)
-            }
-        }
-    }
-
-    fun pauseLibraryRestore() {
-        libraryRestoreJob?.cancel()
-    }
-
-    fun resetLibraryRestore() {
-        if (libraryRestoreJob?.isActive != true) _libraryRestore.value = LibraryRestoreState()
-    }
-
-    private val _integrity = MutableStateFlow(IntegrityUiState())
-    internal val integrity = _integrity.asStateFlow()
-    private var integrityJob: Job? = null
-
-    fun checkDriveIntegrity(sample: Boolean) {
-        if (integrityJob?.isActive == true) return
-        _integrity.value = IntegrityUiState(running = true)
-        integrityJob = viewModelScope.launch {
-            try {
-                when (val result = integrityChecker.check(sample) { report ->
-                    _integrity.value = IntegrityUiState(running = true, report = report)
-                }) {
-                    is AppResult.Success -> _integrity.value = IntegrityUiState(report = result.value, complete = true)
-                    is AppResult.Failure -> _integrity.value = _integrity.value.copy(
-                        running = false, error = result.error.toUiText()
-                    )
-                }
-            } finally {
-                _integrity.value = _integrity.value.copy(running = false)
-            }
-        }
-    }
-
-    fun stopIntegrityCheck() {
-        integrityJob?.cancel()
-    }
-
-    fun resetIntegrityCheck() {
-        if (integrityJob?.isActive != true) _integrity.value = IntegrityUiState()
-    }
-
-    fun resync() {
-        viewModelScope.launch {
-            when (val result = syncRepository.fullResync()) {
-                is AppResult.Success -> _messages.tryEmit(
-                    if (result.value.lockedFiles > 0) {
-                        UiText.PluralResource(Res.plurals.rebuild_locked_files, result.value.lockedFiles,
-                            result.value.lockedFiles
-                        )
-                    } else {
-                        UiText.Resource(Res.string.message_rebuild_done,
-                            result.value.inserted,
-                            result.value.updated,
-                            result.value.detachedFromRemote
-                        )
-                    }
-                )
-
-                is AppResult.Failure -> _messages.tryEmit(result.error.toUiText())
-            }
-        }
-    }
-
-
     fun logout(onLoggedOut: () -> Unit) {
         viewModelScope.launch {
             when (val result = telegramAuthRepository.logout()) {
@@ -632,8 +411,7 @@ class SettingsViewModel(
                                 backupFolders = emptySet(),
                                 backupFolderRules = emptyList(),
                                 linkedTelegramSources = emptyList(),
-                                smartFolders = emptyList(),
-                                audioPlaylists = emptyList()
+                                smartFolders = emptyList()
                             )
                         }
                     }

@@ -15,6 +15,7 @@ The active engine is the pinned DriveInfinity derivative described in [REBUILD-P
 python3 scripts/check_native_alignment.py app/build/outputs/apk/release/*.apk
 python3 scripts/collect_release.py --verify-only
 python3 scripts/generate_launcher.py --check
+python3 scripts/generate_icons.py --check
 ```
 
 AGP 9.4 exposes the debug unit-test variant; the workflow runs that suite alongside release lint, R8 and packaging. The KSP host-test/lint dependency is declared explicitly for Gradle 9.7.

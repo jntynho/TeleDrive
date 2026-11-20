@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.infinity.drive.resources.Res
-import com.infinity.drive.resources.library_restore_close
+import com.infinity.drive.resources.common_close
 import com.infinity.drive.resources.note_tasks_title
 import org.jetbrains.compose.resources.stringResource
 
@@ -42,7 +42,7 @@ internal fun NoteChecklistDialog(tasks: List<NoteExtras.Task>, toggle: (NoteExtr
             }
         },
         confirmButton = {
-            TextButton(onClick = close) { Text(stringResource(Res.string.library_restore_close)) }
+            TextButton(onClick = close) { Text(stringResource(Res.string.common_close)) }
         }
     )
 }

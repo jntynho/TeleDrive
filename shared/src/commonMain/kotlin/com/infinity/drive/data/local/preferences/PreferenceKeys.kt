@@ -23,6 +23,9 @@ object PreferenceKeys {
     val BACKUP_INTERVAL_HOURS = intPreferencesKey("backup_interval_hours")
     val BACKUP_MIN_FILE_SIZE_MB = intPreferencesKey("backup_min_file_size_mb")
     val ACCENT_COLOUR = stringPreferencesKey("accent_colour")
+    val CUSTOM_THEMES = stringPreferencesKey("custom_themes")
+    val SELECTED_CUSTOM_THEME = stringPreferencesKey("selected_custom_theme")
+    val ICON_STYLE = stringPreferencesKey("icon_style")
     val DASHBOARD_STYLE = stringPreferencesKey("dashboard_style")
     val DASHBOARD_DARK_STYLES = stringSetPreferencesKey("dashboard_dark_styles")
     val BACKUP_MAX_FILE_SIZE_MB = intPreferencesKey("backup_max_file_size_mb")
@@ -38,7 +41,6 @@ object PreferenceKeys {
     val KEY_BACKUP_CREATED = booleanPreferencesKey("key_backup_created")
     val FOLDER_OWNERSHIP_REPAIRED = booleanPreferencesKey("folder_ownership_repaired")
 
-    val AUDIO_PLAYLISTS = stringPreferencesKey("audio_playlists")
     val LINKED_TELEGRAM_SOURCES = stringPreferencesKey("linked_telegram_sources")
     val SMART_FOLDERS = stringPreferencesKey("smart_folders")
     val THEME = stringPreferencesKey("theme")

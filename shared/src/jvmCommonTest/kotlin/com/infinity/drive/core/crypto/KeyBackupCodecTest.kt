@@ -44,24 +44,4 @@ class KeyBackupCodecTest {
     fun `garbage blob returns null`() {
         assertNull(codec.decode(ByteArray(64) { 1 }, "pw".toCharArray()))
     }
-    @Test
-    fun portableKeyOpensOnlyForTheSameAccountAndPassword() {
-        val password = "long portable password".toCharArray()
-        val blob = codec.encodePortable(contentKey, 129L, password)
-        val result = codec.decodePortable(blob, 129L, password) as KeyBackupCodec.PortableKey.Unwrapped
-        assertArrayEquals(contentKey, result.bytes)
-        assertEquals(KeyBackupCodec.PortableKey.OtherAccount, codec.decodePortable(blob, 130L, password))
-        assertEquals(KeyBackupCodec.PortableKey.Invalid, codec.decodePortable(blob, 129L, "wrong".toCharArray()))
-        assertNull(codec.readInfo(blob)?.hint)
-    }
-
-    @Test
-    fun portableKeyRejectsTamperedAndOrdinaryBackups() {
-        val password = "long portable password".toCharArray()
-        val tampered = codec.encodePortable(contentKey, 129L, password)
-        tampered[tampered.lastIndex] = (tampered.last().toInt() xor 1).toByte()
-        val unbound = codec.encode(contentKey, password, hint = null)
-        assertEquals(KeyBackupCodec.PortableKey.Invalid, codec.decodePortable(tampered, 129L, password))
-        assertEquals(KeyBackupCodec.PortableKey.Invalid, codec.decodePortable(unbound, 129L, password))
-    }
 }

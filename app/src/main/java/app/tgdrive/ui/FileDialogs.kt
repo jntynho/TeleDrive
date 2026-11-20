@@ -12,7 +12,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import app.tgdrive.SessionBundle
 import app.tgdrive.data.formatBytes
@@ -95,9 +94,6 @@ internal fun nameError(value:String):String?=runCatching{cleanName(value)}.excep
         "purge"->ConfirmDialog("Delete permanently?","Original Telegram messages and all versions will be deleted, including an imported original. This cannot be undone.","Delete permanently",onDismiss,busy=busy,error=error){perform{bundle.actions.purge(listOf(item.id))}}
         "text"->ExtractedTextDialog(item,state,bundle,onDismiss)
         "conflicts"->FileConflictDialog(item,state,bundle,onDismiss)
-        "links"->FileLinksDialog(item,state,bundle,onDismiss)
-        "versions"->VersionSheet(item,state,bundle,onDismiss)
-        "share"->PublicShareDialog(item,state,bundle,onDismiss,system.startTransfers)
         "webdav"->ConfirmDialog("Export to WebDAV?","This uploads a separate, decrypted copy to your configured server, then downloads it to verify its checksum. It consumes network data.","Export copy",onDismiss,busy=busy,error=error){perform{bundle.transfers.enqueue(TaskKind.WEBDAV,item);system.startTransfers()}}
         "info"->AlertDialog(onDismissRequest=onDismiss,title={Text("File details")},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
             Text(item.name);Text("${formatBytes(item.size)} · ${item.mime}");Text("Version: ${item.versionId}",style=MaterialTheme.typography.bodySmall)
@@ -125,7 +121,6 @@ internal fun nameError(value:String):String?=runCatching{cleanName(value)}.excep
                 }
                 if(state.local[item.id]?.ocrText?.isNotBlank()==true)ActionRow("Extracted text",icon=DriveIcons.DocumentScanner){mode="text"}
                 if(state.conflicts.any{it.entityId==item.id||it.entityId==item.versionId})ActionRow("Review conflicting changes",icon=DriveIcons.History){mode="conflicts"}
-                if(state.shares.isNotEmpty())ActionRow("Manage exported links",icon=DriveIcons.Link){mode="links"}
                 TextButton({more=!more},enabled=!busy){Text(if(more)"Fewer options"else"More options")}
                 if(more) {
                 DriveGroup {
@@ -135,12 +130,9 @@ internal fun nameError(value:String):String?=runCatching{cleanName(value)}.excep
                 ActionRow("Rename",icon=DriveIcons.Edit){mode="rename"}
                 ActionRow("Move",icon=DriveIcons.DriveFileMove){mode="move"}
                 ActionRow("Tags",icon=DriveIcons.Label){mode="tags"}
-                ActionRow("Versions / replace content",icon=DriveIcons.History){mode="versions"}
-                ActionRow("Upload new content version",icon=DriveIcons.Upload){onDismiss();system.upload(item.folderId,state.itemVaults[item.id].orEmpty(),item.id)}
                 }
-                DriveGroup {
-                if(state.preferences.sharingUrl.isNotBlank())ActionRow("Create public copy link","Requires your optional sharing server",DriveIcons.Link){mode="share"}
-                if(state.preferences.webDavUrl.isNotBlank())ActionRow("Copy to WebDAV","Requires your optional HTTPS endpoint",DriveIcons.CloudUpload){mode="webdav"}
+                if(state.preferences.webDavUrl.isNotBlank())DriveGroup {
+                ActionRow("Copy to WebDAV","Requires your optional HTTPS endpoint",DriveIcons.CloudUpload){mode="webdav"}
                 }
                 }
                 ActionRow("Move to Trash",icon=DriveIcons.DeleteOutline){mode="trash"}
@@ -149,26 +141,6 @@ internal fun nameError(value:String):String?=runCatching{cleanName(value)}.excep
         }}
     }
     }
-}
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable fun VersionSheet(item:Item,state:LibraryState,bundle:SessionBundle,onDismiss:()->Unit){
-    val form=rememberFormAction()
-    com.infinity.drive.presentation.components.DriveBottomSheet(onDismissRequest={if(!form.busy)onDismiss()}){LazyColumn(Modifier.fillMaxWidth().heightIn(max=600.dp),contentPadding=PaddingValues(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-        item{SectionTitle("Content versions","Restoring retains the other content versions.");if(form.busy)LinearProgressIndicator(Modifier.fillMaxWidth());form.error?.let{Text(it,color=MaterialTheme.colorScheme.error)}}
-        items(state.versions.filter{it.itemId==item.id}.sortedByDescending{it.createdAt},key={it.id}){version->DriveCard(Modifier.fillMaxWidth()){
-            Column(Modifier.padding(16.dp)){Text(DateFormat.getDateTimeInstance().format(Date(version.createdAt)));Text(formatBytes(version.size),style=MaterialTheme.typography.bodySmall);if(version.id==item.versionId)Text("Current version",color=MaterialTheme.colorScheme.primary)else TextButton(enabled=!form.busy,onClick={form.run(onDismiss){bundle.actions.restoreVersion(item.id,version.id)}}){Text("Restore this version")}}
-        }}
-    }}
-}
-@Composable private fun PublicShareDialog(item:Item,state:LibraryState,bundle:SessionBundle,onDismiss:()->Unit,start:()->Unit){
-    var hours by remember{mutableFloatStateOf(24f)};var password by remember{mutableStateOf("")};var consent by remember{mutableStateOf(false)}
-    AlertDialog(onDismissRequest=onDismiss,title={Text("Create a public copy")},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
-        if(state.preferences.sharingUrl.isBlank())Text("A sharing server must already be configured to create a public link.",color=MaterialTheme.colorScheme.error)
-        Text("This exports a decrypted copy to your server, even for vault files. The server operator can read that copy. Revocation cannot recall downloaded copies.")
-        Text("Expires in ${hours.toInt()} hours");Slider(hours,{hours=it},valueRange=1f..168f)
-        DriveTextField(password,{password=it},label={Text("Optional link password")},visualTransformation=PasswordVisualTransformation(),singleLine=true)
-        DriveCheckboxRow("I approve exporting this copy.",consent,{consent=it})
-    }},confirmButton={TextButton(onClick={bundle.actions.run{bundle.transfers.enqueue(TaskKind.SHARE,item,payload=ShareOptions(hours.toInt()).json(),sharePassword=password);start()};onDismiss()},enabled=consent&&state.preferences.sharingUrl.isNotBlank()){Text("Create link")}},dismissButton={TextButton(onClick=onDismiss){Text("Cancel")}})
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun ImportSheet(state:LibraryState,bundle:SessionBundle,folder:String,onDismiss:()->Unit){
@@ -202,7 +174,7 @@ internal fun folderDescendants(id:String,folders:List<Folder>):Set<String> {
     val form=rememberFormAction()
     val conflicts=state.conflicts.filter{it.entityId==item.id||it.entityId==item.versionId}
     AlertDialog(onDismissRequest={if(!form.busy)onDismiss()},title={Text("Review changes")},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)){
-        Text("Choose which library information to keep. Other uploaded content versions remain available in Versions.")
+        Text("Choose which library information to keep.")
         if(conflicts.isEmpty())Text("All changes have been reviewed.")
         conflicts.forEach{conflict->
             fun description(op:Envelope):String=runCatching{val body=bundle.library.vaults.body(op);when(op.kind){EntityKind.ITEM->body.model<Item>().let{"${it.name} · Tags: ${it.tags.joinToString()} · ${if(it.deletedAt>0)"In Trash"else"Active"}"};EntityKind.VERSION->body.model<Version>().let{"${formatBytes(it.size)} · ${DateFormat.getDateTimeInstance().format(Date(it.createdAt))}"};else->"Library change"}}.getOrDefault("Unlock the vault to compare this change.")
@@ -210,14 +182,6 @@ internal fun folderDescendants(id:String,folders:List<Folder>):Set<String> {
             Text("Other: ${description(conflict.incoming)}")
             Row{TextButton(enabled=!form.busy,onClick={form.run{bundle.library.resolveConflict(conflict.id,false)}}){Text("Keep current")};TextButton(enabled=!form.busy,onClick={form.run{bundle.library.resolveConflict(conflict.id,true)}}){Text("Use other")}}
         }
-        form.error?.let{Text(it,color=MaterialTheme.colorScheme.error)}
-    }},confirmButton={TextButton(enabled=!form.busy,onClick=onDismiss){Text("Done")}})
-}
-@Composable private fun FileLinksDialog(item:Item,state:LibraryState,bundle:SessionBundle,onDismiss:()->Unit){
-    val form=rememberFormAction()
-    AlertDialog(onDismissRequest={if(!form.busy)onDismiss()},title={Text("Exported public links")},text={Column(Modifier.verticalScroll(rememberScrollState())){
-        Text("All links created by this profile. Older records do not identify their source file. Revoking prevents future downloads; copies already saved cannot be recalled.")
-        state.shares.forEach{share->SelectionContainer{Text(share.url,style=MaterialTheme.typography.bodySmall)};TextButton(enabled=!form.busy,onClick={form.run{bundle.connections.revoke(share.id)}}){Text("Revoke link")}}
         form.error?.let{Text(it,color=MaterialTheme.colorScheme.error)}
     }},confirmButton={TextButton(enabled=!form.busy,onClick=onDismiss){Text("Done")}})
 }

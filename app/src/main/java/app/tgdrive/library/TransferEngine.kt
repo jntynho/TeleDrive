@@ -53,7 +53,7 @@ class TransferEngine(val repository: LibraryRepository, val scope: CoroutineScop
                     val time = now()
                     if (time - active.progressAt >= 800) {
                         val file = update.file
-                        val current = repository.database?.get("tasks", entry.key)?.model<TransferTask>()
+                        val current = repository.database?.task(entry.key)
                         if (current != null && current.state == TaskState.TRANSFERRING) {
                             val base = current.parts.sumOf { it.plainSize }
                             val spec = runCatching { current.payload.model<UploadSpec>() }.getOrDefault(UploadSpec())
@@ -88,12 +88,12 @@ class TransferEngine(val repository: LibraryRepository, val scope: CoroutineScop
         }
         wake?.invoke()
     }
-    suspend fun enqueue(kind: TaskKind, item: Item, destination: Uri? = null, payload: String = "{}", sharePassword: String? = null): String {
+    suspend fun enqueue(kind: TaskKind, item: Item, destination: Uri? = null, payload: String = "{}"): String {
+        require(kind != TaskKind.RETIRED_PUBLIC_EXPORT)
         val task = TransferTask(kind = kind, title = item.name, itemId = item.id, destination = destination?.toString() ?: "",
             total = item.size, vaultId = if(kind==TaskKind.EXPORT)payload.model<List<String>>().map{repository.itemVault(it)}.firstOrNull{it.isNotEmpty()}.orEmpty() else repository.itemVault(item.id), accountId = repository.state.value.accountId,
             profileId = repository.session.profileId, versionId = item.versionId, payload = payload)
-        if(kind==TaskKind.SHARE)repository.saveAccountSecret("share-password:${task.id}",sharePassword?:"")
-        if (kind == TaskKind.WEBDAV || kind == TaskKind.SHARE) OptionalConnections(repository).bind(task)
+        if (kind == TaskKind.WEBDAV) OptionalConnections(repository).bind(task)
         repository.setTask(task)
         wake?.invoke()
         return task.id
@@ -129,7 +129,7 @@ class TransferEngine(val repository: LibraryRepository, val scope: CoroutineScop
             db.remove("tasks", it.id)
         } }
     }
-    fun task(id: String): TransferTask = repository.db().get("tasks", id)?.model() ?: error("Transfer no longer exists.")
+    fun task(id: String): TransferTask = repository.db().task(id) ?: error("Transfer no longer exists.")
     suspend fun pauseProtected() {
         repository.state.value.tasks.filter { it.vaultId.isNotEmpty() && it.state !in terminal && it.state !in setOf(TaskState.PAUSED,TaskState.FAILED) }.forEach {
             pause(it.id);val current=task(it.id)
@@ -314,7 +314,7 @@ class TransferEngine(val repository: LibraryRepository, val scope: CoroutineScop
         }finally{partial.delete()}
     }
     private suspend fun notifyCompleted(task:TransferTask)=completionLock.withLock {
-        val latest=repository.db().get("tasks",task.id)?.model<TransferTask>()?:return@withLock
+        val latest=repository.db().task(task.id)?:return@withLock
         if(latest.state!=TaskState.COMPLETED||latest.completionNotified)return@withLock
         try {
             completed(latest)

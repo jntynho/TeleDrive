@@ -27,7 +27,7 @@ The reference `shared` engine and `ui` presentation modules are integrated rathe
 | Diagnostics, concurrency/retry settings, optional update check | Reference Advanced/About sections; updates target TG Drive releases |
 | Existing TG Drive Saved Messages files and vaults | Separate compatibility reader; no automatic removal or reinterpretation as the new format |
 
-Upgrade gates: preserve installed sessions/keys, never overwrite an existing new session, retire only old worker names, enforce owned/private channel checks, keep legacy and new storage paths separate, preserve launcher/Solar design, verify builds/unit/device tests and signed in-place upgrade. Validation results and any remaining limitations will be recorded before publication. This inventory is not itself proof that device or live Telegram checks have passed.
+Upgrade gates: preserve installed sessions and keys, keep legacy and new storage paths separate, enforce private channel ownership, and validate the launcher and [Iconsax styles](../third_party/iconsax/SOURCE.md). Verify builds, host and device tests, and the signed in-place upgrade before publication. See [TESTING.md](TESTING.md) for recorded results and remaining device checks.
 
 TG Drive UI adaptation: Home/Gallery/Audio/Settings remain the four primary destinations; All files and Activity are Home shortcuts. Search and sorting remain scoped to the visible collection, including audio preview sequences. The approved dashboard is shared through `skin`; Settings uses the same wide capsule switch and serial preference commits. The reference supports one active Telegram account with several storage channels, rather than simultaneous 0.x session profiles.
 

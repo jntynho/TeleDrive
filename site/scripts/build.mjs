@@ -11,6 +11,29 @@ const REPOSITORY = "jntynho/TeleDrive";
 export const SITE_URL = "https://jntynho.github.io/TeleDrive/";
 const expected = ["tg-drive-arm64-v8a.apk", "tg-drive-armeabi-v7a.apk"];
 
+// Icon assets from Iconsax - https://iconsax.io (Proprietary Free License).
+function iconSprite(source, icons) {
+  const names = new Set(
+    Array.from(source.matchAll(/href="#i-([a-z-]+)"/g), ([, name]) => name),
+  );
+  if (!names.size) return "";
+  const symbols = Array.from(names, (name) => {
+    const paths = icons.geometry.outline[icons.site[name]];
+    if (!paths) throw new Error(`Missing Iconsax website glyph: ${name}`);
+    const body = paths
+      .map(({ d, strokeWidth, strokeLineCap, strokeLineJoin, strokeMiterLimit }) => {
+        if (!strokeWidth) return `<path d="${d}" fill="currentColor"/>`;
+        const cap = strokeLineCap ? ` stroke-linecap="${strokeLineCap}"` : "";
+        const join = strokeLineJoin ? ` stroke-linejoin="${strokeLineJoin}"` : "";
+        const miter = strokeMiterLimit ? ` stroke-miterlimit="${strokeMiterLimit}"` : "";
+        return `<path d="${d}" fill="none" stroke="currentColor" stroke-width="${strokeWidth}"${cap}${join}${miter}/>`;
+      })
+      .join("");
+    return `<symbol id="i-${name}" viewBox="0 0 24 24">${body}</symbol>`;
+  }).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" class="icon-definitions" aria-hidden="true" width="0" height="0"><defs>${symbols}</defs></svg>`;
+}
+
 export function releaseManifest(release) {
   if (
     release.draft ||
@@ -66,46 +89,14 @@ export async function build({
     path.join(repo, "docs/brand/tg-drive-icon.svg"),
     path.join(output, "assets/icon.svg"),
   );
-  const icons = {
-    download: "cloud-download",
-    upload: "cloud-upload",
-    folder: "folder-open",
-    gallery: "gallery",
-    audio: "music-notes",
-    home: "home-2",
-    document: "document-text",
-    cloud: "cloud",
-    info: "info-circle",
-    theme: "palette-round",
-    shield: "shield-check",
-    phone: "smartphone",
-    code: "code",
-    check: "check",
-    arrow: "alt-arrow-right",
-    close: "close",
-    qr: "qr-code",
-    lock: "lock-keyhole",
-    history: "history",
-    search: "rounded-magnifier",
-    settings: "settings-minimalistic",
-    heart: "heart",
-  };
-  let sprite =
-    '<svg xmlns="http://www.w3.org/2000/svg" class="icon-definitions" aria-hidden="true" width="0" height="0"><defs>';
-  for (const [name, file] of Object.entries(icons)) {
-    const raw = await readFile(
-      path.join(repo, `third_party/solar/icons/${file}-linear.svg`),
-      "utf8",
-    );
-    const body = raw.replace(/^.*?<svg[^>]*>/s, "").replace(/<\/svg>\s*$/, "");
-    sprite += `<symbol id="i-${name}" viewBox="0 0 24 24">${body}</symbol>`;
-  }
-  sprite += "</defs></svg>";
+  const icons = JSON.parse(
+    await readFile(path.join(repo, "third_party/iconsax/teledrive-icons.json"), "utf8"),
+  );
   for (const file of ["index.html", "privacy.html", "404.html"]) {
     const source = await readFile(path.join(output, file), "utf8");
     await writeFile(
       path.join(output, file),
-      source.replace("<!-- ICONS -->", sprite),
+      source.replace("<!-- ICONS -->", iconSprite(source, icons)),
     );
   }
   await writeFile(
@@ -122,8 +113,8 @@ export async function build({
   await writeFile(path.join(output, "assets/phone-qr.svg"), qr);
   await mkdir(path.join(output, "assets/licenses"), { recursive: true });
   await cp(
-    path.join(repo, "third_party/solar/LICENSE"),
-    path.join(output, "assets/licenses/Solar.txt"),
+    path.join(repo, "third_party/iconsax/NOTICE.txt"),
+    path.join(output, "assets/licenses/Iconsax.txt"),
   );
   await cp(
     path.join(repo, "third_party/fonts/Roboto-OFL.txt"),

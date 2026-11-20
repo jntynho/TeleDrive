@@ -316,17 +316,15 @@ class TransferIntegrationTest {
     }
     @Test fun `connection credentials stay with their Telegram user when a profile signs in to another account`()=runBlocking {
         open();repo.saveAccountSecret("webdav-password","first-account-password")
-        repo.saveAccountSecret("sharing-token","first-account-owner-token")
         suspend fun switchTo(id:Long) {
             wire.userId=id;wire.update!!(TdApi.UpdateAuthorizationState(TdApi.AuthorizationStateReady()))
             withTimeout(10_000) { repo.state.first { it.accountId == id && it.loaded } }
         }
         switchTo(1702)
-        assertNull(repo.accountSecret("webdav-password"));assertNull(repo.accountSecret("sharing-token"))
+        assertNull(repo.accountSecret("webdav-password"))
         repo.saveAccountSecret("webdav-password","second-account-password")
         switchTo(1701)
         assertEquals("first-account-password",repo.accountSecret("webdav-password"))
-        assertEquals("first-account-owner-token",repo.accountSecret("sharing-token"))
     }
     @Test fun `embedded message alone restores library and repeated scan is idempotent`()=runBlocking {
         open();val bytes="self-contained original".toByteArray()
@@ -469,15 +467,13 @@ class TransferIntegrationTest {
         repo.saveAccountSecret("pending-recovery:${vault.id}","")
         assertEquals("",repo.accountSecret("pending-recovery:${vault.id}"))
     }
-    @Test fun acknowledgementCannotDismissANewerIdenticalNoticeOrPublicLink()=runBlocking {
+    @Test fun acknowledgementCannotDismissANewerIdenticalNotice()=runBlocking {
         open();repo.notice("Saved");val displayed=repo.state.value
-        repo.shareResult(ShareResult("link","https://example.invalid/link",123))
         repo.notice("Saved")
         repo.acknowledgeNotice(displayed.messageRevision,displayed.error,displayed.notice)
         assertEquals("Saved",repo.state.value.notice)
-        assertNotNull(repo.state.value.lastShare)
         val latest=repo.state.value;repo.acknowledgeNotice(latest.messageRevision,latest.error,latest.notice)
-        assertNull(repo.state.value.notice);assertNotNull(repo.state.value.lastShare)
+        assertNull(repo.state.value.notice)
     }
     @Test fun scanUpdatesCannotOverwriteANewRuleToggle()=runBlocking {
         open();val rule=BackupRule(name="Folder",treeUri="content://test/tree/root")

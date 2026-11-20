@@ -1,8 +1,6 @@
 package com.infinity.drive.data.repository
 
-import com.infinity.drive.core.files.AppStoragePaths
 import com.infinity.drive.core.files.FileImporter
-import com.infinity.drive.core.files.FileNameUtils
 import com.infinity.drive.core.security.HiddenContentAccess
 import com.infinity.drive.core.telegram.RemoteDocument
 import com.infinity.drive.core.telegram.TelegramClient
@@ -10,11 +8,9 @@ import com.infinity.drive.data.local.dao.FileDao
 import com.infinity.drive.data.local.dao.FilePartDao
 import com.infinity.drive.data.local.dao.TransferDao
 import com.infinity.drive.data.local.entity.FileEntity
-import com.infinity.drive.data.local.entity.FilePartEntity
 import com.infinity.drive.data.remote.telegram.ManifestCodec
 import com.infinity.drive.data.remote.telegram.RemoteFileManifest
 import com.infinity.drive.domain.model.BackupState
-import com.infinity.drive.domain.model.FileCategory
 import com.infinity.drive.domain.repository.TransferRepository
 import com.infinity.drive.core.common.AppResult
 import kotlinx.coroutines.Dispatchers
@@ -22,8 +18,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.util.UUID
 
 class TelegramFileVersions(
     private val client: TelegramClient,
@@ -32,15 +26,11 @@ class TelegramFileVersions(
     private val parts: FilePartDao,
     private val active: ActiveChannel,
     private val access: HiddenContentAccess,
-    private val reader: DriveContentReader,
     private val importer: FileImporter,
-    private val storage: AppStoragePaths,
     private val transfers: TransferRepository,
     private val transferRows: TransferDao
 ) {
-    data class Revision(val id: Long, val modifiedAt: Long, val size: Long)
-
-    private data class Archived(val revision: Long, val manifest: RemoteFileManifest, val document: RemoteDocument)
+    private data class Archived(val revision: Long, val manifest: RemoteFileManifest)
 
     private val staging = Mutex()
 
@@ -82,52 +72,10 @@ class TelegramFileVersions(
         return ids
     }
 
-    suspend fun list(fileId: String): List<Revision> = withContext(Dispatchers.IO) {
-        val file = readable(fileId)
-        archives(file).map { (id, group) ->
-            val manifest = group.first().manifest
-            Revision(id, manifest.modifiedAt, manifest.sizeBytes)
-        }.sortedByDescending(Revision::modifiedAt)
-    }
-
     suspend fun replace(fileId: String, reference: String) = withContext(Dispatchers.IO) { staging.withLock {
         val original = readable(fileId)
         val source = importer.prepare(reference) { ensureActive() } ?: error("The file is no longer available.")
         commit(original, source)
-    } }
-
-    suspend fun restore(fileId: String, revision: Long) = withContext(Dispatchers.IO) { staging.withLock {
-        val original = readable(fileId)
-        val items = archives(original)[revision] ?: error("This revision is no longer available.")
-        val first = items.first()
-        val metadata = first.manifest
-        val chat = first.document.chatId
-        val revisionParts = items.takeIf { metadata.isPart }.orEmpty().map { item ->
-            FilePartEntity(fileId, item.manifest.partIndex, chat, item.document.messageId,
-                item.document.remoteFileId, item.document.uniqueFileId, item.manifest.partOffset,
-                item.manifest.partSize, item.document.sizeBytes, item.document.dateSeconds * 1000L)
-        }
-        val old = original.copy(
-            sizeBytes = metadata.sizeBytes, chatId = chat, messageId = first.document.messageId,
-            remoteFileId = first.document.remoteFileId, remoteUniqueId = first.document.uniqueFileId,
-            isEncrypted = metadata.encrypted, partCount = revisionParts.size
-        )
-        val dir = File(storage.filesDir, "imports/" + UUID.randomUUID()).apply { mkdirs() }
-        val temporary = File(dir, FileNameUtils.sanitize(metadata.name))
-        importer.reserve(temporary.path)
-        try {
-            val hash = temporary.outputStream().buffered().use {
-                reader.copyRemote(old, it, revisionParts) { check(readable(fileId).chatId == chat) }
-            }
-            check(metadata.contentHash == null || hash.equals(metadata.contentHash, true))
-            commit(original, com.infinity.drive.core.files.ImportedFile(temporary.path, metadata.name, temporary.length()))
-        } finally {
-            importer.registered(temporary.path)
-            if (files.byId(fileId)?.localPath != temporary.path) {
-                temporary.delete()
-                dir.delete()
-            }
-        }
     } }
 
     private suspend fun commit(original: FileEntity, source: com.infinity.drive.core.files.ImportedFile) {
@@ -161,37 +109,12 @@ class TelegramFileVersions(
         return file
     }
 
-    private suspend fun archives(file: FileEntity): Map<Long, List<Archived>> {
-        val chat = requireNotNull(file.chatId)
-        val result = mutableListOf<Archived>()
-        var cursor = 0L
-        repeat(10_000) {
-            check(readable(file.id).chatId == chat)
-            val page = client.fetchDocuments(chat, cursor, 100)
-            result.addAll(page.documents.asSequence().mapNotNull(::unpack).filter { it.manifest.fileId == file.id })
-            if (page.nextFromMessageId == 0L) return result.groupBy(Archived::revision).mapNotNull { (id, items) ->
-                val group = items.distinctBy { it.manifest.partIndex }.sortedBy { it.manifest.partIndex }
-                val first = group.first().manifest
-                val count = first.partCount.coerceAtLeast(1)
-                (id to group).takeIf {
-                    group.size == count && group.withIndex().all { (index, item) ->
-                        item.manifest.partIndex == index && item.manifest.sizeBytes == first.sizeBytes &&
-                            item.manifest.encrypted == first.encrypted && item.manifest.partCount.coerceAtLeast(1) == count
-                    }
-                }
-            }.toMap()
-            check(page.nextFromMessageId != cursor) { "Telegram did not advance the history scan." }
-            cursor = page.nextFromMessageId
-        }
-        error("The Telegram history scan limit was reached.")
-    }
-
     private fun unpack(doc: RemoteDocument): Archived? {
         if (!doc.caption.startsWith(PREFIX)) return null
         val envelope = doc.caption.removePrefix(PREFIX)
         val revision = envelope.substringBefore(':').toLongOrNull() ?: return null
         val manifest = codec.decode(envelope.substringAfter(':', "")) ?: return null
-        return Archived(revision, manifest, doc)
+        return Archived(revision, manifest)
     }
 
     companion object {

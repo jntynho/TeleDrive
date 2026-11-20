@@ -9,7 +9,6 @@ interface SyncRepository {
     val syncing: Flow<Boolean>
 
     /** Files indexed so far in the running rebuild; 0 when nothing is running. */
-    val indexedSoFar: Flow<Int>
 
     /**
      * Rebuilds local metadata from the storage chat. Walks the full document
@@ -18,15 +17,6 @@ interface SyncRepository {
      * remote documents missing locally are inserted. Safe after a data wipe.
      */
     suspend fun fullResync(): AppResult<SyncStats>
-
-    /** Restores missing local entries from the selected drive with a durable cursor. */
-    suspend fun restoreLibrary(restart: Boolean = false, onProgress: (RestoreProgress) -> Unit): AppResult<RestoreProgress>
-
-    data class RestoreProgress(
-        val scanned: Int = 0,
-        val restored: Int = 0,
-        val locked: Int = 0
-    )
 
     /** Fetches only messages newer than the last known message id. */
     suspend fun incrementalSync(): AppResult<SyncStats>

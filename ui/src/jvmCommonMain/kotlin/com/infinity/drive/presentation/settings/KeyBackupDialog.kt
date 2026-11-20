@@ -2,7 +2,6 @@ package com.infinity.drive.presentation.settings
 
 import app.tgdrive.ui.elasticVerticalScroll as verticalScroll
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,34 +15,29 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.common_cancel
-import com.infinity.drive.resources.common_restore
 import com.infinity.drive.resources.settings_back_encryption_key
-import com.infinity.drive.resources.settings_enter_passphrase_used_backing
-import com.infinity.drive.resources.settings_forgot_show_hint
 import com.infinity.drive.resources.settings_hint_optional
-import com.infinity.drive.resources.settings_no_key_backup_found
 import com.infinity.drive.resources.settings_passphrase
 import com.infinity.drive.resources.settings_passphrase_min_length
 import com.infinity.drive.resources.settings_passphrases_do_not_match
-import com.infinity.drive.resources.settings_reading_hint
 import com.infinity.drive.resources.settings_repeat_passphrase
 import com.infinity.drive.resources.settings_required_encryption_key_wrapped
-import com.infinity.drive.resources.settings_restore_encryption_key
 import com.infinity.drive.resources.settings_save_backup
 import com.infinity.drive.resources.settings_stored_unencrypted_never_put
+import org.jetbrains.compose.resources.stringResource
+
+private const val MIN_LENGTH = 8
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -133,81 +127,3 @@ fun KeyBackupDialog(
         }
     )
 }
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-fun KeyRestoreDialog(
-    working: Boolean,
-    hint: KeyHint,
-    onShowHint: () -> Unit,
-    onConfirm: (passphrase: String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var passphrase by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = {if(!working)onDismiss()},
-        title = { Text(stringResource(Res.string.settings_restore_encryption_key)) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                Text(
-                    text = stringResource(Res.string.settings_enter_passphrase_used_backing),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(8.dp))
-                when (hint) {
-                    is KeyHint.Unknown -> TextButton(
-                        onClick = onShowHint,
-                        contentPadding = PaddingValues(0.dp)
-                    ) { Text(stringResource(Res.string.settings_forgot_show_hint)) }
-
-                    is KeyHint.Loading -> Text(
-                        text = stringResource(Res.string.settings_reading_hint),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    is KeyHint.Missing -> Text(
-                        text = stringResource(Res.string.settings_no_key_backup_found),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error
-                    )
-
-                    is KeyHint.Loaded -> Text(
-                        text = hint.text?.let { saved -> "Hint: $saved" }
-                            ?: "No hint was saved with this backup.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                Spacer(Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = passphrase,
-                    enabled = !working,
-                    onValueChange = { passphrase = it },
-                    label = { Text(stringResource(Res.string.settings_passphrase)) },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onConfirm(passphrase) },
-                shapes = ButtonDefaults.shapes(),
-                enabled = passphrase.isNotEmpty() && !working
-            ) { Text(stringResource(Res.string.common_restore)) }
-        },
-        dismissButton = {
-            OutlinedButton(
-                onClick = onDismiss,
-                enabled = !working,
-                shapes = ButtonDefaults.shapes()
-            ) { Text(stringResource(Res.string.common_cancel)) }
-        }
-    )
-}
-
-private const val MIN_LENGTH = 8

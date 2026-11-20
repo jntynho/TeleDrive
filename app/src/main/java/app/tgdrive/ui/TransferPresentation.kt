@@ -34,7 +34,8 @@ internal fun transferCanResume(task:TransferTask,cooldown:Long,time:Long=now())=
 
 internal fun completedTransferLabel(kind:TaskKind)=when(kind){
     TaskKind.UPLOAD->"Saved";TaskKind.DOWNLOAD->"Downloaded";TaskKind.PIN->"Available offline";TaskKind.VERIFY->"Verified"
-    TaskKind.EXPORT->"Exported";TaskKind.WEBDAV->"Copied";TaskKind.SHARE->"Link created";TaskKind.OCR->"Text extracted"
+    TaskKind.EXPORT->"Exported";TaskKind.WEBDAV->"Copied";TaskKind.OCR->"Text extracted"
+    TaskKind.RETIRED_PUBLIC_EXPORT->"Unavailable"
 }
 
 internal data class TransferCallbacks(

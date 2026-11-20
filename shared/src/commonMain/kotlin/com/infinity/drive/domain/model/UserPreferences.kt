@@ -35,6 +35,9 @@ data class UserPreferences(
     val navigationBarLabels:Boolean=true,
     val dynamicColor: Boolean = false,
     val accentColour: AccentColour = AccentColour.BLUE,
+    val customThemes: List<CustomTheme> = emptyList(),
+    val selectedCustomThemeId: String? = null,
+    val iconStyle: AppIconStyle = AppIconStyle.OUTLINE,
     val dashboardStyle: DashboardStyle = DashboardStyle.CLASSIC,
     val dashboardDarkStyles: Set<String> = setOf("ORBIT", "RIBBON"),
     val viewMode: ViewMode = ViewMode.LIST,
@@ -58,8 +61,6 @@ data class UserPreferences(
 
     val audioSortField: FileSortField = FileSortField.NAME,
     val audioSortDirection: SortDirection = SortDirection.ASCENDING,
-    val audioPlaylists: List<AudioPlaylist> = emptyList(),
-
     val backgroundPlayback: Boolean = false,
     val streamBeforeDownload: Boolean = true,
     val preferredAudioLanguage: String = "",
@@ -80,4 +81,7 @@ data class UserPreferences(
 
     val proxyEnabled: Boolean = false,
     val activeProxyId: String = ""
-)
+) {
+    val selectedCustomTheme: CustomTheme?
+        get() = customThemes.firstOrNull { it.id == selectedCustomThemeId }
+}

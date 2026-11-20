@@ -30,7 +30,7 @@ import com.infinity.drive.core.security.HiddenContentAccess
 import com.infinity.drive.presentation.common.Formatters
 import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.common_cancel
-import com.infinity.drive.resources.library_restore_close
+import com.infinity.drive.resources.common_close
 import com.infinity.drive.resources.preview_zip_entry_error
 import com.infinity.drive.resources.preview_zip_entry_password
 import com.infinity.drive.resources.preview_zip_entry_save
@@ -114,7 +114,7 @@ internal fun ArchiveEntrySaveDialog(
         },
         confirmButton = {
             if (exported) TextButton(onClick = onClose) {
-                Text(stringResource(Res.string.library_restore_close))
+                Text(stringResource(Res.string.common_close))
             } else TextButton(
                 enabled = !busy && (!entry.isEncrypted || password.isNotEmpty()),
                 onClick = {

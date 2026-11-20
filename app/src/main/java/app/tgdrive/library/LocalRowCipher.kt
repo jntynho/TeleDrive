@@ -40,7 +40,7 @@ class LocalRowCipher(accountId: Long, existingOnly: Boolean = false) : RowCodec 
         return "enc1:" + Base64.getEncoder().encodeToString(cipher.iv + cipher.doFinal(value.toByteArray()))
     }
     override fun decode(table: String, id: String, value: String): String {
-        require(value.startsWith("enc1:")) { "Unexpected unprotected library row. Do not reset data; restore an index checkpoint if the installation key is unavailable." }
+        require(value.startsWith("enc1:")) { "Unexpected unprotected library record. Keep a copy of the original installation data." }
         val bytes = Base64.getDecoder().decode(value.removePrefix("enc1:")); require(bytes.size >= 28)
         return Cipher.getInstance("AES/GCM/NoPadding").run {
             init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, bytes.copyOfRange(0, 12)))

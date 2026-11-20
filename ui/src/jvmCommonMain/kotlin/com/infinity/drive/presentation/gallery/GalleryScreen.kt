@@ -469,16 +469,6 @@ fun GalleryScreen(
                         }
                     },
                     actions = {
-                        if (state.tab != GalleryTab.VIDEOS) {
-                            com.infinity.drive.presentation.platform.LocalPlatformScreens.current.PhotoHistoryControl(
-                                state.isAlbumView, viewModel.albumFolderId, appliedQuery
-                            ) { id ->
-                                onOpenFile(id, PreviewSequence(
-                                    folderId = viewModel.albumFolderId, filterByFolder = state.isAlbumView,
-                                    categories = listOf(FileCategory.IMAGE)
-                                ))
-                            }
-                        }
                         Box {
                             IconButton(onClick={sorting=true}){Icon(DriveIcons.Sort,"Sort gallery")}
                             SortMenu(expanded=sorting,current=state.sortField,direction=state.sortDirection,onDismiss={sorting=false},onSelect={field,direction->sorting=false;viewModel.setSort(field,direction)},fields=if(state.tab==GalleryTab.ALBUMS)listOf(FileSortField.NAME,FileSortField.DATE_MODIFIED)else listOf(FileSortField.DATE_MODIFIED,FileSortField.DATE_ADDED,FileSortField.NAME,FileSortField.NATURAL_NAME,FileSortField.SIZE,FileSortField.EXTENSION,FileSortField.TYPE),prefixContent={

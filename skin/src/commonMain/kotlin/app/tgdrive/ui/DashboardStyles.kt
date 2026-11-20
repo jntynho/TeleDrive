@@ -20,9 +20,12 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
@@ -38,8 +41,11 @@ private fun palette(style:String,dark:Boolean):DashboardPalette {
         "ORBIT"->if(dark)0xFF1B3048L to 0xFF294D68L else 0xFFDFECF9L to 0xFFC7DEEDL
         "MOSAIC"->if(dark)0xFF183C33L to 0xFF214D41L else 0xFFE0F1E9L to 0xFFC9E7DBL
         "RIBBON"->if(dark)0xFF282339L to 0xFF40334DL else 0xFFF1E6F7L to 0xFFE2D5EFL
-        "HORIZON"->if(dark)0xFF233347L to 0xFF344C63L else 0xFFE8EFF8L to 0xFFCEDFEBL
+        "HORIZON"->if(dark)0xFF15233CL to 0xFF294466L else 0xFFE8F2FDL to 0xFFD0E4F2L
         "STRATA"->if(dark)0xFF273236L to 0xFF354347L else 0xFFE6EEEBL to 0xFFD2E2DDL
+        "SPECTRUM" -> if (dark) 0xFF321F35L to 0xFF543449L else 0xFFFBE5EEL to 0xFFEFCDE0L
+        "LEDGER" -> if (dark) 0xFF212B28L to 0xFF3A473BL else 0xFFEFF1E0L to 0xFFDEE5CDL
+        "BEACON" -> if (dark) 0xFF342318L to 0xFF563623L else 0xFFFFE9C5L to 0xFFF3D1A5L
         else->if(dark)0xFF37302AL to 0xFF4A3B2FL else 0xFFF2E2CEL to 0xFFE8D0B6L
     }
     return DashboardPalette(Color(shades.first),Color(shades.second),if(dark)Color(0xFFF8F3EE)else Color(0xFF25322F))
@@ -49,7 +55,15 @@ private fun categoryColours(dark:Boolean)=if(dark)listOf(Color(0xFF7EBCFF),Color
 
 /** Every style uses the measured height of the original Classic layout. */
 @Composable
-internal fun StyledLibraryDashboard(style:String,usage:LibraryOverview,loading:Boolean,updated:String,dark:Boolean){
+internal fun StyledLibraryDashboard(
+    style: String,
+    usage: LibraryOverview,
+    loading: Boolean,
+    updated: String,
+    dark: Boolean,
+    modifier: Modifier,
+    headerAction: (@Composable () -> Unit)?
+) {
     val canonical=when(style){"AURORA"->"HORIZON";"COMPACT"->"STRATA";else->style}
     val palette=palette(canonical,dark)
     val top by animateColorAsState(palette.top,tween(240),label="dashboardTop")
@@ -58,30 +72,42 @@ internal fun StyledLibraryDashboard(style:String,usage:LibraryOverview,loading:B
     val colours=categoryColours(dark)
     CompositionLocalProvider(LocalContentColor provides ink){
         BoxWithConstraints(Modifier.fillMaxWidth()){
-            val frameHeight=originalClassicHeight(maxWidth,usage,loading,updated)
-            Column(Modifier.fillMaxWidth().height(frameHeight).testTag("library-card")
+            val cardWidth = maxWidth
+            val frameHeight = originalClassicHeight(cardWidth, usage, loading, updated)
+            Box(modifier.fillMaxWidth().height(frameHeight).testTag("library-card")
                 .clip(RoundedCornerShape(24.dp)).background(Brush.linearGradient(listOf(top,bottom)))
                 .drawBehind{
-                    if(canonical=="CLASSIC"){
-                        val fold=Path().apply{moveTo(size.width*.94f,size.height);quadraticTo(size.width*.89f,size.height*.65f,size.width,size.height*.40f);lineTo(size.width,size.height);close()}
-                        drawPath(fold,Color.White.copy(alpha=if(dark).04f else .18f))
+                    when (canonical) {
+                        "CLASSIC" -> {
+                            val fold=Path().apply{moveTo(size.width*.94f,size.height);quadraticTo(size.width*.89f,size.height*.65f,size.width,size.height*.40f);lineTo(size.width,size.height);close()}
+                            drawPath(fold,Color.White.copy(alpha=if(dark).04f else .18f))
+                        }
+                        "BEACON" -> drawBeacon(dark)
                     }
-                }.padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
-                    Text("Your library",Modifier.weight(1f).skeleton(loading),style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=TextOverflow.Ellipsis)
-                    Icon(DriveIcons.Folder,null,Modifier.size(24.dp).skeleton(loading))
-                }
-                Column(Modifier.weight(1f).fillMaxWidth(),verticalArrangement=Arrangement.Center){
-                    when(canonical){
-                        "ORBIT"->OrbitBody(usage,loading,colours)
-                        "MOSAIC"->MosaicBody(usage,loading)
-                        "RIBBON"->RibbonBody(usage,loading,colours)
-                        "HORIZON"->HorizonBody(usage,loading,colours)
-                        "STRATA"->StrataBody(usage,loading,colours)
-                        else->StorageValue(usage,loading,large=true)
+                }) {
+                Column(Modifier.fillMaxSize().padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                    Row(Modifier.fillMaxWidth().heightIn(min = 24.dp),verticalAlignment=Alignment.CenterVertically) {
+                        Text("Your library",Modifier.weight(1f).skeleton(loading),style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=TextOverflow.Ellipsis)
+                        if (headerAction == null) Icon(DriveIcons.Folder,null,Modifier.size(24.dp).skeleton(loading))
+                        else Spacer(Modifier.width(40.dp))
                     }
+                    Column(Modifier.weight(1f).fillMaxWidth(),verticalArrangement=Arrangement.Center) {
+                        when(canonical) {
+                            "ORBIT" -> OrbitBody(usage,loading,colours)
+                            "MOSAIC" -> MosaicBody(usage,loading,colours,cardWidth-40.dp)
+                            "RIBBON" -> RibbonBody(usage,loading,colours)
+                            "HORIZON" -> HorizonBody(usage,loading,dark)
+                            "STRATA" -> StrataBody(usage,loading,colours)
+                            "SPECTRUM" -> SpectrumBody(usage,loading,colours)
+                            "LEDGER" -> LedgerBody(usage,loading)
+                            else -> StorageValue(usage,loading,large=true)
+                        }
+                    }
+                    DashboardFootnote(usage,loading,updated)
                 }
-                DashboardFootnote(usage,loading,updated)
+                if (headerAction != null) {
+                    Box(Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 8.dp)) { headerAction() }
+                }
             }
         }
     }
@@ -146,28 +172,57 @@ private fun CategoryRing(usage:LibraryOverview,loading:Boolean,colours:List<Colo
     }
 }
 @Composable
-private fun MosaicBody(usage:LibraryOverview,loading:Boolean){
-    val large=LocalDensity.current.fontScale>1.3f
-    val icons=listOf(DriveIcons.Photo,DriveIcons.PlayArrow,DriveIcons.MusicNote,DriveIcons.Description)
-    val tiles:@Composable ()->Unit={
-        Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
-            repeat(2){row->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){
-                repeat(2){column->val index=row*2+column
-                    Column(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(LocalContentColor.current.copy(alpha=.065f)).padding(4.dp),
-                        horizontalAlignment=Alignment.CenterHorizontally){
-                        Icon(icons[index],categoryNames[index],Modifier.size(14.dp).skeleton(loading))
-                        Text(formatLibraryBytes(usage.groups.getOrElse(index){0}),Modifier.skeleton(loading),style=MaterialTheme.typography.labelSmall,maxLines=1,overflow=TextOverflow.Ellipsis)
+private fun MosaicBody(usage: LibraryOverview, loading: Boolean, colours: List<Color>, width: Dp) {
+    val largeText = LocalDensity.current.fontScale > 1.3f
+    val tiles: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            repeat(2) { row ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    repeat(2) { column ->
+                        val index = row * 2 + column
+                        val label = categoryNames[index]
+                        val amount = formatLibraryBytes(usage.groups.getOrElse(index) { 0L })
+                        val colour = colours[index]
+                        val description = if (largeText) Modifier.semantics { contentDescription = "$label, $amount" } else Modifier
+                        Column(
+                            Modifier.weight(1f).then(description).clip(RoundedCornerShape(10.dp))
+                                .background(colour.copy(alpha = .14f)).padding(horizontal = 6.dp, vertical = 3.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Icon(categoryIcon(index), null, Modifier.size(14.dp).skeleton(loading), tint = colour)
+                                Text(label, Modifier.skeleton(loading), style = MaterialTheme.typography.labelSmall, maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis)
+                            }
+                            if (!largeText) {
+                                Text(amount, Modifier.skeleton(loading), style = MaterialTheme.typography.labelSmall, maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis)
+                            }
+                        }
                     }
                 }
-            }}
+            }
         }
     }
-    if(large){StorageValue(usage,loading,caption=false);Spacer(Modifier.height(8.dp));tiles()}
-    else Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
-        Column(Modifier.weight(1f)){StorageValue(usage,loading,caption=false,compact=true);Text("Total",style=MaterialTheme.typography.bodySmall)}
-        Box(Modifier.weight(1f)){tiles()}
+    if (largeText || width < 245.dp) {
+        StorageValue(usage, loading, caption = false, compact = true)
+        Spacer(Modifier.height(5.dp))
+        tiles()
+    } else {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(Modifier.weight(.37f)) { StorageValue(usage, loading, compact = true) }
+            Box(Modifier.weight(.63f)) { tiles() }
+        }
     }
 }
+
+@Composable
+private fun categoryIcon(index: Int) = when (index) {
+    0 -> DriveIcons.Photo
+    1 -> DriveIcons.Videocam
+    2 -> DriveIcons.MusicNote
+    else -> DriveIcons.Description
+}
+
 @Composable
 private fun RibbonBody(usage:LibraryOverview,loading:Boolean,colours:List<Color>){
     StorageValue(usage,loading,caption=false);Spacer(Modifier.height(10.dp))
@@ -177,20 +232,113 @@ private fun RibbonBody(usage:LibraryOverview,loading:Boolean,colours:List<Color>
     Spacer(Modifier.height(6.dp));CategoryLegend(loading,colours)
 }
 @Composable
-private fun HorizonBody(usage:LibraryOverview,loading:Boolean,colours:List<Color>){
-    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
-        Box(Modifier.weight(1f)){StorageValue(usage,loading,large=true)}
-        if(LocalDensity.current.fontScale<=1.3f){
-            Box(Modifier.size(64.dp).skeleton(loading),contentAlignment=Alignment.Center){
-                Box(Modifier.size(54.dp).clip(RoundedCornerShape(16.dp)).background(LocalContentColor.current.copy(alpha=.06f)))
-                Icon(DriveIcons.Folder,null,Modifier.size(42.dp))
-                Box(Modifier.align(Alignment.TopEnd).size(26.dp).clip(CircleShape).background(colours.first()),contentAlignment=Alignment.Center){
-                    Icon(DriveIcons.CloudQueue,null,Modifier.size(18.dp),tint=Color.White)
+private fun HorizonBody(usage: LibraryOverview, loading: Boolean, dark: Boolean) {
+    val atmosphere = if (dark) Color(0xFF81AFE1) else Color(0xFF76A9D1)
+    val hills = if (dark) Color(0xFF92C5CC) else Color(0xFF3E759D)
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(Modifier.weight(1f)) { StorageValue(usage, loading, large = true) }
+        if (LocalDensity.current.fontScale <= 1.3f) {
+            Box(
+                Modifier.size(width = 98.dp, height = 74.dp).skeleton(loading).clip(RoundedCornerShape(16.dp))
+                    .background(Brush.verticalGradient(listOf(atmosphere.copy(alpha = .32f), atmosphere.copy(alpha = .06f)))),
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(Modifier.matchParentSize()) {
+                    drawCircle(if (dark) Color(0xFFE9DAF5) else Color(0xFFFFD397), 12.dp.toPx(), Offset(size.width * .76f, size.height * .26f))
+                    val ridge = Path().apply {
+                        moveTo(0f, size.height * .78f)
+                        quadraticTo(size.width * .24f, size.height * .49f, size.width * .52f, size.height * .74f)
+                        quadraticTo(size.width * .76f, size.height * .91f, size.width, size.height * .55f)
+                        lineTo(size.width, size.height)
+                        lineTo(0f, size.height)
+                        close()
+                    }
+                    drawPath(ridge, hills.copy(alpha = .28f))
+                    drawLine(hills.copy(alpha = .32f), Offset(0f, size.height * .82f), Offset(size.width, size.height * .82f), 1.dp.toPx())
                 }
+                Icon(DriveIcons.CloudQueue, null, Modifier.size(36.dp).offset(x = (-5).dp, y = (-2).dp))
             }
         }
     }
 }
+
+@Composable
+private fun SpectrumBody(usage: LibraryOverview, loading: Boolean, colours: List<Color>) {
+    val chart: @Composable () -> Unit = {
+        val sizes = List(categoryNames.size) { usage.groups.getOrElse(it) { 0L }.coerceAtLeast(0L) }
+        val maximum = sizes.max().coerceAtLeast(1L).toDouble()
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            sizes.forEachIndexed { index, amount ->
+                val colour = colours[index]
+                val fraction = (amount / maximum).toFloat()
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(Modifier.width(12.dp).height(46.dp).skeleton(loading).clip(CircleShape).background(colour.copy(alpha = .16f))) {
+                        if (fraction > 0f) {
+                            Box(Modifier.fillMaxWidth().fillMaxHeight(fraction).align(Alignment.BottomCenter).clip(CircleShape).background(colour))
+                        }
+                    }
+                    Icon(categoryIcon(index), "${categoryNames[index]}, ${formatLibraryBytes(amount)}", Modifier.size(14.dp).skeleton(loading), tint = colour)
+                }
+            }
+        }
+    }
+    if (LocalDensity.current.fontScale > 1.3f) {
+        StorageValue(usage, loading, caption = false, compact = true)
+        Spacer(Modifier.height(6.dp))
+        chart()
+    } else {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(Modifier.weight(1f)) { StorageValue(usage, loading, compact = true) }
+            Box(Modifier.weight(1f)) { chart() }
+        }
+    }
+}
+
+@Composable
+private fun LedgerBody(usage: LibraryOverview, loading: Boolean) {
+    val ink = LocalContentColor.current
+    val amount = if (loading) "3.4 GB" else formatLibraryBytes(usage.offlineBytes)
+    if (LocalDensity.current.fontScale > 1.3f) {
+        StorageValue(usage, loading, compact = true)
+        Spacer(Modifier.height(5.dp))
+        HorizontalDivider(color = ink.copy(alpha = .2f))
+        Spacer(Modifier.height(5.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("On this device", Modifier.weight(1f).skeleton(loading), style = MaterialTheme.typography.labelSmall)
+            Text(amount, Modifier.skeleton(loading), style = MaterialTheme.typography.labelLarge)
+        }
+    } else {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.weight(1f)) { StorageValue(usage, loading, compact = true) }
+            VerticalDivider(Modifier.height(46.dp), color = ink.copy(alpha = .2f))
+            Column(Modifier.weight(.9f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(amount, Modifier.skeleton(loading), style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("On this device", Modifier.skeleton(loading), style = MaterialTheme.typography.bodySmall, color = ink.copy(alpha = .8f))
+            }
+        }
+    }
+}
+
+private fun DrawScope.drawBeacon(dark: Boolean) {
+    val light = if (dark) Color(0xFFEC9D58) else Color(0xFFC56A33)
+    val radius = size.height * .36f
+    val source = Offset(size.width * .88f, size.height * .58f)
+    drawCircle(light.copy(alpha = .12f), radius, source)
+    drawCircle(light.copy(alpha = .18f), radius * .72f, source, style = Stroke(1.dp.toPx()))
+    drawCircle(light.copy(alpha = .26f), radius * .43f, source)
+    val beams = Path().apply {
+        moveTo(source.x, source.y)
+        lineTo(size.width * .61f, 0f)
+        lineTo(size.width * .74f, 0f)
+        close()
+        moveTo(source.x, source.y)
+        lineTo(size.width, size.height * .23f)
+        lineTo(size.width, size.height * .44f)
+        close()
+    }
+    drawPath(beams, light.copy(alpha = .12f))
+}
+
 @Composable
 private fun StrataBody(usage:LibraryOverview,loading:Boolean,colours:List<Color>){
     val large=LocalDensity.current.fontScale>1.3f

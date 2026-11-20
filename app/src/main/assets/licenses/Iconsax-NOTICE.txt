@@ -1,0 +1,12 @@
+Icon assets from Iconsax (Vuesax / Lusaxweb) — https://iconsax.io
+Iconsax Proprietary Free License
+
+TeleDrive integrates selected Iconsax Free Outline and Broken glyphs in its
+application UI and its website. Authorship and copyright remain with Iconsax.
+The glyphs are licensed for use as part of the application and website under
+the Iconsax terms. The TeleDrive source-code license does not sublicense the
+Iconsax assets for separate reuse, resale or redistribution as icon files.
+
+Icon browser — https://app.iconsax.io/
+Developer license — https://docs.iconsax.io/license-and-terms/license
+Usage Manifesto — https://docs.iconsax.io/license-and-terms/usage-manifesto

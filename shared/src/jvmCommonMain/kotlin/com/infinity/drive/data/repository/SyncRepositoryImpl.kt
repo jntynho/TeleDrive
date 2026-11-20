@@ -6,10 +6,8 @@ import com.infinity.drive.core.common.AppResult
 import com.infinity.drive.core.common.SafeLog
 import com.infinity.drive.core.publish.PublishScheduler
 import com.infinity.drive.core.crypto.KeyBackupCodec
-import com.infinity.drive.core.files.AppStoragePaths
 import com.infinity.drive.core.files.MimeTypes
 import com.infinity.drive.core.telegram.RemoteDocument
-import com.infinity.drive.core.telegram.TelegramAuthState
 import com.infinity.drive.core.telegram.TelegramClient
 import com.infinity.drive.core.telegram.TelegramException
 import com.infinity.drive.data.local.dao.FileDao
@@ -27,19 +25,17 @@ import com.infinity.drive.domain.model.FileCategory
 import com.infinity.drive.domain.model.FileTags
 import com.infinity.drive.domain.repository.SettingsRepository
 import com.infinity.drive.domain.repository.SyncRepository
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.io.File
-import java.io.IOException
-import java.nio.file.Files
 import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
+
+internal fun isAdvancingHistory(cursor: Long, next: Long): Boolean =
+    next == 0L || next > 0 && (cursor == 0L || next < cursor)
 
 /**
  * Reconciles local metadata with the storage chat. The chat is the source of
@@ -60,15 +56,12 @@ class SyncRepositoryImpl(
     private val folderStateSynchronizer: FolderStateSynchronizer,
     private val publishScheduler: PublishScheduler,
     private val settingsRepository: SettingsRepository,
-    private val database: DriveInfinityDatabase,
-    private val storagePaths: AppStoragePaths
+    private val database: DriveInfinityDatabase
 ) : SyncRepository {
 
     private val _syncing = MutableStateFlow(false)
     override val syncing: Flow<Boolean> = _syncing
 
-    private val _indexedSoFar = MutableStateFlow(0)
-    override val indexedSoFar: Flow<Int> = _indexedSoFar
     private val syncMutex = Mutex()
 
     override suspend fun fullResync(): AppResult<SyncRepository.SyncStats> =
@@ -85,7 +78,6 @@ class SyncRepositoryImpl(
     private suspend fun runSync(incremental: Boolean): AppResult<SyncRepository.SyncStats> =
         syncMutex.withLock {
             _syncing.value = true
-            _indexedSoFar.value = 0
             try {
                 doSync(incremental)
             } catch (e: TelegramException) {
@@ -97,109 +89,6 @@ class SyncRepositoryImpl(
                 _syncing.value = false
             }
         }
-
-    override suspend fun restoreLibrary(
-        restart: Boolean,
-        onProgress: (SyncRepository.RestoreProgress) -> Unit
-    ): AppResult<SyncRepository.RestoreProgress> =
-        syncMutex.withLock {
-            _syncing.value = true
-            _indexedSoFar.value = 0
-            try {
-                withContext(Dispatchers.IO) { restoreSelectedDrive(restart, onProgress) }
-            } catch (e: TelegramException) {
-                AppResult.Failure(
-                    if (e.isRateLimit) AppError.RateLimited(e.retryAfterSeconds ?: 0)
-                    else AppError.TelegramError(e.code, e.message)
-                )
-            } catch (e: IOException) {
-                SafeLog.w(TAG, "Restore checkpoint I/O failed", e)
-                AppResult.Failure(AppError.Unknown())
-            } finally {
-                _syncing.value = false
-            }
-        }
-
-    private suspend fun restoreSelectedDrive(
-        restart: Boolean,
-        onProgress: (SyncRepository.RestoreProgress) -> Unit
-    ): AppResult<SyncRepository.RestoreProgress> {
-        if (telegramClient.authState.value != TelegramAuthState.Ready) {
-            return AppResult.Failure(AppError.AuthenticationRequired)
-        }
-        val chatId = activeChannel.id() ?: return AppResult.Failure(AppError.NotFound)
-        val userId = telegramClient.getCurrentUser().id
-        val directory = File(storagePaths.filesDir, "library-restore")
-        Files.createDirectories(directory.toPath())
-        val checkpoint = File(directory, "$userId-$chatId")
-        if (restart) Files.deleteIfExists(checkpoint.toPath())
-        val saved = LibraryRestoreCheckpoint.read(checkpoint)
-        var cursor = saved.cursor
-        var progress = saved.progress
-        onProgress(progress)
-        _indexedSoFar.value = progress.restored
-        if (cursor == 0L) folderStateSynchronizer.pull(chatId)
-        if (activeChannel.id() != chatId) return AppResult.Failure(AppError.NotFound)
-        val folderCache = mutableMapOf<String, String?>()
-        var remainingPages = MAX_PAGES
-
-        while (remainingPages-- > 0) {
-            val page = telegramClient.fetchDocuments(chatId, cursor, PAGE_SIZE)
-            if (telegramClient.authState.value != TelegramAuthState.Ready ||
-                activeChannel.id() != chatId
-            ) return AppResult.Failure(AppError.AuthenticationRequired)
-            val next = page.nextFromMessageId
-            if (!isAdvancingHistory(cursor, next)) return AppResult.Failure(AppError.Timeout())
-            val pendingDeletes = pendingDeleteDao.messageIdsIn(chatId).toSet()
-            val known = existingForPage(page.documents)
-            val partIndexes = filePartDao.partsOfAll(
-                known.manifests.values.mapNotNull { it?.takeIf { m -> m.isPart }?.fileId }.distinct()
-            ).mapTo(mutableSetOf()) { it.fileId to it.partIndex }
-            var scanned = 0
-            var restored = 0
-            var locked = 0
-            database.inImmediateTransaction {
-                for (document in page.documents.distinctBy { it.messageId }) {
-                    if (document.messageId in pendingDeletes || isInternalDocument(document)) continue
-                    scanned++
-                    if (manifestCodec.isLocked(document.caption)) {
-                        locked++
-                        continue
-                    }
-                    val manifest = known.manifests[document]
-                    val existing = manifest?.let { fileDao.byId(it.fileId) }
-                        ?: fileDao.byRemoteUniqueIds(listOf(document.uniqueFileId)).firstOrNull()
-                    if (existing == null ||
-                        (existing.chatId == null && existing.localPath == null && manifest?.isPart == true &&
-                            manifest.partIndex == 0)
-                    ) {
-                        val current = known.copy(
-                            byId = existing?.let { mapOf(it.id to it) }.orEmpty(),
-                            byUniqueId = existing?.remoteUniqueId?.let { mapOf(it to existing) }.orEmpty()
-                        )
-                        if (reconcile(document, folderCache, current) == ReconcileResult.INSERTED) {
-                            restored++
-                        }
-                    } else if (manifest?.isPart == true && !manifest.replaces && (existing.chatId == null || existing.chatId == chatId) &&
-                        partIndexes.add(manifest.fileId to manifest.partIndex)
-                    ) recordPart(document, manifest)
-                }
-            }
-            progress = SyncRepository.RestoreProgress(
-                progress.scanned + scanned, progress.restored + restored, progress.locked + locked
-            )
-            if (next == 0L) {
-                Files.deleteIfExists(checkpoint.toPath())
-                onProgress(progress)
-                return AppResult.Success(progress)
-            }
-            LibraryRestoreCheckpoint(next, progress).write(checkpoint)
-            cursor = next
-            onProgress(progress)
-            _indexedSoFar.value = progress.restored
-        }
-        return AppResult.Failure(AppError.Timeout())
-    }
 
     private suspend fun forgetChat(chatId: Long) {
         val removed = fileDao.deleteRemoteOnlyInChat(chatId)
@@ -267,7 +156,6 @@ class SyncRepositoryImpl(
                     when (reconcile(document, folderCache, known)) {
                         ReconcileResult.INSERTED -> {
                             inserted++
-                            _indexedSoFar.value = inserted
                         }
 
                         ReconcileResult.UPDATED -> updated++
@@ -302,8 +190,7 @@ class SyncRepositoryImpl(
         partial: Boolean
     ): AppResult<SyncRepository.SyncStats> {
         var detached = 0
-        /* Locked files still register as seen, so they cannot be mistaken for
-           missing ones and a restored key backup is not required to prune. */
+        // Locked files still count as seen so a missing local key cannot mark them as detached.
         if (!partial) {
             val stale = fileDao.filesWithRemote().filter { entity ->
                 val messageId = entity.messageId

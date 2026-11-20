@@ -179,6 +179,8 @@ fun DriveInfinityApp(
         darkTheme = darkTheme,
         dynamicColor = state.dynamicColor,
         accentColour = state.accentColour,
+        customTheme = state.customTheme,
+        iconStyle = state.iconStyle,
         amoled = state.theme == AppTheme.AMOLED
     ) {
         CompositionLocalProvider(

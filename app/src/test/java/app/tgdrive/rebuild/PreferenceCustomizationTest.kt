@@ -51,4 +51,26 @@ class PreferenceCustomizationTest {
         store.edit{it[PreferenceKeys.DASHBOARD_DARK_STYLES]=setOf("STRATA","unknown-style")}
         assertEquals(setOf("STRATA"),repository.preferences.first().dashboardDarkStyles)
     }
+
+    @Test fun customThemesPreserveBothPalettesAndTheFallbackAcrossRepositoryRecreation() = runBlocking {
+        val store = Store()
+        val repository = SettingsRepositoryImpl(store, cipher)
+        val light = ThemePalette(0xFF2356A8, 0xFF365E72, 0xFF256C62, 0xFFF0F5FF,
+            overrides = mapOf("PRIMARY_CONTAINER" to 0xFFBFD5FF))
+        val dark = ThemePalette(0xFFADCBFC, 0xFF81BCD2, 0xFF89D5CC, 0xFF182436,
+            overrides = mapOf("OUTLINE" to 0xFFB1BDCC))
+        val theme = CustomTheme("blue-hour", "Blue Hour", light, dark)
+        repository.update { it.selectAccentColour(AccentColour.TIDAL).saveCustomTheme(theme).copy(iconStyle = AppIconStyle.BROKEN) }
+        val reopened = SettingsRepositoryImpl(store, cipher)
+        val saved = reopened.preferences.first()
+        assertEquals(theme, saved.selectedCustomTheme)
+        assertEquals(AppIconStyle.BROKEN, saved.iconStyle)
+        reopened.update { it.saveCustomTheme(theme.copy(name = "Evening")) }
+        assertEquals(listOf(theme.copy(name = "Evening")), reopened.preferences.first().customThemes)
+        reopened.update { it.deleteCustomTheme(theme.id) }
+        val deleted = reopened.preferences.first()
+        assertNull(deleted.selectedCustomTheme)
+        assertTrue(deleted.customThemes.isEmpty())
+        assertEquals(AccentColour.TIDAL, deleted.accentColour)
+    }
 }

@@ -16,8 +16,11 @@ import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
 import app.tgdrive.R
 import com.infinity.drive.presentation.settings.SettingsClickRow
+import com.infinity.drive.resources.Res
+import com.infinity.drive.resources.common_back
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource as sharedStringResource
 import org.koin.compose.koinInject
 
 @Composable
@@ -111,7 +114,7 @@ private fun FolderSyncDialog(close: () -> Unit) {
                         }
                     }
                     TextButton({ plan = null }, enabled = !running) {
-                        Text(stringResource(R.string.workspaces_up))
+                        Text(sharedStringResource(Res.string.common_back))
                     }
                 }
             }

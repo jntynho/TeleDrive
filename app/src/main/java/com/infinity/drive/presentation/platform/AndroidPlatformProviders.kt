@@ -272,11 +272,9 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
     val startupThumbnails=org.koin.compose.koinInject<com.infinity.drive.data.local.dao.ThumbnailDao>()
     val startupPreparation=remember(context,startupLoader,startupThumbnails){com.infinity.drive.presentation.startup.AndroidStartupPreparation(context,startupLoader,startupThumbnails)}
     val liquidNavigation=if(android.os.Build.VERSION.SDK_INT>=33)com.infinity.drive.presentation.navigation.liquid.rememberLiquidNavigation()else null
-    val portableKeyFiles = rememberAndroidPortableKeyFiles()
     val directoryTreeDocument = rememberAndroidDirectoryTreeDocument()
     val folderArchiveDocument = rememberAndroidFolderArchiveDocument()
     CompositionLocalProvider(
-        LocalPortableKeyFiles provides portableKeyFiles,
         LocalDirectoryTreeDocument provides directoryTreeDocument,
         LocalFolderArchiveDocument provides folderArchiveDocument,
         LocalLiquidNavigation provides liquidNavigation,
@@ -314,6 +312,8 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
                     darkTheme = darkTheme,
                     dynamicColor = prefs.dynamicColor,
                     accentColour = prefs.accentColour,
+                    customTheme = prefs.selectedCustomTheme,
+                    iconStyle = prefs.iconStyle,
                     amoled = prefs.theme == AppTheme.AMOLED
                 ) {
                 FileSystemFolderPickerDialog(

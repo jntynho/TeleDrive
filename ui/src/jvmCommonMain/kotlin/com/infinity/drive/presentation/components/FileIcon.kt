@@ -2,9 +2,11 @@
 package com.infinity.drive.presentation.components
 
 import app.tgdrive.ui.DriveIcons
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.infinity.drive.domain.model.FileCategory
 
+@Composable
 fun iconFor(category: FileCategory): ImageVector = when (category) {
     FileCategory.IMAGE -> DriveIcons.Image
     FileCategory.VIDEO -> DriveIcons.VideoFile

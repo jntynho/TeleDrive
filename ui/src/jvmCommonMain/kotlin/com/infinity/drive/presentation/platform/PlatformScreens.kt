@@ -22,21 +22,15 @@ interface PlatformScreens {
     fun RecoveryExport(onBack: () -> Unit) = Unit
 
     @Composable
-    fun AccountProfilesSetting(compact: Boolean = false) = Unit
-
-    @Composable
-    fun WorkspacesSetting() = Unit
+    fun AccountProfilesSetting(
+        compact: Boolean = false,
+        profileName: String? = null,
+        username: String? = null,
+        photoPath: String? = null
+    ) = Unit
 
     @Composable
     fun FolderSyncSetting() = Unit
-
-    val supportsPublicLinks: Boolean get() = false
-
-    @Composable
-    fun PublicLinksSetting() = Unit
-
-    @Composable
-    fun PhotoHistoryControl(onAlbum: Boolean, folder: String?, query: String, openFile: (String) -> Unit) = Unit
 
     @Composable
     fun Preview(onBack: () -> Unit, onEditNote: (String, String) -> Unit, onCreateNote: (String, String) -> Unit)

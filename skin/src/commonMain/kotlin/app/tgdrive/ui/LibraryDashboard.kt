@@ -31,9 +31,11 @@ fun LibraryDashboard(
     loading: Boolean = false,
     updatedLabel: String = "No uploads yet",
     style:String=LocalDashboardStyle.current,
-    dark:Boolean=LocalDashboardDark.current?: (style in setOf("ORBIT","RIBBON"))
+    dark:Boolean=LocalDashboardDark.current?: (style in setOf("ORBIT","RIBBON")),
+    modifier: Modifier = Modifier,
+    headerAction: (@Composable () -> Unit)? = null
 ) {
-    StyledLibraryDashboard(style,usage,loading,updatedLabel,dark)
+    StyledLibraryDashboard(style,usage,loading,updatedLabel,dark,modifier,headerAction)
     if(showAddAction)Button(onAdd,Modifier.fillMaxWidth().padding(top=8.dp).heightIn(min=52.dp),shape=CircleShape){
         Icon(DriveIcons.Add,null);Spacer(Modifier.width(8.dp));Text("Add files")
     }

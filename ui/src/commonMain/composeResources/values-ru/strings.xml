@@ -46,18 +46,6 @@
         <item quantity="many">%1$d элементов</item>
         <item quantity="other">%1$d элементов</item>
     </plurals>
-    <plurals name="rebuild_indexed_files">
-        <item quantity="one">Проиндексирован %1$d файл</item>
-        <item quantity="few">Проиндексировано %1$d файла</item>
-        <item quantity="many">Проиндексировано %1$d файлов</item>
-        <item quantity="other">Проиндексировано %1$d файлов</item>
-    </plurals>
-    <plurals name="rebuild_locked_files">
-        <item quantity="one">Пропущен %1$d зашифрованный файл. Восстановите резервную копию ключа для индексации.</item>
-        <item quantity="few">Пропущено %1$d зашифрованных файла. Восстановите резервную копию ключа для индексации.</item>
-        <item quantity="many">Пропущено %1$d зашифрованных файлов. Восстановите резервную копию ключа для индексации.</item>
-        <item quantity="other">Пропущено %1$d зашифрованных файлов. Восстановите резервную копию ключа для индексации.</item>
-    </plurals>
     <plurals name="home_back_up_pending">
         <item quantity="one">Резервное копирование %1$d файла</item>
         <item quantity="few">Резервное копирование %1$d файлов</item>
@@ -596,10 +584,7 @@
     <string name="settings_files_stay_telegram_channel">Ваши файлы останутся в канале Telegram. Это устройство сбросит локальный индекс, превью и кэши, и пересоздаст их при повторном входе.</string>
     <string name="settings_log">Выйти</string>
     <string name="settings_log_telegram">Выйти из Telegram?</string>
-    <string name="settings_reading_channel">Чтение вашего канала хранения</string>
-    <string name="settings_rebuild_index_telegram">Переиндексировать диск из Telegram</string>
     <string name="settings_removes_session_stored_api">Удаляет сессию и сохраненные ключи API</string>
-    <string name="settings_restores_file_list">Восстанавливает список файлов из вашего канала хранения</string>
     <string name="settings_shown_channels_private_owned">Отображаются приватные каналы, созданные вами с именем TG Drive.</string>
     <string name="settings_state_connected">Подключено</string>
     <string name="settings_state_connecting">Подключение</string>
@@ -649,11 +634,7 @@
     <string name="settings_block_screenshots">Запрет скриншотов</string>
     <string name="settings_change_passphrase">Сменить кодовую фразу</string>
     <string name="settings_confirm_removing_lock">Подтвердите личность перед снятием блокировки</string>
-    <string name="settings_encrypt_thumbnails">Шифровать миниатюры</string>
-    <string name="settings_encrypt_uploads">Шифровать загружаемое</string>
-    <string name="settings_encryption_stays_off">Шифрование отключено до установки кодовой фразы</string>
     <string name="settings_enter_passphrase_used_backing">Введите кодовую фразу, использованную при бэкапе ключа.</string>
-    <string name="settings_files_sealed_leaving_device">Файлы шифруются перед отправкой с устройства. Требуется кодовая фраза.</string>
     <string name="settings_forgot_show_hint">Забыли? Показать подсказку</string>
     <string name="settings_hides_app_screenshots_screen">Скрывает приложение на скриншотах, при записи экрана и в списке недавних</string>
     <string name="settings_hint_optional">Подсказка (необязательно)</string>
@@ -663,19 +644,15 @@
     <string name="settings_passphrase">Кодовая фраза</string>
     <string name="settings_passphrase_min_length">Не менее %1$d символов</string>
     <string name="settings_passphrases_do_not_match">Кодовые фразы не совпадают</string>
-    <string name="settings_protects_cached_previews_device">Защищает кэшированные превью ключом устройства. Фраза не требуется. Галерея грузится медленнее.</string>
-    <string name="settings_reading_hint">Чтение подсказки…</string>
     <string name="settings_repeat_passphrase">Повторите кодовую фразу</string>
     <string name="settings_require_fingerprint_screen_lock">Требовать отпечаток или блокировку экрана</string>
     <string name="settings_required_before_encrypt">Требуется перед включением шифрования загрузок</string>
     <string name="settings_required_encryption_key_wrapped">Требуется для шифрования. Ключ защищен этой фразой и сохранен в канале Telegram для восстановления на новом устройстве. Telegram не знает фразу.</string>
-    <string name="settings_restore_encryption_key">Восстановить ключ шифрования</string>
     <string name="settings_save_backup">Сохранить копию</string>
     <string name="settings_set">Задать</string>
     <string name="settings_set_passphrase">Установить кодовую фразу</string>
     <string name="settings_stored_unencrypted_never_put">Хранится в открытом виде. Не указывайте сюда кодовую фразу.</string>
     <string name="settings_turn_off_app_lock">Отключить блокировку приложения</string>
-    <string name="settings_unlock_files_encrypted_earlier">Расшифровать файлы, зашифрованные ранней кодовой фразой</string>
     <string name="settings_uploads_stay_unencrypted_set">Загрузки остаются незашифрованными до её установки. Зашифрованные ранее файлы остаются защищенными.</string>
     <string name="settings_nothing_to_remove">Нечего удалять</string>
 
@@ -852,17 +829,14 @@
     <string name="message_created_drive">Создан диск %1$s</string>
     <string name="message_download_queued">Скачивание добавлено в очередь</string>
     <string name="message_key_backup_saved">Копия ключа сохранена в Telegram</string>
-    <string name="message_key_restored">Ключ шифрования восстановлен, переиндексация</string>
     <string name="message_moved_count">Перемещено %1$d</string>
     <string name="message_moved_to_trash">Перемещено в корзину</string>
     <string name="message_moved_to_trash_count">Перемещено в корзину: %1$d</string>
     <string name="message_nothing_to_download">Нечего скачивать</string>
-    <string name="message_rebuild_done">Индексация: добавлено %1$d, обновлено %2$d, удалено %3$d</string>
     <string name="message_renamed">Переименовано</string>
     <string name="message_thumbnails_cleared">Миниатюры очищены</string>
     <string name="message_trash_emptied">Корзина очищена</string>
     <string name="message_upload_queued">Загрузка добавлена в очередь</string>
-    <string name="message_wrong_passphrase">Неверная кодовая фраза</string>
 
     <!-- Error messages -->
     <string name="error_authentication_failed">Ошибка аутентификации</string>
@@ -877,7 +851,7 @@
     <string name="error_insufficient_storage">Недостаточно места. Требуется %1$s, свободно %2$s</string>
     <string name="error_invalid_api">Недействительные API ID или API hash</string>
     <string name="error_invalid_phone">Недействительный номер телефона</string>
-    <string name="error_key_unreadable">Устройство не может прочитать ключ шифрования. Сначала восстановите копию ключа кодовой фразой.</string>
+    <string name="error_key_unreadable">Устройство не может прочитать ключ шифрования. Откройте зашифрованные файлы в той установке приложения, где хранится подходящий ключ.</string>
     <string name="error_last_drive">Это ваш единственный диск. Создайте другой диск перед удалением этого.</string>
     <string name="error_no_internet">Нет подключения к Интернету</string>
     <string name="error_no_local_copy">У файла нет локальной копии</string>
@@ -941,4 +915,5 @@
         <item>العربية</item>
     </string-array>
     <string name="nav_audio">Аудио</string>
+    <string name="common_close">Закрыть</string>
 </resources>

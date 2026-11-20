@@ -34,14 +34,6 @@
         <item quantity="one">%1$d item</item>
         <item quantity="other">%1$d items</item>
     </plurals>
-    <plurals name="rebuild_indexed_files">
-        <item quantity="one">Indexed %1$d file</item>
-        <item quantity="other">Indexed %1$d files</item>
-    </plurals>
-    <plurals name="rebuild_locked_files">
-        <item quantity="one">%1$d encrypted file skipped. Restore your key backup to index it.</item>
-        <item quantity="other">%1$d encrypted files skipped. Restore your key backup to index them.</item>
-    </plurals>
     <plurals name="home_back_up_pending">
         <item quantity="one">Back up %1$d file</item>
         <item quantity="other">Back up %1$d files</item>
@@ -574,10 +566,7 @@
     <string name="settings_files_stay_telegram_channel">Your files stay in the Telegram channel. This device drops its index, thumbnails and caches, and rebuilds them when you sign in again.</string>
     <string name="settings_log">Log out</string>
     <string name="settings_log_telegram">Log out of Telegram?</string>
-    <string name="settings_reading_channel">Reading your storage channel</string>
-    <string name="settings_rebuild_index_telegram">Rebuild index from Telegram</string>
     <string name="settings_removes_session_stored_api">Removes the session and stored API credentials</string>
-    <string name="settings_restores_file_list">Restores the file list from your storage channel</string>
     <string name="settings_shown_channels_private_owned">Shown channels are private, owned by you, and named TG Drive.</string>
     <string name="settings_state_connected">Connected</string>
     <string name="settings_state_connecting">Connecting</string>
@@ -627,11 +616,7 @@
     <string name="settings_block_screenshots">Block screenshots</string>
     <string name="settings_change_passphrase">Change recovery passphrase</string>
     <string name="settings_confirm_removing_lock">Confirm it is you before removing the lock</string>
-    <string name="settings_encrypt_thumbnails">Encrypt thumbnails</string>
-    <string name="settings_encrypt_uploads">Encrypt uploads</string>
-    <string name="settings_encryption_stays_off">Encryption stays off until a passphrase is set</string>
     <string name="settings_enter_passphrase_used_backing">Enter the passphrase you used when backing up the key.</string>
-    <string name="settings_files_sealed_leaving_device">Files are sealed before leaving this device. Needs a recovery passphrase.</string>
     <string name="settings_forgot_show_hint">Forgot it? Show hint</string>
     <string name="settings_hides_app_screenshots_screen">Hides the app from screenshots, screen recording and the recent apps preview</string>
     <string name="settings_hint_optional">Hint (optional)</string>
@@ -641,19 +626,15 @@
     <string name="settings_passphrase">Passphrase</string>
     <string name="settings_passphrase_min_length">At least %1$d characters</string>
     <string name="settings_passphrases_do_not_match">Passphrases do not match</string>
-    <string name="settings_protects_cached_previews_device">Protects cached previews with a device-only key. No passphrase needed. Slower gallery.</string>
-    <string name="settings_reading_hint">Reading hint…</string>
     <string name="settings_repeat_passphrase">Repeat passphrase</string>
     <string name="settings_require_fingerprint_screen_lock">Require fingerprint or screen lock</string>
     <string name="settings_required_before_encrypt">Required before uploads can be encrypted</string>
     <string name="settings_required_encryption_key_wrapped">Required for encryption. Your key is wrapped with this passphrase and stored in your Telegram channel, so you can recover files on a new device. Telegram never sees the passphrase.</string>
-    <string name="settings_restore_encryption_key">Restore encryption key</string>
     <string name="settings_save_backup">Save backup</string>
     <string name="settings_set">Set</string>
     <string name="settings_set_passphrase">Set recovery passphrase</string>
     <string name="settings_stored_unencrypted_never_put">Stored unencrypted. Never put the passphrase here.</string>
     <string name="settings_turn_off_app_lock">Turn off app lock</string>
-    <string name="settings_unlock_files_encrypted_earlier">Unlock files encrypted with an earlier passphrase, on this device or another one</string>
     <string name="settings_uploads_stay_unencrypted_set">Uploads stay unencrypted until you set one. Files already encrypted on this device can still be covered.</string>
     <string name="settings_nothing_to_remove">Nothing to remove</string>
 
@@ -830,17 +811,14 @@
     <string name="message_created_drive">Created %1$s</string>
     <string name="message_download_queued">Download queued</string>
     <string name="message_key_backup_saved">Key backup saved to Telegram</string>
-    <string name="message_key_restored">Encryption key restored, reindexing</string>
     <string name="message_moved_count">Moved %1$d</string>
     <string name="message_moved_to_trash">Moved to trash</string>
     <string name="message_moved_to_trash_count">%1$d moved to trash</string>
     <string name="message_nothing_to_download">Nothing to download</string>
-    <string name="message_rebuild_done">Rebuilt: %1$d added, %2$d updated, %3$d removed</string>
     <string name="message_renamed">Renamed</string>
     <string name="message_thumbnails_cleared">Thumbnails cleared</string>
     <string name="message_trash_emptied">Trash emptied</string>
     <string name="message_upload_queued">Upload queued</string>
-    <string name="message_wrong_passphrase">Wrong passphrase</string>
 
     <!-- Error messages -->
     <string name="error_authentication_failed">Authentication failed</string>
@@ -855,7 +833,7 @@
     <string name="error_insufficient_storage">Not enough space. %1$s needed, %2$s free</string>
     <string name="error_invalid_api">Invalid API ID or API hash</string>
     <string name="error_invalid_phone">Invalid phone number</string>
-    <string name="error_key_unreadable">This device cannot read its encryption key. Restore your key backup with its passphrase first.</string>
+    <string name="error_key_unreadable">This device cannot read its encryption key. Use the installation that holds the matching key to open the encrypted files.</string>
     <string name="error_last_drive">This is your only drive. Create another one before deleting it.</string>
     <string name="error_no_internet">No internet connection</string>
     <string name="error_no_local_copy">File has no local copy</string>
@@ -955,39 +933,6 @@
     <string name="transfers_retry_batch_error">Could not requeue failed transfers.</string>
     <string name="transfers_retry_batch_none">No failed transfers are eligible for batch retry.</string>
     <string name="transfers_retry_batch_queued">Transfers requeued: %1$d</string>
-    <string name="library_restore_title">Restore library</string>
-    <string name="library_restore_subtitle">Recover missing files and folders from this drive</string>
-    <string name="library_restore_hint">TeleDrive scans the selected Telegram drive and restores missing library entries. You can continue a paused scan from the last saved page. Restore your encryption key to recover locked items.</string>
-    <string name="library_restore_progress">%1$d documents checked · %2$d entries restored · %3$d locked</string>
-    <string name="library_restore_start">Start or resume</string>
-    <string name="library_restore_pause">Pause</string>
-    <string name="library_restore_close">Close</string>
-    <string name="library_restore_done">Library scan complete.</string>
-    <string name="drive_integrity_title">Check drive integrity</string>
-    <string name="drive_integrity_subtitle">Verify the Telegram copies indexed in this drive</string>
-    <string name="drive_integrity_hint">TeleDrive checks file references and missing or inconsistent parts in the selected drive.</string>
-    <string name="drive_integrity_sample">Verify the contents of up to 8 samples (up to 64 MB)</string>
-    <string name="drive_integrity_start">Run check</string>
-    <string name="drive_integrity_progress">%1$d checked · %2$d available · %3$d missing · %4$d inconsistent</string>
-    <string name="drive_integrity_details">%1$d unverified · %2$d need the encryption key · %3$d samples verified</string>
-    <string name="drive_integrity_problems">Some files to review</string>
-    <string name="key_backup_verify">Verify Telegram key backup</string>
-    <string name="key_backup_verify_hint">Check the saved encryption key with your backup password</string>
-    <string name="key_backup_verified">The Telegram key backup opened successfully.</string>
-    <string name="key_file_export">Export content key</string>
-    <string name="key_file_export_hint">Save a password-protected key file for your Telegram account</string>
-    <string name="key_file_import">Import content key</string>
-    <string name="key_file_import_hint">Open a key file you previously exported for this account</string>
-    <string name="key_file_device_prompt">Confirm your device lock to manage the encryption key.</string>
-    <string name="key_file_password">Backup password</string>
-    <string name="key_file_password_repeat">Repeat password</string>
-    <string name="key_file_password_hint">Use at least 12 characters and keep the password separately from the file.</string>
-    <string name="key_file_invalid">The key backup is invalid or the password is incorrect.</string>
-    <string name="key_file_other_account">This key file belongs to a different Telegram account.</string>
-    <string name="key_file_conflict">This device already has a different encryption key.</string>
-    <string name="key_file_io_failed">TeleDrive could not read or save the key file.</string>
-    <string name="key_file_reindex_incomplete">The key is ready. Continue the file scan in Restore library.</string>
-    <string name="key_file_saved">Encrypted key file saved.</string>
     <string name="backup_preview_title">Preview backup</string>
     <string name="backup_preview_description">Estimate uploads and skips before starting a backup</string>
     <string name="backup_preview_scanning">Reading the selected backup folders…</string>
@@ -1079,18 +1024,6 @@
     <string name="note_tasks_title">Checklist</string>
     <string name="note_tasks_open">Tasks · %1$d/%2$d</string>
     <string name="note_checklist_insert">Insert checklist item</string>
-    <string name="audio_playlist_title">Playlists</string>
-    <string name="audio_playlist_add">Add to playlist</string>
-    <string name="audio_playlist_create">New playlist</string>
-    <string name="audio_playlist_delete">Delete playlist</string>
-    <string name="audio_playlist_empty">There are no playable tracks here yet.</string>
-    <string name="audio_playlist_move_down">Move track down</string>
-    <string name="audio_playlist_move_up">Move track up</string>
-    <string name="audio_playlist_name">Playlist name</string>
-    <string name="audio_playlist_play">Play playlist</string>
-    <string name="audio_playlist_remove_track">Remove track from playlist</string>
-    <string name="audio_playlist_save_queue">Save playing queue</string>
-    <string name="audio_playlist_unavailable">Choose a different name and make sure the tracks are still available.</string>
     <string name="chat_import_title">Save from a Telegram chat</string>
     <string name="chat_import_back">Choose another chat</string>
     <string name="chat_import_clear_visible">Clear shown</string>
@@ -1117,11 +1050,8 @@
     <string name="files_zip_select">Select files</string>
     <string name="files_zip_preparing">Compressing selected files…</string>
     <string name="files_zip_failed">Couldn’t compress or queue the selected files.</string>
-    <string name="versions_title">Version history</string>
-    <string name="versions_error">The version operation could not finish. Check the connection and file type.</string>
-    <string name="versions_empty">No previous saved versions.</string>
-    <string name="versions_replace">Replace with a new version</string>
-    <string name="versions_restore">Restore</string>
-    <string name="versions_restore_message">Restore these bytes as the next version? The current backed-up version stays in history.</string>
-    <string name="versions_done">Done</string>
+    <string name="settings_icon_style">Icon style</string>
+    <string name="settings_icon_outline">Outline</string>
+    <string name="settings_icon_broken">Broken</string>
+    <string name="common_close">Close</string>
 </resources>

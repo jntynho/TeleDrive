@@ -4,7 +4,7 @@ An original, static product website for [TeleDrive](https://github.com/jntynho/T
 
 ## Design and content
 
-The Telegrive reference was reviewed for its product presentation, download flow, app previews, installation instructions and FAQ. This site uses its own design, copy, assets and implementation: warm neutral surfaces, blue and sage accents, Roboto and the app's Solar icons. No Telegrive page code, artwork or screenshots are included.
+The Telegrive reference informed the product presentation, download flow, app previews, installation instructions and FAQ. The site has original copy and app previews, warm neutral surfaces, blue and sage accents, Roboto and Iconsax Outline glyphs.
 
 The site includes real app screens with fictional sample data, light/dark themes, keyboard-accessible preview tabs, a phone QR code, installation guidance, privacy information, and exactly two standalone Android downloads. It makes no iOS/desktop or unconditional unlimited-storage claims. Telegram service limits and optional encryption are explained explicitly.
 
@@ -47,7 +47,7 @@ CI reads GitHub's latest stable release once per build and writes a same-origin 
 
 All fonts, screenshots, icons and scripts are hosted on Pages. There is no analytics SDK, account form, Telegram sign-in form or user upload endpoint. Only the selected website theme is saved in browser storage. GitHub's hosting/download practices still apply. A restrictive HTML content security policy limits scripts, styles, images and data requests to the site itself.
 
-The brand comes from `docs/brand/tg-drive-icon.svg`. Solar icons retain CC BY 4.0 attribution; the self-hosted Roboto subset retains its OFL license. The build copies both license texts. The sample libraries use fictional file names and placeholder thumbnails; no real user files or profile data are shown.
+The brand comes from `docs/brand/tg-drive-icon.svg`. The site integrates Iconsax Outline glyphs under the Iconsax Proprietary Free License and self-hosts a Roboto subset under the SIL Open Font License. The build includes both notices. The sample libraries use fictional file names and placeholder thumbnails. [Iconsax source and attribution](../third_party/iconsax/SOURCE.md)
 
 For optional native screenshot regeneration (Android toolchain required), from the repository root:
 

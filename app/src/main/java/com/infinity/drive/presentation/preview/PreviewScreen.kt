@@ -95,10 +95,6 @@ import org.koin.compose.koinInject
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import com.infinity.drive.core.media.ExternalMediaStreams
-import com.infinity.drive.domain.model.BackupState
-import com.infinity.drive.domain.model.PublicLinkConnection
-import com.infinity.drive.presentation.sharing.AndroidPublicLinks
-import com.infinity.drive.presentation.sharing.CreatePublicLinkDialog
 import kotlinx.coroutines.CancellationException
 import com.infinity.drive.resources.files_hide
 import com.infinity.drive.resources.files_unhide
@@ -185,9 +181,6 @@ fun PreviewScreen(
     var showOverflow by remember { mutableStateOf(false) }
     var recognitionTarget by remember { mutableStateOf<DriveFile?>(null) }
     val recognizer = koinInject<AndroidTextRecognition>()
-    val publicLinks = koinInject<AndroidPublicLinks>()
-    var workspaceFile by remember { mutableStateOf<DriveFile?>(null) }
-    var publicLinkFile by remember { mutableStateOf<DriveFile?>(null) }
 
     val deleteConsentLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()
@@ -280,21 +273,6 @@ fun PreviewScreen(
     }
     val canStreamExternally = canUseExtraActions && activity != null && currentFile.hasRemoteCopy &&
         currentFile.category in setOf(FileCategory.AUDIO, FileCategory.VIDEO)
-    var shareConnection by remember(currentFile.chatId) { mutableStateOf<PublicLinkConnection?>(null) }
-    LaunchedEffect(currentFile.chatId, currentFile.category, showOverflow, canUseExtraActions) {
-        if ((showOverflow || currentFile.category == FileCategory.AUDIO) && canUseExtraActions) {
-            shareConnection = try {
-                publicLinks.connection()
-            } catch (cancel: CancellationException) {
-                throw cancel
-            } catch (_: Exception) {
-                null
-            }
-        }
-    }
-    val canSharePublicly = canUseExtraActions && shareConnection != null &&
-        currentFile.backupState == BackupState.BACKED_UP && currentFile.hasRemoteCopy &&
-        currentFile.sizeBytes in 0..AndroidPublicLinks.MAX_SHARE_BYTES
     val canRecognizeText = canUseExtraActions && currentFile.sizeBytes in 1..(48L * 1024 * 1024) &&
         (currentFile.hasLocalCopy || currentFile.hasRemoteCopy) &&
         (MimeTypes.isImage(currentFile.mimeType) || MimeTypes.isPdf(currentFile.mimeType))
@@ -392,12 +370,10 @@ fun PreviewScreen(
                     title={com.infinity.drive.presentation.audio.AudioNowPlayingTitle(currentFile)},
                     navigationIcon={IconButton(onBack){Icon(DriveIcons.ArrowBack,stringResource(Res.string.common_back))}},
                     actions = {
-                        if (viewModel.fromTrash) IconButton({ viewModel.showInfo(currentFile) }) { Icon(DriveIcons.Info, "File details") }
-                        else {
-                            if (canStreamExternally) IconButton(::openInPlayer) { Icon(DriveIcons.OpenInNew, externalTitle) }
-                            if (canSharePublicly) IconButton(onClick = { publicLinkFile = currentFile }) {
-                                Icon(DriveIcons.Link, androidx.compose.ui.res.stringResource(app.tgdrive.R.string.live_links_create))
-                            }
+                        if (viewModel.fromTrash) {
+                            IconButton({ viewModel.showInfo(currentFile) }) { Icon(DriveIcons.Info, "File details") }
+                        } else if (canStreamExternally) {
+                            IconButton(::openInPlayer) { Icon(DriveIcons.OpenInNew, externalTitle) }
                         }
                     },
                     colors=TopAppBarDefaults.topAppBarColors(containerColor=Color.Transparent,scrolledContainerColor=Color.Transparent,
@@ -468,26 +444,6 @@ fun PreviewScreen(
         if (canStreamExternally) {
             com.infinity.drive.presentation.components.SheetActionRow(externalTitle, DriveIcons.OpenInNew, onClick = ::openInPlayer)
         }
-        if (canUseExtraActions && currentFile.backupState == BackupState.BACKED_UP &&
-            currentFile.sizeBytes in 1..com.infinity.drive.presentation.workspaces.AndroidWorkspaces.MAX_BYTES
-        ) {
-            com.infinity.drive.presentation.components.SheetActionRow(
-                androidx.compose.ui.res.stringResource(app.tgdrive.R.string.workspaces_publish),
-                DriveIcons.CloudSync
-            ) {
-                showOverflow = false
-                workspaceFile = currentFile
-            }
-        }
-        if (canSharePublicly) {
-            com.infinity.drive.presentation.components.SheetActionRow(
-                androidx.compose.ui.res.stringResource(app.tgdrive.R.string.live_links_create),
-                DriveIcons.Link
-            ) {
-                showOverflow = false
-                publicLinkFile = currentFile
-            }
-        }
         if (canRecognizeText) {
             com.infinity.drive.presentation.components.SheetActionRow(
                 androidx.compose.ui.res.stringResource(app.tgdrive.R.string.extract_text),
@@ -497,13 +453,6 @@ fun PreviewScreen(
                 recognitionTarget = currentFile
             }
         }
-    }
-    workspaceFile?.takeIf { canUseExtraActions && it.id == currentFile.id }?.let {
-        com.infinity.drive.presentation.workspaces.WorkspacesDialog(it) { workspaceFile = null }
-    }
-    val configuredShare = shareConnection
-    publicLinkFile?.takeIf { it.id == currentFile.id && canSharePublicly }?.let {
-        if (configuredShare != null) CreatePublicLinkDialog(it, configuredShare, dismiss = { publicLinkFile = null })
     }
     recognitionTarget?.takeIf { it.id == currentFile.id && canRecognizeText }?.let { source ->
         TextRecognitionDialog(source, recognizer, onCreateNote = { title, text ->

@@ -59,7 +59,7 @@ class DriveDesignTest {
         render { Column { DriveAppHeader("Settings",null,HeaderSearch("",{},"Search settings")); SettingsHome(LibraryState()) { opened = it } } }
         screenshot("settings")
         val destinations = linkedMapOf(
-            "Telegram accounts" to "accounts", "Transfers" to "transfers", "Storage & offline" to "storage",
+            "Transfers" to "transfers", "Storage & offline" to "storage",
             "Library & recovery" to "index", "Privacy & security" to "privacy", "Diagnostics" to "diagnostics", "About TeleDrive" to "about",
         )
         destinations.forEach { (label, route) ->
@@ -157,7 +157,7 @@ class DriveDesignTest {
         render{Column{DriveAppHeader("Gallery",null,HeaderSearch("",{},"Search photos and videos"));SettingsHome(LibraryState()) {}}}
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(1)
         listOf("Organize by rules","Resolve conflicts","Optional connections").forEach{compose.onNodeWithText(it).assertDoesNotExist()}
-        compose.onNodeWithText("Telegram accounts").assertIsDisplayed()
+        compose.onNodeWithText("Telegram accounts").assertDoesNotExist()
     }
 
     @Test fun homeKeepsLibraryActivityAndBackupsReachable() {

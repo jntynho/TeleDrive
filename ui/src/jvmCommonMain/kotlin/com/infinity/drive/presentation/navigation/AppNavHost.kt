@@ -271,7 +271,6 @@ fun AppNavHost(
             SettingsSectionScreen(
                 section = section,
                 onDashboardStyles={navController.navigateOnce(Route.DashboardStyles)},
-                onOpenHidden={navController.navigateOnce(Route.Collection(com.infinity.drive.presentation.collection.CollectionType.HIDDEN.name))},
                 onOpenChannels = { navController.navigateOnce(Route.Channels) },
                 onOpenPreviousLibrary = { navController.navigateOnce(Route.PreviousLibrary) },
                 onOpenRecoveryExport = {

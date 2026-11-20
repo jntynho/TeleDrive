@@ -163,11 +163,11 @@ internal fun AudioTransport(state:AudioPlaybackState,isFavorite:Boolean?=null,fa
         }
         IconButton(player::next,enabled=active&&state.canSkipNext){Icon(MediaIcons.Next,"Next audio",Modifier.size(28.dp),tint=Color.White.copy(alpha=if(active&&state.canSkipNext)1f else .35f))}
         if(isFavorite!=null){
-            val fill by animateFloatAsState(if(isFavorite)1f else 0f,tween(220, easing=FastOutSlowInEasing),label="favoriteFill")
+            val selection by animateFloatAsState(if(isFavorite)1f else 0f,tween(220, easing=FastOutSlowInEasing),label="favoriteSelection")
             IconButton(onFavorite,enabled=active&&favoriteEnabled){
-                Box(Modifier.size(23.dp).graphicsLayer{scaleX=1f+.08f*kotlin.math.sin(fill*Math.PI).toFloat();scaleY=scaleX}){
-                    Icon(DriveIcons.Favorite,if(isFavorite)"Remove from favorites"else"Add to favorites",Modifier.fillMaxSize(),tint=Color.White)
-                    Icon(MediaIcons.HeartFilled,null,Modifier.fillMaxSize().graphicsLayer{alpha=fill},tint=Color.White)
+                Box(Modifier.size(32.dp).graphicsLayer{scaleX=1f+.08f*kotlin.math.sin(selection*Math.PI).toFloat();scaleY=scaleX}
+                    .background(Color.White.copy(alpha=.16f*selection),CircleShape),contentAlignment=Alignment.Center){
+                    Icon(DriveIcons.Favorite,if(isFavorite)"Remove from favorites"else"Add to favorites",Modifier.size(23.dp),tint=Color.White.copy(alpha=.7f+.3f*selection))
                 }
             }
         }

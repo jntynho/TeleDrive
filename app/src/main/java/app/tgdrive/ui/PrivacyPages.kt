@@ -20,8 +20,6 @@ import androidx.compose.ui.unit.dp
 import app.tgdrive.SessionBundle
 import app.tgdrive.library.*
 import kotlinx.coroutines.*
-import java.text.DateFormat
-import java.util.Date
 
 @Composable fun VaultsPage(state:LibraryState,bundle:SessionBundle){
     var create by androidx.compose.runtime.saveable.rememberSaveable{mutableStateOf(false)};var unlock by remember{mutableStateOf<VaultDescriptor?>(null)}
@@ -82,9 +80,9 @@ import java.util.Date
 
 @Composable fun ConnectionsPage(state:LibraryState,bundle:SessionBundle){
     var webdav by remember{mutableStateOf(state.preferences.webDavUrl)};var user by remember{mutableStateOf(state.preferences.webDavUser)}
-    var password by remember{mutableStateOf("")};var server by remember{mutableStateOf(state.preferences.sharingUrl)};var token by remember{mutableStateOf("")}
+    var password by remember{mutableStateOf("")}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=16.dp,end=16.dp,top=16.dp,bottom=32.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
-        item{InfoCard("Your own HTTPS endpoints","Ordinary Telegram uploads do not need these settings. WebDAV and public links require services you choose and control. No Telegram session is sent to either service.",DriveIcons.Link)}
+        item{InfoCard("Your own HTTPS endpoint","Choose an HTTPS service you control for optional WebDAV copies.",DriveIcons.Link)}
         item{Text("WebDAV backup copy",style=MaterialTheme.typography.titleLarge)}
         item{DriveTextField(webdav,{webdav=it},label={Text("Final HTTPS WebDAV endpoint")},singleLine=true,modifier=Modifier.fillMaxWidth())}
         item{DriveTextField(user,{user=it},label={Text("WebDAV username")},singleLine=true,modifier=Modifier.fillMaxWidth())}
@@ -95,21 +93,6 @@ import java.util.Date
             bundle.library.updatePreferences{it.copy(webDavUrl=webdav.trim(),webDavUser=user.trim())};bundle.library.notice("WebDAV configuration saved. No file has been exported.")
         };password=""}){Text("Save WebDAV settings")}}
         item{TextButton(onClick={bundle.actions.run{bundle.connections.testWebDav()}},enabled=state.preferences.webDavUrl.isNotBlank()){Text("Test saved WebDAV connection")}}
-        item{HorizontalDivider();Text("Public-copy sharing server",style=MaterialTheme.typography.titleLarge)}
-        item{DriveTextField(server,{server=it},label={Text("HTTPS sharing origin")},singleLine=true,modifier=Modifier.fillMaxWidth())}
-        item{DriveTextField(token,{token=it},label={Text("Owner token · blank keeps existing")},singleLine=true,visualTransformation=PasswordVisualTransformation(),modifier=Modifier.fillMaxWidth())}
-        item{DriveButton(modifier=Modifier.fillMaxWidth(),onClick={val t=token;bundle.actions.run{
-            if(server.isNotBlank())bundle.connections.https(server.trim())
-            if(t.isNotEmpty()){require(t.length>=32&&t.none{it.isISOControl()}){"The owner token needs at least 32 characters without control characters."};bundle.library.saveAccountSecret("sharing-token",t)}
-            bundle.library.updatePreferences{it.copy(sharingUrl=server.trim())};bundle.library.notice("Sharing endpoint saved. A link is only created when you explicitly export a file.")
-        };token=""}){Text("Save sharing settings")}}
-        item{InfoCard("Self-hosted component included","The repository's sharing-server folder contains the service, tests and HTTPS proxy example. It stores explicit exported copies, never Telegram login sessions. Configuring a URL does not deploy a server.")}
-        if(state.shares.isNotEmpty())item{Text("Created links",style=MaterialTheme.typography.titleLarge)}
-        items(state.shares,key={it.id}){share->DriveCard(Modifier.fillMaxWidth()){Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
-            SelectionContainer{Text(share.url,style=MaterialTheme.typography.bodySmall)}
-            Text("Expires ${DateFormat.getDateTimeInstance().format(Date(share.expiresAt))}",style=MaterialTheme.typography.bodySmall)
-            TextButton(onClick={bundle.actions.run{bundle.connections.revoke(share.id)}}){Text("Revoke future access")}
-        }}}
         item{Spacer(Modifier.height(20.dp))}
     }
 }

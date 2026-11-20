@@ -82,7 +82,7 @@ class RebuiltUiTest {
         if(::activity.isInitialized)activity.pause().stop().destroy()
         stopKoin()
     }
-    @Test fun hiddenHeaderOpensItsSettingsAndSecurityOffersTheSameLockSwitch(){
+    @Test fun hiddenLockStaysInHiddenAndRetiredActionsAreAbsentFromSettings(){
         compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("Hidden",substring=false).performClick()
         compose.onNodeWithContentDescription("Hidden settings").performClick()
@@ -90,13 +90,23 @@ class RebuiltUiTest {
         compose.onNodeWithText("Lock Hidden",substring=false).assertIsDisplayed()
         compose.onNodeWithTag("navigation-settings").performClick()
         compose.onNodeWithText("Security",substring=false).performScrollTo().performClick()
-        compose.onNodeWithText("Lock Hidden",substring=false).performScrollTo().assertIsDisplayed()
+        for (label in listOf("Lock Hidden", "Encrypt uploads", "Encrypt thumbnails", "Verify Telegram key backup",
+            "Restore encryption key", "Export content key", "Import content key")) {
+            compose.onNodeWithText(label, substring = false).assertDoesNotExist()
+        }
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithText("Telegram account", substring = false).performClick()
+        for (label in listOf("Rebuild index from Telegram", "Restore library", "Check drive integrity",
+            "Team workspaces", "Public links", "Telegram accounts", "Connected")) {
+            compose.onNodeWithText(label, substring = false).assertDoesNotExist()
+        }
     }
     @Test fun galleryReturnsFromAlbumsToAllMediaAfterFilteringPhotos() {
         compose.waitUntil(15000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithTag("navigation-gallery").performClick()
         compose.onNodeWithText("Photos",substring=false).performClick()
         compose.waitUntil(10000){compose.onAllNodesWithTag("gallery-file-Photo.jpg").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithContentDescription("Photo history").assertDoesNotExist()
         compose.onNodeWithContentDescription("Sort gallery").performClick()
         compose.onNodeWithText("Albums",substring=false).performClick()
         compose.waitUntil(10000){compose.onAllNodesWithText("Not in a folder",substring=false).fetchSemanticsNodes().isNotEmpty()}
@@ -123,6 +133,7 @@ class RebuiltUiTest {
         compose.onNodeWithContentDescription("Close search").performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Song",substring=false).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Song",substring=false).assertIsDisplayed()
+        compose.onNodeWithContentDescription("Playlists").assertDoesNotExist()
         capture("audio")
         compose.onNodeWithText("Report.pdf").assertDoesNotExist()
         compose.onNodeWithText("Photo.jpg").assertDoesNotExist()
@@ -176,7 +187,12 @@ class RebuiltUiTest {
     }
 
     @Test fun fileActionsUseHeaderDetailsAndHideActionsForAnOpenFile(){
-        val file=runBlocking{GlobalContext.get().get<com.infinity.drive.domain.repository.FileRepository>().getFile("Report.pdf")}!!
+        val file = runBlocking {
+            val koin = GlobalContext.get()
+            koin.get<FileDao>().setRemoteMapping("Report.pdf", 500L, 100L, "report-remote", "report-unique", BackupState.BACKED_UP)
+            requireNotNull(koin.get<com.infinity.drive.domain.repository.FileRepository>().getFile("Report.pdf"))
+        }
+        assertTrue(file.hasRemoteCopy)
         compose.runOnUiThread{activity.get().setContent{ProvidePlatformActions{
             com.infinity.drive.presentation.theme.DriveInfinityTheme{
                 com.infinity.drive.presentation.components.FileActionsSheet(file,onDismiss={},onOpen={},isOpen=true)
@@ -184,9 +200,20 @@ class RebuiltUiTest {
         }}}
         compose.onNodeWithText("Open",substring=false).assertDoesNotExist()
         compose.onNodeWithText("Make available offline",substring=false).assertDoesNotExist()
+        compose.onNodeWithText("Version history", substring = false).assertDoesNotExist()
         compose.onNodeWithText("Download",substring=false).performScrollTo().assertIsDisplayed()
         compose.onNodeWithContentDescription("File details").assertIsDisplayed().performClick()
         compose.onNodeWithContentDescription("Back to file actions").assertIsDisplayed()
+    }
+
+    @Test fun audioFileActionsExcludePlaylists() {
+        compose.waitUntil(15_000) { compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("navigation-audio").performClick()
+        val options = compose.onNodeWithContentDescription("Audio options for Song.mp3")
+        compose.waitUntil(10_000) { options.isDisplayed() }
+        options.performClick()
+        compose.onNodeWithText("Download", substring = false).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Add to playlist", substring = false).assertDoesNotExist()
     }
 
     @Test fun fileFavoriteActionUpdatesItsVisibleStateWithoutClosingTheSheet(){
@@ -696,23 +723,94 @@ class RebuiltUiTest {
         compose.waitUntil(15000){compose.onNodeWithText("Your library",substring=false).isDisplayed()}
         compose.onNodeWithTag("navigation-settings").performClick()
         compose.onNodeWithText("Appearance",substring=false).performScrollTo().performClick()
-        compose.onNodeWithContentDescription("Teal accent").performScrollTo()
-        compose.onNodeWithContentDescription("Teal accent").performClick()
-        compose.waitUntil(5000){compose.waitForIdle();runBlocking{settings.preferences.first().accentColour==com.infinity.drive.domain.model.AccentColour.TEAL}}
+        compose.onNodeWithContentDescription("Tidal accent").performScrollTo()
+        compose.onNodeWithContentDescription("Tidal accent").performClick()
+        compose.waitUntil(5000){compose.waitForIdle();runBlocking{settings.preferences.first().accentColour==com.infinity.drive.domain.model.AccentColour.TIDAL}}
         org.junit.Assert.assertFalse(runBlocking{settings.preferences.first().dynamicColor})
         compose.onNodeWithText("Dashboard Style",substring=false).performScrollTo().performClick()
-        compose.waitUntil(5000){compose.onNodeWithText("Classic · Default",substring=false).isDisplayed()}
-        com.infinity.drive.domain.model.DashboardStyle.entries.forEach{style->
-            compose.onNodeWithTag("dashboard-tone-${style.name}-Dark").performScrollTo().performClick()
+        val carousel = compose.onNodeWithTag("dashboard-style-carousel")
+        val classicTone = compose.onNodeWithTag("dashboard-tone-CLASSIC")
+        val styles = com.infinity.drive.domain.model.DashboardStyle.entries
+        carousel.assertIsDisplayed()
+        classicTone.assertIsOff().performClick()
+        classicTone.assertIsOn()
+        org.junit.Assert.assertFalse(runBlocking { "CLASSIC" in settings.preferences.first().dashboardDarkStyles })
+        carousel.performTouchInput { swipeLeft() }
+        compose.onNodeWithTag("dashboard-option-ORBIT").assertIsDisplayed()
+        carousel.performTouchInput { swipeRight() }
+        classicTone.assertIsOn()
+
+        styles.forEachIndexed { index, style ->
+            if (index > 0) compose.onNodeWithContentDescription("Next dashboard style").performClick()
+            val tone = compose.onNodeWithTag("dashboard-tone-${style.name}")
+            val initiallyDark = style.name in runBlocking { settings.preferences.first().dashboardDarkStyles }
+            if (!initiallyDark && index > 0) tone.performClick()
+            tone.assertIsOn()
             capture("dashboard-preview-${style.name.lowercase()}")
             compose.onNodeWithTag("apply-dashboard-${style.name}").performScrollTo().performClick()
-            compose.waitUntil(5000){compose.waitForIdle();runBlocking{settings.preferences.first().let{it.dashboardStyle==style&&style.name in it.dashboardDarkStyles}}}
+            compose.waitUntil(5000) {
+                compose.waitForIdle()
+                runBlocking { settings.preferences.first().let { it.dashboardStyle == style && style.name in it.dashboardDarkStyles } }
+            }
         }
-        capture("dashboard-style-selected")
-        compose.onNodeWithContentDescription("Back",substring=false).performClick()
+        compose.onNodeWithContentDescription("Back", substring = false).performClick()
         compose.onNodeWithTag("navigation-home").performClick()
-        compose.onNodeWithTag("library-card").assertIsDisplayed()
-        capture("home-strata-dashboard")
+        val library = compose.onNodeWithTag("library-card")
+        library.assertIsDisplayed().performTouchInput { click() }
+        compose.onNodeWithTag("dashboard-style-sheet").assertDoesNotExist()
+        library.performTouchInput { longClick() }
+        compose.onNodeWithTag("dashboard-style-sheet").assertIsDisplayed()
+        val savedStyle = styles.last()
+        compose.onNodeWithTag("dashboard-option-${savedStyle.name}").assertIsDisplayed()
+        compose.onNode(hasText("0 B") and hasAnyAncestor(hasTestTag("dashboard-style-sheet"))).assertIsDisplayed()
+        compose.onNodeWithTag("dashboard-tone-${savedStyle.name}").assertIsOn().performClick()
+        compose.onNodeWithTag("apply-dashboard-${savedStyle.name}").performScrollTo().performClick()
+        compose.waitUntil(5000) {
+            compose.waitForIdle()
+            runBlocking { settings.preferences.first().let { it.dashboardStyle == savedStyle && savedStyle.name !in it.dashboardDarkStyles } }
+        }
+        capture("home-dashboard-style-sheet")
+    }
+
+    @Test fun iconStyleDefaultsToOutlineAndCanBeChangedInAppearance() {
+        val settings = GlobalContext.get().get<SettingsRepository>()
+        org.junit.Assert.assertEquals(com.infinity.drive.domain.model.AppIconStyle.OUTLINE,
+            runBlocking { settings.preferences.first().iconStyle })
+        compose.waitUntil(15_000) { compose.onNodeWithText("Your library", substring = false).isDisplayed() }
+        compose.onNodeWithTag("navigation-settings").performClick()
+        compose.onNodeWithText("Appearance", substring = false).performScrollTo().performClick()
+        compose.onNodeWithText("Icon style", substring = false).performScrollTo().performClick()
+        compose.onNodeWithText("Broken", substring = false).performClick()
+        compose.waitUntil(5000) {
+            compose.waitForIdle()
+            runBlocking { settings.preferences.first().iconStyle == com.infinity.drive.domain.model.AppIconStyle.BROKEN }
+        }
+        compose.onNodeWithText("Broken", substring = false).assertIsDisplayed()
+    }
+
+    @Test fun customThemeIsSavedAndCanBeDeletedInAppearance() {
+        compose.waitUntil(15_000) { compose.onNodeWithText("Your library", substring = false).isDisplayed() }
+        compose.onNodeWithTag("navigation-settings").performClick()
+        compose.onNodeWithText("Appearance", substring = false).performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Add Custom").performScrollTo().performClick()
+        compose.onNodeWithTag("custom-theme-name").performScrollTo().performTextReplacement("Blue Hour")
+        compose.onNodeWithText("Primary", substring = false).performScrollTo().performClick()
+        compose.onNodeWithTag("custom-theme-colour-hex").performTextReplacement("#164F69")
+        compose.onNodeWithText("Apply color", substring = false).performScrollTo().performClick()
+        compose.onNodeWithText("Save theme", substring = false).performClick()
+        val settings = GlobalContext.get().get<SettingsRepository>()
+        compose.waitUntil(5000) {
+            compose.waitForIdle()
+            runBlocking { settings.preferences.first().selectedCustomTheme?.light?.primary == 0xFF164F69L }
+        }
+        compose.onNodeWithContentDescription("Blue Hour accent").assertIsSelected()
+        compose.onNodeWithContentDescription("Edit custom theme").performScrollTo().performClick()
+        compose.onNodeWithTag("custom-theme-name").performScrollTo().assertTextContains("Blue Hour")
+        compose.onNodeWithContentDescription("Back", substring = false).performClick()
+        compose.onNodeWithContentDescription("Delete custom theme").performScrollTo().performClick()
+        compose.onNodeWithText("Delete theme", substring = false).performClick()
+        compose.onNodeWithContentDescription("Blue Hour accent").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Default accent").assertIsSelected()
     }
 
     @Test fun leavingHiddenForHomeKeepsItsSessionUntilTheAppIsBackgrounded(){

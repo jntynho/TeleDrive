@@ -38,10 +38,13 @@ data class SystemActions(
     val reconnectBackup:(String)->Unit={},
     val transferSettings:()->Unit={},val vaultSettings:()->Unit={},
 )
-enum class NativeTab(val title: String, val icon: ImageVector) {
-    HOME("Home",DriveIcons.Home), GALLERY("Gallery",DriveIcons.PhotoLibrary), AUDIO("Audio",DriveIcons.MusicNotes), SETTINGS("Settings",DriveIcons.Settings),
+enum class NativeTab(val title: String, private val iconVector: @Composable () -> ImageVector) {
+    HOME("Home", { DriveIcons.Home }), GALLERY("Gallery", { DriveIcons.PhotoLibrary }),
+    AUDIO("Audio", { DriveIcons.MusicNotes }), SETTINGS("Settings", { DriveIcons.Settings }),
     // Keep serialized enum names readable when Android restores a 0.3.0 activity.
-    FILES("Home",DriveIcons.Home), TRANSFERS("Activity",DriveIcons.SwapVert), BACKUPS("Backups",DriveIcons.Backup)
+    FILES("Home", { DriveIcons.Home }), TRANSFERS("Activity", { DriveIcons.SwapVert }), BACKUPS("Backups", { DriveIcons.Backup });
+
+    val icon: ImageVector @Composable get() = iconVector()
 }
 internal val navigationTabs = listOf(NativeTab.HOME,NativeTab.GALLERY,NativeTab.AUDIO,NativeTab.SETTINGS)
 internal val nativeTabSaver = Saver<NativeTab,Any>(save={it.name},restore={saved->
@@ -147,7 +150,7 @@ fun NativeApp(bundle: SessionBundle, pool: SessionPool, system: SystemActions,re
                             NativeTab.HOME,NativeTab.FILES,NativeTab.TRANSFERS,NativeTab.BACKUPS->HomePage(state,bundle,system,onPreview={previewId=it},page=homeRoute,onPage={homeRoute=it;if(it=="files")recentView=false},onFolderTitle={folderTitle=it},onFolderBack={fileBack=it},homeQuery=homeQuery,filesQuery=filesQuery,onFilters={filesFilters=it},recentView=recentView,onRecent={recentView=true;filesQuery="";homeRoute="files"},onAdd={recentView=false;addRequested=true;homeRoute="files"},addRequested=addRequested,onAddConsumed={addRequested=false},homeSearch=HeaderSearch(homeQuery,{homeQuery=it},"Search your library"),filesSearch=HeaderSearch(filesQuery,{filesQuery=it},"Search files, tags and text",filesFilters))
                             NativeTab.GALLERY->MediaPage(state,bundle,system,gallery=true,onPreview={previousGallery=emptyList();previewId=it},query=galleryQuery,search=HeaderSearch(galleryQuery,{galleryQuery=it},"Search photos and videos"),sort=gallerySort,kind=galleryKind,onKind={galleryKind=it},selecting=gallerySelecting,selected=gallerySelected.toSet(),onSelection={gallerySelected=it.toList()},onSelectMode={gallerySelecting=true})
                             NativeTab.AUDIO->MediaPage(state,bundle,system,gallery=false,onPreview={previewId=it},query=audioQuery,search=HeaderSearch(audioQuery,{audioQuery=it},"Search audio"),sort=audioSort)
-                            NativeTab.SETTINGS->SettingsPage(state,bundle,pool,system,onClose={tab=NativeTab.HOME},page=settingsRoute,onPage={settingsRoute=it},onAccounts={accountSheet=true},query=settingsQuery,search=HeaderSearch(settingsQuery,{settingsQuery=it},"Search settings"))
+                            NativeTab.SETTINGS->SettingsPage(state,bundle,system,onClose={tab=NativeTab.HOME},page=settingsRoute,onPage={settingsRoute=it},query=settingsQuery,search=HeaderSearch(settingsQuery,{settingsQuery=it},"Search settings"))
                         }}
                     }
                 }
@@ -176,9 +179,6 @@ fun NativeApp(bundle: SessionBundle, pool: SessionPool, system: SystemActions,re
     }
     val accountForm=rememberFormAction()
     profiles.firstOrNull{it.id==removeProfileId}?.let{profile->ConfirmDialog("Remove local profile?","${profile.label} will be removed from the account switcher. Telegram messages are not deleted. Profiles with pending or failed work must be reviewed first.","Remove profile",{removeProfileId=""},busy=accountForm.busy,error=accountForm.error){accountForm.run({removeProfileId=""}){pool.removeSignedOut(profile.id)}}}
-    state.lastShare?.let { result->AlertDialog(onDismissRequest=bundle.library::clearShare,title={Text("Public copy created")},text={Column{
-        androidx.compose.foundation.text.selection.SelectionContainer { Text(result.url) };Text("This link grants access to an exported copy. Revoking cannot recall downloaded copies.",style=MaterialTheme.typography.bodySmall)
-    }},confirmButton={TextButton(onClick=bundle.library::clearShare){Text("Done")}}) }
 }
 
 @Composable fun SectionTitle(title: String, subtitle: String? = null) {

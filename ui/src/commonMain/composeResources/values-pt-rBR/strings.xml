@@ -34,14 +34,6 @@
         <item quantity="one">%1$d item</item>
         <item quantity="other">%1$d itens</item>
     </plurals>
-    <plurals name="rebuild_indexed_files">
-        <item quantity="one">%1$d arquivo indexado</item>
-        <item quantity="other">%1$d arquivos indexados</item>
-    </plurals>
-    <plurals name="rebuild_locked_files">
-        <item quantity="one">%1$d arquivo criptografado ignorado. Restaure o backup da chave para indexá-lo.</item>
-        <item quantity="other">%1$d arquivos criptografados ignorados. Restaure o backup da chave para indexá-los.</item>
-    </plurals>
     <plurals name="home_back_up_pending">
         <item quantity="one">Fazer backup de %1$d arquivo</item>
         <item quantity="other">Fazer backup de %1$d arquivos</item>
@@ -574,10 +566,7 @@
     <string name="settings_files_stay_telegram_channel">Seus arquivos permanecem no canal do Telegram. Este dispositivo descarta seu índice, miniaturas e caches, e os reconstrói quando você entrar novamente.</string>
     <string name="settings_log">Sair</string>
     <string name="settings_log_telegram">Sair do Telegram?</string>
-    <string name="settings_reading_channel">Lendo seu canal de armazenamento</string>
-    <string name="settings_rebuild_index_telegram">Reconstruir índice a partir do Telegram</string>
     <string name="settings_removes_session_stored_api">Remove a sessão e as credenciais da API armazenadas</string>
-    <string name="settings_restores_file_list">Restaura a lista de arquivos a partir do seu canal de armazenamento</string>
     <string name="settings_shown_channels_private_owned">Os canais exibidos são privados, de sua propriedade e com o nome TG Drive.</string>
     <string name="settings_state_connected">Conectado</string>
     <string name="settings_state_connecting">Conectando</string>
@@ -627,11 +616,7 @@
     <string name="settings_block_screenshots">Bloquear capturas de tela</string>
     <string name="settings_change_passphrase">Alterar frase de recuperação</string>
     <string name="settings_confirm_removing_lock">Confirme sua identidade antes de remover o bloqueio</string>
-    <string name="settings_encrypt_thumbnails">Criptografar miniaturas</string>
-    <string name="settings_encrypt_uploads">Criptografar envios</string>
-    <string name="settings_encryption_stays_off">A criptografia fica desativada até que uma frase de recuperação seja definida</string>
     <string name="settings_enter_passphrase_used_backing">Insira a frase de recuperação usada ao fazer o backup da chave.</string>
-    <string name="settings_files_sealed_leaving_device">Os arquivos são lacrados antes de saírem deste dispositivo. Requer uma frase de recuperação.</string>
     <string name="settings_forgot_show_hint">Esqueceu? Exibir dica</string>
     <string name="settings_hides_app_screenshots_screen">Oculta o app em capturas e gravações de tela e na tela de apps recentes</string>
     <string name="settings_hint_optional">Dica (opcional)</string>
@@ -641,19 +626,15 @@
     <string name="settings_passphrase">Frase de recuperação</string>
     <string name="settings_passphrase_min_length">Pelo menos %1$d caracteres</string>
     <string name="settings_passphrases_do_not_match">As frases de recuperação não coincidem</string>
-    <string name="settings_protects_cached_previews_device">Protege as pré-visualizações em cache com uma chave exclusiva do dispositivo. Não precisa de frase de recuperação. A galeria fica mais lenta.</string>
-    <string name="settings_reading_hint">Lendo dica…</string>
     <string name="settings_repeat_passphrase">Repetir frase de recuperação</string>
     <string name="settings_require_fingerprint_screen_lock">Exigir impressão digital ou bloqueio de tela</string>
     <string name="settings_required_before_encrypt">Necessário antes de criptografar os envios</string>
     <string name="settings_required_encryption_key_wrapped">Necessário para criptografia. Sua chave é encapsulada com essa frase de recuperação e armazenada no seu canal do Telegram, permitindo recuperar arquivos em um novo dispositivo. O Telegram nunca tem acesso à frase.</string>
-    <string name="settings_restore_encryption_key">Restaurar chave de criptografia</string>
     <string name="settings_save_backup">Salvar backup</string>
     <string name="settings_set">Definir</string>
     <string name="settings_set_passphrase">Definir frase de recuperação</string>
     <string name="settings_stored_unencrypted_never_put">Armazenado sem criptografia. Nunca insira a frase de recuperação aqui.</string>
     <string name="settings_turn_off_app_lock">Desativar bloqueio do app</string>
-    <string name="settings_unlock_files_encrypted_earlier">Desbloqueie arquivos criptografados com uma frase de recuperação anterior, neste ou em outro dispositivo</string>
     <string name="settings_uploads_stay_unencrypted_set">Os envios continuam sem criptografia até que você defina uma frase de recuperação. Arquivos já criptografados neste dispositivo ainda podem ser acessados.</string>
     <string name="settings_nothing_to_remove">Nada para remover</string>
 
@@ -830,17 +811,14 @@
     <string name="message_created_drive">%1$s criado</string>
     <string name="message_download_queued">Download adicionado à fila</string>
     <string name="message_key_backup_saved">Backup da chave salvo no Telegram</string>
-    <string name="message_key_restored">Chave de criptografia restaurada; reindexando</string>
     <string name="message_moved_count">%1$d movidos</string>
     <string name="message_moved_to_trash">Movido para a lixeira</string>
     <string name="message_moved_to_trash_count">%1$d movidos para a lixeira</string>
     <string name="message_nothing_to_download">Nada para baixar</string>
-    <string name="message_rebuild_done">Reconstruído: %1$d adicionados, %2$d atualizados, %3$d removidos</string>
     <string name="message_renamed">Renomeado</string>
     <string name="message_thumbnails_cleared">Miniaturas limpas</string>
     <string name="message_trash_emptied">Lixeira esvaziada</string>
     <string name="message_upload_queued">Envio adicionado à fila</string>
-    <string name="message_wrong_passphrase">Frase de recuperação incorreta</string>
 
     <!-- Error messages -->
     <string name="error_authentication_failed">Falha na autenticação</string>
@@ -855,7 +833,7 @@
     <string name="error_insufficient_storage">Espaço insuficiente. Necessário: %1$s; livre: %2$s</string>
     <string name="error_invalid_api">ID da API ou hash da API inválido</string>
     <string name="error_invalid_phone">Número de telefone inválido</string>
-    <string name="error_key_unreadable">Este dispositivo não consegue ler a chave de criptografia. Restaure o backup da chave com a frase de recuperação correspondente.</string>
+    <string name="error_key_unreadable">Este dispositivo não consegue ler a chave de criptografia. Use a instalação que possui a chave correspondente para abrir os arquivos criptografados.</string>
     <string name="error_last_drive">Este é o seu único drive. Crie outro antes de excluí-lo.</string>
     <string name="error_no_internet">Sem conexão com a internet</string>
     <string name="error_no_local_copy">O arquivo não possui cópia local</string>
@@ -919,4 +897,5 @@
         <item>العربية</item>
     </string-array>
     <string name="nav_audio">Áudio</string>
+    <string name="common_close">Fechar</string>
 </resources>

@@ -48,7 +48,7 @@ Only these two ARM standalone APKs are published. Universal, x86, x86_64 and AAB
 
 ## Features
 
-The Android rebuild uses the real [DriveInfinity](https://github.com/ZHINFINITY/DriveInfinity) engine and presentation modules, adapted to TG Drive's dark visual system, Solar Linear icons, Sand library dashboard and four-tab navigation.
+The Android rebuild uses the [DriveInfinity](https://github.com/ZHINFINITY/DriveInfinity) engine and presentation modules, adapted to TeleDrive's visual system, Iconsax icons, library dashboard and four-tab navigation.
 
 | Area | Available options |
 | --- | --- |
@@ -58,7 +58,8 @@ The Android rebuild uses the real [DriveInfinity](https://github.com/ZHINFINITY/
 | Activity | Persistent upload/download queue, progress, pause/resume/retry/cancel, concurrency and shared Telegram cooldowns |
 | Backup | Selected folders, exclusions, instant/scheduled backup, Wi-Fi/charging rules and file-size limits |
 | Privacy & recovery | Optional file/thumbnail encryption, passphrase-protected key backup, device app lock and screenshot blocking |
-| Storage & advanced | Cache budget, cleanup, Trash/restore/retention, proxies/failover, notifications, appearance/density and optional updates |
+| Storage & advanced | Cache budget, cleanup, Trash/restore/retention, proxies/failover, notifications and optional updates |
+| Appearance | Iconsax Outline and Broken, swipable dashboard previews, accent presets and custom colors for light and dark themes |
 
 ### Four tabs. One library.
 
@@ -87,7 +88,7 @@ Read the [transfer and playback notes](docs/TRANSFER-AND-PLAYBACK.md) for the sc
 
 ## Moving from the original app
 
-TG Drive Next is a separate installation with a new signing identity. It does not overwrite `app.tgdrive`, clear its files, or read its private local session/index. Keep the original app for its existing Saved Messages library and old vaults. Sign in again in Next to use private-channel drives; restore the matching encryption recovery material when opening encrypted channel content.
+TG Drive Next is a separate installation with a new signing identity. It does not overwrite `app.tgdrive`, clear its files, or read its private local session/index. Keep the original app for its existing Saved Messages library and old vaults. Sign in again in Next to use private-channel drives. Existing encrypted channel content still opens on installations that hold the matching content key. Before clearing app data or moving devices, use an installation that can open the files to save readable copies. This version omits content-key import and recovery.
 
 The previous-library compatibility reader only reads data within the current installation's own namespace. It cannot bypass Android's isolation to import the other app's private data.
 
@@ -106,7 +107,7 @@ Ordinary channels are not end-to-end encrypted. Keep encryption recovery materia
 | [Upload pipeline](docs/UPLOAD-0.8.md) | Parallel content preparation and coordinated publication |
 | [UI/UX corrections · Arabic](docs/UI-UX-0.9.ar.md) | The 0.9 audit corrections and practical limits |
 | [UI review and fixes · Arabic](docs/UI-UX-SKILL-REVIEW.ar.md) | The full interface review, applied corrections and validation |
-| [Solar and approved layouts · Arabic](docs/SOLAR-0.11.ar.md) | Icon sources, semicircle dashboard and grouped Activity |
+| [Approved layouts for 0.11 · Arabic](docs/SOLAR-0.11.ar.md) | Historical semicircle dashboard and grouped Activity design |
 | [Telegram and Gallery follow-up · Arabic](docs/reviews/TELEGRAM-GALLERY-STARTUP-FOLLOWUP.ar.md) | Telegram actions, pinch stability, startup and the restored icon |
 | [Hidden device lock · Arabic](docs/reviews/HIDDEN-DEVICE-LOCK.ar.md) | Android authentication, shared lock controls and legacy PIN migration |
 | [Startup preparation · Arabic](docs/reviews/STARTUP-PREPARATION.ar.md) | Bounded local preparation, animation probes and manual performance profiling |
@@ -145,7 +146,7 @@ Local release outputs are unsigned unless the Next signing configuration is supp
 
 ## Contributing
 
-[Workspaces, version history and folder synchronization](docs/WORKSPACES-AND-SYNC.md)
+[Folder synchronization and Telegram accounts](docs/WORKSPACES-AND-SYNC.md)
 
 [Report a bug](https://github.com/jntynho/TeleDrive/issues) with your app version, Android version, device architecture and steps to reproduce. Remove phone numbers, login codes, API credentials and private file details from reports and screenshots.
 
@@ -155,7 +156,7 @@ For code contributions, keep changes focused and run the checks relevant to the 
 
 Based on [DriveInfinity](https://github.com/ZHINFINITY/DriveInfinity), originally by Mahmudul Hasan Khan (Mahmud0808 / DrDisagree), with ZHINFINITY and contributor changes, under [Apache 2.0](third_party/driveinfinity/LICENSE). The pinned source and derivative changes are recorded [here](third_party/driveinfinity/SOURCE.md).
 
-Built with [TDLib](https://github.com/tdlib/td), [Jetpack Compose](https://developer.android.com/compose), [Media3](https://developer.android.com/media/media3) and [Tink](https://github.com/tink-crypto/tink). Interface icons use **Solar Linear by [480 Design](https://www.figma.com/community/file/1166831539721848736)**, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Selected SVG sources, attribution and the native-vector conversion details are in [third_party/solar](third_party/solar/SOURCE.md).
+Built with [TDLib](https://github.com/tdlib/td), [Jetpack Compose](https://developer.android.com/compose), [Media3](https://developer.android.com/media/media3) and [Tink](https://github.com/tink-crypto/tink). The interface uses [Iconsax](https://app.iconsax.io/) Outline and Broken glyphs under the [Iconsax Proprietary Free License](https://docs.iconsax.io/license-and-terms/license). [Source and attribution](third_party/iconsax/SOURCE.md)
 
 TG Drive is an independent project and is not affiliated with Telegram.
 

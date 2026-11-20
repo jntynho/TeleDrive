@@ -34,7 +34,11 @@ class LibraryDatabase(context: Context, val accountId: Long, private val codec: 
     fun entity(kind: EntityKind, id: String): Envelope? = get("entities", "${kind.name}:$id")?.model()
     fun entities(): List<Envelope> = all("entities").map { it.model() }
     fun putEntity(value: Envelope) = put("entities", "${value.kind.name}:${value.entityId}", value.json(), value.kind.name)
-    fun tasks(): List<TransferTask> = all("tasks").map { it.model() }
+    // Keep the original export records readable on disk without returning them to the transfer queue.
+    fun tasks(): List<TransferTask> = all("tasks").mapNotNull { decodeSupportedTask(it) }
+    fun task(id: String): TransferTask? = get("tasks", id)?.let { decodeSupportedTask(it) }
+    private fun decodeSupportedTask(payload: String): TransferTask? =
+        payload.model<TransferTask>().takeUnless { it.kind == TaskKind.RETIRED_PUBLIC_EXPORT }
     fun putTask(task: TransferTask) = put("tasks", task.id, task.json())
     fun local(id: String) = get("local", id)?.model<LocalItem>() ?: LocalItem(id)
     fun putLocal(value: LocalItem) = put("local", value.itemId, value.json())

@@ -6,7 +6,7 @@ on:
     paths:
       - "site/**"
       - "docs/brand/**"
-      - "third_party/solar/**"
+      - "third_party/iconsax/**"
       - "third_party/fonts/**"
       - ".github/workflows/pages.yml"
   release:

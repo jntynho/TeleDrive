@@ -19,6 +19,17 @@ class LibraryDatabaseTest {
         first.transaction { first.putTask(task); first.apply(JournalEntry(op("a"), pending = true)) }; first.close()
         db().use { reopened -> assertEquals(task, reopened.tasks().single()); assertEquals("a", reopened.entity(EntityKind.ITEM, "item")!!.operationId); assertEquals(1, reopened.pending().size) }
     }
+    @Test fun `retired public export stays out of the active queue after reopening`() {
+        val oldTask = """{"id":"old-export","kind":"SHARE","title":"report.pdf","accountId":910}"""
+        db().use { first ->
+            first.put("tasks", "old-export", oldTask)
+            first.putTask(TransferTask(id = "upload", kind = TaskKind.UPLOAD, title = "photo.jpg", accountId = 910))
+        }
+        db().use { reopened ->
+            assertEquals(listOf("upload"), reopened.tasks().map { it.id })
+            assertEquals(oldTask, reopened.get("tasks", "old-export"))
+        }
+    }
     @Test fun `acknowledgement is idempotent and clears pending write`() {
         db().use { d -> val e = op("a"); d.apply(JournalEntry(e, pending = true)); d.apply(JournalEntry(e, 123)); d.apply(JournalEntry(e, 123)); assertEquals(1, d.all("journal").size); assertTrue(d.pending().isEmpty()) }
     }

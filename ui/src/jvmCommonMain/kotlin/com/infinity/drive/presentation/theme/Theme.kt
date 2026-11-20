@@ -3,21 +3,55 @@ package com.infinity.drive.presentation.theme
 
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import app.tgdrive.ui.DriveTheme
 import app.tgdrive.ui.DriveColors
+import app.tgdrive.ui.IconStyle
+import app.tgdrive.ui.LocalIconStyle
 import com.infinity.drive.domain.model.AccentColour
+import com.infinity.drive.domain.model.AppIconStyle
+import com.infinity.drive.domain.model.CustomTheme
 import androidx.compose.ui.graphics.lerp
 
 @Composable
-fun DriveInfinityTheme(darkTheme:Boolean=true,dynamicColor:Boolean=false,amoled:Boolean=false,accentColour:AccentColour=AccentColour.BLUE,content:@Composable ()->Unit) {
-    val fallback=if(darkTheme)DriveColors else lightColorScheme(primary=Color(0xFF0068D9),primaryContainer=Color(0xFFD9EAFF),onPrimaryContainer=Color(0xFF071D36),secondaryContainer=Color(0xFFE6EDF7),onSecondaryContainer=Color(0xFF14263A),onPrimary=Color.White,background=Color(0xFFF5F5F7),surface=Color.White,surfaceContainer=Color.White,surfaceContainerLow=Color(0xFFF0F1F4),surfaceContainerHigh=Color(0xFFE7E9EF),surfaceContainerHighest=Color(0xFFDDE1E9),surfaceVariant=Color(0xFFE9EAED),onSurface=Color(0xFF191A1C),onSurfaceVariant=Color(0xFF5B5D63),outlineVariant=Color(0xFFE0E1E4),surfaceTint=Color.Transparent)
-    val dynamic=if(dynamicColor)platformColorScheme(darkTheme,true)else null
-    val base=dynamic?:accentedScheme(fallback,accentColour,darkTheme)
-    val colors=if(amoled)base.copy(background=Color.Black,surface=Color(0xFF171819),surfaceContainer=Color(0xFF171819),surfaceContainerLow=Color(0xFF141414),surfaceContainerHigh=Color(0xFF242424),surfaceContainerHighest=Color(0xFF303030))else base
+fun DriveInfinityTheme(
+    darkTheme: Boolean = true,
+    dynamicColor: Boolean = false,
+    amoled: Boolean = false,
+    accentColour: AccentColour = AccentColour.BLUE,
+    customTheme: CustomTheme? = null,
+    iconStyle: AppIconStyle = AppIconStyle.OUTLINE,
+    content: @Composable () -> Unit
+) {
+    val dynamic = platformColorScheme(darkTheme, dynamicColor)
+    val base = dynamic ?: remember(customTheme, accentColour, darkTheme) {
+        val definition = customTheme ?: accentColour.themeDefinition()
+        definition?.toColorScheme(darkTheme) ?: accentedScheme(defaultColorScheme(darkTheme), accentColour, darkTheme)
+    }
+    val colors = if (amoled) base.withAmoledBackground() else base
+    val glyphStyle = when (iconStyle) {
+        AppIconStyle.OUTLINE -> IconStyle.Outline
+        AppIconStyle.BROKEN -> IconStyle.Broken
+    }
     PlatformThemeSideEffects(darkTheme)
-    DriveTheme(colors,content)
+    CompositionLocalProvider(LocalIconStyle provides glyphStyle) {
+        DriveTheme(colors, content)
+    }
 }
+
+internal fun defaultColorScheme(dark: Boolean): ColorScheme = if (dark) DriveColors else lightColorScheme(
+    primary = Color(0xFF0068D9), onPrimary = Color.White,
+    primaryContainer = Color(0xFFD9EAFF), onPrimaryContainer = Color(0xFF071D36),
+    secondaryContainer = Color(0xFFE6EDF7), onSecondaryContainer = Color(0xFF14263A),
+    background = Color(0xFFF5F5F7), surface = Color.White,
+    surfaceContainer = Color.White, surfaceContainerLow = Color(0xFFF0F1F4),
+    surfaceContainerHigh = Color(0xFFE7E9EF), surfaceContainerHighest = Color(0xFFDDE1E9),
+    surfaceVariant = Color(0xFFE9EAED), onSurface = Color(0xFF191A1C),
+    onSurfaceVariant = Color(0xFF5B5D63), outlineVariant = Color(0xFFE0E1E4),
+    surfaceTint = Color.Transparent
+)
 
 /** Accent roles change together; backgrounds and AMOLED black remain neutral. */
 internal fun accentedScheme(base:ColorScheme,accent:AccentColour,dark:Boolean):ColorScheme {

@@ -50,11 +50,6 @@ class LibraryActions(val repository: LibraryRepository, val transfers: TransferE
         }
         repository.flush(); repository.notice("Original messages and content versions deleted. A minimal deletion marker prevents accidental backup resurrection.")
     }
-    suspend fun restoreVersion(itemId: String, versionId: String) {
-        val version = repository.version(versionId); require(version.itemId == itemId)
-        repository.updateItem(repository.item(itemId).copy(versionId = version.id, sha256 = version.sha256, size = version.size))
-        repository.notice("Previous content version restored. Other versions were retained.")
-    }
     suspend fun unpin(id: String) {
         val local = repository.db().local(id)
         if (local.pinnedVersion.isNotEmpty()) repository.cache?.unpin(local.pinnedVersion)

@@ -79,7 +79,7 @@ test("creates a standalone project-site artifact with metadata, QR and attributi
       "assets/icon-180.png",
       "assets/share.png",
       "assets/fonts/roboto-latin.woff2",
-      "assets/licenses/Solar.txt",
+      "assets/licenses/Iconsax.txt",
       "assets/licenses/Roboto.txt",
     ]) {
       assert.ok(
@@ -90,6 +90,12 @@ test("creates a standalone project-site artifact with metadata, QR and attributi
     }
     const html = await readFile(path.join(output, "index.html"), "utf8");
     assert.ok(!html.includes("<!-- ICONS -->"));
+    assert.match(html, /<symbol id="i-home"[^>]*><path[^>]+fill="currentColor"/);
+    assert.match(html, /https:\/\/app\.iconsax\.io\//);
+    assert.match(
+      await readFile(path.join(output, "assets/licenses/Iconsax.txt"), "utf8"),
+      /Proprietary Free License/,
+    );
     assert.ok(html.includes("tg-drive-arm64-v8a.apk"));
     assert.ok(!html.includes("tg-drive-x86_64.apk"));
     assert.ok(!html.includes("daveragos"));

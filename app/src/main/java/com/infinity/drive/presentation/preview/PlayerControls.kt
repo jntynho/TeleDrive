@@ -249,35 +249,35 @@ private fun SeekButton(icon:ImageVector,description:String,size:androidx.compose
 }
 private fun speedLabel(value:Float)=if(value%1f==0f)"${value.toInt()}×"else"${value}×"
 /** Video scaling applied to the surface, cycled from the controls. */
-enum class PlayerResizeMode(val icon: ImageVector, val description: String) {
-    FIT(app.tgdrive.ui.MediaIcons.Fit, "Scaling: fit"),
-    ZOOM(app.tgdrive.ui.MediaIcons.Crop, "Scaling: crop to fill"),
-    FILL(app.tgdrive.ui.MediaIcons.Fit, "Scaling: stretch");
+enum class PlayerResizeMode(val description: String) {
+    FIT("Scaling: fit"),
+    ZOOM("Scaling: crop to fill"),
+    FILL("Scaling: stretch");
+
+    val icon: ImageVector @Composable get() = if (this == ZOOM) MediaIcons.Crop else MediaIcons.Fit
 
     fun next(): PlayerResizeMode = if (this == FIT) ZOOM else FIT
 }
 
 /** Screen orientation while a video is open, cycled from the controls. */
 internal enum class PlayerRotation(
-    val icon: ImageVector,
     val description: String,
     val orientation: Int
 ) {
     AUTO(
-        app.tgdrive.ui.MediaIcons.Rotate,
         "Rotation: follow device",
         ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
     ),
     LANDSCAPE(
-        app.tgdrive.ui.MediaIcons.Rotate,
         "Rotation: locked landscape",
         ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
     ),
     PORTRAIT(
-        app.tgdrive.ui.MediaIcons.Rotate,
         "Rotation: locked portrait",
         ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     );
+
+    val icon: ImageVector @Composable get() = MediaIcons.Rotate
 
     fun next(): PlayerRotation = entries[(ordinal + 1) % entries.size]
 }

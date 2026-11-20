@@ -25,7 +25,7 @@ import app.tgdrive.*
 import app.tgdrive.data.formatBytes
 import app.tgdrive.library.*
 
-@Composable fun SettingsPage(state:LibraryState,bundle:SessionBundle,pool:SessionPool,system:SystemActions,onClose:()->Unit={},page:String,onPage:(String)->Unit,onAccounts:()->Unit={},query:String="",search:HeaderSearch?=null){
+@Composable fun SettingsPage(state:LibraryState,bundle:SessionBundle,system:SystemActions,onClose:()->Unit={},page:String,onPage:(String)->Unit,query:String="",search:HeaderSearch?=null){
     val uriHandler=androidx.compose.ui.platform.LocalUriHandler.current
     var confirmCache by rememberSaveable{mutableStateOf(false)}
     var info by remember{mutableStateOf<String?>(null)};var cleanup by remember{mutableStateOf<List<Item>?>(null)}
@@ -49,7 +49,7 @@ import app.tgdrive.library.*
         Column(Modifier.fillMaxSize()){
 
             when(current){
-                "home"->{search?.let{HeaderSearchField(it)};SettingsHome(state,query){destination->if(destination=="accounts")onAccounts()else onPage(destination);if(destination=="storage")bundle.actions.run{bundle.library.updateStorage()}}}
+                "home"->{search?.let{HeaderSearchField(it)};SettingsHome(state,query){destination->onPage(destination);if(destination=="storage")bundle.actions.run{bundle.library.updateStorage()}}}
                 "vaults"->VaultsPage(state,bundle)
                 else->LazyColumn(Modifier.fillMaxSize(),state=listState,contentPadding=PaddingValues(start=16.dp,end=16.dp,top=16.dp,bottom=32.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
                     when(current){
@@ -87,11 +87,7 @@ import app.tgdrive.library.*
                             item{DriveGroup{
                                 ActionRow("Sync library",icon=DriveIcons.Sync){bundle.actions.run{bundle.library.sync()}}
                                 DriveDivider()
-                                ActionRow("Refresh entire library","Does not erase the existing local library",DriveIcons.ManageSearch){bundle.actions.run{bundle.library.sync(full=true)}}
-                                DriveDivider()
                                 ActionRow("Back up library information","Includes folders, tags, versions and encrypted vault descriptors",DriveIcons.CloudUpload){bundle.actions.run{bundle.library.saveCloudIndex()}}
-                                DriveDivider()
-                                ActionRow("Restore library information","Merge and preserve conflicts; never reset login",DriveIcons.Restore){bundle.actions.run{bundle.library.restoreCloudIndex()}}
                             }}
                             item{ActionRow("Export library information","No Telegram sessions or device-only source URIs",DriveIcons.SaveAlt,onClick=system.exportIndex)}
                             item{ActionRow("Import library information","Only a matching Telegram account is accepted",DriveIcons.FileOpen,onClick=system.importIndex)}
@@ -112,8 +108,6 @@ import app.tgdrive.library.*
                         "diagnostics"->{
                             item{DriveGroup{
                                 ActionRow("Check message availability","Does not delete records for a temporary network failure",DriveIcons.FactCheck){bundle.actions.run{bundle.actions.checkAvailability()}}
-                                DriveDivider()
-                                ActionRow("Refresh library from Telegram","Keep valid local and concurrent changes",DriveIcons.Sync){bundle.actions.run{bundle.library.sync(full=true)}}
                             }}
                             item{SelectionContainer{Text(bundle.actions.diagnosticText(),style=MaterialTheme.typography.bodySmall)}}
                             items(state.healthProblems){p->Text(p,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
@@ -123,9 +117,9 @@ import app.tgdrive.library.*
                             item{SectionTitle("TeleDrive","${BuildConfig.VERSION_NAME} · build ${BuildConfig.VERSION_CODE}")}
                             item{InfoCard("Independent Telegram client","Your files use your own account. No claim of unlimited storage, guaranteed SMS or permanent provider availability is made.",DriveIcons.CloudQueue)}
                             item{DriveGroup{
-                                ActionRow("Solar Linear icons","By 480 Design · adapted as native vectors",DriveIcons.Info){uriHandler.openUri("https://www.figma.com/community/file/1166831539721848736")}
+                                ActionRow("Iconsax icons","Outline and Broken",DriveIcons.Info){uriHandler.openUri("https://app.iconsax.io/")}
                                 DriveDivider()
-                                ActionRow("Icon license","Creative Commons Attribution 4.0 International",DriveIcons.Shield){uriHandler.openUri("https://creativecommons.org/licenses/by/4.0/")}
+                                ActionRow("Icon license","Iconsax Proprietary Free License",DriveIcons.Shield){uriHandler.openUri("https://docs.iconsax.io/license-and-terms/license")}
                             }}
                             item{SelectionContainer{Text("Signing certificate SHA-256:\n${signingFingerprint(bundle.library.context)}",style=MaterialTheme.typography.bodySmall)}}
                             item{InfoCard("Updates preserve identity","Install updates signed with the same certificate. Keep your existing app installed when updating to preserve its local settings.")}

@@ -4,11 +4,11 @@ TG Drive 1.0 uses the Android engine from [DriveInfinity](https://github.com/ZHI
 
 ## Telegram and encryption
 
-Telegram cloud channels are not end-to-end encrypted. Ordinary uploads remain readable as documents in Telegram. Optional file encryption uses the reference `TDE1` authenticated AES-256-GCM chunked format; optional encrypted captions protect names and folder metadata, and thumbnail encryption is a separate preference. File size, account/channel identity, timing and access patterns can remain visible. Existing TG Drive 0.x vaults use their original Tink format and are only read by the compatibility reader.
+Telegram cloud channels are not end-to-end encrypted. Ordinary uploads remain readable as documents in Telegram. Existing file encryption policies use the reference `TDE1` authenticated AES-256-GCM chunked format. Existing caption and thumbnail encryption policies can still apply. File size, account/channel identity, timing and access patterns can remain visible. Existing TG Drive 0.x vaults use their original Tink format and are only read by the compatibility reader.
 
 Content keys, API credentials and the local TDLib key are wrapped with Android Keystore. Existing session/content keys are never silently replaced when they cannot be read. Wrapped-key writes use atomic replacement. An existing TDLib database with a missing key fails safely. Cache/thumbnail keys can be regenerated because their content is disposable.
 
-Use the key backup/passphrase and recovery options before relying on encrypted uploads. The reference passphrase KDF is PBKDF2-HMAC-SHA256 (310,000 iterations, random salt); keep recovery material outside the phone. Telegram login cannot recover a lost content key. This derivative has not received an independent cryptographic audit.
+The reference key-backup passphrase KDF is PBKDF2-HMAC-SHA256 (310,000 iterations, random salt). This version omits content-key import and recovery. Telegram login cannot recover a lost content key. Save readable copies from an installation that holds the matching key before clearing its data or moving devices. This derivative has not received an independent cryptographic audit.
 
 The separate sign-in recovery file requires a future authentication token from Telegram. TeleDrive checks for this token before asking for a file password. If it is unavailable, keep your active session and use QR sign-in from another signed-in device if you need to reconnect. Telegram may still require its two-step verification password. [Telegram authorization documentation](https://core.telegram.org/api/auth#future-auth-tokens)
 

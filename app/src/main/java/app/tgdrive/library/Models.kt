@@ -1,5 +1,6 @@
 package app.tgdrive.library
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
@@ -38,7 +39,10 @@ fun now() = System.currentTimeMillis()
     val itemId: String, val pinnedVersion: String = "", val verifiedVersion: String = "", val verifiedAt: Long = 0,
     val sourceUri: String = "", val sourceHash: String = "", val ocrText: String = "", val missing: Boolean = false,
 )
-@Serializable enum class TaskKind { UPLOAD, DOWNLOAD, PIN, VERIFY, EXPORT, WEBDAV, SHARE, OCR }
+@Serializable enum class TaskKind {
+    UPLOAD, DOWNLOAD, PIN, VERIFY, EXPORT, WEBDAV, OCR,
+    @SerialName("SHARE") RETIRED_PUBLIC_EXPORT
+}
 @Serializable enum class TaskState { QUEUED, PREPARING, TRANSFERRING, PAUSED, WAITING_FOR_WIFI, WAITING_FOR_CHARGING, WAITING_FOR_UNLOCK, WAITING_FOR_NETWORK, WAITING_FOR_DEVICE, SYNCING_METADATA, RETRY_WAIT, COMPLETED, FAILED, CANCELLED }
 @Serializable data class TransferTask(
     val id: String = newId(), val kind: TaskKind, val title: String, val state: TaskState = TaskState.QUEUED,
@@ -64,13 +68,12 @@ fun now() = System.currentTimeMillis()
     val uploadPaceKiB: Int = 0, val chunkMiB: Int = 512, val cacheMiB: Int = 512, val trashDays: Int = 30,
     val lockEnabled: Boolean = false, val hideNotifications: Boolean = true, val secureScreen: Boolean = false,
     val showGrid: Boolean = false, val detectDuplicates: Boolean = true, val autoSync: Boolean = true,
-    val webDavUrl: String = "", val webDavUser: String = "", val sharingUrl: String = "",
+    val webDavUrl: String = "", val webDavUser: String = "",
     val backupNotifications: Boolean = true, val scanIntervalHours: Int = 6,
 )
 @Serializable data class Conflict(val id: String = newId(), val entityId: String, val kept: Envelope, val incoming: Envelope, val createdAt: Long = now())
 @Serializable data class JournalEntry(val envelope: Envelope, val messageId: Long = 0, val pending: Boolean = false)
 @Serializable data class Snapshot(val schema: Int = 2, val accountId: Long, val createdAt: Long = now(), val entities: List<Envelope>)
-@Serializable data class ShareResult(val id: String, val url: String, val expiresAt: Long)
 @Serializable data class VaultDescriptor(
     val id: String = newId(), val label: String, val salt: String, val iterations: Int = 600_000,
     val passwordWrap: String, val recoveryWrap: String, val createdAt: Long = now(),
@@ -86,12 +89,10 @@ data class LibraryState(
     val syncing: Boolean = false, val lastSyncAt: Long = 0, val error: String? = null, val notice: String? = null,
     val cacheBytes: Long = 0, val offlineBytes: Long = 0, val retainedSourceBytes:Long=0,val stagingBytes:Long=0,val exportBytes:Long=0, val pendingOperations: Int = 0,
     val incoming: List<ImportCandidate> = emptyList(), val organization: List<OrganizationChange> = emptyList(),
-    val lastShare: ShareResult? = null,
     val healthProblems: List<String> = emptyList(),
     val sendCooldownUntil: Long = 0,
     val undoTrashIds:List<String> = emptyList(),
     val itemVaults: Map<String, String> = emptyMap(), val folderVaults: Map<String, String> = emptyMap(),
-    val shares: List<ShareResult> = emptyList(),
 )
 data class ImportCandidate(val messageId: Long, val name: String, val mime: String, val size: Long, val date: Long)
 data class OrganizationChange(val itemId: String, val name: String, val fromFolderId: String, val destination: String)

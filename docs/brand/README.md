@@ -20,4 +20,4 @@ python3 scripts/generate_launcher.py
 python3 scripts/generate_launcher.py --check
 ```
 
-The generator requires only Python's standard library. Android vector gradients are supported by the app's minimum SDK (26). Interface glyphs remain the licensed Solar Linear vectors under `third_party/solar`; the small notification silhouette remains unchanged.
+The generator requires only Python's standard library. Android vector gradients are supported by the app's minimum SDK (26). The interface glyph source and license live in [third_party/iconsax](../../third_party/iconsax/SOURCE.md).

@@ -3,7 +3,6 @@ package com.infinity.drive.data.repository
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
 import com.infinity.drive.core.crypto.CredentialCipher
 import kotlin.io.encoding.Base64
 import com.infinity.drive.core.telegram.TelegramCredentials
@@ -12,8 +11,7 @@ import com.infinity.drive.domain.model.AppLanguage
 import com.infinity.drive.domain.model.BackupFolderRule
 import com.infinity.drive.domain.model.LinkedTelegramSource
 import com.infinity.drive.domain.model.SmartFolder
-import com.infinity.drive.domain.model.PublicLinkConnection
-import com.infinity.drive.domain.model.AudioPlaylist
+import com.infinity.drive.domain.model.CustomTheme
 import kotlinx.serialization.json.Json
 import com.infinity.drive.domain.model.UserPreferences
 import com.infinity.drive.domain.model.DashboardStyle
@@ -72,42 +70,13 @@ class SettingsRepositoryImpl(
         dataStore.edit {
             it.remove(PreferenceKeys.API_ID_ENCRYPTED)
             it.remove(PreferenceKeys.API_HASH_ENCRYPTED)
-            it.asMap().keys.filter { key -> key.name.startsWith(PUBLIC_LINK_PREFIX) }.forEach { key -> it.remove(key) }
-        }
-    }
-
-    override suspend fun publicLinkConnection(drive: Long): PublicLinkConnection? {
-        val current = dataStore.data.first()
-        if (current[PreferenceKeys.STORAGE_CHAT_ID] != drive) return null
-        val encoded = current[stringPreferencesKey("$PUBLIC_LINK_PREFIX$drive")] ?: return null
-        return runCatching {
-            val bytes = credentialCipher.decrypt(Base64.decode(encoded))
-            try {
-                collectionsJson.decodeFromString<PublicLinkConnection>(bytes.decodeToString())
-            } finally {
-                bytes.fill(0)
-            }
-        }.getOrNull()
-    }
-
-    override suspend fun setPublicLinkConnection(drive: Long, connection: PublicLinkConnection?) {
-        val key = stringPreferencesKey("$PUBLIC_LINK_PREFIX$drive")
-        dataStore.edit { prefs ->
-            require(prefs[PreferenceKeys.STORAGE_CHAT_ID] == drive && prefs[PreferenceKeys.ONBOARDING_COMPLETE] == true)
-            if (connection == null) prefs.remove(key)
-            else {
-                val bytes = collectionsJson.encodeToString(connection).encodeToByteArray()
-                try {
-                    prefs[key] = Base64.encode(credentialCipher.encrypt(bytes))
-                } finally {
-                    bytes.fill(0)
-                }
-            }
+            // Existing profiles may still have encrypted sharing credentials from older releases.
+            it.asMap().keys.filter { key -> key.name.startsWith(LEGACY_PUBLIC_LINK_PREFIX) }.forEach { key -> it.remove(key) }
         }
     }
 
     private companion object {
-        const val PUBLIC_LINK_PREFIX = "public_link_connection_"
+        const val LEGACY_PUBLIC_LINK_PREFIX = "public_link_connection_"
     }
 
     private fun Preferences.toUserPreferences(): UserPreferences {
@@ -126,9 +95,6 @@ class SettingsRepositoryImpl(
             backupFolderRules = this[PreferenceKeys.BACKUP_FOLDER_RULES]?.let { stored ->
                 runCatching { collectionsJson.decodeFromString<List<BackupFolderRule>>(stored) }.getOrNull()
             }.orEmpty(),
-            audioPlaylists = this[PreferenceKeys.AUDIO_PLAYLISTS]?.let { stored ->
-                runCatching { collectionsJson.decodeFromString<List<AudioPlaylist>>(stored) }.getOrNull()
-            }.orEmpty(),
             linkedTelegramSources = this[PreferenceKeys.LINKED_TELEGRAM_SOURCES]?.let { stored ->
                 runCatching { collectionsJson.decodeFromString<List<LinkedTelegramSource>>(stored) }.getOrNull()
             }.orEmpty(),
@@ -143,6 +109,11 @@ class SettingsRepositoryImpl(
                 ?: defaults.backupIntervalHours,
             backupMinFileSizeMb = minimum,
             accentColour = enumOrDefault(this[PreferenceKeys.ACCENT_COLOUR], defaults.accentColour),
+            customThemes = this[PreferenceKeys.CUSTOM_THEMES]?.let { stored ->
+                runCatching { collectionsJson.decodeFromString<List<CustomTheme>>(stored) }.getOrNull()
+            }.orEmpty(),
+            selectedCustomThemeId = this[PreferenceKeys.SELECTED_CUSTOM_THEME],
+            iconStyle = enumOrDefault(this[PreferenceKeys.ICON_STYLE], defaults.iconStyle),
             dashboardStyle = DashboardStyle.fromStored(this[PreferenceKeys.DASHBOARD_STYLE]),
             dashboardDarkStyles = (this[PreferenceKeys.DASHBOARD_DARK_STYLES] ?: defaults.dashboardDarkStyles)
                 .filterTo(mutableSetOf()){name->DashboardStyle.entries.any{it.name==name}},
@@ -240,8 +211,6 @@ class SettingsRepositoryImpl(
         this[PreferenceKeys.BACKUP_FOLDERS] = prefs.backupFolders
         if (prefs.backupFolderRules.isEmpty()) remove(PreferenceKeys.BACKUP_FOLDER_RULES)
         else this[PreferenceKeys.BACKUP_FOLDER_RULES] = collectionsJson.encodeToString(prefs.backupFolderRules)
-        if (prefs.audioPlaylists.isEmpty()) remove(PreferenceKeys.AUDIO_PLAYLISTS)
-        else this[PreferenceKeys.AUDIO_PLAYLISTS] = collectionsJson.encodeToString(prefs.audioPlaylists)
         if (prefs.linkedTelegramSources.isEmpty()) remove(PreferenceKeys.LINKED_TELEGRAM_SOURCES)
         else this[PreferenceKeys.LINKED_TELEGRAM_SOURCES] = collectionsJson.encodeToString(prefs.linkedTelegramSources)
         if (prefs.smartFolders.isEmpty()) remove(PreferenceKeys.SMART_FOLDERS)
@@ -253,6 +222,11 @@ class SettingsRepositoryImpl(
         this[PreferenceKeys.BACKUP_INTERVAL_HOURS] = prefs.backupIntervalHours
         this[PreferenceKeys.BACKUP_MIN_FILE_SIZE_MB] = prefs.backupMinFileSizeMb.coerceAtLeast(0)
         this[PreferenceKeys.ACCENT_COLOUR] = prefs.accentColour.name
+        if (prefs.customThemes.isEmpty()) remove(PreferenceKeys.CUSTOM_THEMES)
+        else this[PreferenceKeys.CUSTOM_THEMES] = collectionsJson.encodeToString(prefs.customThemes)
+        prefs.selectedCustomTheme?.let { this[PreferenceKeys.SELECTED_CUSTOM_THEME] = it.id }
+            ?: remove(PreferenceKeys.SELECTED_CUSTOM_THEME)
+        this[PreferenceKeys.ICON_STYLE] = prefs.iconStyle.name
         this[PreferenceKeys.DASHBOARD_STYLE] = prefs.dashboardStyle.name
         this[PreferenceKeys.DASHBOARD_DARK_STYLES] = prefs.dashboardDarkStyles
             .filterTo(mutableSetOf()){name->DashboardStyle.entries.any{it.name==name}}

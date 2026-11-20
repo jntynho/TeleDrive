@@ -27,23 +27,15 @@ object AndroidPlatformScreens : PlatformScreens {
     }
 
     @Composable
-    override fun AccountProfilesSetting(compact: Boolean) =
-        com.infinity.drive.presentation.platform.AccountProfilesSetting(compact)
-
-    @Composable
-    override fun WorkspacesSetting() = com.infinity.drive.presentation.workspaces.WorkspacesSetting()
+    override fun AccountProfilesSetting(
+        compact: Boolean,
+        profileName: String?,
+        username: String?,
+        photoPath: String?
+    ) = com.infinity.drive.presentation.platform.AccountProfilesSetting(compact, profileName, username, photoPath)
 
     @Composable
     override fun FolderSyncSetting() = com.infinity.drive.presentation.sync.FolderSyncSetting()
-
-    override val supportsPublicLinks = true
-
-    @Composable
-    override fun PublicLinksSetting() = com.infinity.drive.presentation.sharing.PublicLinksSetting()
-
-    @Composable
-    override fun PhotoHistoryControl(onAlbum: Boolean, folder: String?, query: String, openFile: (String) -> Unit) =
-        com.infinity.drive.presentation.gallery.PhotoHistoryControl(onAlbum, folder, query, openFile)
 
     @Composable
     override fun Preview(onBack: () -> Unit, onEditNote: (String, String) -> Unit, onCreateNote: (String, String) -> Unit) {

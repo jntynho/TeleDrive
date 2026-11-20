@@ -16,9 +16,8 @@ class LibraryUsageTest {
     @Test fun pickerExcludesDescendantsAndSettingsDoNotOfferRemovedRoutes() {
         val folders=listOf(Folder("a","A"),Folder("b","B","a"),Folder("c","C","b"),Folder("other","Other"))
         assertEquals(setOf("a","b","c"),folderDescendants("a",folders))
-        val routes=settingDestinations(LibraryState()).map{it.route}.toSet()
-        assertTrue("accounts" in routes)
-        assertTrue(routes.intersect(setOf("organize","conflicts","connections")).isEmpty())
+        assertTrue("privacy" in visibleSettingsRoutes)
+        assertTrue(visibleSettingsRoutes.intersect(setOf("accounts","organize","conflicts","connections")).isEmpty())
     }
     @Test fun transferStartRequiresWorkAndCanResumePausedAlongsideActiveUploads() {
         assertFalse(canStartTransfers(LibraryState()))

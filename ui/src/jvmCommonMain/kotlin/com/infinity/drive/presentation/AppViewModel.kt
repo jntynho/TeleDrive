@@ -34,6 +34,8 @@ import com.infinity.drive.core.common.AppResult
 import com.infinity.drive.data.repository.LocalDataWiper
 import kotlinx.coroutines.NonCancellable
 import com.infinity.drive.domain.model.AppLanguage
+import com.infinity.drive.domain.model.AppIconStyle
+import com.infinity.drive.domain.model.CustomTheme
 import kotlinx.coroutines.withContext
 
 data class AppUiState(
@@ -45,6 +47,8 @@ data class AppUiState(
     val dashboardDark:Boolean=false,
     val dynamicColor: Boolean = false,
     val accentColour:com.infinity.drive.domain.model.AccentColour=com.infinity.drive.domain.model.AccentColour.BLUE,
+    val customTheme: CustomTheme? = null,
+    val iconStyle: AppIconStyle = AppIconStyle.OUTLINE,
     val compactLayout: Boolean = false,
     val locked: Boolean = false,
     val warmupGlass:Boolean=false
@@ -92,6 +96,8 @@ class AppViewModel(
             dashboardDark = prefs.dashboardStyle.name in prefs.dashboardDarkStyles,
             dynamicColor = prefs.dynamicColor,
             accentColour = prefs.accentColour,
+            customTheme = prefs.selectedCustomTheme,
+            iconStyle = prefs.iconStyle,
             compactLayout = prefs.layoutDensity == LayoutDensity.COMPACT,
             locked = locked,
             warmupGlass=prefs.floatingNavigationBar&&prefs.navigationBarBlur&&prefs.navigationBarStyle==com.infinity.drive.domain.model.NavigationBarStyle.FLOATING

@@ -28,7 +28,7 @@ import com.infinity.drive.resources.backup_preview_unchanged
 import com.infinity.drive.resources.backup_preview_unreadable
 import com.infinity.drive.resources.backup_preview_uploads
 import com.infinity.drive.resources.common_cancel
-import com.infinity.drive.resources.library_restore_close
+import com.infinity.drive.resources.common_close
 import org.jetbrains.compose.resources.stringResource
 
 internal data class BackupPreviewState(
@@ -84,13 +84,13 @@ internal fun BackupPreviewDialog(
                 TextButton(onClick = onStart) { Text(stringResource(Res.string.backup_preview_start)) }
             } else {
                 TextButton(onClick = onClose) {
-                    Text(stringResource(if (state.running) Res.string.common_cancel else Res.string.library_restore_close))
+                    Text(stringResource(if (state.running) Res.string.common_cancel else Res.string.common_close))
                 }
             }
         },
         dismissButton = {
             if (report != null && report.uploads > 0) {
-                TextButton(onClick = onClose) { Text(stringResource(Res.string.library_restore_close)) }
+                TextButton(onClick = onClose) { Text(stringResource(Res.string.common_close)) }
             }
         }
     )

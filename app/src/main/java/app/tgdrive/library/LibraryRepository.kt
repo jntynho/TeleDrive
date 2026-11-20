@@ -140,8 +140,7 @@ class LibraryRepository(val context: Context, val session: TelegramDrive, val sc
             rules = db().all("rules").map { row -> row.model() }, preferences = db().preferences(), lockedVaults = locked,
             unlockedVaultIds = vaults.unlockedIds, vaults = descriptors, conflicts = db().all("conflicts").map { row -> row.model() },
             pendingOperations = db().pending().size, sendCooldownUntil=sender.until, healthProblems = problems,
-            itemVaults = entities.filter { e -> e.kind == EntityKind.ITEM }.associate { e -> e.entityId to e.vaultId }, folderVaults = entities.filter { e -> e.kind == EntityKind.FOLDER }.associate { e -> e.entityId to e.vaultId },
-            shares = db().entries("settings").filter { row->row.first.startsWith("share:") }.map { row->row.second.model() }) }
+            itemVaults = entities.filter { e -> e.kind == EntityKind.ITEM }.associate { e -> e.entityId to e.vaultId }, folderVaults = entities.filter { e -> e.kind == EntityKind.FOLDER }.associate { e -> e.entityId to e.vaultId }) }
     }
     fun itemVault(id: String) = db().entity(EntityKind.ITEM, id)?.vaultId ?: ""
     fun version(id: String): Version = state.value.versions.firstOrNull { it.id == id } ?: error("File version is locked or unavailable.")
@@ -224,7 +223,7 @@ class LibraryRepository(val context: Context, val session: TelegramDrive, val sc
     suspend fun updateTask(id:String,account:Long,update:(TransferTask)->TransferTask)=withContext(Dispatchers.IO) {
         writes.withLock {
             checkAccount(account)
-            val current=db().get("tasks",id)?.model<TransferTask>()?:return@withLock
+            val current=db().task(id)?:return@withLock
             db().putTask(update(current).copy(updatedAt=now()))
             mutable.update{it.copy(tasks=db().tasks())}
         }
@@ -447,15 +446,6 @@ class LibraryRepository(val context: Context, val session: TelegramDrive, val sc
             commit(envelope(EntityKind.VERSION, version.id, version.copy(parts=emptyList(), size=0, sha256="", thumbnail=null).json(), vault, deleted=true))
         }
     }
-    suspend fun restoreCloudIndex() = withContext(Dispatchers.IO) {
-        sync(full = true)
-        val id = db().get("settings", "cloudBackups")?.model<List<Long>>()?.firstOrNull() ?: error("No cloud index checkpoint was found.")
-        val file = remote.readAll(id); require(file.length() <= 32 * 1024 * 1024) { "Index checkpoint is too large." }
-        val snapshot = file.readText().model<Snapshot>()
-        require(snapshot.schema == 2 && snapshot.accountId == state.value.accountId)
-        mutate { db -> snapshot.entities.forEach { db.apply(JournalEntry(it, pending = true)) } }
-        changed?.invoke(); notice("Checkpoint restored. Conflicts remain available for review.")
-    }
     suspend fun importMessage(candidate: ImportCandidate, folder: String) {
         require(folder.isEmpty()||db().entity(EntityKind.FOLDER,folder)?.vaultId.orEmpty().isEmpty()) { "Import references into Personal first; encrypting their content requires a protected upload." }
         if(state.value.versions.any{it.imported&&it.parts.any{part->part.messageId==candidate.messageId}}){notice("This message is already in your library.");return}
@@ -473,8 +463,6 @@ class LibraryRepository(val context: Context, val session: TelegramDrive, val sc
         it.copy(error=if(it.error==error)null else it.error,notice=if(it.notice==notice)null else it.notice,
             undoTrashIds=if(it.notice==notice)emptyList()else it.undoTrashIds)
     } }
-    fun clearShare() { mutable.update{it.copy(lastShare=null)} }
-    fun shareResult(result: ShareResult) { mutable.update { it.copy(lastShare = result) } }
     fun setOrganization(value: List<OrganizationChange>) { mutable.update { it.copy(organization = value) } }
     fun clearImports() { mutable.update { it.copy(incoming = emptyList()) } }
 }

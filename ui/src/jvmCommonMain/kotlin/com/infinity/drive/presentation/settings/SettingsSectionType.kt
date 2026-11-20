@@ -3,6 +3,7 @@ package com.infinity.drive.presentation.settings
 
 import app.tgdrive.ui.DriveIcons
 import org.jetbrains.compose.resources.StringResource
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.settings_section_about_subtitle
@@ -29,56 +30,58 @@ import com.infinity.drive.resources.settings_section_storage_title
 enum class SettingsSectionType(
     val titleRes: StringResource,
     val subtitleRes: StringResource,
-    val icon: ImageVector
+    private val iconVector: @Composable () -> ImageVector
 ) {
     ACCOUNT(
         Res.string.settings_section_account_title,
         Res.string.settings_section_account_subtitle,
-        DriveIcons.AccountCircle
+        { DriveIcons.AccountCircle }
     ),
     BACKUP(
         Res.string.settings_section_backup_title,
         Res.string.settings_section_backup_subtitle,
-        DriveIcons.CloudUpload
+        { DriveIcons.CloudUpload }
     ),
     STORAGE(
         Res.string.settings_section_storage_title,
         Res.string.settings_section_storage_subtitle,
-        DriveIcons.Storage
+        { DriveIcons.Storage }
     ),
     PERMISSIONS(
         Res.string.settings_section_permissions_title,
         Res.string.settings_section_permissions_subtitle,
-        DriveIcons.Shield
+        { DriveIcons.Shield }
     ),
     SECURITY(
         Res.string.settings_section_security_title,
         Res.string.settings_section_security_subtitle,
-        DriveIcons.Lock
+        { DriveIcons.Lock }
     ),
     APPEARANCE(
         Res.string.settings_section_appearance_title,
         Res.string.settings_section_appearance_subtitle,
-        DriveIcons.Palette
+        { DriveIcons.Palette }
     ),
     PLAYBACK(
         Res.string.settings_section_playback_title,
         Res.string.settings_section_playback_subtitle,
-        DriveIcons.PlayCircle
+        { DriveIcons.PlayCircle }
     ),
     NOTIFICATIONS(
         Res.string.settings_section_notifications_title,
         Res.string.settings_section_notifications_subtitle,
-        DriveIcons.Notifications
+        { DriveIcons.Notifications }
     ),
     ADVANCED(
         Res.string.settings_section_advanced_title,
         Res.string.settings_section_advanced_subtitle,
-        DriveIcons.Tune
+        { DriveIcons.Tune }
     ),
     ABOUT(
         Res.string.settings_section_about_title,
         Res.string.settings_section_about_subtitle,
-        DriveIcons.Info
-    )
+        { DriveIcons.Info }
+    );
+
+    val icon: ImageVector @Composable get() = iconVector()
 }

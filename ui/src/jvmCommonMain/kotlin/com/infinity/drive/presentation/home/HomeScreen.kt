@@ -3,10 +3,13 @@ package com.infinity.drive.presentation.home
 
 import app.tgdrive.ui.ElasticLazyColumn as LazyColumn
 import app.tgdrive.ui.DriveIcons
+import app.tgdrive.ui.LibraryDashboard
+import app.tgdrive.ui.LibraryOverview
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,6 +43,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -57,6 +65,7 @@ import com.infinity.drive.presentation.navigation.LocalBottomBarInset
 import com.infinity.drive.presentation.platform.LocalPermissionRequester
 import com.infinity.drive.presentation.platform.LocalPlatformCapabilities
 import com.infinity.drive.presentation.preview.PreviewSequence
+import com.infinity.drive.presentation.settings.DashboardStylesSheet
 import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.home_section_favorites
 import org.jetbrains.compose.resources.stringResource
@@ -88,6 +97,12 @@ fun HomeScreen(
             totals.filterKeys{it !in media}.values.sum())
     }
     val lastUpload=remember(state.recentFiles){state.recentFiles.filter{it.remoteFileId!=null||it.messageId!=null}.maxOfOrNull{it.addedAt}}
+    val dashboardUsage = LibraryOverview(state.backedUpCount, state.remoteBytes, storageGroups, state.localBytes)
+    val dashboardUpdatedLabel = lastUpload?.let { "Added ${com.infinity.drive.presentation.common.Formatters.date(it)}" }
+        ?: state.lastBackupAt?.let { "Backup ${com.infinity.drive.presentation.common.Formatters.date(it)}" }
+        ?: if (state.backedUpCount > 0) "In your drive" else "No uploads yet"
+    var showDashboardStyles by rememberSaveable { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
     val firstFrame=com.infinity.drive.presentation.platform.LocalFirstLibraryFrame.current
     LaunchedEffect(state.loading,firstFrame){
         if(!state.loading){androidx.compose.runtime.withFrameNanos{};firstFrame()}
@@ -120,6 +135,9 @@ fun HomeScreen(
     CollectSnackbarMessages(viewModel.messages, snackbarHostState)
     CollectSnackbarMessages(uploads.messages, snackbarHostState)
     com.infinity.drive.presentation.upload.AddFilesSheet(showUploadSheet,onDismiss={showUploadSheet=false})
+    if (showDashboardStyles && !state.loading) {
+        DashboardStylesSheet(dashboardUsage, dashboardUpdatedLabel, onDismiss = { showDashboardStyles = false })
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -161,12 +179,19 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item("library-overview") {
-                app.tgdrive.ui.LibraryDashboard(
-                    app.tgdrive.ui.LibraryOverview(state.backedUpCount, state.remoteBytes, storageGroups, state.localBytes),
-                    { showUploadSheet = true }, showAddAction = false,
-                    updatedLabel = lastUpload?.let { "Added ${com.infinity.drive.presentation.common.Formatters.date(it)}" }
-                        ?: state.lastBackupAt?.let { "Backup ${com.infinity.drive.presentation.common.Formatters.date(it)}" }
-                        ?: if (state.backedUpCount > 0) "In your drive" else "No uploads yet"
+                LibraryDashboard(
+                    dashboardUsage, { showUploadSheet = true }, showAddAction = false, updatedLabel = dashboardUpdatedLabel,
+                    modifier = Modifier.pointerInput(haptics) {
+                        detectTapGestures(onLongPress = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            showDashboardStyles = true
+                        })
+                    }.semantics {
+                        onLongClick(label = "Choose dashboard style") {
+                            showDashboardStyles = true
+                            true
+                        }
+                    }
                 )
                 Spacer(Modifier.height(20.dp))
                 app.tgdrive.ui.LibraryBrowse(listOf(

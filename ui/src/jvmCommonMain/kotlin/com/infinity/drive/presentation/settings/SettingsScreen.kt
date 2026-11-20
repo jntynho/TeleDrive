@@ -71,8 +71,12 @@ fun SettingsScreen(onBack:(()->Unit)?,onOpenSection:(SettingsSectionType)->Unit,
                         com.infinity.drive.presentation.components.TelegramProfileAvatar(state.user?.photoPath,Modifier.size(44.dp))
                         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
                             Text(state.user?.let{listOf(it.firstName,it.lastName).filter(String::isNotBlank).joinToString(" ")}?.takeIf(String::isNotBlank)?:"Telegram account",style=MaterialTheme.typography.titleMedium)
-                            val connection=accountConnectionLabel(authorization,state.connection)
-                            Text(connection+if(state.preferences.storageChatId!=null)" · "+(channels.firstOrNull{it.chatId==state.preferences.storageChatId}?.label?.takeIf{it.isNotBlank()}?:"Storage channels")else" · Set up your drive",maxLines=1,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            val connection = accountConnectionLabel(authorization, state.connection)
+                            val drive = if (state.preferences.storageChatId != null) {
+                                channels.firstOrNull { it.chatId == state.preferences.storageChatId }
+                                    ?.label?.takeIf { it.isNotBlank() } ?: "Storage channels"
+                            } else "Set up your drive"
+                            Text(listOfNotNull(connection, drive).joinToString(" · "),maxLines=1,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Icon(DriveIcons.KeyboardArrowRight,null,tint=MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -104,9 +108,9 @@ private fun SectionRow(section:SettingsSectionType,onClick:()->Unit) {
     SettingsClickRow(stringResource(section.titleRes),onClick,icon=section.icon,trailing={Icon(DriveIcons.KeyboardArrowRight,null,tint=MaterialTheme.colorScheme.onSurfaceVariant)})
 }
 
-internal fun accountConnectionLabel(auth:com.infinity.drive.core.telegram.TelegramAuthState,connection:TelegramConnectionState):String = when(auth){
+internal fun accountConnectionLabel(auth:com.infinity.drive.core.telegram.TelegramAuthState,connection:TelegramConnectionState):String? = when(auth){
     com.infinity.drive.core.telegram.TelegramAuthState.Ready->when(connection){
-        TelegramConnectionState.READY->"Connected"
+        TelegramConnectionState.READY->null
         TelegramConnectionState.CONNECTING->"Connecting"
         TelegramConnectionState.UPDATING->"Syncing"
         TelegramConnectionState.WAITING_FOR_NETWORK->"Waiting for network"

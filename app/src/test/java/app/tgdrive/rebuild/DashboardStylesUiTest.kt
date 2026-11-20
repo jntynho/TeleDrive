@@ -12,15 +12,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.unit.dp
 import app.tgdrive.ui.*
 import com.infinity.drive.domain.model.DashboardStyle
 import com.infinity.drive.presentation.settings.SettingsSwitchRow
-import com.infinity.drive.presentation.settings.DashboardStyleOption
+import com.infinity.drive.presentation.settings.DashboardStyleSelector
 import com.infinity.drive.presentation.theme.DriveInfinityTheme
 import org.junit.*
 import org.junit.Assert.*
@@ -101,6 +103,20 @@ class DashboardStylesUiTest {
             capture("dashboard-${choice.name.lowercase()}")
         }
     }
+    @Test fun mosaicPairsAllFourMediaCategoriesWithTheirSizes() {
+        show {
+            Column(Modifier.padding(16.dp)) {
+                LibraryDashboard(
+                    LibraryOverview(4, 10_485_760, listOf(1_048_576, 2_097_152, 3_145_728, 4_194_304)),
+                    {}, showAddAction = false, style = DashboardStyle.MOSAIC.name
+                )
+            }
+        }
+        listOf("Photos", "Videos", "Audio", "Files", "1.0 MB", "2.0 MB", "3.0 MB", "4.0 MB").forEach {
+            compose.onNodeWithText(it, substring = false).assertIsDisplayed()
+        }
+    }
+
     @Test fun repeatedSwitchChangesKeepTheTouchTargetAndRowStable(){
         var checked by mutableStateOf(false)
         show{Column(Modifier.padding(16.dp)){SettingsSwitchRow("Debug logging",checked,{checked=it})}}
@@ -115,7 +131,7 @@ class DashboardStylesUiTest {
         compose.mainClock.advanceTimeBy(1000)
         node.assertIsOff();assertEquals(bounds,node.fetchSemanticsNode().boundsInRoot)
     }
-    @Test fun allSixFramesStayEqualAcrossLightDarkLoadingAndEmptyData(){
+    @Test fun allFramesStayEqualAcrossLightDarkLoadingAndEmptyData(){
         var style by mutableStateOf(DashboardStyle.CLASSIC)
         var dark by mutableStateOf(false)
         var loading by mutableStateOf(false)
@@ -137,32 +153,38 @@ class DashboardStylesUiTest {
             }
         }
     }
-    @Test fun tonePreviewDoesNotApplyUntilTheExplicitButtonIsPressed(){
-        var savedDark by mutableStateOf(false)
-        var active by mutableStateOf(false)
-        var applies=0
-        var style by mutableStateOf(DashboardStyle.CLASSIC)
-        show{Column(Modifier.padding(16.dp).verticalScroll(rememberScrollState())){
-            DashboardStyleOption(style,LibraryOverview(12,2048,listOf(1024,1024,0,0)),active,savedDark){savedDark=it;active=true;applies++}
-        }}
-        val bounds=compose.onNodeWithTag("dashboard-option-CLASSIC").fetchSemanticsNode().size
-        DashboardStyle.entries.forEach{choice->
-            compose.runOnIdle{style=choice}
-            assertEquals(bounds,compose.onNodeWithTag("dashboard-option-${choice.name}").fetchSemanticsNode().size)
+    @Test fun selectorRespectsRtlAndKeepsToneChangesLocalUntilApply() {
+        var selected by mutableStateOf(DashboardStyle.ORBIT)
+        var darkStyles by mutableStateOf(setOf("ORBIT"))
+        var applies = 0
+        show {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                DashboardStyleSelector(LibraryOverview(12, 2048, listOf(1024, 1024, 0, 0)), "Updated just now", selected, darkStyles) { style, dark ->
+                    selected = style
+                    darkStyles = if (dark) darkStyles + style.name else darkStyles - style.name
+                    applies++
+                }
+            }
         }
-        compose.runOnIdle{style=DashboardStyle.CLASSIC}
-        compose.onNodeWithTag("dashboard-tone-CLASSIC-Dark").performScrollTo().performClick()
-        assertEquals(0,applies);assertFalse(savedDark)
-        compose.onNodeWithTag("apply-dashboard-CLASSIC").performScrollTo().performClick()
-        assertEquals(1,applies);assertTrue(savedDark)
-        compose.onNodeWithTag("apply-dashboard-CLASSIC").assertIsNotEnabled().assertIsSelected()
-        compose.onNodeWithTag("dashboard-tone-CLASSIC-Light").performScrollTo().performClick()
-        assertEquals(1,applies)
-        compose.onNodeWithTag("apply-dashboard-CLASSIC").assertIsEnabled()
-        capture("dashboard-style-option")
+        val orbitApply = compose.onNodeWithTag("apply-dashboard-ORBIT")
+        val orbitTone = compose.onNodeWithTag("dashboard-tone-ORBIT")
+        orbitApply.assertIsNotEnabled().assertIsSelected()
+        orbitTone.assertIsOn().performClick()
+        orbitTone.assertIsOff()
+        assertEquals(0, applies)
+        assertEquals(setOf("ORBIT"), darkStyles)
+        compose.onNodeWithTag("dashboard-style-carousel").performTouchInput { swipeRight() }
+        compose.onNodeWithTag("dashboard-option-MOSAIC").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Previous dashboard style").performClick()
+        orbitTone.assertIsOff()
+        orbitApply.assertIsEnabled().performClick()
+        orbitApply.assertIsNotEnabled().assertIsSelected()
+        assertEquals(1, applies)
+        assertTrue(darkStyles.isEmpty())
+        capture("dashboard-style-carousel")
     }
     @Test @Config(qualifiers="w320dp-h1200dp-xhdpi")
-    fun largeTextPreservesEqualFramesAndReadableTotalsForAllSixStyles(){
+    fun largeTextPreservesEqualFramesAndReadableTotalsForEveryStyle(){
         var style by mutableStateOf(DashboardStyle.CLASSIC)
         show{
             val density=LocalDensity.current

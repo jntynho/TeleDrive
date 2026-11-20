@@ -75,42 +75,6 @@ class KeyBackupCodec(
         }
     }.getOrNull()
 
-    fun encodePortable(contentKey: ByteArray, accountId: Long, password: CharArray): ByteArray {
-        require(contentKey.size == KEY_LENGTH && accountId > 0)
-        val payload = ByteBuffer.allocate(PORTABLE_TAG.size + Long.SIZE_BYTES + KEY_LENGTH)
-            .put(PORTABLE_TAG)
-            .putLong(accountId)
-            .put(contentKey)
-            .array()
-        return try {
-            encode(payload, password, hint = null)
-        } finally {
-            payload.fill(0)
-        }
-    }
-
-    sealed interface PortableKey {
-        data object Invalid : PortableKey
-        data object OtherAccount : PortableKey
-        data class Unwrapped(val bytes: ByteArray) : PortableKey
-    }
-
-    fun decodePortable(blob: ByteArray, accountId: Long, password: CharArray): PortableKey {
-        if (blob.size > MAX_BACKUP_BYTES) return PortableKey.Invalid
-        val payload = decode(blob, password) ?: return PortableKey.Invalid
-        return try {
-            if (payload.size != PORTABLE_TAG.size + Long.SIZE_BYTES + KEY_LENGTH ||
-                !payload.copyOfRange(0, PORTABLE_TAG.size).contentEquals(PORTABLE_TAG)
-            ) return PortableKey.Invalid
-            val buffer = ByteBuffer.wrap(payload)
-            buffer.position(PORTABLE_TAG.size)
-            if (buffer.long != accountId) PortableKey.OtherAccount
-            else PortableKey.Unwrapped(ByteArray(KEY_LENGTH).also(buffer::get))
-        } finally {
-            payload.fill(0)
-        }
-    }
-
     private fun header(blob: ByteArray): ByteBuffer {
         val buffer = ByteBuffer.wrap(blob)
         val magic = ByteArray(MAGIC.size).also(buffer::get)
@@ -126,8 +90,6 @@ class KeyBackupCodec(
         private const val VERSION: Byte = 1
         private const val SALT_LENGTH = 16
         private const val MAX_HINT_LENGTH = 128
-        private val PORTABLE_TAG = byteArrayOf(0x54, 0x44, 0x50, 0x4B, 1)
-        private const val KEY_LENGTH = 32
         const val MAX_BACKUP_BYTES = 1024
         const val BACKUP_FILE_NAME = "driveinfinity.keybackup"
     }
