@@ -13,6 +13,7 @@ import com.infinity.drive.domain.model.TransferType
         Index("state"),
         Index("fileId"),
         Index("createdAt"),
+        Index(value = ["chatId", "state"]),
         Index(value = ["state", "priority", "createdAt"])
     ]
 )

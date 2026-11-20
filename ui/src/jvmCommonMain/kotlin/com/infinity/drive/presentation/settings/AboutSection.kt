@@ -57,10 +57,8 @@ fun AboutSection(state:SettingsUiState,viewModel:SettingsViewModel){
     SettingsSectionTitle("PROJECT")
     SettingsGroup{
         add{SettingsClickRow("Source code",{opener.open(AppLinks.REPOSITORY)},subtitle="Explore TeleDrive on GitHub",icon=DriveIcons.Code)}
-        add{SettingsClickRow("Release history",{opener.open(AppLinks.REPOSITORY+"/releases")},subtitle="Changes and installable APKs",icon=DriveIcons.Update)}
         add{SettingsClickRow("Credits & licenses",{opener.open(AppLinks.REPOSITORY+"/blob/main/THIRD_PARTY_NOTICES.md")},subtitle="Third-party components and acknowledgements",icon=DriveIcons.Info)}
         add{SettingsClickRow("Iconsax icons",{opener.open("https://docs.iconsax.io/license-and-terms/license")},subtitle="Outline and Broken · Proprietary Free License",icon=DriveIcons.Palette)}
-        add{SettingsClickRow("Support upstream",{opener.open(AppLinks.DONATE)},subtitle="Optional support for the DriveInfinity engine",icon=DriveIcons.Favorite)}
     }
     Text("Made possible by open source.",Modifier.fillMaxWidth().padding(horizontal=24.dp,vertical=24.dp),
         style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)

@@ -81,6 +81,23 @@ class MediaSurfaceRegressionTest {
             }
         }
     }}}
+    @Test fun onlyTheVisiblePhotoDisplaysDelayedLoading() {
+        val visible = androidx.compose.runtime.mutableStateOf(true)
+        activity.get().setContent {
+            DriveInfinityTheme {
+                com.infinity.drive.presentation.preview.ZoomableImage(
+                    model = null, contentKey = "photo", contentDescription = "Photo",
+                    showLoadingIndicator = visible.value
+                )
+            }
+        }
+        compose.mainClock.advanceTimeBy(350)
+        compose.onNodeWithContentDescription("Preparing photo").assertIsDisplayed()
+        compose.runOnIdle { visible.value = false }
+        compose.mainClock.advanceTimeBy(250)
+        compose.onNodeWithContentDescription("Preparing photo").assertDoesNotExist()
+    }
+
     @Test fun audioControlsAndArtworkKeepTheirBoundsAndEmbeddedLyricsStayAbsent(){
         install()
         val controls=compose.onNodeWithTag("audio-controls").fetchSemanticsNode().boundsInRoot

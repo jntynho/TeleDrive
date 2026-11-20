@@ -18,15 +18,13 @@ import androidx.compose.ui.graphics.lerp
 @Composable
 fun DriveInfinityTheme(
     darkTheme: Boolean = true,
-    dynamicColor: Boolean = false,
     amoled: Boolean = false,
     accentColour: AccentColour = AccentColour.BLUE,
     customTheme: CustomTheme? = null,
     iconStyle: AppIconStyle = AppIconStyle.OUTLINE,
     content: @Composable () -> Unit
 ) {
-    val dynamic = platformColorScheme(darkTheme, dynamicColor)
-    val base = dynamic ?: remember(customTheme, accentColour, darkTheme) {
+    val base = remember(customTheme, accentColour, darkTheme) {
         val definition = customTheme ?: accentColour.themeDefinition()
         definition?.toColorScheme(darkTheme) ?: accentedScheme(defaultColorScheme(darkTheme), accentColour, darkTheme)
     }

@@ -41,7 +41,7 @@ class QueueMigrationTest {
                 }
                 values.put("id",if(table=="files")"original-file"else"original-transfer")
                 if(table=="files"){
-                    values.put("name","Original.jpg");values.put("mimeType","image/jpeg");values.put("category","IMAGE");values.put("backupState","NONE")
+                    values.put("chatId", -100100L);values.put("name","Original.jpg");values.put("mimeType","image/jpeg");values.put("category","IMAGE");values.put("backupState","NONE")
                 }else{
                     values.put("displayName","Original.jpg");values.put("type","UPLOAD");values.put("state","QUEUED");values.put("fileId","original-file")
                 }
@@ -49,7 +49,7 @@ class QueueMigrationTest {
             }
             old.version=11
         }
-        fun open()=Room.databaseBuilder(context,DriveInfinityDatabase::class.java,name).addMigrations(MIGRATION_11_12,MIGRATION_12_13,MIGRATION_13_14,MIGRATION_14_15,MIGRATION_15_16,MIGRATION_16_17).allowMainThreadQueries().build()
+        fun open()=Room.databaseBuilder(context,DriveInfinityDatabase::class.java,name).addMigrations(MIGRATION_11_12,MIGRATION_12_13,MIGRATION_13_14,MIGRATION_14_15,MIGRATION_15_16,MIGRATION_16_17,MIGRATION_17_18).allowMainThreadQueries().build()
         try {
             val first=open()
             try {
@@ -60,6 +60,7 @@ class QueueMigrationTest {
                 assertTrue(file.tagsEncoded.isEmpty())
                 assertEquals("jpg\u0001original.jpg", file.extensionSortKey)
                 assertFalse(file.offlinePinned);assertNull(file.importReference);assertTrue(file.uploadRequested)
+                assertEquals(-100100L, db.transferDao().byId("original-transfer")!!.chatId)
                 assertEquals(0,db.transferDao().byId("original-transfer")!!.retryCount)
                 assertFalse(db.transferDao().byId("original-transfer")!!.retryableFailure)
                 assertEquals(1,db.transferDao().claim("original-transfer",100))

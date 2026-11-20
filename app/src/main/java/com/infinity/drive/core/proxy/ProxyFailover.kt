@@ -9,6 +9,8 @@ import com.infinity.drive.domain.repository.TelegramAuthRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -27,29 +29,31 @@ class ProxyFailover(
 
     fun start(scope: CoroutineScope) {
         scope.launch {
-            authRepository.connectionState
-                .collectLatest { state ->
-                    if (state != TelegramConnectionState.CONNECTING) return@collectLatest
-                    if (!routingEnabled()) return@collectLatest
-                    var tried = 0
-                    while (isActive) {
-                        delay(SETTLE_MS)
-                        if (!routingEnabled()) return@collectLatest
-                        val limit = proxyRepository.observeProxies().first().size
-                        if (tried >= limit) {
-                            SafeLog.w(TAG, "Every saved proxy was tried without connecting")
-                            return@collectLatest
-                        }
-                        tried++
-                        val rotated = proxyRepository.rotate()
-                        if (rotated !is AppResult.Success || !rotated.value) return@collectLatest
+            combine(authRepository.connectionState, settingsRepository.preferences) { connection, prefs ->
+                connection == TelegramConnectionState.CONNECTING && prefs.proxyEnabled
+            }.distinctUntilChanged().collectLatest { shouldTry ->
+                if (!shouldTry) return@collectLatest
+                var activeId = settingsRepository.preferences.first().activeProxyId
+                val tried = mutableSetOf(activeId)
+                while (isActive) {
+                    delay(SETTLE_MS)
+                    val prefs = settingsRepository.preferences.first()
+                    if (!prefs.proxyEnabled) return@collectLatest
+                    if (activeId != prefs.activeProxyId) {
+                        activeId = prefs.activeProxyId
+                        tried.clear()
+                        tried.add(activeId)
+                        continue
                     }
+                    val rotated = proxyRepository.rotate(activeId, tried)
+                    val next = (rotated as? AppResult.Success)?.value ?: return@collectLatest
+                    tried.add(next)
+                    activeId = next
+                    SafeLog.d(TAG, "Tried another saved proxy")
                 }
+            }
         }
     }
-
-    private suspend fun routingEnabled(): Boolean =
-        settingsRepository.preferences.first().proxyEnabled
 
     private companion object {
         const val TAG = "ProxyFailover"

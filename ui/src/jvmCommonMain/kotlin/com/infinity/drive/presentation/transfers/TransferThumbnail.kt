@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -22,7 +21,7 @@ import com.infinity.drive.core.files.MimeTypes
 import com.infinity.drive.core.media.ThumbnailModel
 import com.infinity.drive.domain.model.FileCategory
 import com.infinity.drive.domain.model.TransferTask
-import com.infinity.drive.presentation.components.iconFor
+import com.infinity.drive.presentation.components.FileTypeFallback
 
 /**
  * Leading visual for a transfer row. The category comes from the file name
@@ -58,12 +57,8 @@ fun TransferThumbnail(
                 onError = { failed = true }
             )
         } else {
-            Icon(
-                imageVector = iconFor(category),
-                contentDescription = null,
-                modifier = Modifier.size(22.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            val name = transfer.displayName
+            FileTypeFallback(name, MimeTypes.fromFileName(name), category, 22.dp)
         }
     }
 }

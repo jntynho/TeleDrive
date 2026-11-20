@@ -23,10 +23,10 @@ interface ProxyRepository {
     suspend fun applyActive()
 
     /**
-     * Moves to the next saved proxy and reconnects through it. Returns false
-     * when there is nothing else to try.
+     * Tries remaining saved routes only if routing still uses the expected
+     * proxy. Returns the newly selected route ID, or null if none was applied.
      */
-    suspend fun rotate(): AppResult<Boolean>
+    suspend fun rotate(expectedId: String, excludedIds: Set<String>): AppResult<String?>
 
     /** Reports how far a check through [proxy] got. */
     suspend fun test(proxy: ProxyServer): AppResult<ProxyProbeResult>

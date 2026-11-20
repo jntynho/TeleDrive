@@ -265,7 +265,6 @@ class FilesViewModel(
             gridSize = prefs.gridSize,
             sortField = prefs.sortField,
             sortDirection = prefs.sortDirection,
-            showHidden = prefs.showHiddenFiles,
             loaded = true,
             capabilities = capabilities
         )

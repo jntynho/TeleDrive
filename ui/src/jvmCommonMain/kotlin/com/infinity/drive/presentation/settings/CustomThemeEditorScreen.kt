@@ -57,9 +57,7 @@ import com.infinity.drive.presentation.common.AppBackHandler
 import com.infinity.drive.presentation.navigation.LocalBottomBarInset
 import com.infinity.drive.presentation.theme.ThemeColourGroup
 import com.infinity.drive.presentation.theme.ThemeColourRole
-import com.infinity.drive.presentation.theme.captureTheme
 import com.infinity.drive.presentation.theme.editorDefinition
-import com.infinity.drive.presentation.theme.platformColorScheme
 import com.infinity.drive.presentation.theme.toColorScheme
 import com.infinity.drive.presentation.theme.toStoredColour
 import com.infinity.drive.presentation.theme.withAmoledBackground
@@ -111,18 +109,10 @@ internal fun CustomThemeEditorScreen(
 ) {
     val focusManager = LocalFocusManager.current
 
-    val lightWallpaper = platformColorScheme(darkTheme = false, dynamicColor = true)
-    val darkWallpaper = platformColorScheme(darkTheme = true, dynamicColor = true)
-    val dynamic = remember(lightWallpaper, darkWallpaper) {
-        if (lightWallpaper != null && darkWallpaper != null) {
-            captureTheme("dynamic", "Dynamic", lightWallpaper, darkWallpaper)
-        } else null
-    }
     val builtIn = remember { AccentColour.presets.map { it.editorDefinition() } }
-    val baseThemes = builtIn + listOfNotNull(dynamic) + preferences.customThemes
+    val baseThemes = builtIn + preferences.customThemes
     val original = preferences.customThemes.firstOrNull { it.id == themeId }
     val source = original
-        ?: dynamic?.takeIf { preferences.dynamicColor }
         ?: preferences.selectedCustomTheme
         ?: remember(preferences.accentColour) { preferences.accentColour.editorDefinition() }
 

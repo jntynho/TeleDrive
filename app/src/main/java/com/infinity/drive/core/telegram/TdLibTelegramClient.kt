@@ -505,17 +505,21 @@ internal class TdLibTelegramClient(
     override suspend fun applyProxy(proxy: TelegramProxy?) {
         if (client == null) return
         awaitAuthorizedOrParameters()
-        runCatching {
+        val selectedId = if (proxy == null) {
+            send<TdApi.Ok>(TdApi.DisableProxy())
+            null
+        } else {
+            send<TdApi.AddedProxy>(
+                TdApi.AddProxy(TdApi.Proxy(proxy.host, proxy.port, proxy.toTdType()), true, "TeleDrive")
+            ).id
+        }
+        // Activate the replacement first. Rejected updates leave the existing route intact.
+        try {
             val existing = send<TdApi.AddedProxies>(TdApi.GetProxies())
-            existing.proxies.forEach { send<TdApi.Ok>(TdApi.RemoveProxy(it.id)) }
+            existing.proxies.filter { it.id != selectedId }.forEach { send<TdApi.Ok>(TdApi.RemoveProxy(it.id)) }
+        } catch (_: TelegramException) {
+            SafeLog.w(TAG, "Could not remove an inactive proxy")
         }
-        if (proxy == null) {
-            runCatching { send<TdApi.Ok>(TdApi.DisableProxy()) }
-            return
-        }
-        send<TdApi.AddedProxy>(
-            TdApi.AddProxy(TdApi.Proxy(proxy.host,proxy.port,proxy.toTdType()),true,"TG Drive")
-        )
     }
 
     override suspend fun testProxy(proxy: TelegramProxy) {

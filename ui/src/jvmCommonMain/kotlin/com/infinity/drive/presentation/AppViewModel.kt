@@ -7,7 +7,6 @@ import com.infinity.drive.core.security.AppLockManager
 import com.infinity.drive.core.telegram.TelegramAuthState
 import com.infinity.drive.domain.model.AppTheme
 import com.infinity.drive.domain.model.BackupTrigger
-import com.infinity.drive.domain.model.LayoutDensity
 import com.infinity.drive.domain.repository.BackupRepository
 import com.infinity.drive.domain.repository.ChannelRepository
 import com.infinity.drive.domain.repository.SettingsRepository
@@ -45,11 +44,9 @@ data class AppUiState(
     val language: AppLanguage = AppLanguage.ENGLISH,
     val dashboardStyle:com.infinity.drive.domain.model.DashboardStyle=com.infinity.drive.domain.model.DashboardStyle.CLASSIC,
     val dashboardDark:Boolean=false,
-    val dynamicColor: Boolean = false,
     val accentColour:com.infinity.drive.domain.model.AccentColour=com.infinity.drive.domain.model.AccentColour.BLUE,
     val customTheme: CustomTheme? = null,
     val iconStyle: AppIconStyle = AppIconStyle.OUTLINE,
-    val compactLayout: Boolean = false,
     val locked: Boolean = false,
     val warmupGlass:Boolean=false
 )
@@ -94,11 +91,9 @@ class AppViewModel(
             language = prefs.language,
             dashboardStyle = prefs.dashboardStyle,
             dashboardDark = prefs.dashboardStyle.name in prefs.dashboardDarkStyles,
-            dynamicColor = prefs.dynamicColor,
             accentColour = prefs.accentColour,
             customTheme = prefs.selectedCustomTheme,
             iconStyle = prefs.iconStyle,
-            compactLayout = prefs.layoutDensity == LayoutDensity.COMPACT,
             locked = locked,
             warmupGlass=prefs.floatingNavigationBar&&prefs.navigationBarBlur&&prefs.navigationBarStyle==com.infinity.drive.domain.model.NavigationBarStyle.FLOATING
         )

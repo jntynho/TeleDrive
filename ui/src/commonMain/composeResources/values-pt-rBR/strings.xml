@@ -639,26 +639,23 @@
     <string name="settings_nothing_to_remove">Nada para remover</string>
 
     <!-- Settings: appearance -->
-    <string name="settings_archived_shortcut">Atalho para Arquivados</string>
-    <string name="settings_compact_layout">Layout compacto</string>
-    <string name="settings_dynamic_color">Cor dinâmica</string>
+
+
     <string name="settings_gallery_grid_columns">Colunas da grade na galeria</string>
     <string name="settings_gallery_grid_view">Visualização em grade na galeria</string>
     <string name="settings_grid_columns">Colunas da grade nos arquivos</string>
     <string name="settings_grid_view">Visualização em grade nos arquivos</string>
-    <string name="settings_hidden_shortcut">Atalho para Ocultos</string>
+
     <string name="settings_recent_files">Arquivos recentes</string>
     <string name="settings_recent_files_subtitle">Exibe os arquivos adicionados recentemente na tela inicial</string>
-    <string name="settings_shows_archived_collection_home">Exibe a coleção de Arquivados na tela inicial</string>
-    <string name="settings_shows_hidden_collection_home">Exibe a coleção de Ocultos na tela inicial</string>
+
     <string name="settings_theme">Tema</string>
     <string name="settings_language">Idioma</string>
     <string name="language_system">Padrão do sistema</string>
     <string name="language_english">English</string>
     <string name="language_russian">Русский</string>
     <string name="language_portuguese_br">Português (Brasil)</string>
-    <string name="settings_tighter_list_rows_without">Linhas de lista mais compactas, sem exibir tamanho e data</string>
-    <string name="settings_use_wallpaper_colors_available">Usar as cores do papel de parede quando disponíveis</string>
+
     <string name="theme_dark">Escuro</string>
     <string name="theme_amoled">AMOLED</string>
     <string name="theme_light">Claro</string>

@@ -173,15 +173,29 @@
     <string name="search_content_label">محتوى الملاحظات وملفات PDF</string>
     <string name="search_content_notes_only">محتوى الملاحظات</string>
     <string name="search_content_skipped">الملفات المتجاوزة أو المفحوصة جزئيًا: %1$d</string>
-    <string name="files_zip_title">ضغط ورفع بصيغة ZIP</string>
-    <string name="files_zip_description">الاحتفاظ بالملفات الأصلية ورفع نسخة مضغوطة واحدة</string>
-    <string name="files_zip_default_name">أرشيف</string>
-    <string name="files_zip_name">اسم الأرشيف</string>
-    <string name="files_zip_select">اختيار الملفات</string>
-    <string name="files_zip_preparing">جارٍ ضغط الملفات المحددة…</string>
-    <string name="files_zip_failed">تعذّر ضغط الملفات المحددة أو إضافتها إلى قائمة الرفع.</string>
+
+
+
+
+
     <string name="settings_icon_style">نمط الأيقونات</string>
     <string name="settings_icon_outline">Outline</string>
     <string name="settings_icon_broken">Broken</string>
     <string name="common_close">إغلاق</string>
+    <string name="preview_preparing_photo">جارٍ فتح الصورة</string>
+    <string name="proxy_status_applying">جارٍ تطبيق إعدادات الوكيل…</string>
+    <string name="proxy_status_connecting">جارٍ الاتصال عبر الوكيل المحدد…</string>
+    <string name="proxy_status_connected">Telegram متصل عبر الوكيل المحدد</string>
+    <string name="proxy_status_waiting">في انتظار اتصال بالشبكة</string>
+    <string name="transfers_uploads_in_progress">عمليات الرفع جارية</string>
+    <string name="transfers_activity_actions">إجراءات النقل</string>
+    <string name="transfers_view_active">عرض عمليات النقل النشطة</string>
+    <string name="transfers_pause_active">إيقاف عمليات النقل النشطة مؤقتًا</string>
+    <string name="transfers_resume_paused">استئناف عمليات النقل المتوقفة</string>
+    <string name="transfers_no_channel_actions">لا توجد إجراءات نقل متاحة لهذه القناة.</string>
+    <string name="transfers_resume_upload">استئناف الرفع</string>
+    <string name="transfers_pause_upload">إيقاف الرفع مؤقتًا</string>
+    <string name="transfers_cancel_upload">إلغاء الرفع</string>
+    <string name="transfers_cancel_upload_title">إلغاء الرفع؟</string>
+    <string name="transfers_cancel_upload_message">أوقف عملية الرفع هذه وأزلها من قائمة الانتظار.</string>
 </resources>

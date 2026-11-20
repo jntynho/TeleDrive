@@ -58,8 +58,8 @@ interface FileDao {
     suspend fun setUploadRequested(ids:List<String>,requested:Boolean)
     @Query("UPDATE files SET uploadRequested = 0 WHERE messageId IS NULL AND id IN (SELECT fileId FROM transfers WHERE id IN (:ids) AND type IN ('UPLOAD','BACKUP'))")
     suspend fun suppressUploadsForTransfers(ids:List<String>)
-    @Query("UPDATE files SET uploadRequested = 0 WHERE messageId IS NULL AND id IN (SELECT fileId FROM transfers WHERE type IN ('UPLOAD','BACKUP') AND state IN ('QUEUED','RUNNING','PAUSED','FAILED'))")
-    suspend fun suppressPendingUploads()
+    @Query("UPDATE files SET uploadRequested = 0 WHERE messageId IS NULL AND id IN (SELECT fileId FROM transfers WHERE chatId = :chatId AND type IN ('UPLOAD','BACKUP') AND state IN ('QUEUED','RUNNING','PAUSED','FAILED'))")
+    suspend fun suppressPendingUploads(chatId: Long)
 
     @Query("UPDATE files SET contentHash = :hash WHERE id = :id")
     suspend fun setContentHash(id:String,hash:String)

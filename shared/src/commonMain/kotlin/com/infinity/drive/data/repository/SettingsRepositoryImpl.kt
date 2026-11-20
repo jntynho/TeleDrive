@@ -139,7 +139,6 @@ class SettingsRepositoryImpl(
             navigationBarStyle = enumOrDefault(this[PreferenceKeys.NAVIGATION_STYLE],defaults.navigationBarStyle),
             navigationBarBlur = this[PreferenceKeys.NAVIGATION_BLUR] ?: defaults.navigationBarBlur,
             navigationBarLabels = this[PreferenceKeys.NAVIGATION_LABELS] ?: defaults.navigationBarLabels,
-            dynamicColor = this[PreferenceKeys.DYNAMIC_COLOR] ?: defaults.dynamicColor,
             viewMode = if(this[PreferenceKeys.FILE_LIST_DEFAULT_APPLIED]==true)enumOrDefault(this[PreferenceKeys.VIEW_MODE], defaults.viewMode)else com.infinity.drive.domain.model.ViewMode.LIST,
             galleryViewMode = enumOrDefault(
                 this[PreferenceKeys.GALLERY_VIEW_MODE],
@@ -150,13 +149,6 @@ class SettingsRepositoryImpl(
                 ?: defaults.galleryGridSize,
             gridSize = this[PreferenceKeys.GRID_SIZE] ?: defaults.gridSize,
             albumGridSize = this[PreferenceKeys.ALBUM_GRID_SIZE] ?: defaults.albumGridSize,
-            layoutDensity = enumOrDefault(
-                this[PreferenceKeys.LAYOUT_DENSITY],
-                defaults.layoutDensity
-            ),
-            showHiddenFiles = this[PreferenceKeys.SHOW_HIDDEN_FILES] ?: defaults.showHiddenFiles,
-            showArchivedFiles = this[PreferenceKeys.SHOW_ARCHIVED_FILES]
-                ?: defaults.showArchivedFiles,
             showRecentFiles = this[PreferenceKeys.SHOW_RECENT_FILES] ?: defaults.showRecentFiles,
             linkPreviews = this[PreferenceKeys.LINK_PREVIEWS] ?: defaults.linkPreviews,
             updateCheckEnabled = this[PreferenceKeys.UPDATE_CHECK_ENABLED]
@@ -246,16 +238,12 @@ class SettingsRepositoryImpl(
         this[PreferenceKeys.NAVIGATION_STYLE] = prefs.navigationBarStyle.name
         this[PreferenceKeys.NAVIGATION_BLUR] = prefs.navigationBarBlur
         this[PreferenceKeys.NAVIGATION_LABELS] = prefs.navigationBarLabels
-        this[PreferenceKeys.DYNAMIC_COLOR] = prefs.dynamicColor
         this[PreferenceKeys.FILE_LIST_DEFAULT_APPLIED] = true
         this[PreferenceKeys.VIEW_MODE] = prefs.viewMode.name
         this[PreferenceKeys.GALLERY_VIEW_MODE] = prefs.galleryViewMode.name
         this[PreferenceKeys.GALLERY_GRID_SIZE] = prefs.galleryGridSize
         this[PreferenceKeys.GRID_SIZE] = prefs.gridSize
         this[PreferenceKeys.ALBUM_GRID_SIZE] = prefs.albumGridSize
-        this[PreferenceKeys.LAYOUT_DENSITY] = prefs.layoutDensity.name
-        this[PreferenceKeys.SHOW_HIDDEN_FILES] = prefs.showHiddenFiles
-        this[PreferenceKeys.SHOW_ARCHIVED_FILES] = prefs.showArchivedFiles
         this[PreferenceKeys.SHOW_RECENT_FILES] = prefs.showRecentFiles
         this[PreferenceKeys.LINK_PREVIEWS] = prefs.linkPreviews
         this[PreferenceKeys.UPDATE_CHECK_ENABLED] = prefs.updateCheckEnabled

@@ -35,7 +35,6 @@ import com.infinity.drive.domain.model.deleteCustomTheme
 import com.infinity.drive.domain.model.saveCustomTheme
 import com.infinity.drive.domain.model.selectAccentColour
 import com.infinity.drive.domain.model.selectCustomTheme
-import com.infinity.drive.domain.model.selectDynamicAccent
 import com.infinity.drive.resources.settings_icon_style
 import com.infinity.drive.resources.settings_icon_outline
 import com.infinity.drive.resources.settings_icon_broken
@@ -79,7 +78,6 @@ import com.infinity.drive.resources.common_storage_channels
 import com.infinity.drive.resources.lock_timeout_labels
 import com.infinity.drive.resources.settings_add_another_folder
 import com.infinity.drive.resources.settings_app_lock
-import com.infinity.drive.resources.settings_archived_shortcut
 import com.infinity.drive.resources.settings_auto_clear_trash
 import com.infinity.drive.resources.settings_auto_lock
 import com.infinity.drive.resources.settings_automatic_backup
@@ -98,7 +96,6 @@ import com.infinity.drive.resources.settings_clear_cache_action
 import com.infinity.drive.resources.settings_clear_cache_title
 import com.infinity.drive.resources.settings_clear_thumbnails_action
 import com.infinity.drive.resources.settings_clear_thumbnails_title
-import com.infinity.drive.resources.settings_compact_layout
 import com.infinity.drive.resources.settings_confirm_removing_lock
 import com.infinity.drive.resources.settings_debug_logging
 import com.infinity.drive.resources.settings_exclusions
@@ -110,7 +107,6 @@ import com.infinity.drive.resources.settings_verified_cleanup_title
 import com.infinity.drive.resources.settings_gallery_previews_regenerated_browse
 import com.infinity.drive.resources.settings_gallery_grid_columns
 import com.infinity.drive.resources.settings_gallery_grid_view
-import com.infinity.drive.resources.settings_hidden_shortcut
 import com.infinity.drive.resources.settings_hides_app_screenshots_screen
 import com.infinity.drive.resources.settings_key_backup_stored
 import com.infinity.drive.resources.settings_link_previews
@@ -137,13 +133,10 @@ import com.infinity.drive.resources.settings_retry_attempts
 import com.infinity.drive.resources.settings_set
 import com.infinity.drive.resources.settings_set_passphrase
 import com.infinity.drive.resources.settings_shown_channels_private_owned
-import com.infinity.drive.resources.settings_shows_archived_collection_home
-import com.infinity.drive.resources.settings_shows_hidden_collection_home
 import com.infinity.drive.resources.settings_skip_files_larger_than
 import com.infinity.drive.resources.settings_stream_downloading
 import com.infinity.drive.resources.settings_switch_drives_create_another
 import com.infinity.drive.resources.settings_theme
-import com.infinity.drive.resources.settings_tighter_list_rows_without
 import com.infinity.drive.resources.settings_transfers_wi_fi_only
 import com.infinity.drive.resources.settings_transfers_wi_fi_only_summary
 import com.infinity.drive.resources.settings_turn_off_app_lock
@@ -158,7 +151,6 @@ import com.infinity.drive.resources.theme_light
 import com.infinity.drive.resources.theme_system
 import com.infinity.drive.resources.trash_clear_labels
 import com.infinity.drive.domain.model.AppTheme
-import com.infinity.drive.domain.model.LayoutDensity
 import com.infinity.drive.domain.model.ViewMode
 import com.infinity.drive.presentation.platform.LocalDownloadLocationConfigurable
 import com.infinity.drive.resources.settings_download_location
@@ -943,7 +935,6 @@ private fun AppearanceSection(
     onCustomTheme: (String?) -> Unit
 ) {
     val prefs = state.preferences
-    val capabilities = LocalPlatformCapabilities.current
     var showThemeDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showIconStyleDialog by rememberSaveable { mutableStateOf(false) }
@@ -992,9 +983,7 @@ private fun AppearanceSection(
         add {
             AccentColourPicker(
                 preferences = prefs,
-                supportsDynamicColor = capabilities.supportsDynamicColor,
                 onSelect = { colour -> viewModel.update { it.selectAccentColour(colour) } },
-                onSelectDynamic = { viewModel.update { it.selectDynamicAccent() } },
                 onSelectCustom = { id -> viewModel.update { it.selectCustomTheme(id) } },
                 onEditCustom = onCustomTheme,
                 onDeleteCustom = { id -> viewModel.update { it.deleteCustomTheme(id) } },
@@ -1055,21 +1044,6 @@ private fun AppearanceSection(
                 onChange = { value -> viewModel.update { it.copy(galleryGridSize = value) } }
             )
         }
-        add(visible = prefs.viewMode == ViewMode.LIST || prefs.galleryViewMode == ViewMode.LIST) {
-            SettingsSwitchRow(
-                title = stringResource(Res.string.settings_compact_layout),
-                subtitle = stringResource(Res.string.settings_tighter_list_rows_without),
-                checked = prefs.layoutDensity == LayoutDensity.COMPACT,
-                onChange = { value ->
-                    viewModel.update {
-                        it.copy(
-                            layoutDensity = if (value) LayoutDensity.COMPACT
-                            else LayoutDensity.COMFORTABLE
-                        )
-                    }
-                }
-            )
-        }
         add {
             SettingsSwitchRow(
                 title = stringResource(Res.string.settings_link_previews),
@@ -1084,24 +1058,6 @@ private fun AppearanceSection(
                 subtitle = stringResource(Res.string.settings_recent_files_subtitle),
                 checked = prefs.showRecentFiles,
                 onChange = { value -> viewModel.update { it.copy(showRecentFiles = value) } }
-            )
-        }
-        add {
-            SettingsSwitchRow(
-                title = stringResource(Res.string.settings_hidden_shortcut),
-                subtitle = stringResource(Res.string.settings_shows_hidden_collection_home),
-                checked = prefs.showHiddenFiles,
-                onChange = { value -> viewModel.update { it.copy(showHiddenFiles = value) } }
-            )
-        }
-        add {
-            SettingsSwitchRow(
-                title = stringResource(Res.string.settings_archived_shortcut),
-                subtitle = stringResource(Res.string.settings_shows_archived_collection_home),
-                checked = prefs.showArchivedFiles,
-                onChange = { value ->
-                    viewModel.update { it.copy(showArchivedFiles = value) }
-                }
             )
         }
     }

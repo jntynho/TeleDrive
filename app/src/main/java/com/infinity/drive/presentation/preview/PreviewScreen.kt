@@ -151,7 +151,6 @@ import com.infinity.drive.presentation.components.ErrorState
 import com.infinity.drive.presentation.components.FileInfoSheet
 import com.infinity.drive.presentation.components.LoadingState
 import com.infinity.drive.presentation.components.RenameDialog
-import com.infinity.drive.presentation.components.iconFor
 import kotlinx.coroutines.delay
 import java.io.File
 import kotlin.time.Duration.Companion.milliseconds
@@ -538,7 +537,8 @@ private fun PreviewPage(
             ZoomableImage(model=(content as? PreviewContent.Image)?.model,contentKey=file.id,
                 previewModel=com.infinity.drive.core.media.thumbnailModel(file),contentDescription=file.name,
                 knownImageSize=if((file.width?:0)>0&&(file.height?:0)>0)androidx.compose.ui.unit.IntSize(file.width!!,file.height!!)else androidx.compose.ui.unit.IntSize.Zero,
-                onTap=onToggleChrome,onZoomChanged=onImageZoomChanged)
+                onTap=onToggleChrome,onZoomChanged=onImageZoomChanged,
+                showLoadingIndicator=isActivePage)
         }
         return
     }
@@ -786,7 +786,7 @@ private fun ArchiveRow(
     val icon = if (node.isDirectory) {
         if (row.expanded) DriveIcons.FolderOpen else DriveIcons.Folder
     } else {
-        iconFor(FileCategory.fromMimeType(MimeTypes.fromFileName(node.name)))
+        com.infinity.drive.presentation.components.fileTypeIcon(node.name, MimeTypes.fromFileName(node.name))
     }
     val chevronRotation by animateFloatAsState(
         targetValue = if (row.expanded) 180f else 0f,

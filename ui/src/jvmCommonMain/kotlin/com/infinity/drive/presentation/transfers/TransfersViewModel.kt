@@ -1,5 +1,6 @@
 package com.infinity.drive.presentation.transfers
 
+import com.infinity.drive.data.repository.ActiveChannel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.infinity.drive.domain.model.TransferSection
@@ -11,6 +12,10 @@ import com.infinity.drive.resources.transfers_retry_batch_error
 import com.infinity.drive.resources.transfers_retry_batch_none
 import com.infinity.drive.resources.transfers_retry_batch_queued
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,6 +25,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class TransfersUiState(
+    val chatId: Long? = null,
     val active: List<TransferTask> = emptyList(),
     val paused: List<TransferTask> = emptyList(),
     val failed: List<TransferTask> = emptyList(),
@@ -31,16 +37,18 @@ data class TransfersUiState(
     val loading: Boolean = true
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class TransfersViewModel(
     private val transferRepository: TransferRepository,
+    private val activeChannel: ActiveChannel,
     private val hidden:com.infinity.drive.core.security.HiddenContentAccess
 ) : ViewModel() {
 
-    private val rows = combine(
-        transferRepository.observeSection(TransferSection.ACTIVE, SECTION_LIMIT),
-        transferRepository.observeSection(TransferSection.PAUSED, SECTION_LIMIT),
-        transferRepository.observeSection(TransferSection.FAILED, SECTION_LIMIT),
-        transferRepository.observeSection(TransferSection.COMPLETED, SECTION_LIMIT)
+    private fun rows(chatId: Long) = combine(
+        transferRepository.observeSection(chatId, TransferSection.ACTIVE, SECTION_LIMIT),
+        transferRepository.observeSection(chatId, TransferSection.PAUSED, SECTION_LIMIT),
+        transferRepository.observeSection(chatId, TransferSection.FAILED, SECTION_LIMIT),
+        transferRepository.observeSection(chatId, TransferSection.COMPLETED, SECTION_LIMIT)
     ) { active, paused, failed, completed ->
         val seen = mutableSetOf<String>()
         listOf(
@@ -54,16 +62,17 @@ class TransfersViewModel(
     private fun List<TransferTask>.filterUnseen(seen: MutableSet<String>): List<TransferTask> =
         filter { seen.add(it.id) }
 
-    private val totals = combine(
-        transferRepository.observeSectionCount(TransferSection.ACTIVE),
-        transferRepository.observeSectionCount(TransferSection.PAUSED),
-        transferRepository.observeSectionCount(TransferSection.FAILED),
-        transferRepository.observeSectionCount(TransferSection.COMPLETED)
+    private fun totals(chatId: Long) = combine(
+        transferRepository.observeSectionCount(chatId, TransferSection.ACTIVE),
+        transferRepository.observeSectionCount(chatId, TransferSection.PAUSED),
+        transferRepository.observeSectionCount(chatId, TransferSection.FAILED),
+        transferRepository.observeSectionCount(chatId, TransferSection.COMPLETED)
     ) { counts -> counts.toList() }
 
-    val uiState: StateFlow<TransfersUiState> = combine(rows, totals,hidden.lock.state,hidden.protectedFolders,hidden.notesRestricted) { rawSections, counts, _, _, _ ->
+    private fun channelState(chatId: Long) = combine(rows(chatId), totals(chatId), hidden.lock.state, hidden.protectedFolders, hidden.notesRestricted) { rawSections, counts, _, _, _ ->
         val sections=rawSections.map{section->section.map{task->task.copy(displayName=hidden.notificationName(task.fileId,task.displayName),errorMessage=if(task.fileId?.let{!hidden.canRead(it)}==true)null else task.errorMessage)}}
         TransfersUiState(
+            chatId = chatId,
             active = sections[0],
             paused = sections[1],
             failed = sections[2],
@@ -74,22 +83,27 @@ class TransfersViewModel(
             completedTotal = counts[3],
             loading = false
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TransfersUiState())
+    }.onStart { emit(TransfersUiState(chatId = chatId)) }
+
+    val uiState: StateFlow<TransfersUiState> = activeChannel.observe().flatMapLatest { chatId ->
+        if (chatId == null) flowOf(TransfersUiState(loading = false)) else channelState(chatId)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000, replayExpirationMillis = 0), TransfersUiState())
 
     fun pause(id: String) = launch { transferRepository.pause(id) }
 
     fun resume(id: String) = launch { transferRepository.resume(id) }
 
-    fun cancel(id: String) = launch { transferRepository.cancel(id) }
+    fun cancel(id: String, dismissFinished: Boolean = false) = launch { transferRepository.cancel(id, dismissFinished) }
 
     fun retry(id: String) = launch { transferRepository.retry(id) }
 
     private val retryResults = Channel<UiText>(Channel.CONFLATED)
     val retryMessages = retryResults.receiveAsFlow()
 
-    fun retryFailedBatch(batchId: String? = null) = launch {
+    fun retryFailedBatch(chatId: Long?, batchId: String? = null) = launch {
+        if (chatId == null || chatId != activeChannel.id()) return@launch
         val message = try {
-            val count = transferRepository.retryFailedBatch(batchId)
+            val count = transferRepository.retryFailedBatch(chatId, batchId)
             if (count == 0) UiText.Resource(Res.string.transfers_retry_batch_none)
             else UiText.Resource(Res.string.transfers_retry_batch_queued, count)
         } catch (cancel: CancellationException) {
@@ -100,13 +114,17 @@ class TransfersViewModel(
         retryResults.trySend(message)
     }
 
-    fun pauseAll() = launch { transferRepository.pauseAll() }
+    fun pauseAll(chatId: Long?) = inChannel(chatId, transferRepository::pauseAll)
 
-    fun resumeAll() = launch { transferRepository.resumeAll() }
+    fun resumeAll(chatId: Long?) = inChannel(chatId, transferRepository::resumeAll)
 
-    fun cancelAll() = launch { transferRepository.cancelAll() }
+    fun cancelAll(chatId: Long?) = inChannel(chatId, transferRepository::cancelAll)
 
-    fun clearFinished() = launch { transferRepository.clearFinished() }
+    fun clearFinished(chatId: Long?) = inChannel(chatId, transferRepository::clearFinished)
+
+    private fun inChannel(chatId: Long?, action: suspend (Long) -> Unit) = launch {
+        if (chatId != null && chatId == activeChannel.id()) action(chatId)
+    }
 
     private fun launch(block: suspend () -> Unit) {
         viewModelScope.launch { block() }

@@ -99,7 +99,6 @@ import com.infinity.drive.resources.proxy_port
 import com.infinity.drive.resources.proxy_reachable
 import com.infinity.drive.resources.proxy_route_needs_one
 import com.infinity.drive.resources.proxy_route_off_summary
-import com.infinity.drive.resources.proxy_route_on_summary
 import com.infinity.drive.resources.proxy_route_through
 import com.infinity.drive.resources.proxy_saved
 import com.infinity.drive.resources.proxy_secret
@@ -112,8 +111,17 @@ import com.infinity.drive.resources.proxy_type_mtproto
 import com.infinity.drive.resources.proxy_type_socks5
 import com.infinity.drive.resources.proxy_unreachable
 import com.infinity.drive.resources.proxy_username_optional
-import com.infinity.drive.core.telegram.ProxyLink
 import com.infinity.drive.core.telegram.TelegramProxyType
+import com.infinity.drive.core.telegram.TelegramProxy
+import com.infinity.drive.core.telegram.TelegramConnectionState
+import com.infinity.drive.core.telegram.hasValidFields
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import com.infinity.drive.resources.proxy_status_applying
+import com.infinity.drive.resources.proxy_status_connecting
+import com.infinity.drive.resources.proxy_status_connected
+import com.infinity.drive.resources.proxy_status_waiting
 import com.infinity.drive.domain.model.ProxyServer
 import com.infinity.drive.presentation.common.imeTargetBottomInset
 import com.infinity.drive.presentation.common.CollectSnackbarMessages
@@ -157,7 +165,7 @@ fun ProxyScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { importOpen = true }) {
+                    IconButton(onClick = { importOpen = true }, enabled = !state.applying) {
                         Icon(
                             DriveIcons.ContentPaste,
                             contentDescription = stringResource(Res.string.proxy_paste_link)
@@ -170,8 +178,10 @@ fun ProxyScreen(
             FloatingActionButton(
                 modifier=Modifier.padding(bottom=com.infinity.drive.presentation.navigation.LocalBottomBarHeight.current),
                 onClick = {
-                    editing = null
-                    editorOpen = true
+                    if (!state.applying) {
+                        editing = null
+                        editorOpen = true
+                    }
                 }
             ) {
                 Icon(DriveIcons.Add, contentDescription = stringResource(Res.string.proxy_add))
@@ -187,6 +197,8 @@ fun ProxyScreen(
                 RoutingCard(
                     enabled = state.enabled,
                     hasProxies = state.proxies.isNotEmpty(),
+                    applying = state.applying,
+                    connection = state.connection,
                     onChange = viewModel::setEnabled,
                     modifier = Modifier.animateItem()
                 )
@@ -221,6 +233,7 @@ fun ProxyScreen(
                     ProxyCard(
                         proxy = proxy,
                         routing = state.enabled,
+                        applying = state.applying,
                         reachability = state.reachability[proxy.id],
                         modifier = Modifier.animateItem(),
                         onSelect = { viewModel.select(proxy.id) },
@@ -280,6 +293,8 @@ fun ProxyScreen(
 private fun RoutingCard(
     enabled: Boolean,
     hasProxies: Boolean,
+    applying: Boolean,
+    connection: TelegramConnectionState,
     onChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -318,7 +333,7 @@ private fun RoutingCard(
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .clip(shape)
-            .clickable { onChange(!enabled) }
+            .toggleable(enabled, enabled = hasProxies && !applying, role = Role.Switch, onValueChange = onChange)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
@@ -333,7 +348,12 @@ private fun RoutingCard(
                 Spacer(Modifier.height(4.dp))
                 val summary = when {
                     !hasProxies -> Res.string.proxy_route_needs_one
-                    enabled -> Res.string.proxy_route_on_summary
+                    applying -> Res.string.proxy_status_applying
+                    enabled -> when (connection) {
+                        TelegramConnectionState.READY -> Res.string.proxy_status_connected
+                        TelegramConnectionState.WAITING_FOR_NETWORK -> Res.string.proxy_status_waiting
+                        TelegramConnectionState.CONNECTING, TelegramConnectionState.UPDATING -> Res.string.proxy_status_connecting
+                    }
                     else -> Res.string.proxy_route_off_summary
                 }
                 AnimatedContent(targetState = summary, label = SUMMARY_LABEL) { line ->
@@ -345,7 +365,11 @@ private fun RoutingCard(
                 }
             }
             Spacer(Modifier.width(16.dp))
-            app.tgdrive.ui.DriveSwitch(checked = enabled, onCheckedChange = onChange)
+            if (applying) {
+                androidx.compose.material3.CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+            } else {
+                app.tgdrive.ui.DriveSwitch(checked = enabled, onCheckedChange = null)
+            }
         }
     }
 }
@@ -355,6 +379,7 @@ private fun RoutingCard(
 private fun ProxyCard(
     proxy: ProxyServer,
     routing: Boolean,
+    applying: Boolean,
     reachability: ProxyReachability?,
     modifier: Modifier = Modifier,
     onSelect: () -> Unit,
@@ -382,13 +407,13 @@ private fun ProxyCard(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
             .clip(shape)
-            .clickable(onClick = onSelect)
+            .selectable(selected = proxy.isActive, enabled = !applying, role = Role.RadioButton, onClick = onSelect)
     ) {
         Row(
             modifier = Modifier.padding(start = 12.dp, top = 12.dp, end = 4.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            RadioButton(selected = proxy.isActive, onClick = onSelect)
+            RadioButton(selected = proxy.isActive, onClick = null, enabled = !applying)
             Spacer(Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -401,7 +426,7 @@ private fun ProxyCard(
                     text = stringResource(
                         Res.string.proxy_endpoint,
                         typeLabel(proxy.type),
-                        proxy.host,
+                        proxy.host.let { if (':' in it) "[$it]" else it },
                         proxy.port
                     ),
                     style = MaterialTheme.typography.bodySmall,
@@ -418,7 +443,7 @@ private fun ProxyCard(
             }
             Spacer(Modifier.width(8.dp))
             Box {
-                IconButton(onClick = { menuOpen = true }) {
+                IconButton(onClick = { menuOpen = true }, enabled = !applying) {
                     Icon(
                         DriveIcons.MoreVert,
                         contentDescription = stringResource(Res.string.common_actions)
@@ -528,10 +553,10 @@ private fun ProxyEditorSheet(
     var secret by remember { mutableStateOf(original?.secret.orEmpty()) }
 
     val portNumber = port.toIntOrNull()
-    val valid = host.isNotBlank() &&
-            portNumber != null &&
-            portNumber in ProxyLink.MIN_PORT..ProxyLink.MAX_PORT &&
-            (type != TelegramProxyType.MTPROTO || secret.isNotBlank())
+    val valid = portNumber != null && TelegramProxy(
+        type, host.trim().removeSurrounding("[", "]"), portNumber,
+        username = username, password = password, secret = secret.trim()
+    ).hasValidFields()
 
     com.infinity.drive.presentation.components.DriveBottomSheet(
         onDismissRequest = onDismiss,
@@ -590,7 +615,7 @@ private fun ProxyEditorSheet(
             Row(modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
                     value = host,
-                    onValueChange = { host = it.trim() },
+                    onValueChange = { host = it.take(255) },
                     label = { Text(stringResource(Res.string.proxy_host)) },
                     singleLine = true,
                     modifier = Modifier.weight(2f)
@@ -598,7 +623,7 @@ private fun ProxyEditorSheet(
                 Spacer(Modifier.width(12.dp))
                 OutlinedTextField(
                     value = port,
-                    onValueChange = { value -> port = value.filter { it.isDigit() } },
+                    onValueChange = { value -> port = value.filter { it in '0'..'9' }.take(5) },
                     label = { Text(stringResource(Res.string.proxy_port)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

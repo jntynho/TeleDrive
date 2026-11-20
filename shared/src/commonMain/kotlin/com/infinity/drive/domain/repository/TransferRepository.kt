@@ -11,9 +11,9 @@ interface TransferRepository {
      * The newest rows of one section. A backup can queue tens of thousands of
      * transfers, far more than a list can show, so every observer is bounded.
      */
-    fun observeSection(section: TransferSection, limit: Int): Flow<List<TransferTask>>
+    fun observeSection(chatId: Long, section: TransferSection, limit: Int): Flow<List<TransferTask>>
 
-    fun observeSectionCount(section: TransferSection): Flow<Int>
+    fun observeSectionCount(chatId: Long, section: TransferSection): Flow<Int>
 
     fun observeActiveCount(): Flow<Int>
 
@@ -48,7 +48,7 @@ interface TransferRepository {
 
     suspend fun resume(id: String)
 
-    suspend fun cancel(id: String)
+    suspend fun cancel(id: String, dismissFinished: Boolean = false)
 
     /** Stops any queued, running or paused transfer belonging to [fileIds]. */
     suspend fun cancelForFiles(fileIds: List<String>)
@@ -56,16 +56,16 @@ interface TransferRepository {
     suspend fun retry(id: String)
 
     /** Requeues eligible, temporarily failed transfers, optionally scoped to one batch. */
-    suspend fun retryFailedBatch(batchId: String? = null): Int = 0
+    suspend fun retryFailedBatch(chatId: Long, batchId: String? = null): Int = 0
 
     /** Bulk controls applied in one database write so the list updates at once. */
-    suspend fun pauseAll()
+    suspend fun pauseAll(chatId: Long)
 
-    suspend fun resumeAll()
+    suspend fun resumeAll(chatId: Long)
 
-    suspend fun cancelAll()
+    suspend fun cancelAll(chatId: Long)
 
-    suspend fun clearFinished()
+    suspend fun clearFinished(chatId: Long)
 
     /** Re-queues transfers left RUNNING by a killed process. */
     suspend fun recoverOrphanedTransfers()

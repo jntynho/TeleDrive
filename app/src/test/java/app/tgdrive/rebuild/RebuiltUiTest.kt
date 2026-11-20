@@ -227,9 +227,10 @@ class RebuiltUiTest {
     }
 
     @Test fun activityUsesInlineFiltersAndTheSharedFileActionSheet(){
+        prepareActivityChannel()
         runBlocking{GlobalContext.get().get<com.infinity.drive.data.local.dao.TransferDao>().upsert(
             com.infinity.drive.data.local.entity.TransferEntity(id="done-task",type=com.infinity.drive.domain.model.TransferType.UPLOAD,
-                fileId="Report.pdf",displayName="Report.pdf",localPath=null,chatId=null,messageId=null,remoteFileId=null,sizeBytes=123,
+                fileId="Report.pdf",displayName="Report.pdf",localPath=null,chatId=-100701L,messageId=null,remoteFileId=null,sizeBytes=123,
                 state=com.infinity.drive.domain.model.TransferState.COMPLETED,createdAt=1,updatedAt=1,completedAt=1))}
         compose.waitUntil(15000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("Activity").performClick()
@@ -241,6 +242,42 @@ class RebuiltUiTest {
         compose.onNodeWithText("Open",substring=false).performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Download",substring=false).performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Send in Telegram",substring=false).performScrollTo().assertIsDisplayed()
+    }
+
+    private fun prepareActivityChannel() = runBlocking {
+        val koin = GlobalContext.get()
+        koin.get<SettingsRepository>().update { it.copy(storageChatId = -100701L) }
+        val files = koin.get<FileDao>()
+        files.byId("Report.pdf")?.let { files.upsert(it.copy(chatId = -100701L)) }
+    }
+
+    @Test fun activitySwitchesHistoryAndShowsContextualUploadOptions() {
+        prepareActivityChannel()
+        val koin = GlobalContext.get()
+        val dao = koin.get<com.infinity.drive.data.local.dao.TransferDao>()
+        runBlocking {
+            val running = com.infinity.drive.data.local.entity.TransferEntity(
+                "first-channel-upload", com.infinity.drive.domain.model.TransferType.UPLOAD, null,
+                "First channel.docx", null, -100701L, null, null, sizeBytes = 100,
+                state = com.infinity.drive.domain.model.TransferState.RUNNING, createdAt = 1, updatedAt = 1
+            )
+            dao.upsert(running)
+            dao.upsert(running.copy(id = "second-channel-upload", chatId = -100702L, displayName = "Second channel.zip"))
+        }
+        compose.waitUntil(15000) { compose.onNodeWithText("Your library").isDisplayed() }
+        compose.onNodeWithContentDescription("Activity").performClick()
+        compose.onNodeWithText("First channel.docx").assertIsDisplayed()
+        compose.onNodeWithText("Second channel.zip").assertDoesNotExist()
+        compose.onNodeWithContentDescription("More actions", substring = false).performClick()
+        compose.onNodeWithText("Uploads in progress").assertIsDisplayed()
+        compose.onNodeWithText("Pause active transfers").assertIsDisplayed()
+        runBlocking { koin.get<SettingsRepository>().update { it.copy(storageChatId = -100702L) } }
+        compose.waitUntil(5000) { compose.onNodeWithText("Second channel.zip").isDisplayed() }
+        compose.onNodeWithText("First channel.docx").assertDoesNotExist()
+        compose.onNodeWithText("Uploads in progress").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Transfer options").performClick()
+        compose.onNodeWithText("Pause upload").assertIsDisplayed()
+        compose.onNodeWithText("Cancel upload").assertIsDisplayed()
     }
 
     @Test fun showInFolderRevealsTheRequestedFileBeyondTheFirstPage(){
@@ -545,7 +582,7 @@ class RebuiltUiTest {
         compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
         val settings=GlobalContext.get().get<SettingsRepository>()
         listOf(com.infinity.drive.domain.model.AppTheme.LIGHT,com.infinity.drive.domain.model.AppTheme.DARK,com.infinity.drive.domain.model.AppTheme.AMOLED).forEach{theme->
-            runBlocking{settings.update{it.copy(theme=theme,dynamicColor=false)}}
+            runBlocking{settings.update{it.copy(theme=theme)}}
             compose.waitForIdle()
             compose.onNodeWithContentDescription("Search home").performClick()
             compose.onNode(hasSetTextAction()).assertIsDisplayed()
@@ -581,10 +618,11 @@ class RebuiltUiTest {
     }
 
     @Test fun floatingBarKeepsTheActivityViewportFullHeight(){
+        prepareActivityChannel()
         val settings=GlobalContext.get().get<SettingsRepository>()
         runBlocking{settings.update{it.copy(floatingNavigationBar=true,navigationBarStyle=com.infinity.drive.domain.model.NavigationBarStyle.FLOATING)}}
         runBlocking{GlobalContext.get().get<com.infinity.drive.data.local.dao.TransferDao>().upsert(
-            com.infinity.drive.data.local.entity.TransferEntity(id="viewport-task",type=com.infinity.drive.domain.model.TransferType.UPLOAD,fileId="Report.pdf",displayName="Report.pdf",localPath=null,chatId=null,messageId=null,remoteFileId=null,sizeBytes=123,state=com.infinity.drive.domain.model.TransferState.COMPLETED,createdAt=1,updatedAt=1,completedAt=1))}
+            com.infinity.drive.data.local.entity.TransferEntity(id="viewport-task",type=com.infinity.drive.domain.model.TransferType.UPLOAD,fileId="Report.pdf",displayName="Report.pdf",localPath=null,chatId=-100701L,messageId=null,remoteFileId=null,sizeBytes=123,state=com.infinity.drive.domain.model.TransferState.COMPLETED,createdAt=1,updatedAt=1,completedAt=1))}
         compose.waitUntil(15000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("Activity").performClick()
         compose.waitUntil(5000){compose.onNode(hasText("Finished",substring=false) and hasClickAction()).isDisplayed()}
@@ -726,7 +764,6 @@ class RebuiltUiTest {
         compose.onNodeWithContentDescription("Tidal accent").performScrollTo()
         compose.onNodeWithContentDescription("Tidal accent").performClick()
         compose.waitUntil(5000){compose.waitForIdle();runBlocking{settings.preferences.first().accentColour==com.infinity.drive.domain.model.AccentColour.TIDAL}}
-        org.junit.Assert.assertFalse(runBlocking{settings.preferences.first().dynamicColor})
         compose.onNodeWithText("Dashboard Style",substring=false).performScrollTo().performClick()
         val carousel = compose.onNodeWithTag("dashboard-style-carousel")
         val classicTone = compose.onNodeWithTag("dashboard-tone-CLASSIC")

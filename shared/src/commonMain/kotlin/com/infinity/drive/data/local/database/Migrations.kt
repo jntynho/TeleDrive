@@ -228,3 +228,14 @@ val MIGRATION_16_17 = object : Migration(16, 17) {
         connection.execSQL("ALTER TABLE files ADD COLUMN tagsEncoded TEXT NOT NULL DEFAULT ''")
     }
 }
+
+
+val MIGRATION_17_18 = object : Migration(17, 18) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            """UPDATE transfers SET chatId = (SELECT files.chatId FROM files WHERE files.id = transfers.fileId)
+                WHERE chatId IS NULL AND fileId IS NOT NULL"""
+        )
+        connection.execSQL("CREATE INDEX IF NOT EXISTS index_transfers_chatId_state ON transfers (chatId, state)")
+    }
+}

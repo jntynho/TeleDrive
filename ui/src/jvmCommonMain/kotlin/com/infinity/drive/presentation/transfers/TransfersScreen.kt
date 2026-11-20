@@ -33,8 +33,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Card
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,6 +43,7 @@ import androidx.compose.material3.Text
 import com.infinity.drive.presentation.components.PageHeader
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -60,6 +59,17 @@ import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.infinity.drive.resources.files_import_preparing
 import com.infinity.drive.resources.Res
+import com.infinity.drive.resources.transfers_uploads_in_progress
+import com.infinity.drive.resources.transfers_activity_actions
+import com.infinity.drive.resources.transfers_view_active
+import com.infinity.drive.resources.transfers_pause_active
+import com.infinity.drive.resources.transfers_resume_paused
+import com.infinity.drive.resources.transfers_no_channel_actions
+import com.infinity.drive.resources.transfers_resume_upload
+import com.infinity.drive.resources.transfers_pause_upload
+import com.infinity.drive.resources.transfers_cancel_upload
+import com.infinity.drive.resources.transfers_cancel_upload_title
+import com.infinity.drive.resources.transfers_cancel_upload_message
 import com.infinity.drive.resources.transfers_retry_batch
 import com.infinity.drive.resources.transfers_retry_batch_all
 import com.infinity.drive.presentation.common.load
@@ -106,6 +116,10 @@ import com.infinity.drive.core.transfer.FileParts
 import com.infinity.drive.presentation.common.Formatters
 import com.infinity.drive.presentation.common.add
 import com.infinity.drive.presentation.components.ConfirmDialog
+import com.infinity.drive.presentation.components.DriveBottomSheet
+import com.infinity.drive.presentation.components.LocalSheetCloseThen
+import com.infinity.drive.presentation.components.SheetActionRow
+import androidx.compose.foundation.verticalScroll
 import com.infinity.drive.presentation.components.EmptyState
 import com.infinity.drive.presentation.components.liftedTopAppBarColors
 import com.infinity.drive.presentation.components.rememberToolbarLift
@@ -118,6 +132,17 @@ fun TransfersScreen(
     onOpenFile:(String,PreviewSequence)->Unit={_,_->}
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    key(state.chatId) { ChannelTransfersScreen(state, onBack, viewModel, onOpenFile) }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChannelTransfersScreen(
+    state: TransfersUiState,
+    onBack: () -> Unit,
+    viewModel: TransfersViewModel,
+    onOpenFile: (String, PreviewSequence) -> Unit
+) {
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(viewModel) {
         viewModel.retryMessages.collect { snackbar.showSnackbar(it.load()) }
@@ -127,6 +152,12 @@ fun TransfersScreen(
     var showMenu by remember { mutableStateOf(false) }
     var filter by rememberSaveable { mutableStateOf("All transfers") }
     var selectedTransfer by remember{mutableStateOf<TransferTask?>(null)}
+    var uploadMenuId by remember { mutableStateOf<String?>(null) }
+    var cancelUploadId by remember { mutableStateOf<String?>(null) }
+    fun openActions(task: TransferTask) {
+        if (!task.type.isIncoming && !task.state.isTerminal) uploadMenuId = task.id
+        else selectedTransfer = task
+    }
     var selectedFile by remember{mutableStateOf<Pair<String,com.infinity.drive.domain.model.DriveFile>?>(null)}
     var actionError by remember{mutableStateOf<String?>(null)}
     val repository=org.koin.compose.koinInject<com.infinity.drive.domain.repository.FileRepository>()
@@ -147,11 +178,11 @@ fun TransfersScreen(
             val batchId = actionTransfer.batchId
             if (actionTransfer.state == TransferState.FAILED && actionTransfer.retryableFailure && batchId != null) {
                 com.infinity.drive.presentation.components.SheetActionRow(retryBatchLabel, DriveIcons.Refresh) {
-                    closeThen { viewModel.retryFailedBatch(batchId) }
+                    closeThen { viewModel.retryFailedBatch(state.chatId, batchId) }
                 }
             }
             if(actionTransfer.state!=TransferState.COMPLETED)com.infinity.drive.presentation.components.SheetActionRow(
-                if(actionTransfer.state.isTerminal)"Dismiss transfer"else"Cancel transfer",DriveIcons.Close){closeThen{viewModel.cancel(actionTransfer.id)}}
+                if(actionTransfer.state.isTerminal)"Dismiss transfer"else"Cancel transfer",DriveIcons.Close){closeThen{viewModel.cancel(actionTransfer.id, dismissFinished = actionTransfer.state.isTerminal)}}
         })
     if(actionError!=null)androidx.compose.material3.AlertDialog(onDismissRequest={actionError=null},title={Text("File unavailable")},text={Text(actionError!!)},confirmButton={androidx.compose.material3.TextButton({actionError=null}){Text("Close")}})
 
@@ -164,7 +195,7 @@ fun TransfersScreen(
             confirmLabel = stringResource(Res.string.common_clear),
             onConfirm = {
                 confirmClearFinished = false
-                viewModel.clearFinished()
+                viewModel.clearFinished(state.chatId)
             },
             onDismiss = { confirmClearFinished = false }
         )
@@ -178,9 +209,80 @@ fun TransfersScreen(
             destructive = true,
             onConfirm = {
                 confirmCancelAll = false
-                viewModel.cancelAll()
+                viewModel.cancelAll(state.chatId)
             },
             onDismiss = { confirmCancelAll = false }
+        )
+    }
+
+    if (showMenu) {
+        DriveBottomSheet(onDismissRequest = { showMenu = false }) {
+            val closeThen = LocalSheetCloseThen.current
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 16.dp)) {
+                val uploading = state.active.any { !it.type.isIncoming && it.state == TransferState.RUNNING }
+                Text(
+                    if (uploading) stringResource(Res.string.transfers_uploads_in_progress) else stringResource(Res.string.transfers_activity_actions),
+                    Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                    style = MaterialTheme.typography.titleLarge
+                )
+                if (state.activeTotal > 0) {
+                    SheetActionRow(stringResource(Res.string.transfers_view_active), DriveIcons.SwapVert) { closeThen { filter = "Active" } }
+                    SheetActionRow(stringResource(Res.string.transfers_pause_active), DriveIcons.Pause) {
+                        closeThen { viewModel.pauseAll(state.chatId) }
+                    }
+                }
+                if (state.pausedTotal > 0) {
+                    SheetActionRow(stringResource(Res.string.transfers_resume_paused), DriveIcons.PlayArrow) {
+                        closeThen { viewModel.resumeAll(state.chatId) }
+                    }
+                }
+                if (state.failedTotal > 0) {
+                    SheetActionRow(stringResource(Res.string.transfers_retry_batch_all), DriveIcons.Refresh) {
+                        closeThen { viewModel.retryFailedBatch(state.chatId) }
+                    }
+                }
+                if (state.activeTotal + state.pausedTotal + state.failedTotal > 0) {
+                    SheetActionRow(stringResource(Res.string.transfers_cancel), DriveIcons.Close) {
+                        closeThen { confirmCancelAll = true }
+                    }
+                }
+                if (state.completedTotal > 0) {
+                    SheetActionRow(stringResource(Res.string.transfers_clear_finished), DriveIcons.DeleteOutline) {
+                        closeThen { confirmClearFinished = true }
+                    }
+                }
+                if (state.activeTotal + state.pausedTotal + state.failedTotal + state.completedTotal == 0) {
+                    Text(stringResource(Res.string.transfers_no_channel_actions), Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+                }
+            }
+        }
+    }
+
+    val upload = (state.active + state.paused).firstOrNull { it.id == uploadMenuId }
+    LaunchedEffect(upload?.id) { if (upload == null) uploadMenuId = null }
+    if (upload != null) {
+        DriveBottomSheet(onDismissRequest = { uploadMenuId = null }) {
+            val closeThen = LocalSheetCloseThen.current
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 16.dp)) {
+                Text(upload.displayName, Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                    style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (upload.state == TransferState.PAUSED) {
+                    SheetActionRow(stringResource(Res.string.transfers_resume_upload), DriveIcons.PlayArrow) { closeThen { viewModel.resume(upload.id) } }
+                } else {
+                    SheetActionRow(stringResource(Res.string.transfers_pause_upload), DriveIcons.Pause) { closeThen { viewModel.pause(upload.id) } }
+                }
+                SheetActionRow(stringResource(Res.string.transfers_cancel_upload), DriveIcons.Close) { closeThen { cancelUploadId = upload.id } }
+            }
+        }
+    }
+    cancelUploadId?.let { id ->
+        ConfirmDialog(
+            title = stringResource(Res.string.transfers_cancel_upload_title),
+            message = stringResource(Res.string.transfers_cancel_upload_message),
+            confirmLabel = stringResource(Res.string.transfers_cancel),
+            destructive = true,
+            onDismiss = { cancelUploadId = null },
+            onConfirm = { cancelUploadId = null; viewModel.cancel(id) }
         )
     }
 
@@ -206,36 +308,6 @@ fun TransfersScreen(
                         Icon(
                             DriveIcons.MoreVert,
                             contentDescription = stringResource(Res.string.common_actions)
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        DropdownMenuItem(text={Text("Pause all")},enabled=state.active.isNotEmpty(),onClick={showMenu=false;viewModel.pauseAll()})
-                        DropdownMenuItem(text={Text("Resume all")},enabled=state.paused.isNotEmpty(),onClick={showMenu=false;viewModel.resumeAll()})
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.transfers_retry_batch_all)) },
-                            enabled = state.failedTotal > 0,
-                            onClick = { showMenu = false; viewModel.retryFailedBatch() }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.transfers_cancel)) },
-                            enabled = state.active.isNotEmpty() ||
-                                    state.paused.isNotEmpty() ||
-                                    state.failed.isNotEmpty(),
-                            onClick = {
-                                showMenu = false
-                                confirmCancelAll = true
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.transfers_clear_finished)) },
-                            enabled = state.completed.isNotEmpty(),
-                            onClick = {
-                                showMenu = false
-                                confirmClearFinished = true
-                            }
                         )
                     }
                 }
@@ -288,7 +360,7 @@ fun TransfersScreen(
             if(filter=="All transfers"||filter=="Active") section("active", activeTitle, state.active, state.activeTotal,visibleTaskIds) { transfer ->
                 TransferRow(
                     transfer = transfer,
-                    onMore={selectedTransfer=transfer},
+                    onMore={openActions(transfer)},
                     primaryIcon = DriveIcons.Pause,
                     primaryLabel = stringResource(Res.string.common_pause),
                     onPrimary = { viewModel.pause(transfer.id) },
@@ -297,7 +369,7 @@ fun TransfersScreen(
             if(filter=="All transfers"||filter=="Active") section("paused", pausedTitle, state.paused, state.pausedTotal,visibleTaskIds) { transfer ->
                 TransferRow(
                     transfer = transfer,
-                    onMore={selectedTransfer=transfer},
+                    onMore={openActions(transfer)},
                     primaryIcon = DriveIcons.PlayArrow,
                     primaryLabel = stringResource(Res.string.common_resume),
                     onPrimary = { viewModel.resume(transfer.id) },
@@ -306,14 +378,14 @@ fun TransfersScreen(
             if(filter=="All transfers"||filter=="Failed") section("failed", failedTitle, state.failed, state.failedTotal,visibleTaskIds) { transfer ->
                 TransferRow(
                     transfer = transfer,
-                    onMore={selectedTransfer=transfer},
+                    onMore={openActions(transfer)},
                     primaryIcon = DriveIcons.Refresh,
                     primaryLabel = stringResource(Res.string.common_retry),
                     onPrimary = { viewModel.retry(transfer.id) },
                 )
             }
             if(filter=="All transfers"||filter=="Done") section("finished", finishedTitle, state.completed, state.completedTotal,visibleTaskIds) { transfer ->
-                TransferRow(transfer = transfer,onMore={selectedTransfer=transfer})
+                TransferRow(transfer = transfer,onMore={openActions(transfer)})
             }
         }
     }

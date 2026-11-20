@@ -2,7 +2,18 @@
 package com.infinity.drive.presentation.preview
 
 import app.tgdrive.ui.DriveIcons
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import com.infinity.drive.resources.preview_preparing_photo
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateDecay
 import androidx.compose.foundation.gestures.*
@@ -43,7 +54,7 @@ import kotlin.math.abs
 @kotlin.OptIn(kotlinx.coroutines.FlowPreview::class)
 @Composable
 fun ZoomableImage(model:Any?,contentDescription:String?,modifier:Modifier=Modifier,
-    onTap:()->Unit={},onZoomChanged:(Boolean)->Unit={},contentKey:Any?=model,previewModel:Any?=null,knownImageSize:IntSize=IntSize.Zero
+    onTap:()->Unit={},onZoomChanged:(Boolean)->Unit={},contentKey:Any?=model,previewModel:Any?=null,knownImageSize:IntSize=IntSize.Zero, showLoadingIndicator:Boolean=false
 ) {
     var lastPainter by remember(contentKey){mutableStateOf<androidx.compose.ui.graphics.painter.Painter?>(null)}
     var retainedPainter by remember(contentKey,model){mutableStateOf(lastPainter)}
@@ -79,6 +90,12 @@ fun ZoomableImage(model:Any?,contentDescription:String?,modifier:Modifier=Modifi
         LaunchedEffect(model){animation?.cancel();scale=1f;offset=Offset.Zero;zoomChanged(false)}
         EmptyState(DriveIcons.BrokenImage,stringResource(Res.string.preview_image_undecodable),modifier=modifier,
             actionLabel="Retry",onAction={failed=false});return}
+    val loading = showLoadingIndicator && !fullReady
+    var showProgress by remember(contentKey) { mutableStateOf(false) }
+    LaunchedEffect(contentKey, loading) {
+        if (loading) delay(140)
+        showProgress = loading
+    }
     Box(modifier.fillMaxSize().semantics {
         stateDescription="Zoom ${(scale*100).toInt()} percent"
         customActions=listOf(CustomAccessibilityAction("Zoom in"){animation?.cancel();scale=(scale*1.5f).coerceAtMost(6f);offset=clamp(offset,scale);true},
@@ -153,6 +170,21 @@ fun ZoomableImage(model:Any?,contentDescription:String?,modifier:Modifier=Modifi
                 else->Unit
             }
         },modifier=frame.graphicsLayer{alpha=fullAlpha;scaleX=scale;scaleY=scale;translationX=offset.x;translationY=offset.y})
+        AnimatedVisibility(
+            visible = showProgress,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 48.dp),
+            enter = fadeIn(tween(150)),
+            exit = fadeOut(tween(130))
+        ) {
+            val label = stringResource(Res.string.preview_preparing_photo)
+            Box(Modifier.background(Color.Black.copy(alpha = .48f), CircleShape).padding(9.dp)) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(19.dp).semantics { this.contentDescription = label },
+                    color = Color.White.copy(alpha = .86f),
+                    strokeWidth = 2.dp
+                )
+            }
+        }
         region?.let{tile->
             androidx.compose.foundation.Canvas(Modifier.fillMaxSize()){
                 val factor=minOf(size.width/tile.original.width,size.height/tile.original.height)*scale

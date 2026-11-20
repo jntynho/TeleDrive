@@ -43,6 +43,9 @@ interface TransferDao {
     @Query("UPDATE transfers SET state = 'QUEUED', retryCount = 0, nextAttemptAt = 0, errorMessage = NULL, updatedAt = :now WHERE id = :id AND state IN ('FAILED','PAUSED','CANCELLED')")
     suspend fun resetForRetry(id:String,now:Long)
 
+    @Query("UPDATE transfers SET chatId = :chatId WHERE id = :id AND chatId IS NULL AND state = 'RUNNING'")
+    suspend fun bindChannel(id: String, chatId: Long)
+
     @Query("UPDATE transfers SET chatId = :chatId, messageId = :messageId WHERE id = :id AND state = 'RUNNING'")
     suspend fun recordPending(id:String,chatId:Long,messageId:Long)
 
@@ -60,11 +63,11 @@ interface TransferDao {
         """SELECT failed.id, failed.fileId, failed.type, failed.backupSessionId
            FROM transfers AS failed
            JOIN files ON files.id = failed.fileId AND files.trashedAt IS NULL
-           WHERE failed.state = 'FAILED' AND failed.retryableFailure = 1
+           WHERE failed.chatId = :chatId AND failed.state = 'FAILED' AND failed.retryableFailure = 1
              AND (:batchId IS NULL OR COALESCE(failed.backupSessionId, failed.uploadBatchId) = :batchId)
              AND NOT EXISTS (
                 SELECT 1 FROM transfers AS other
-                WHERE other.fileId = failed.fileId AND other.id != failed.id
+                WHERE other.chatId = failed.chatId AND other.fileId = failed.fileId AND other.id != failed.id
                   AND (other.type = failed.type OR
                     (other.type IN ('UPLOAD','BACKUP') AND failed.type IN ('UPLOAD','BACKUP')))
                   AND (other.state IN ('QUEUED','RUNNING','PAUSED') OR
@@ -73,7 +76,7 @@ interface TransferDao {
                         (other.createdAt = failed.createdAt AND other.id > failed.id))))
              )"""
     )
-    suspend fun failedBatchCandidates(batchId: String?): List<FailedTransferRetryCandidate>
+    suspend fun failedBatchCandidates(chatId: Long, batchId: String?): List<FailedTransferRetryCandidate>
 
     @Query(
         """UPDATE transfers SET state = 'QUEUED', retryableFailure = 0, errorMessage = NULL,
@@ -112,31 +115,16 @@ interface TransferDao {
     fun observeById(id: String): Flow<TransferEntity?>
 
     @Query(
-        """SELECT * FROM transfers WHERE state IN ('QUEUED', 'RUNNING')
-           ORDER BY priority DESC, createdAt ASC LIMIT :limit"""
+        """SELECT * FROM transfers WHERE chatId = :chatId AND state IN (:states)
+           ORDER BY CASE WHEN state = 'COMPLETED' THEN COALESCE(completedAt, updatedAt) END DESC,
+                    CASE WHEN state = 'FAILED' THEN updatedAt END DESC,
+                    CASE WHEN state IN ('QUEUED', 'RUNNING') THEN priority END DESC,
+                    createdAt ASC, id ASC LIMIT :limit"""
     )
-    fun observeActive(limit: Int): Flow<List<TransferEntity>>
+    fun observeSection(chatId: Long, states: List<TransferState>, limit: Int): Flow<List<TransferEntity>>
 
-    @Query(
-        """SELECT * FROM transfers WHERE state = 'PAUSED'
-           ORDER BY createdAt ASC LIMIT :limit"""
-    )
-    fun observePaused(limit: Int): Flow<List<TransferEntity>>
-
-    @Query(
-        """SELECT * FROM transfers WHERE state = 'FAILED'
-           ORDER BY updatedAt DESC LIMIT :limit"""
-    )
-    fun observeFailed(limit: Int): Flow<List<TransferEntity>>
-
-    @Query(
-        """SELECT * FROM transfers WHERE state = 'COMPLETED'
-           ORDER BY COALESCE(completedAt, updatedAt) DESC LIMIT :limit"""
-    )
-    fun observeCompleted(limit: Int): Flow<List<TransferEntity>>
-
-    @Query("SELECT COUNT(*) FROM transfers WHERE state = :state")
-    fun observeCountByState(state: TransferState): Flow<Int>
+    @Query("SELECT COUNT(*) FROM transfers WHERE chatId = :chatId AND state IN (:states)")
+    fun observeSectionCount(chatId: Long, states: List<TransferState>): Flow<Int>
 
     @Query(
         """SELECT * FROM transfers
@@ -214,26 +202,26 @@ interface TransferDao {
     @Query("DELETE FROM transfers WHERE id IN (:ids)")
     suspend fun deleteByIds(ids: List<String>)
 
-    @Query("DELETE FROM transfers WHERE state IN ('COMPLETED', 'CANCELLED')")
-    suspend fun clearFinished()
+    @Query("DELETE FROM transfers WHERE chatId = :chatId AND state IN ('COMPLETED', 'CANCELLED')")
+    suspend fun clearFinished(chatId: Long)
 
     @Query(
         """UPDATE transfers SET state = 'PAUSED', updatedAt = :now
-           WHERE state IN ('QUEUED', 'RUNNING')"""
+           WHERE chatId = :chatId AND state IN ('QUEUED', 'RUNNING')"""
     )
-    suspend fun pauseAll(now: Long): Int
+    suspend fun pauseAll(chatId: Long, now: Long): Int
 
     @Query(
         """UPDATE transfers SET state = 'QUEUED', retryCount = 0, nextAttemptAt = 0, errorMessage = NULL, updatedAt = :now
-           WHERE state = 'PAUSED'"""
+           WHERE chatId = :chatId AND state = 'PAUSED'"""
     )
-    suspend fun resumeAll(now: Long): Int
+    suspend fun resumeAll(chatId: Long, now: Long): Int
 
     @Query(
         """UPDATE transfers SET state = 'CANCELLED', updatedAt = :now
-           WHERE state IN ('QUEUED', 'RUNNING', 'PAUSED', 'FAILED')"""
+           WHERE chatId = :chatId AND state IN ('QUEUED', 'RUNNING', 'PAUSED', 'FAILED')"""
     )
-    suspend fun cancelAll(now: Long): Int
+    suspend fun cancelAll(chatId: Long, now: Long): Int
 
     @Query("SELECT * FROM transfers WHERE backupSessionId = :sessionId")
     suspend fun bySession(sessionId: String): List<TransferEntity>

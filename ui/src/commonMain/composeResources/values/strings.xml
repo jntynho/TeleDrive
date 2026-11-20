@@ -639,26 +639,23 @@
     <string name="settings_nothing_to_remove">Nothing to remove</string>
 
     <!-- Settings: appearance -->
-    <string name="settings_archived_shortcut">Show archived media</string>
-    <string name="settings_compact_layout">Compact layout</string>
-    <string name="settings_dynamic_color">Dynamic color</string>
+
+
     <string name="settings_gallery_grid_columns">Gallery grid columns</string>
     <string name="settings_gallery_grid_view">Grid view in gallery</string>
     <string name="settings_grid_columns">Files grid columns</string>
     <string name="settings_grid_view">Grid view in files</string>
-    <string name="settings_hidden_shortcut">Show hidden items</string>
+
     <string name="settings_recent_files">Recent files</string>
     <string name="settings_recent_files_subtitle">Shows recently added files on the home screen</string>
-    <string name="settings_shows_archived_collection_home">Include archived items in the gallery. The Archived collection is always available.</string>
-    <string name="settings_shows_hidden_collection_home">Include hidden items in files and gallery. The private collection remains in Security.</string>
+
     <string name="settings_theme">Theme</string>
     <string name="settings_language">Language</string>
     <string name="language_system">System default</string>
     <string name="language_english">English</string>
     <string name="language_russian">Русский</string>
     <string name="language_portuguese_br">Português (Brasil)</string>
-    <string name="settings_tighter_list_rows_without">Tighter list rows without the size and date line</string>
-    <string name="settings_use_wallpaper_colors_available">Use wallpaper colors when available</string>
+
     <string name="theme_dark">Dark</string>
     <string name="theme_amoled">AMOLED</string>
     <string name="theme_light">Light</string>
@@ -1043,15 +1040,29 @@
     <string name="search_content_label">Note and PDF contents</string>
     <string name="search_content_notes_only">Note contents</string>
     <string name="search_content_skipped">Files skipped or partly searched: %1$d</string>
-    <string name="files_zip_title">Compress and upload as ZIP</string>
-    <string name="files_zip_description">Keep the originals and upload one compressed copy</string>
-    <string name="files_zip_default_name">Archive</string>
-    <string name="files_zip_name">Archive name</string>
-    <string name="files_zip_select">Select files</string>
-    <string name="files_zip_preparing">Compressing selected files…</string>
-    <string name="files_zip_failed">Couldn’t compress or queue the selected files.</string>
+
+
+
+
+
     <string name="settings_icon_style">Icon style</string>
     <string name="settings_icon_outline">Outline</string>
     <string name="settings_icon_broken">Broken</string>
     <string name="common_close">Close</string>
+    <string name="preview_preparing_photo">Preparing photo</string>
+    <string name="proxy_status_applying">Applying proxy settings…</string>
+    <string name="proxy_status_connecting">Connecting through the selected proxy…</string>
+    <string name="proxy_status_connected">Telegram connected through the selected proxy</string>
+    <string name="proxy_status_waiting">Waiting for a network connection</string>
+    <string name="transfers_uploads_in_progress">Uploads in progress</string>
+    <string name="transfers_activity_actions">Transfer actions</string>
+    <string name="transfers_view_active">View active transfers</string>
+    <string name="transfers_pause_active">Pause active transfers</string>
+    <string name="transfers_resume_paused">Resume paused transfers</string>
+    <string name="transfers_no_channel_actions">No transfer actions are available for this channel.</string>
+    <string name="transfers_resume_upload">Resume upload</string>
+    <string name="transfers_pause_upload">Pause upload</string>
+    <string name="transfers_cancel_upload">Cancel upload</string>
+    <string name="transfers_cancel_upload_title">Cancel upload?</string>
+    <string name="transfers_cancel_upload_message">Stop this upload and remove it from the queue.</string>
 </resources>

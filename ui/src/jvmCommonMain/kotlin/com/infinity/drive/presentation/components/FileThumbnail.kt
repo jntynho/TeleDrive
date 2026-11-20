@@ -24,6 +24,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
@@ -67,6 +69,7 @@ fun FileThumbnail(
     val retryEpoch=LocalThumbnailRetryEpoch.current
     val model=com.infinity.drive.core.media.thumbnailModel(file)
     var failed by remember(model,retryEpoch) { mutableStateOf(false) }
+    var loaded by remember(model, retryEpoch) { mutableStateOf(false) }
     var attempts by remember(model,retryEpoch) { androidx.compose.runtime.mutableIntStateOf(0) }
     LaunchedEffect(failed,model,retryEpoch){
         if(failed&&attempts<2){kotlinx.coroutines.delay(1500L*(attempts+1));attempts++;failed=false}
@@ -82,21 +85,22 @@ fun FileThumbnail(
         val badgeSize = (shortestSide * BADGE_RATIO).coerceIn(18.dp, 44.dp)
         val showDuration = shortestSide >= DURATION_MIN_SIDE
 
-        if (supportsThumbnail && (file.hasLocalCopy || file.hasRemoteCopy) && !failed) {
-            AsyncImage(
-                model = imageRequest,
-                contentDescription = file.name,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = contentScale,
-                onError = { failed = true }
-            )
-        } else {
-            Icon(
-                imageVector = iconFor(file.category),
-                contentDescription = file.name,
-                modifier = Modifier.size(28.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        val requestThumbnail = supportsThumbnail && (file.hasLocalCopy || file.hasRemoteCopy) && !failed
+        Box(Modifier.fillMaxSize().semantics { contentDescription = file.name }, contentAlignment = Alignment.Center) {
+            // Successful thumbnails cover the fallback; missing results retain a useful icon.
+            if (!requestThumbnail || !loaded && file.category !in setOf(FileCategory.IMAGE, FileCategory.VIDEO, FileCategory.AUDIO)) {
+                FileTypeFallback(file.name, file.mimeType, file.category, (shortestSide * 0.51f).coerceIn(16.dp, 30.dp))
+            }
+            if (requestThumbnail) {
+                AsyncImage(
+                    model = imageRequest,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = contentScale,
+                    onSuccess = { loaded = true },
+                    onError = { loaded = false; failed = true }
+                )
+            }
         }
 
         if (file.category == FileCategory.VIDEO) {

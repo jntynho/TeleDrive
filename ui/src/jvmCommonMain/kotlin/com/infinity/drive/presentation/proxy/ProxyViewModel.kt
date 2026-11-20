@@ -14,6 +14,7 @@ import com.infinity.drive.core.telegram.TelegramProxy
 import com.infinity.drive.domain.model.ProxyServer
 import com.infinity.drive.domain.repository.ProxyRepository
 import com.infinity.drive.domain.repository.SettingsRepository
+import com.infinity.drive.domain.repository.TelegramAuthRepository
 import com.infinity.drive.presentation.common.UiText
 import com.infinity.drive.presentation.common.toUiText
 import kotlinx.coroutines.Job
@@ -34,9 +35,11 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class ProxyViewModel(
     private val proxyRepository: ProxyRepository,
-    settingsRepository: SettingsRepository
+    settingsRepository: SettingsRepository,
+    authRepository: TelegramAuthRepository
 ) : ViewModel() {
 
+    private val applying = MutableStateFlow(false)
     private val reachability = MutableStateFlow<Map<String, ProxyReachability>>(emptyMap())
     private val testJobs = mutableMapOf<String, Job>()
 
@@ -46,44 +49,47 @@ class ProxyViewModel(
     val uiState: StateFlow<ProxyUiState> = combine(
         proxyRepository.observeProxies(),
         settingsRepository.preferences.map { it.proxyEnabled }.distinctUntilChanged(),
-        reachability
-    ) { proxies, enabled, results ->
+        reachability, applying, authRepository.connectionState
+    ) { proxies, enabled, results, changing, connection ->
         ProxyUiState(
             proxies = proxies,
             enabled = enabled,
             loading = false,
+            applying = changing,
+            connection = connection,
             reachability = results
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), ProxyUiState())
 
-    fun save(proxy: ProxyServer) {
+    fun save(proxy: ProxyServer) = change {
         testJobs.remove(proxy.id)?.cancel()
-        viewModelScope.launch {
-            reachability.update { it - proxy.id }
-            report(proxyRepository.save(proxy))
-        }
+        reachability.update { it - proxy.id }
+        report(proxyRepository.save(proxy))
     }
 
-    fun delete(id: String) {
+    fun delete(id: String) = change {
         testJobs.remove(id)?.cancel()
-        viewModelScope.launch {
-            reachability.update { it - id }
-            report(proxyRepository.delete(id))
-        }
+        reachability.update { it - id }
+        report(proxyRepository.delete(id))
     }
 
-    fun select(id: String) {
-        viewModelScope.launch { report(proxyRepository.select(id)) }
+    fun select(id: String) = change { report(proxyRepository.select(id)) }
+
+    fun setEnabled(enabled: Boolean) = change {
+        val result = proxyRepository.setEnabled(enabled)
+        if (result is AppResult.Failure && result.error == AppError.NotFound) {
+            _messages.tryEmit(UiText.Resource(Res.string.proxy_add_one_first))
+        } else report(result)
     }
 
-    fun setEnabled(enabled: Boolean) {
+    private fun change(action: suspend () -> Unit) {
+        if (!applying.compareAndSet(false, true)) return
         viewModelScope.launch {
-            val result = proxyRepository.setEnabled(enabled)
-            if (result is AppResult.Failure && result.error is AppError.NotFound) {
-                _messages.tryEmit(UiText.Resource(Res.string.proxy_add_one_first))
-                return@launch
+            try {
+                action()
+            } finally {
+                applying.value = false
             }
-            report(result)
         }
     }
 
@@ -108,8 +114,12 @@ class ProxyViewModel(
             _messages.tryEmit(UiText.Resource(Res.string.proxy_link_not_recognised))
             return
         }
-        save(parsed.toServer())
-        _messages.tryEmit(UiText.Resource(Res.string.proxy_link_imported, parsed.host))
+        change {
+            when (val result = proxyRepository.save(parsed.toServer())) {
+                is AppResult.Success -> _messages.tryEmit(UiText.Resource(Res.string.proxy_link_imported, parsed.host))
+                is AppResult.Failure -> report(result)
+            }
+        }
     }
 
     private fun AppResult<ProxyProbeResult>.toReachability(): ProxyReachability = when (this) {

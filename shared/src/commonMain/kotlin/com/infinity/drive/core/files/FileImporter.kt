@@ -14,15 +14,6 @@ interface FileImporter {
         prepare(reference, onProgress)
 
 
-    val canPrepareZip: Boolean get() = false
-
-    /** Prepares one staged ZIP while keeping the selected originals intact. */
-    suspend fun prepareZip(
-        references: List<String>,
-        archiveName: String,
-        checkActive: suspend () -> Unit
-    ): ImportedFile? = null
-
     /**
      * Splits a picked reference into the files to import. A folder yields one
      * entry per file inside it; anything else yields the reference itself.

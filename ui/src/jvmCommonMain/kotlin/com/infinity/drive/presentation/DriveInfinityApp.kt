@@ -98,7 +98,6 @@ import com.infinity.drive.domain.model.AppLanguage
 import com.infinity.drive.domain.model.AppTheme
 import com.infinity.drive.presentation.applock.LockScreen
 import com.infinity.drive.presentation.components.LoadingState
-import com.infinity.drive.presentation.components.LocalCompactLayout
 import com.infinity.drive.presentation.platform.LocalAppVersion
 import com.infinity.drive.presentation.platform.LocalUrlOpener
 import com.infinity.drive.presentation.navigation.AppNavHost
@@ -177,7 +176,6 @@ fun DriveInfinityApp(
 
     DriveInfinityTheme(
         darkTheme = darkTheme,
-        dynamicColor = state.dynamicColor,
         accentColour = state.accentColour,
         customTheme = state.customTheme,
         iconStyle = state.iconStyle,
@@ -187,8 +185,7 @@ fun DriveInfinityApp(
             (LocalLocaleList as ProvidableCompositionLocal<LocaleList>) provides targetLocaleList,
             LocalLayoutDirection provides targetDirection,
             app.tgdrive.ui.LocalDashboardStyle provides state.dashboardStyle.name,
-            app.tgdrive.ui.LocalDashboardDark provides state.dashboardDark,
-            LocalCompactLayout provides state.compactLayout
+            app.tgdrive.ui.LocalDashboardDark provides state.dashboardDark
         ) {
             val startupFiles=org.koin.compose.koinInject<com.infinity.drive.domain.repository.FileRepository>()
             val startupMode=if(state.locked)"locked"else if(state.onboardingComplete)"library"else"sign-in"

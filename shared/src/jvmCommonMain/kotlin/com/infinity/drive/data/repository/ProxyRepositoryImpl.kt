@@ -8,15 +8,21 @@ import com.infinity.drive.core.proxy.ProxyProbeResult
 import com.infinity.drive.core.telegram.TelegramClient
 import com.infinity.drive.core.telegram.TelegramException
 import com.infinity.drive.core.telegram.TelegramProxy
+import com.infinity.drive.core.telegram.hasValidFields
 import com.infinity.drive.data.local.dao.ProxyDao
 import com.infinity.drive.data.local.entity.ProxyEntity
 import com.infinity.drive.domain.model.ProxyServer
 import com.infinity.drive.domain.repository.ProxyRepository
 import com.infinity.drive.domain.repository.SettingsRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Saved routes to Telegram, for networks where it is blocked.
@@ -39,72 +45,122 @@ class ProxyRepositoryImpl(
         proxies.map { it.toDomain(isActive = it.id == activeId) }
     }
 
-    override suspend fun save(proxy: ProxyServer): AppResult<Unit> {
-        proxyDao.upsert(proxy.toEntity())
+    private val mutations = Mutex()
+    private var appliedProxy: TelegramProxy? = null
+    private var routeApplied = false
+
+    override suspend fun save(proxy: ProxyServer): AppResult<Unit> = mutate {
+        val normalized = proxy.copy(host = proxy.host.trim().removeSurrounding("[", "]"))
+        val target = normalized.toTelegram()
+        if (!target.hasValidFields()) return@mutate AppResult.Failure(invalidProxy())
+        val previous = proxyDao.byId(proxy.id)
         val prefs = settingsRepository.preferences.first()
-        if (prefs.activeProxyId.isBlank()) {
-            settingsRepository.update { it.copy(activeProxyId = proxy.id) }
+        val activeEdit = prefs.proxyEnabled && prefs.activeProxyId == proxy.id
+        // TDLib receives only valid inputs. A failed active edit keeps the old row and route.
+        if (activeEdit) applyRoute(target)
+        try {
+            proxyDao.upsert(normalized.toEntity(previous?.addedAt ?: System.currentTimeMillis()))
+        } catch (error: Exception) {
+            if (activeEdit && previous != null && error !is CancellationException) applyRoute(previous.toDomain(false).toTelegram())
+            throw error
         }
-        return applyAndReport()
+        if (prefs.activeProxyId.isBlank()) settingsRepository.update { it.copy(activeProxyId = proxy.id) }
+        AppResult.Success(Unit)
     }
 
-    override suspend fun delete(id: String): AppResult<Unit> {
-        proxyDao.delete(id)
+    override suspend fun delete(id: String): AppResult<Unit> = mutate {
         val prefs = settingsRepository.preferences.first()
         if (prefs.activeProxyId == id) {
-            val fallback = proxyDao.all().firstOrNull()
-            settingsRepository.update {
-                it.copy(
-                    activeProxyId = fallback?.id.orEmpty(),
-                    proxyEnabled = it.proxyEnabled && fallback != null
-                )
-            }
+            val fallback = proxyDao.all().firstOrNull { it.id != id }
+            if (prefs.proxyEnabled) applyRoute(fallback?.toDomain(false)?.toTelegram())
+            settingsRepository.update { it.copy(activeProxyId = fallback?.id.orEmpty(), proxyEnabled = it.proxyEnabled && fallback != null) }
         }
-        return applyAndReport()
+        proxyDao.delete(id)
+        AppResult.Success(Unit)
     }
 
-    override suspend fun select(id: String): AppResult<Unit> {
-        settingsRepository.update { it.copy(activeProxyId = id) }
-        return applyAndReport()
+    override suspend fun select(id: String): AppResult<Unit> = mutate {
+        val proxy = proxyDao.byId(id) ?: return@mutate AppResult.Failure(AppError.NotFound)
+        val prefs = settingsRepository.preferences.first()
+        if (prefs.proxyEnabled) applyRoute(proxy.toDomain(false).toTelegram())
+        if (prefs.activeProxyId != id) settingsRepository.update { it.copy(activeProxyId = id) }
+        AppResult.Success(Unit)
     }
 
-    override suspend fun setEnabled(enabled: Boolean): AppResult<Unit> {
-        if (enabled && proxyDao.all().isEmpty()) {
-            return AppResult.Failure(
-                AppError.NotFound
-            )
-        }
-        settingsRepository.update { it.copy(proxyEnabled = enabled) }
-        return applyAndReport()
+    override suspend fun setEnabled(enabled: Boolean): AppResult<Unit> = mutate {
+        val prefs = settingsRepository.preferences.first()
+        val selected = proxyDao.byId(prefs.activeProxyId) ?: if (enabled) proxyDao.all().firstOrNull() else null
+        if (enabled && selected == null) return@mutate AppResult.Failure(AppError.NotFound)
+        applyRoute(selected?.toDomain(false)?.toTelegram().takeIf { enabled })
+        settingsRepository.update { it.copy(proxyEnabled = enabled, activeProxyId = selected?.id ?: it.activeProxyId) }
+        AppResult.Success(Unit)
     }
 
-    override suspend fun rotate(): AppResult<Boolean> {
+    override suspend fun rotate(expectedId: String, excludedIds: Set<String>): AppResult<String?> = mutate {
+        val prefs = settingsRepository.preferences.first()
+        if (!prefs.proxyEnabled || prefs.activeProxyId != expectedId) return@mutate AppResult.Success(null)
         val saved = proxyDao.all()
-        if (saved.size < 2) return AppResult.Success(false)
-        val activeId = settingsRepository.preferences.first().activeProxyId
-        val current = saved.indexOfFirst { it.id == activeId }
-        val next = saved[(current + 1).mod(saved.size)]
-        SafeLog.d(TAG, "Switching to the next saved proxy")
-        return when (val result = select(next.id)) {
-            is AppResult.Success -> AppResult.Success(true)
-            is AppResult.Failure -> result
+        val index = saved.indexOfFirst { it.id == expectedId }
+        val candidates = saved.drop(index + 1) + saved.take((index + 1).coerceAtLeast(0))
+        for (candidate in candidates) {
+            if (candidate.id == expectedId || candidate.id in excludedIds) continue
+            try {
+                applyRoute(candidate.toDomain(false).toTelegram())
+            } catch (_: TelegramException) {
+                continue
+            }
+            settingsRepository.update { it.copy(activeProxyId = candidate.id) }
+            return@mutate AppResult.Success(candidate.id)
         }
+        AppResult.Success(null)
     }
 
     override suspend fun applyActive() {
-        runCatching { telegramClient.applyProxy(activeProxy()) }
-            .onFailure { SafeLog.w(TAG, "Could not apply the proxy", it) }
+        val result = mutate {
+            val prefs = settingsRepository.preferences.first()
+            val target = if (prefs.proxyEnabled) proxyDao.byId(prefs.activeProxyId)?.toDomain(false)?.toTelegram() else null
+            applyRoute(target, force = true)
+            AppResult.Success(Unit)
+        }
+        if (result is AppResult.Failure) SafeLog.w(TAG, "Could not initialize the saved proxy route")
     }
 
+    private suspend fun <T> mutate(action: suspend () -> AppResult<T>): AppResult<T> = mutations.withLock {
+        // The connection may become ready while we apply a route. Persist the
+        // applied choice even if that state change cancels a failover caller.
+        withContext(NonCancellable) {
+            try {
+                action()
+            } catch (_: TelegramException) {
+                AppResult.Failure(AppError.UnsupportedOperation("Telegram could not apply the proxy settings."))
+            } catch (_: java.io.IOException) {
+                AppResult.Failure(AppError.Unknown())
+            }
+        }
+    }
+
+    private suspend fun applyRoute(target: TelegramProxy?, force: Boolean = false) {
+        if (!force && routeApplied && target == appliedProxy) return
+        telegramClient.applyProxy(target)
+        val changed = !routeApplied || target != appliedProxy
+        appliedProxy = target
+        routeApplied = true
+        if (changed && !force) telegramClient.reconnect()
+    }
+
+    private fun invalidProxy() = AppError.UnsupportedOperation("Check the proxy address, port and credentials.")
+
     override suspend fun test(proxy: ProxyServer): AppResult<ProxyProbeResult> = try {
-        telegramClient.testProxy(proxy.toTelegram())
-        AppResult.Success(ProxyProbeResult.ANSWERED)
+        val target = proxy.toTelegram()
+        if (!target.hasValidFields()) AppResult.Failure(invalidProxy()) else {
+            telegramClient.testProxy(target)
+            AppResult.Success(ProxyProbeResult.ANSWERED)
+        }
     } catch (e: TelegramException) {
         if (e.code == UNAUTHORIZED) {
             probe(proxy)
         } else {
-            SafeLog.w(TAG, "Proxy test failed", e)
-            AppResult.Failure(AppError.TelegramError(e.code, e.message))
+            AppResult.Failure(AppError.NetworkUnavailable)
         }
     }
 
@@ -113,32 +169,8 @@ class ProxyRepositoryImpl(
         return if (result == ProxyProbeResult.UNREACHABLE) {
             AppResult.Failure(AppError.NetworkUnavailable)
         } else {
-            AppResult.Success(result)
+            AppResult.Success(ProxyProbeResult.REACHABLE)
         }
-    }
-
-    @Volatile
-    private var appliedProxy: TelegramProxy? = null
-
-    private suspend fun activeProxy(): TelegramProxy? {
-        val prefs = settingsRepository.preferences.first()
-        if (!prefs.proxyEnabled) return null
-        val entity = prefs.activeProxyId.takeIf { it.isNotBlank() }?.let { proxyDao.byId(it) }
-        return entity?.toDomain(isActive = true)?.toTelegram()
-    }
-
-    private suspend fun applyAndReport(): AppResult<Unit> = try {
-        val target = activeProxy()
-        telegramClient.applyProxy(target)
-        if (target != appliedProxy) {
-            appliedProxy = target
-            telegramClient.reconnect()
-        }
-        AppResult.Success(Unit)
-    } catch (e: TelegramException) {
-        AppResult.Failure(
-            AppError.TelegramError(e.code, e.message)
-        )
     }
 
     private fun ProxyEntity.toDomain(isActive: Boolean) = ProxyServer(
@@ -153,7 +185,7 @@ class ProxyRepositoryImpl(
         isActive = isActive
     )
 
-    private fun ProxyServer.toEntity() = ProxyEntity(
+    private fun ProxyServer.toEntity(addedAt: Long) = ProxyEntity(
         id = id,
         label = label,
         type = type,
@@ -162,7 +194,7 @@ class ProxyRepositoryImpl(
         username = username?.takeIf { it.isNotBlank() },
         password = password?.takeIf { it.isNotBlank() },
         secret = secret?.takeIf { it.isNotBlank() },
-        addedAt = System.currentTimeMillis()
+        addedAt = addedAt
     )
 
     private fun ProxyServer.toTelegram() = TelegramProxy(

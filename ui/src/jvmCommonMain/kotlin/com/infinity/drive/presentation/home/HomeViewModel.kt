@@ -69,8 +69,6 @@ data class HomeUiState(
     val activeBackup: BackupSession? = null,
     val missingPermissions: List<AppPermission> = emptyList(),
     val backupFoldersSelected: Boolean = true,
-    val showArchivedSection: Boolean = false,
-    val showHiddenSection: Boolean = false,
     val showRecentSection: Boolean = true,
     val rebuilding: Boolean = false,
     val appLockEnabled: Boolean = false,
@@ -161,7 +159,10 @@ class HomeViewModel(
         countsAndStorage,
         fileRepository.observeRecent(12),
         fileRepository.observeFavoriteFolders(),
-        transferRepository.observeActiveCount(),
+        activeChannel.observe().flatMapLatest { chatId ->
+            if (chatId == null) kotlinx.coroutines.flow.flowOf(0)
+            else transferRepository.observeSectionCount(chatId, com.infinity.drive.domain.model.TransferSection.ACTIVE)
+        },
         combine(
             backupRepository.observeActiveSession(),
             telegramAuthRepository.connectionState,
@@ -183,8 +184,6 @@ class HomeViewModel(
                 drive,
                 prefs.autoBackupEnabled,
                 prefs.appLockEnabled,
-                prefs.showArchivedFiles,
-                prefs.showHiddenFiles,
                 prefs.showRecentFiles
             )
         }
@@ -192,8 +191,6 @@ class HomeViewModel(
         val (counts, storage, lastBackupAt,localBytes) = countsWithStorage
         val (syncing, session, connection, network, missing, drive) = misc
         val appLockEnabled = misc.appLockEnabled
-        val showArchived = misc.showArchivedSection
-        val showHidden = misc.showHiddenSection
         HomeUiState(
             loading = false,
             connection = connection,
@@ -216,8 +213,6 @@ class HomeViewModel(
             lastBackupAt = lastBackupAt,
             appLockEnabled = appLockEnabled,
             rebuilding = syncing,
-            showArchivedSection = showArchived,
-            showHiddenSection = showHidden,
             showRecentSection = misc.showRecentSection,
             activeTransferCount = activeTransfers
         )
@@ -294,8 +289,6 @@ class HomeViewModel(
         val activeDrive: DriveChannel?,
         val autoBackupEnabled: Boolean,
         val appLockEnabled: Boolean,
-        val showArchivedSection: Boolean,
-        val showHiddenSection: Boolean,
         val showRecentSection: Boolean
     )
 

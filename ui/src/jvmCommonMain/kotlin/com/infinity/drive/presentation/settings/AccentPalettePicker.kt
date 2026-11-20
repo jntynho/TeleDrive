@@ -55,7 +55,6 @@ import com.infinity.drive.domain.model.ThemePalette
 import com.infinity.drive.domain.model.UserPreferences
 import com.infinity.drive.presentation.theme.contentColour
 import com.infinity.drive.presentation.theme.editorDefinition
-import com.infinity.drive.presentation.theme.platformColorScheme
 import com.infinity.drive.presentation.theme.toColorScheme
 import com.infinity.drive.presentation.theme.toStoredColour
 import com.infinity.drive.resources.Res
@@ -69,9 +68,7 @@ private val accentCellGap = 2.dp
 @Composable
 internal fun AccentColourPicker(
     preferences: UserPreferences,
-    supportsDynamicColor: Boolean,
     onSelect: (AccentColour) -> Unit,
-    onSelectDynamic: () -> Unit,
     onSelectCustom: (String) -> Unit,
     onEditCustom: (String) -> Unit,
     onDeleteCustom: (String) -> Unit,
@@ -82,17 +79,11 @@ internal fun AccentColourPicker(
         AppTheme.DARK, AppTheme.AMOLED -> true
         AppTheme.SYSTEM -> isSystemInDarkTheme()
     }
-    val useDynamic = supportsDynamicColor && preferences.dynamicColor
-    val activeCustom = preferences.selectedCustomTheme.takeUnless { useDynamic }
+    val activeCustom = preferences.selectedCustomTheme
     val activePreset = preferences.accentColour
     val presets = remember { AccentColour.presets.map { it to it.editorDefinition() } }
-    val selectedIndex = when {
-        useDynamic -> 1
-        activeCustom != null -> presets.size + (if (supportsDynamicColor) 1 else 0) +
-            preferences.customThemes.indexOf(activeCustom)
-        else -> AccentColour.presets.indexOf(activePreset).coerceAtLeast(0) +
-            (if (supportsDynamicColor && activePreset != AccentColour.BLUE) 1 else 0)
-    }
+    val selectedIndex = if (activeCustom != null) presets.size + preferences.customThemes.indexOf(activeCustom)
+        else AccentColour.presets.indexOf(activePreset).coerceAtLeast(0)
     val scrollState = rememberScrollState(
         initial = with(LocalDensity.current) {
             ((accentCellWidth + accentCellGap) * (selectedIndex - 2).coerceAtLeast(0)).roundToPx()
@@ -109,7 +100,7 @@ internal fun AccentColourPicker(
             Column(Modifier.weight(1f)) {
                 Text(stringResource(Res.string.settings_accent_colour), style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    if (useDynamic) "Dynamic" else activeCustom?.name ?: activePreset.chooserLabel,
+                    activeCustom?.name ?: activePreset.chooserLabel,
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.onSurfaceVariant
                 )
@@ -151,21 +142,9 @@ internal fun AccentColourPicker(
                 AccentSample(
                     label = choice.chooserLabel,
                     palette = if (dark) definition.dark else definition.light,
-                    selected = !useDynamic && activeCustom == null && activePreset == choice,
+                    selected = activeCustom == null && activePreset == choice,
                     onSelect = { onSelect(choice) }
                 )
-                if (choice == AccentColour.BLUE && supportsDynamicColor) {
-                    val wallpaper = platformColorScheme(dark, true) ?: colors
-                    AccentSample(
-                        label = "Dynamic",
-                        palette = ThemePalette(
-                            wallpaper.primary.toStoredColour(), wallpaper.secondary.toStoredColour(),
-                            wallpaper.tertiary.toStoredColour(), wallpaper.background.toStoredColour()
-                        ),
-                        selected = useDynamic,
-                        onSelect = onSelectDynamic
-                    )
-                }
             }
             preferences.customThemes.forEach { theme ->
                 val resolved = remember(theme, dark, preferences.theme) {

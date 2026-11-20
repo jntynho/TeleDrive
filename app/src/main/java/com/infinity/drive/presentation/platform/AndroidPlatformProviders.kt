@@ -310,7 +310,6 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
         activeFolderPickerCallback?.let { callback ->
                 DriveInfinityTheme(
                     darkTheme = darkTheme,
-                    dynamicColor = prefs.dynamicColor,
                     accentColour = prefs.accentColour,
                     customTheme = prefs.selectedCustomTheme,
                     iconStyle = prefs.iconStyle,

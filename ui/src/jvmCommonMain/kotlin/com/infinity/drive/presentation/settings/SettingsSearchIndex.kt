@@ -31,7 +31,6 @@ fun settingsSearchEntries():List<SettingsSearchEntry> = listOf(
     SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_language),
     SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_gallery_grid_view),
     SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_gallery_grid_columns),
-    SettingsSearchEntry(SettingsSectionType.APPEARANCE,Res.string.settings_compact_layout),
     SettingsSearchEntry(SettingsSectionType.PLAYBACK,Res.string.settings_stream_downloading),
     SettingsSearchEntry(SettingsSectionType.PLAYBACK,Res.string.settings_background_playback),
     SettingsSearchEntry(SettingsSectionType.NOTIFICATIONS,Res.string.settings_backup_results),

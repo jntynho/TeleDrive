@@ -25,14 +25,14 @@ object ProxyLink {
 
         val kind = when {
             scheme.equals("tg", ignoreCase = true) -> authority
-            authority.equals("t.me", ignoreCase = true) ||
-                    authority.equals("telegram.me", ignoreCase = true) ->
+            (scheme.equals("https", ignoreCase = true) || scheme.equals("http", ignoreCase = true)) &&
+                (authority.equals("t.me", ignoreCase = true) || authority.equals("telegram.me", ignoreCase = true)) ->
                 path.trim('/')
 
             else -> null
         }
 
-        val host = parameters["server"]?.trim().orEmpty()
+        val host = parameters["server"]?.trim()?.removeSurrounding("[", "]").orEmpty()
         val port = parameters["port"]?.trim()?.toIntOrNull() ?: return null
         if (host.isEmpty() || port !in MIN_PORT..MAX_PORT) return null
 
@@ -57,7 +57,7 @@ object ProxyLink {
             )
 
             else -> null
-        }
+        }?.takeIf { it.hasValidFields() }
     }
 
     const val MIN_PORT = 1
@@ -66,22 +66,19 @@ object ProxyLink {
     private fun urlDecode(value: String): String = buildString {
         var index = 0
         while (index < value.length) {
-            val char = value[index]
-            val hex = if (char == '%' && index + 3 <= value.length) {
-                value.substring(index + 1, index + 3)
-            } else {
-                null
-            }
-            val decoded = hex?.toIntOrNull(16)
-            when {
-                char == '+' -> append(' ')
-                decoded != null -> {
-                    append(decoded.toChar())
-                    index += 2
+            if (value[index] == '%' && index + 2 < value.length) {
+                val bytes = mutableListOf<Byte>()
+                while (index + 2 < value.length && value[index] == '%') {
+                    val byte = value.substring(index + 1, index + 3).toIntOrNull(16) ?: break
+                    bytes.add(byte.toByte())
+                    index += 3
                 }
-
-                else -> append(char)
+                if (bytes.isNotEmpty()) {
+                    append(bytes.toByteArray().decodeToString())
+                    continue
+                }
             }
+            append(if (value[index] == '+') ' ' else value[index])
             index++
         }
     }

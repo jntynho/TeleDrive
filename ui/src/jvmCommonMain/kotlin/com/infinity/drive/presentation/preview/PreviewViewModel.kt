@@ -162,7 +162,7 @@ class PreviewViewModel(
 
     val backgroundPlayback: StateFlow<Boolean> = settingsRepository.preferences
         .map { it.backgroundPlayback }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), com.infinity.drive.domain.model.UserPreferences().backgroundPlayback)
 
     val preferredAudioLanguage: StateFlow<String> = settingsRepository.preferences
         .map { it.preferredAudioLanguage }

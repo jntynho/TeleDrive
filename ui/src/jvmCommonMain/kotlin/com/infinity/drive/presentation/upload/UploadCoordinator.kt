@@ -104,64 +104,6 @@ class UploadCoordinator(private val fileRepository:FileRepository,
             })
         }}
     }
-    val canCompressImports get() = fileImporter.canPrepareZip
-
-    fun importAsZip(references: List<String>, name: String, target: String?) {
-        if (references.isEmpty() || !canCompressImports) return
-        importScope.launch {
-            serial.withLock {
-                val drive = settings.preferences.first().takeIf { it.onboardingComplete }?.storageChatId
-                    ?: return@withLock
-                suspend fun verifyTarget() {
-                    val prefs = settings.preferences.first()
-                    check(prefs.onboardingComplete && prefs.storageChatId == drive)
-                    if (target != null) {
-                        val folder = fileRepository.getFolder(target)
-                        check(folder != null && folder.trashedAt == null)
-                    }
-                }
-                _messages.tryEmit(UiText.Resource(Res.string.files_zip_preparing))
-                var temporary: ImportedFile? = null
-                try {
-                    verifyTarget()
-                    val archive = coroutineScope {
-                        val preparation = launch {
-                            settings.preferences.first { !it.onboardingComplete || it.storageChatId != drive }
-                            this@coroutineScope.cancel(CancellationException("Drive changed"))
-                        }
-                        try {
-                            fileImporter.prepareZip(references, name) { ensureActive() }
-                                ?.also { temporary = it }
-                                ?: error("Could not compress the selected files")
-                        } finally {
-                            preparation.cancel()
-                        }
-                    }
-                    verifyTarget()
-                    val (answer, resolvedName) = choice(archive.name, archive.sizeBytes, target, 1, null)
-                    if (answer?.choice == Choice.SKIP) return@withLock
-                    verifyTarget()
-                    val file = when (val result = fileRepository.registerImport(archive, target, resolvedName, allowDuplicate = true, expectedDrive = drive)) {
-                        is AppResult.Success -> result.value
-                        is AppResult.Failure -> error("Could not register the ZIP")
-                    }
-                    temporary = null
-                    when (val result = transferRepository.enqueueUploads(listOf(file.id))) {
-                        is AppResult.Success -> check(result.value == 1)
-                        is AppResult.Failure -> error("Could not queue the ZIP")
-                    }
-                    _messages.tryEmit(UiText.Resource(Res.string.files_import_uploading, 1))
-                } catch (cancel: CancellationException) {
-                    throw cancel
-                } catch (_: Exception) {
-                    _messages.tryEmit(UiText.Resource(Res.string.files_zip_failed))
-                } finally {
-                    temporary?.let(fileImporter::discard)
-                }
-            }
-        }
-    }
-
     fun importFromTelegram(documents: List<RemoteDocument>, target: String?, expectedDrive: Long) {
         importScope.launch {serial.withLock {
             val context = settings.preferences.first()

@@ -21,12 +21,10 @@ data class CustomTheme(
 )
 
 fun UserPreferences.selectAccentColour(colour: AccentColour): UserPreferences =
-    copy(accentColour = colour, dynamicColor = false, selectedCustomThemeId = null)
-
-fun UserPreferences.selectDynamicAccent(): UserPreferences = copy(dynamicColor = true)
+    copy(accentColour = colour, selectedCustomThemeId = null)
 
 fun UserPreferences.selectCustomTheme(id: String): UserPreferences =
-    if (customThemes.any { it.id == id }) copy(selectedCustomThemeId = id, dynamicColor = false) else this
+    if (customThemes.any { it.id == id }) copy(selectedCustomThemeId = id) else this
 
 fun UserPreferences.saveCustomTheme(theme: CustomTheme): UserPreferences {
     val name = theme.name.trim()
@@ -35,7 +33,7 @@ fun UserPreferences.saveCustomTheme(theme: CustomTheme): UserPreferences {
     val themes = if (customThemes.any { it.id == theme.id }) {
         customThemes.map { if (it.id == theme.id) namedTheme else it }
     } else customThemes + namedTheme
-    return copy(customThemes = themes, selectedCustomThemeId = theme.id, dynamicColor = false)
+    return copy(customThemes = themes, selectedCustomThemeId = theme.id)
 }
 
 fun UserPreferences.deleteCustomTheme(id: String): UserPreferences = copy(

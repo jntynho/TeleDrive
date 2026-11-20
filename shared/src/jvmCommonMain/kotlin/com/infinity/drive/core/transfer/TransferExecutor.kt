@@ -168,7 +168,8 @@ class TransferExecutor(
         if(transfer.remoteFileId!=null&&entity.localPath==null&&entity.messageId==null) {
             val prefs=settingsRepository.preferences.first()
             if(prefs.encryptFiles)return Outcome.Failed("To save encrypted copies, download the originals from Telegram and upload them from your device.")
-            val target=entity.chatId?:prefs.storageChatId?:telegramClient.ensureStorageChat(null)
+            val target = transfer.chatId ?: entity.chatId ?: prefs.storageChatId ?: telegramClient.ensureStorageChat(null)
+            transferDao.bindChannel(transfer.id, target)
             val manifest=RemoteFileManifest(fileId=entity.id,name=entity.name,folderPath=folderPathResolver.pathOf(entity.folderId),folderId=entity.folderId,
                 mimeType=entity.mimeType,sizeBytes=entity.sizeBytes,contentHash=null,hidden=false,archived=false,encrypted=false,createdAt=entity.createdAt,modifiedAt=entity.modifiedAt,tags=FileTags.decode(entity.tagsEncoded))
             val caption=manifestCodec.encode(manifest,false)
@@ -208,6 +209,7 @@ class TransferExecutor(
                 }
             }
 
+        transferDao.bindChannel(transfer.id, chatId)
         val encrypt = prefs.encryptFiles && prefs.keyBackupCreated
         val uploadSize = sourceFile.length()
         val sizeChanged = entity.sizeBytes != uploadSize

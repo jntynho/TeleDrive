@@ -205,8 +205,7 @@ fun fileIcon(mime:String)=when{mime.startsWith("image/")->DriveIcons.Image;mime.
     else Box(modifier,contentAlignment=Alignment.Center) {
         when {
             loading->CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp)
-            failed&&!square->IconButton({retry++}){Icon(DriveIcons.Refresh,"Retry preview",tint=MaterialTheme.colorScheme.onSurfaceVariant)}
-            else->Icon(fileIcon(item.mime),if(failed)"Preview unavailable"else null,Modifier.size(32.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)
+            else->com.infinity.drive.presentation.components.FileTypeFallback(item.name, item.mime, com.infinity.drive.domain.model.FileCategory.fromMimeType(item.mime), 22.dp)
         }
     }
 }

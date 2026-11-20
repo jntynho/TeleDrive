@@ -20,6 +20,14 @@ class PreferenceCustomizationTest {
         override suspend fun updateData(transform:suspend (Preferences)->Preferences):Preferences=mutex.withLock{transform(state.value).also{state.value=it}}
     }
     private val cipher=object:CredentialCipher{override fun encrypt(plaintext:ByteArray)=plaintext.copyOf();override fun decrypt(ciphertext:ByteArray)=ciphertext.copyOf()}
+    @Test fun backgroundPlaybackDefaultsOnAndAnExplicitOffChoiceSurvives() = runBlocking {
+        val store = Store()
+        val preferences = SettingsRepositoryImpl(store, cipher)
+        assertTrue(preferences.preferences.first().backgroundPlayback)
+        preferences.update { it.copy(backgroundPlayback = false) }
+        assertFalse(SettingsRepositoryImpl(store, cipher).preferences.first().backgroundPlayback)
+    }
+
     @Test fun newPreferencesHaveCompatibleDefaultsAndSurviveRepositoryRecreation()=runBlocking{
         val store=Store();val repository=SettingsRepositoryImpl(store,cipher)
         assertEquals(DashboardStyle.CLASSIC,repository.preferences.first().dashboardStyle)

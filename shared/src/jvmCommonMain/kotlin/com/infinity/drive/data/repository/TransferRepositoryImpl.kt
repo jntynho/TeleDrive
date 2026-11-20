@@ -43,22 +43,11 @@ class TransferRepositoryImpl(
     private val database: DriveInfinityDatabase
 ) : TransferRepository {
 
-    override fun observeSection(
-        section: TransferSection,
-        limit: Int
-    ): Flow<List<TransferTask>> = when (section) {
-        TransferSection.ACTIVE -> transferDao.observeActive(limit)
-        TransferSection.PAUSED -> transferDao.observePaused(limit)
-        TransferSection.FAILED -> transferDao.observeFailed(limit)
-        TransferSection.COMPLETED -> transferDao.observeCompleted(limit)
-    }.map { list -> list.map { it.toDomain() } }
+    override fun observeSection(chatId: Long, section: TransferSection, limit: Int): Flow<List<TransferTask>> =
+        transferDao.observeSection(chatId, section.states, limit).map { list -> list.map { it.toDomain() } }
 
-    override fun observeSectionCount(section: TransferSection): Flow<Int> = when (section) {
-        TransferSection.ACTIVE -> transferDao.observeActiveCount()
-        TransferSection.PAUSED -> transferDao.observeCountByState(TransferState.PAUSED)
-        TransferSection.FAILED -> transferDao.observeCountByState(TransferState.FAILED)
-        TransferSection.COMPLETED -> transferDao.observeCountByState(TransferState.COMPLETED)
-    }
+    override fun observeSectionCount(chatId: Long, section: TransferSection): Flow<Int> =
+        transferDao.observeSectionCount(chatId, section.states)
 
     override fun observeActiveCount(): Flow<Int> = transferDao.observeActiveCount()
 
@@ -121,7 +110,8 @@ class TransferRepositoryImpl(
         if(entity.remoteFileId==null&&!(type==TransferType.RESTORE&&entity.localPath!=null))return@withLock AppResult.Failure(AppError.NoRemoteCopy)
         val available=storageInspector.availableBytes()
         if(available<entity.sizeBytes+STORAGE_MARGIN)return@withLock AppResult.Failure(AppError.InsufficientStorage(entity.sizeBytes+STORAGE_MARGIN,available))
-        insertTransfer(entity.id,entity.name,entity.sizeBytes,type,priority,null)
+        insertTransfer(entity.id, entity.name, entity.sizeBytes, type, priority, null,
+            entity.chatId ?: settingsRepository.preferences.first().storageChatId)
     }
 
     suspend fun enqueueBackup(
@@ -173,14 +163,14 @@ class TransferRepositoryImpl(
                 )
                 if (rejected != null) continue
                 fileDao.setUploadRequested(listOf(entity.id),true)
-        fileDao.setBackupStateIfLocalOnly(entity.id, BackupState.QUEUED)
+                fileDao.setBackupStateIfLocalOnly(entity.id, BackupState.QUEUED)
                 transfers += TransferEntity(
                     id = UUID.randomUUID().toString(),
                     type = type,
                     fileId = entity.id,
                     displayName = entity.name,
                     localPath = null,
-                    chatId = null,
+                    chatId = entity.chatId ?: prefs.storageChatId,
                     messageId = null,
                     remoteFileId = entity.remoteFileId.takeIf { entity.messageId == null && entity.localPath == null },
                     sizeBytes = entity.sizeBytes,
@@ -232,7 +222,7 @@ class TransferRepositoryImpl(
 
         fileDao.setUploadRequested(listOf(entity.id),true)
         fileDao.setBackupStateIfLocalOnly(entity.id, BackupState.QUEUED)
-        return insertTransfer(entity.id, entity.name, entity.sizeBytes, type, priority, sessionId)
+        return insertTransfer(entity.id, entity.name, entity.sizeBytes, type, priority, sessionId, entity.chatId ?: prefs.storageChatId)
     }
 
     private suspend fun insertTransfer(
@@ -241,7 +231,8 @@ class TransferRepositoryImpl(
         sizeBytes: Long,
         type: TransferType,
         priority: Int,
-        sessionId: String?
+        sessionId: String?,
+        chatId: Long?
     ): AppResult<String> {
         val now = System.currentTimeMillis()
         val transfer = TransferEntity(
@@ -250,7 +241,7 @@ class TransferRepositoryImpl(
             fileId = fileId,
             displayName = name,
             localPath = null,
-            chatId = null,
+            chatId = chatId,
             messageId = null,
             remoteFileId = null,
             sizeBytes = sizeBytes,
@@ -283,15 +274,20 @@ class TransferRepositoryImpl(
         }
     }
 
-    override suspend fun cancel(id: String) {
-        val transfer = transferDao.byId(id) ?: return
-        fileDao.suppressUploadsForTransfers(listOf(id))
-        if (transfer.state.isTerminal) {
-            transferDao.deleteByIds(listOf(id))
-        } else {
-            transferDao.setState(id, TransferState.CANCELLED, System.currentTimeMillis())
-            transfer.fileId?.let { fileDao.setBackupStateIfLocalOnly(it, BackupState.NONE) }
-        }
+    override suspend fun cancel(id: String, dismissFinished: Boolean) {
+        val transfer = database.inImmediateTransaction {
+            val task = transferDao.byId(id) ?: return@inImmediateTransaction null
+            if (task.state.isTerminal != dismissFinished) return@inImmediateTransaction null
+            if (dismissFinished) {
+                if (task.state == TransferState.COMPLETED) return@inImmediateTransaction null
+                transferDao.deleteByIds(listOf(id))
+            } else {
+                fileDao.suppressUploadsForTransfers(listOf(id))
+                transferDao.setState(id, TransferState.CANCELLED, System.currentTimeMillis())
+                task.fileId?.let { fileDao.setBackupStateIfLocalOnly(it, BackupState.NONE) }
+            }
+            task
+        } ?: return
         syncFileStates()
         backupSessionTracker.refresh(transfer.backupSessionId)
     }
@@ -303,20 +299,22 @@ class TransferRepositoryImpl(
             .forEach { cancel(it) }
     }
 
-    override suspend fun pauseAll() {
-        transferDao.pauseAll(System.currentTimeMillis())
+    override suspend fun pauseAll(chatId: Long) {
+        transferDao.pauseAll(chatId, System.currentTimeMillis())
         backupSessionTracker.refreshActive()
     }
 
-    override suspend fun resumeAll() {
-        transferDao.resumeAll(System.currentTimeMillis())
+    override suspend fun resumeAll(chatId: Long) {
+        transferDao.resumeAll(chatId, System.currentTimeMillis())
         backupSessionTracker.refreshActive()
         kickWorker()
     }
 
-    override suspend fun cancelAll() {
-        fileDao.suppressPendingUploads()
-        transferDao.cancelAll(System.currentTimeMillis())
+    override suspend fun cancelAll(chatId: Long) {
+        database.inImmediateTransaction {
+            fileDao.suppressPendingUploads(chatId)
+            transferDao.cancelAll(chatId, System.currentTimeMillis())
+        }
         syncFileStates()
         backupSessionTracker.refreshActive()
     }
@@ -346,11 +344,11 @@ class TransferRepositoryImpl(
         if (queued) kickWorker()
     }
 
-    override suspend fun retryFailedBatch(batchId: String?): Int {
+    override suspend fun retryFailedBatch(chatId: Long, batchId: String?): Int {
         val retried = outgoingLock.withLock {
             incomingLock.withLock {
                 database.inImmediateTransaction {
-                    val candidates = transferDao.failedBatchCandidates(batchId)
+                    val candidates = transferDao.failedBatchCandidates(chatId, batchId)
                     val now = System.currentTimeMillis()
                     for (batch in candidates.chunked(SQL_BATCH)) {
                         transferDao.resetFailedBatch(batch.map { it.id }, now)
@@ -371,8 +369,8 @@ class TransferRepositoryImpl(
         return retried.size
     }
 
-    override suspend fun clearFinished() {
-        transferDao.clearFinished()
+    override suspend fun clearFinished(chatId: Long) {
+        transferDao.clearFinished(chatId)
         syncFileStates()
     }
 

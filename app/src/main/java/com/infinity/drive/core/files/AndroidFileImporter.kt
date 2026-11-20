@@ -10,10 +10,7 @@ import androidx.documentfile.provider.DocumentFile
 import androidx.core.net.toUri
 import com.infinity.drive.core.common.SafeLog
 import java.io.File
-import java.io.IOException
 import java.util.UUID
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 /**
  * Turns a SAF-picked document into a real path the transfer engine can upload
@@ -96,60 +93,6 @@ class AndroidFileImporter(
         } finally {
             preparingPaths.remove(partial.path)
             if (!complete.exists()) preparingPaths.remove(complete.path)
-        }
-    }
-
-    override val canPrepareZip: Boolean get() = true
-
-    override suspend fun prepareZip(
-        references: List<String>,
-        archiveName: String,
-        checkActive: suspend () -> Unit
-    ): ImportedFile? {
-        if (references.isEmpty()) return null
-        require(archiveName.endsWith(".zip", ignoreCase = true) && FileNameUtils.isValidName(archiveName))
-        val directory = File(File(storagePaths.filesDir, IMPORT_DIR), UUID.randomUUID().toString())
-        val target = File(directory, archiveName)
-        reserve(target.absolutePath)
-        try {
-            check(directory.mkdirs())
-            val names = mutableSetOf<String>()
-            val buffer = ByteArray(128 * 1024)
-            ZipOutputStream(target.outputStream().buffered()).use { archive ->
-                for (reference in references.distinct()) {
-                    checkActive()
-                    val source = describe(reference) ?: throw IOException("Could not read a selected file")
-                    val basename = FileNameUtils.sanitize(source.name).trimEnd(' ', '.').ifBlank { "unnamed" }
-                    val name = FileNameUtils.uniqueName(basename) { it.lowercase() in names }
-                    names.add(name.lowercase())
-                    val local = File(source.path).takeIf { it.isFile }
-                    val lastModified = local?.lastModified()
-                    val stream = if (local != null) local.inputStream()
-                        else context.contentResolver.openInputStream(Uri.parse(reference))
-                        ?: throw IOException("The selected file could not be opened")
-                    var length = 0L
-                    stream.use { input ->
-                        archive.putNextEntry(ZipEntry(name).apply { lastModified?.takeIf { it > 0 }?.let { time = it } })
-                        while (true) {
-                            checkActive()
-                            val count = input.read(buffer)
-                            if (count == -1) break
-                            archive.write(buffer, 0, count)
-                            length += count
-                        }
-                    }
-                    if (source.sizeBytes > 0 && length != source.sizeBytes ||
-                        local != null && (local.length() != length || local.lastModified() != lastModified)
-                    ) throw IOException("The selected file changed while being compressed")
-                    archive.closeEntry()
-                }
-            }
-            return ImportedFile(target.absolutePath, archiveName, target.length(), "application/zip")
-        } catch (failure: Throwable) {
-            target.delete()
-            preparingPaths.remove(target.absolutePath)
-            directory.delete()
-            throw failure
         }
     }
 
