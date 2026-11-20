@@ -37,19 +37,19 @@ class ProxyRoutingTest {
         try {
             var route: TelegramProxy? = null
             var reconnects = 0
-            val client = Proxy.newProxyInstance(
+            val unusedClient = Proxy.newProxyInstance(
                 TelegramClient::class.java.classLoader, arrayOf(TelegramClient::class.java)
-            ) { _, method, args ->
-                when (method.name) {
-                    "applyProxy" -> {
-                        val target = args?.get(0) as TelegramProxy?
-                        if (target?.host == "reject.example") throw TelegramException(400, "Invalid proxy")
-                        route = target
-                    }
-                    "reconnect" -> { reconnects++; Unit }
-                    else -> error("Unexpected Telegram call: ${method.name}")
+            ) { _, method, _ -> error("Unexpected Telegram call: " + method.name) } as TelegramClient
+            val client = object : TelegramClient by unusedClient {
+                override suspend fun applyProxy(proxy: TelegramProxy?) {
+                    if (proxy?.host == "reject.example") throw TelegramException(400, "Invalid proxy")
+                    route = proxy
                 }
-            } as TelegramClient
+
+                override suspend fun reconnect() {
+                    reconnects++
+                }
+            }
             val store = object : DataStore<Preferences> {
                 override val data = MutableStateFlow<Preferences>(emptyPreferences())
                 override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences =
