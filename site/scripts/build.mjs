@@ -21,7 +21,7 @@ export function releaseManifest(release) {
   const prefix = `https://github.com/${REPOSITORY}/releases/download/${release.tag_name}/`;
   const assets = expected.map((name) => {
     const matches =
-      release.assets?.filter((asset) => asset.name === name) || [];
+      release.assets?.filter((asset) => asset?.name === name) || [];
     if (matches.length !== 1)
       throw new Error(`Missing or duplicate APK: ${name}`);
     const asset = matches[0];
@@ -68,7 +68,6 @@ export async function build({
   );
   const icons = {
     download: "cloud-download",
-    upload: "cloud-upload",
     folder: "folder-open",
     gallery: "gallery",
     audio: "music-notes",
@@ -80,29 +79,42 @@ export async function build({
     shield: "shield-check",
     phone: "smartphone",
     code: "code",
-    check: "check",
     arrow: "alt-arrow-right",
     close: "close",
     qr: "qr-code",
     lock: "lock-keyhole",
     history: "history",
-    search: "rounded-magnifier",
     settings: "settings-minimalistic",
-    heart: "heart",
   };
-  let sprite =
-    '<svg xmlns="http://www.w3.org/2000/svg" class="icon-definitions" aria-hidden="true" width="0" height="0"><defs>';
+  const iconsByName = new Map();
   for (const [name, file] of Object.entries(icons)) {
     const raw = await readFile(
       path.join(repo, `third_party/solar/icons/${file}-linear.svg`),
       "utf8",
     );
     const body = raw.replace(/^.*?<svg[^>]*>/s, "").replace(/<\/svg>\s*$/, "");
-    sprite += `<symbol id="i-${name}" viewBox="0 0 24 24">${body}</symbol>`;
+    iconsByName.set(
+      name,
+      `<symbol id="i-${name}" viewBox="0 0 24 24">${body}</symbol>`,
+    );
   }
-  sprite += "</defs></svg>";
   for (const file of ["index.html", "privacy.html", "404.html"]) {
     const source = await readFile(path.join(output, file), "utf8");
+    const names = new Set(
+      Array.from(
+        source.matchAll(/<use\b[^>]*\shref\s*=\s*["']#i-([\w-]+)["']/g),
+        (match) => match[1],
+      ),
+    );
+    const symbols = [...names].map((name) => {
+      const symbol = iconsByName.get(name);
+      if (!symbol) throw new Error(`Unknown icon "${name}" in ${file}`);
+      return symbol;
+    });
+    const sprite =
+      '<svg xmlns="http://www.w3.org/2000/svg" class="icon-definitions" aria-hidden="true" width="0" height="0"><defs>' +
+      symbols.join("") +
+      "</defs></svg>";
     await writeFile(
       path.join(output, file),
       source.replace("<!-- ICONS -->", sprite),
@@ -114,7 +126,7 @@ export async function build({
   );
   const qr = await QRCode.toString(SITE_URL + "#download", {
     type: "svg",
-    margin: 2,
+    margin: 4,
     width: 240,
     color: { dark: "#172022", light: "#ffffff" },
     errorCorrectionLevel: "M",

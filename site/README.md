@@ -6,7 +6,7 @@ An original, static product website for [TeleDrive](https://github.com/jntynho/T
 
 The Telegrive reference was reviewed for its product presentation, download flow, app previews, installation instructions and FAQ. This site uses its own design, copy, assets and implementation: warm neutral surfaces, blue and sage accents, Roboto and the app's Solar icons. No Telegrive page code, artwork or screenshots are included.
 
-The site includes real app screens with fictional sample data, light/dark themes, keyboard-accessible preview tabs, a phone QR code, installation guidance, privacy information, and exactly two standalone Android downloads. It makes no iOS/desktop or unconditional unlimited-storage claims. Telegram service limits and optional encryption are explained explicitly.
+The site includes real app screens with fictional sample data, light/dark themes, keyboard-accessible preview tabs, a phone QR code, installation guidance, privacy information, and two standalone Android downloads. It explains Telegram service limits, local access locks and recovery for previously encrypted files. The FAQ describes the separate desktop workspace client.
 
 ## Local development
 
@@ -35,13 +35,13 @@ To use an existing Chromium binary, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/us
 
 For the first deployment, a repository administrator must choose **Settings → Pages → Build and deployment → Source → GitHub Actions**. `actions/configure-pages` cannot enable Pages with the workflow's standard `GITHUB_TOKEN`; it does not have repository administration permission. No personal token is needed when enabling the source in Settings.
 
-Website changes trigger the Pages workflow. The Android release workflow explicitly dispatches it after publishing both APKs, because events created with `GITHUB_TOKEN` do not normally trigger another release workflow. The website workflow also supports manual dispatch and externally published releases.
+Website changes on `main` trigger Pages deployment. The Android release workflow dispatches it after publishing both APKs, because a release created with `GITHUB_TOKEN` does not normally trigger another workflow. An externally published stable release also queues a build on the Pages branch. Manual dispatch on another branch runs validation without deploying.
 
 ## Release information
 
 CI reads GitHub's latest stable release once per build and writes a same-origin `release.json`. The browser never needs GitHub API credentials or its API rate limit. The builder rejects missing, duplicate, nonpositive-size or noncanonical APK assets. Published SHA-256 digests appear when GitHub supplies both of them.
 
-`release-snapshot.json` is a verified build-62 snapshot for offline/local previews. CI always supplies fresh release data through `TELEDRIVE_RELEASE_FILE`. Static `releases/latest/download/` links still work without JavaScript or if loading the manifest fails. Select ARM64 for most modern phones; use ARM32 for a 32-bit ARM system. Both require Android 8.0+.
+`release-snapshot.json` provides a verified fixture for offline/local previews. CI always supplies fresh release data through `TELEDRIVE_RELEASE_FILE` and checks that the deployed manifest matches the build. Static `releases/latest/download/` links still work without JavaScript or if loading the manifest fails. Select ARM64 for most modern phones or ARM32 for a 32-bit ARM system. Both require Android 8.0+.
 
 ## Assets and privacy
 

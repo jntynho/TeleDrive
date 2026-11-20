@@ -39,10 +39,11 @@ const server = http.createServer(async (req, res) => {
     });
     res.end(data);
   } catch {
-    res.writeHead(404, { "Content-Type": "text/plain" });
-    res.end("Not found");
+    const notFound = await readFile(path.join(directory, "404.html")).catch(() => null);
+    res.writeHead(404, { "Content-Type": types[notFound ? ".html" : ".txt"] });
+    res.end(notFound ?? "Not found");
   }
 });
 server.listen(Number(process.env.PORT || 4173), "0.0.0.0", () =>
-  console.log("TeleDrive website: http://localhost:4173/TeleDrive/"),
+  console.log(`TeleDrive website: http://localhost:${server.address().port}/TeleDrive/`),
 );

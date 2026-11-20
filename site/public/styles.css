@@ -55,7 +55,6 @@ a {
 }
 button,
 a,
-input,
 summary {
   -webkit-tap-highlight-color: transparent;
 }
@@ -84,9 +83,6 @@ summary:focus-visible,
 [tabindex]:focus-visible {
   outline: 3px solid var(--blue);
   outline-offset: 5px;
-}
-button:disabled {
-  cursor: wait;
 }
 h1,
 h2,
@@ -193,11 +189,6 @@ svg.icon {
 }
 .site-header nav a:hover {
   color: var(--blue);
-}
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 .icon-button {
   width: 44px;
@@ -392,6 +383,8 @@ svg.icon {
 }
 .hero-orbit {
   position: absolute;
+  max-width: calc(100% + 48px);
+  aspect-ratio: 1;
   border: 1px solid var(--line);
   border-radius: 50%;
   z-index: -1;
@@ -399,12 +392,10 @@ svg.icon {
 }
 .orbit-one {
   width: 580px;
-  height: 580px;
   opacity: 0.8;
 }
 .orbit-two {
   width: 420px;
-  height: 420px;
   background: radial-gradient(circle, var(--sand), transparent 72%);
   opacity: 0.7;
 }
@@ -939,11 +930,23 @@ svg.icon {
   width: 278px;
   transform: rotate(-3deg);
 }
-.preview-device img {
-  transition: opacity 0.14s ease;
+.preview-screen {
+  position: relative;
+  aspect-ratio: 786 / 1704;
 }
-.preview-device.is-switching img {
-  opacity: 0.35;
+.preview-status:not(:empty) {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  padding: 16px;
+  color: #fff;
+  text-align: center;
+}
+@media (forced-colors: active) {
+  .preview-tabs button[aria-selected="true"] {
+    text-decoration: underline;
+  }
 }
 .storage-path {
   display: flex;
@@ -1053,7 +1056,7 @@ svg.icon {
 }
 .download-version a {
   color: var(--blue);
-  text-decoration: none;
+  text-decoration: underline;
 }
 .download-grid {
   display: grid;
@@ -1394,10 +1397,6 @@ dialog > .button {
   letter-spacing: -0.6px;
   margin: 38px 0 16px;
 }
-.legal-page h3 {
-  font-size: 19px;
-  margin: 22px 0 12px;
-}
 .legal-page p,
 .legal-page li {
   font-size: 16px;
@@ -1407,7 +1406,7 @@ dialog > .button {
 .legal-page p + p {
   margin-top: 16px;
 }
-.legal-page a {
+.legal-page a:not(.button) {
   color: var(--blue);
 }
 .legal-page ul {
@@ -1452,17 +1451,15 @@ dialog > .button {
 [data-theme="dark"] .hero-label {
   box-shadow: 0 18px 40px #0003;
 }
-@media (prefers-reduced-motion: no-preference) {
-  [data-js] .reveal {
-    opacity: 0;
-    transform: translateY(14px);
-    transition:
-      opacity 0.5s ease,
-      transform 0.5s ease;
+@media screen and (prefers-reduced-motion: no-preference) {
+  .reveal.is-visible:not(:focus-within) {
+    animation: reveal-in 0.5s ease;
   }
-  [data-js] .reveal.is-visible {
-    opacity: 1;
-    transform: none;
+  @keyframes reveal-in {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
   }
 }
 @media (min-width: 1440px) {
@@ -1504,7 +1501,6 @@ dialog > .button {
   }
   .orbit-one {
     width: 460px;
-    height: 460px;
   }
   .hero-cta {
     gap: 15px;
@@ -1568,14 +1564,11 @@ dialog > .button {
   .brand {
     font-size: 21px;
   }
-  .header-actions {
-    gap: 8px;
-  }
-  .header-actions > .button {
+  .header-download {
     font-size: 12px;
     padding: 12px 15px;
   }
-  .header-actions > .button .icon {
+  .header-download .icon {
     display: none;
   }
   .hero {
@@ -1630,13 +1623,9 @@ dialog > .button {
   }
   .orbit-one {
     width: min(500px, 98%);
-    aspect-ratio: 1;
-    height: auto;
   }
   .orbit-two {
     width: 80%;
-    aspect-ratio: 1;
-    height: auto;
   }
   .trust-strip {
     display: grid;
@@ -1834,15 +1823,13 @@ dialog > .button {
     width: 32px;
     height: 32px;
   }
-  .header-actions {
+  .theme-toggle {
     margin-left: auto;
-    gap: 9px;
   }
-  .header-actions > .button {
+  .header-download {
     display: none;
   }
   .menu-toggle {
-    order: 3;
     min-height: 42px;
     min-width: 48px;
     background: none;
@@ -1853,7 +1840,7 @@ dialog > .button {
   }
   .site-header nav {
     width: 100%;
-    order: 4;
+    flex-basis: 100%;
     margin-left: 0;
     justify-content: center;
     flex-wrap: wrap;
@@ -1865,18 +1852,18 @@ dialog > .button {
   .site-header .source-link {
     display: flex;
   }
-  [data-js] .menu-toggle {
+  .site-header[data-menu-ready] .menu-toggle {
     display: inline-flex;
     align-items: center;
     justify-content: center;
   }
-  [data-js] .site-header nav {
+  .site-header[data-menu-ready] nav {
     display: none;
     padding: 12px 0 4px;
     border-top: 1px solid var(--line);
     margin-top: 8px;
   }
-  [data-js] .site-header.nav-open nav {
+  .site-header[data-menu-ready].nav-open nav {
     display: flex;
   }
   .hero {

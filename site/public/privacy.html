@@ -30,7 +30,17 @@
         ><img src="./assets/icon.svg" width="36" height="36" alt="" /><span
           >TeleDrive<span class="brand-dot">.</span></span
         ></a
-      ><button
+      >
+      <button
+        class="theme-toggle icon-button"
+        type="button"
+        aria-label="Switch to dark theme"
+        title="Switch theme"
+        hidden
+      >
+        <svg class="icon" aria-hidden="true"><use href="#i-theme"></use></svg>
+      </button>
+      <button
         class="menu-toggle"
         type="button"
         aria-expanded="false"
@@ -42,17 +52,6 @@
         <a href="./#features">Features</a><a href="./#download">Download</a
         ><a href="https://github.com/jntynho/TeleDrive">GitHub ↗</a>
       </nav>
-      <div class="header-actions">
-        <button
-          class="theme-toggle icon-button"
-          type="button"
-          aria-label="Switch to dark theme"
-          title="Switch theme"
-          hidden
-        >
-          <svg class="icon" aria-hidden="true"><use href="#i-theme"></use></svg>
-        </button>
-      </div>
     </header>
     <main id="main" class="legal-page section-shell">
       <a class="text-link" href="./">← Back to TeleDrive</a>
@@ -71,7 +70,7 @@
       </p>
       <p>
         Telegram is the storage provider. Its cloud chats are not end-to-end
-        encrypted by default, and its service limits and account controls apply.
+        encrypted, and its service limits and account controls apply.
         Removing a channel or its file messages can remove stored content. Keep
         an independent copy of important files.
       </p>
@@ -91,16 +90,16 @@
       <h2>Protection you can choose</h2>
       <ul>
         <li>
-          <strong>Hidden lock:</strong> uses Android’s fingerprint or
-          screen-lock verification. It does not read or store the phone’s PIN,
-          pattern or password. It controls access in TeleDrive and is separate
-          from file encryption.
+          <strong>Hidden lock</strong> uses a separate six-digit PIN, a
+          recovery key and optional Android biometrics. It controls access
+          to Hidden in this TeleDrive installation.
         </li>
         <li>
-          <strong>Optional encryption:</strong> file and thumbnail encryption
-          can be enabled in the app. Save the matching recovery material
-          somewhere safe, outside the phone. Signing in again does not recreate
-          a lost encryption key.
+          <strong>Previously encrypted files</strong> still need their
+          matching content key. Keep any existing recovery material outside
+          the phone. An encrypted sign-in recovery file restores an eligible
+          Telegram sign-in when Telegram provides a token. It cannot
+          reconstruct an encryption key for your files.
         </li>
         <li>
           <strong>App lock and screenshot blocking:</strong> available through
@@ -116,9 +115,8 @@
         this site.
       </p>
       <p>
-        Release checks contact GitHub. Optional sharing or external services, if
-        configured in the app, use the destinations you select. These are
-        separate from normal private-channel uploads.
+        Release checks contact GitHub. If you configure a Telegram proxy,
+        Telegram traffic uses the proxy route you choose.
       </p>
       <h2>This website</h2>
       <p>

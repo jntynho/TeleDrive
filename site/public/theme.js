@@ -1,6 +1,5 @@
 (() => {
   const root = document.documentElement;
-  root.dataset.js = "true";
   let saved;
   try {
     saved = localStorage.getItem("teledrive-theme");

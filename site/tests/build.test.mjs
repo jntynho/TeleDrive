@@ -95,8 +95,24 @@ test("creates a standalone project-site artifact with metadata, QR and attributi
     assert.ok(!html.includes("daveragos"));
     assert.match(
       await readFile(path.join(output, "assets/phone-qr.svg"), "utf8"),
-      /<svg/,
+      /<path stroke="#172022" d="M4 4\.5h7/,
+      "the top-left finder pattern must start after four clear modules",
     );
+  } finally {
+    await rm(output, { recursive: true, force: true });
+  }
+});
+
+test("includes only the icon symbols each page uses", async () => {
+  const output = await mkdtemp(path.join(tmpdir(), "teledrive-icons-"));
+  try {
+    await build({ output });
+    for (const file of ["index.html", "privacy.html", "404.html"]) {
+      const html = await readFile(path.join(output, file), "utf8");
+      const ids = [...html.matchAll(/<symbol id="(i-[\w-]+)"/g)].map((match) => match[1]);
+      const uses = new Set([...html.matchAll(/<use href="#(i-[\w-]+)"/g)].map((match) => match[1]));
+      assert.deepEqual(ids.sort(), [...uses].sort(), file);
+    }
   } finally {
     await rm(output, { recursive: true, force: true });
   }

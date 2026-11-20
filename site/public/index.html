@@ -56,6 +56,15 @@
         ></a
       >
       <button
+        class="theme-toggle icon-button"
+        type="button"
+        aria-label="Switch to dark theme"
+        title="Switch theme"
+        hidden
+      >
+        <svg class="icon" aria-hidden="true"><use href="#i-theme"></use></svg>
+      </button>
+      <button
         class="menu-toggle"
         type="button"
         aria-expanded="false"
@@ -70,22 +79,10 @@
           >GitHub <span aria-hidden="true">↗</span></a
         >
       </nav>
-      <div class="header-actions">
-        <button
-          class="theme-toggle icon-button"
-          type="button"
-          aria-label="Switch to dark theme"
-          title="Switch theme"
-          hidden
-        >
-          <svg class="icon" aria-hidden="true">
-            <use href="#i-theme"></use>
-          </svg></button
-        ><a class="button button-small button-dark" href="#download"
-          >Get TeleDrive
-          <svg class="icon" aria-hidden="true"><use href="#i-arrow"></use></svg
-        ></a>
-      </div>
+      <a class="header-download button button-small button-dark" href="#download"
+        >Get TeleDrive
+        <svg class="icon" aria-hidden="true"><use href="#i-arrow"></use></svg>
+      </a>
     </header>
     <main id="main">
       <section class="hero section-shell" aria-labelledby="hero-title">
@@ -180,7 +177,7 @@
           </p>
         </div>
       </section>
-      <div class="trust-strip section-shell" aria-label="At a glance">
+      <div class="trust-strip section-shell" role="group" aria-label="At a glance">
         <span
           ><svg class="icon" aria-hidden="true">
             <use href="#i-folder"></use></svg
@@ -200,6 +197,7 @@
 
       <section
         id="features"
+        tabindex="-1"
         class="features section-shell section-space"
         aria-labelledby="features-title"
       >
@@ -306,8 +304,8 @@
             </div>
             <h3>Privacy, with your choices.</h3>
             <p>
-              Device authentication for Hidden. Optional file encryption. Your
-              private channels, with controls you can understand.
+              Keep files in private channels you choose. Protect access on your
+              phone with an app lock and a separate PIN for Hidden.
             </p>
             <a class="text-link" href="./privacy.html"
               >How your data is handled <span aria-hidden="true">↗</span></a
@@ -318,18 +316,24 @@
 
       <section
         id="preview"
+        tabindex="-1"
         class="preview-section section-space"
         aria-labelledby="preview-title"
       >
         <div class="section-shell preview-layout">
           <div class="preview-intro reveal">
             <p class="eyebrow">FEELS FAMILIAR. FITS EVERYTHING.</p>
-            <h2 id="preview-title">Four tabs.<br />One happy home.</h2>
+            <h2 id="preview-title">Your library.<br />A look inside.</h2>
             <p>
               Browse a real preview of TeleDrive.<br />No account needed to take
               a look.
             </p>
-            <div class="preview-tabs" role="tablist" aria-label="App screens">
+            <div
+              class="preview-tabs"
+              role="tablist"
+              aria-label="App screens"
+              hidden
+            >
               <button
                 id="tab-home"
                 type="button"
@@ -379,7 +383,7 @@
                 >Settings
               </button>
             </div>
-            <div id="preview-copy" class="preview-copy">
+            <div class="preview-copy">
               <h3 id="preview-heading">The big picture, at a glance.</h3>
               <p id="preview-description">
                 Your library overview, recent files and the collections you
@@ -390,20 +394,8 @@
               Screens captured from the Android app with sample data.<br />Gallery
               and music artwork depend on the files in your library.
             </p>
-            <noscript
-              ><p>
-                The preview shows Home. Download the app to explore all four
-                tabs.
-              </p></noscript
-            >
           </div>
-          <div
-            id="app-preview"
-            class="preview-device"
-            role="tabpanel"
-            aria-labelledby="tab-home"
-            tabindex="0"
-          >
+          <div id="app-preview" class="preview-device">
             <div class="phone">
               <div class="phone-screen">
                 <div class="phone-status" aria-hidden="true">
@@ -412,14 +404,17 @@
                     >▴▴▴ <span class="battery"></span
                   ></span>
                 </div>
-                <img
-                  id="preview-image"
-                  src="./assets/screens/home.webp"
-                  width="786"
-                  height="1704"
-                  alt="TeleDrive Home: library overview, shortcuts and recent files, using sample data."
-                  loading="lazy"
-                />
+                <div class="preview-screen">
+                  <img
+                    id="preview-image"
+                    src="./assets/screens/home.webp"
+                    width="786"
+                    height="1704"
+                    alt="TeleDrive Home: library overview, shortcuts and recent files, using sample data."
+                    loading="lazy"
+                  />
+                  <p class="preview-status" role="status"></p>
+                </div>
                 <div class="phone-gesture" aria-hidden="true"></div>
               </div>
             </div>
@@ -463,10 +458,8 @@
         <div class="privacy-note">
           <svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
           <p>
-            Telegram cloud chats are not end-to-end encrypted by default.
-            TeleDrive offers optional file encryption; keep your recovery
-            material safe. Telegram limits and server-requested waits still
-            apply.
+            Telegram cloud chats are not end-to-end encrypted. Telegram’s file
+            limits and verification requirements apply to your account.
             <a href="./privacy.html"
               >Read how it works <span aria-hidden="true">↗</span></a
             >
@@ -598,6 +591,7 @@
 
       <section
         id="questions"
+        tabindex="-1"
         class="faq-section section-shell section-space"
         aria-labelledby="faq-title"
       >
@@ -665,15 +659,14 @@
             <summary>How does Hidden lock work?</summary>
             <div>
               <p>
-                Enable Lock Hidden in Settings → Security, or open Hidden → ⋮ →
-                Hidden settings. It uses your phone’s fingerprint or screen
-                lock. Enabling and disabling both require confirmation;
-                cancelling leaves the setting unchanged.
+                Open Hidden → More (⋮) → Hidden settings to set up a six-digit
+                PIN. Save the recovery key so you can reset the PIN if you
+                forget it. You can also enable biometric unlock on supported
+                devices.
               </p>
               <p>
-                A secure phone lock must be set up. Hidden lock controls access
-                inside TeleDrive; optional file encryption is a separate
-                setting.
+                Hidden lock controls access inside TeleDrive. Your files are
+                still stored on Telegram in the channel you chose.
               </p>
             </div>
           </details>
@@ -692,8 +685,9 @@
             <summary>Is there an iPhone or desktop version?</summary>
             <div>
               <p>
-                This project currently publishes Android APKs only. There is no
-                iOS or desktop download on this website.
+                The TeleDrive app is available for Android. GitHub Releases
+                also hosts a separate desktop client for existing TeleDrive
+                workspace servers. An iOS app is currently unavailable.
               </p>
             </div>
           </details>

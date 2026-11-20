@@ -17,13 +17,30 @@ permissions:
   contents: read
 
 concurrency:
-  group: github-pages
+  group: github-pages-${{ github.event_name == 'release' && 'refresh' || github.ref }}
   cancel-in-progress: false
 
 jobs:
+  refresh-release:
+    if: github.event_name == 'release' && !github.event.release.prerelease
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Queue a website build on the Pages branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SITE_BRANCH: ${{ github.event.repository.default_branch }}
+        run: gh workflow run pages.yml --repo "$GH_REPO" --ref "$SITE_BRANCH"
+
   build:
+    if: github.event_name != 'release'
     runs-on: ubuntu-22.04
     timeout-minutes: 15
+    outputs:
+      manifest_sha256: ${{ steps.website.outputs.manifest_sha256 }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,11 +55,14 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: gh api "repos/$GH_REPO/releases/latest" > "$RUNNER_TEMP/teledrive-release.json"
       - name: Validate and build the static website
+        id: website
         env:
           TELEDRIVE_RELEASE_FILE: ${{ runner.temp }}/teledrive-release.json
         run: |
           npm test --prefix site
           npm run build --prefix site
+          digest="$(sha256sum site/dist/release.json | cut -d' ' -f1)"
+          echo "manifest_sha256=$digest" >> "$GITHUB_OUTPUT"
       - name: Install test browser
         working-directory: site
         run: npx playwright install --with-deps chromium
@@ -62,6 +82,7 @@ jobs:
 
   deploy:
     needs: build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     permissions:
@@ -80,20 +101,26 @@ jobs:
       - name: Verify the public website
         env:
           SITE_URL: ${{ steps.deployment.outputs.page_url }}
+          EXPECTED_MANIFEST_SHA256: ${{ needs.build.outputs.manifest_sha256 }}
         run: |
           python3 - <<'PY'
-          import os, time, urllib.request
+          import hashlib, json, os, time, urllib.request
           base = os.environ['SITE_URL'].rstrip('/') + '/'
+          expected = os.environ['EXPECTED_MANIFEST_SHA256']
+          assert expected, 'Missing build manifest digest'
           for attempt in range(12):
               try:
                   with urllib.request.urlopen(base, timeout=15) as response:
                       html = response.read().decode()
-                      assert response.status == 200 and 'A home for' in html and 'TeleDrive' in html
-                  with urllib.request.urlopen(base + 'release.json', timeout=15) as response:
-                      import json
-                      metadata = json.load(response)
-                      assert len(metadata['assets']) == 2
-                  print('Verified public page and both APK records:', base)
+                      assert response.status == 200 and '<title>TeleDrive' in html
+                  request = urllib.request.Request(
+                      base + 'release.json?deployment=' + expected,
+                      headers={'Cache-Control': 'no-cache'},
+                  )
+                  with urllib.request.urlopen(request, timeout=15) as response:
+                      manifest = response.read()
+                  assert hashlib.sha256(manifest).hexdigest() == expected, 'Public APK metadata differs from this build'
+                  print('Verified public page and APK metadata for', json.loads(manifest)['tag'], 'at', base)
                   break
               except Exception:
                   if attempt == 11:
