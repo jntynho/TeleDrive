@@ -250,7 +250,7 @@ internal class TdLibTelegramClient(
 
     private fun rememberAccountIdentity(profileId: String, user: TdApi.User) {
         if (user.id <= 0L) return
-        val name = listOf(user.firstName, user.lastName).map(String::trim).filter(String::isNotEmpty).joinToString(" ")
+        val name = listOfNotNull(user.firstName, user.lastName).map(String::trim).filter(String::isNotEmpty).joinToString(" ")
         val username = user.usernames?.editableUsername?.takeIf(String::isNotBlank)
             ?: user.usernames?.activeUsernames?.firstOrNull()
         DeviceAccounts(context).rememberIdentity(profileId, name, username)

@@ -100,6 +100,20 @@ class TelegramTransportTest {
         assertTrue(wire.sent.isEmpty())
 
         wire.emit(TdApi.UpdateAuthorizationState(TdApi.AuthorizationStateReady()))
+        runCurrent()
+        wire.reply(TdApi.GetMe::class.java, TdApi.User().apply {
+            id = 1234
+            firstName = "Telegram"
+            lastName = "User"
+        })
+        runCurrent()
+        assertEquals(
+            "Telegram User",
+            com.infinity.drive.core.accounts.DeviceAccounts(RuntimeEnvironment.getApplication())
+                .profiles().first().label
+        )
+        // Reading display identity must not request the recovery option.
+        assertTrue(wire.sent.none { it is TdApi.GetOption })
         var recovery: com.infinity.drive.core.telegram.TelegramLoginRecovery? = null
         val export = backgroundScope.launch { recovery = client.getLoginRecovery() }
         runCurrent()
