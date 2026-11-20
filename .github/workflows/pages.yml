@@ -105,7 +105,9 @@ jobs:
         run: |
           python3 - <<'PY'
           import hashlib, json, os, time, urllib.request
-          base = os.environ['SITE_URL'].rstrip('/') + '/'
+          from urllib.parse import urlsplit
+          site_url = urlsplit(os.environ['SITE_URL'])
+          base = site_url._replace(scheme='https').geturl().rstrip('/') + '/'
           expected = os.environ['EXPECTED_MANIFEST_SHA256']
           assert expected, 'Missing build manifest digest'
           for attempt in range(12):
