@@ -484,7 +484,7 @@ private fun ChannelSelectStep(
                     )
                     .selectable(
                         selected = selected,
-                        enabled = !single,
+                        enabled = !single && !working,
                         role = Role.RadioButton,
                         onClick = { onSelect(channel.chatId) }
                     )
@@ -525,6 +525,14 @@ private fun ChannelSelectStep(
                 enabled = !working
             )
             return@OnboardingPage
+        }
+        if (error != null) {
+            Text(
+                text = error.resolve(),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
         }
         BigButton(
             label = stringResource(

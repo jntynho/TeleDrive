@@ -2,7 +2,10 @@
 """Inspect real exported schema plans using 100k synthetic rows (desktop SQLite, not a phone/FPS benchmark)."""
 import json,sqlite3,time
 from pathlib import Path
-schema=json.loads((Path(__file__).resolve().parents[1]/'shared/schemas/com.infinity.drive.data.local.database.DriveInfinityDatabase/13.json').read_text())['database']['entities']
+schema_dir = Path(__file__).resolve().parents[1] / 'shared/schemas/com.infinity.drive.data.local.database.DriveInfinityDatabase'
+current_schema = max((path for path in schema_dir.glob('*.json') if path.stem.isdecimal()), key=lambda path: int(path.stem))
+schema = json.loads(current_schema.read_text())['database']['entities']
+print(f'Using Room schema {current_schema.stem}')
 c=sqlite3.connect(':memory:');c.execute('PRAGMA foreign_keys=OFF')
 for e in schema:
  t=e['tableName'];c.execute(e['createSql'].replace('${TABLE_NAME}',t))

@@ -26,12 +26,13 @@ import com.infinity.drive.core.telegram.TelegramConnectionState
 import com.infinity.drive.presentation.components.EmptyState
 import com.infinity.drive.presentation.navigation.LocalBottomBarInset
 import com.infinity.drive.presentation.platform.LocalPlatformCapabilities
+import com.infinity.drive.presentation.platform.LocalDownloadLocationConfigurable
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun SettingsScreen(onBack:(()->Unit)?,onOpenSection:(SettingsSectionType)->Unit,
-    onOpenActivity:()->Unit={},onOpenSetting:(SettingsSectionType,String)->Unit={s,_->onOpenSection(s)},
+    onOpenSetting:(SettingsSectionType,String)->Unit={s,_->onOpenSection(s)},
     viewModel:SettingsViewModel=koinViewModel()) {
     var query by rememberSaveable { mutableStateOf("") }
     var searching by rememberSaveable { mutableStateOf(false) }
@@ -46,6 +47,7 @@ fun SettingsScreen(onBack:(()->Unit)?,onOpenSection:(SettingsSectionType)->Unit,
     val first by animateColorAsState(palette.firstOrNull()?.let{androidx.compose.ui.graphics.lerp(base,Color(it.toInt()),.28f)}?:base,tween(500),label="profileFirst")
     val second by animateColorAsState(palette.getOrNull(1)?.let{androidx.compose.ui.graphics.lerp(base,Color(it.toInt()),.16f)}?:base,tween(500),label="profileSecond")
     val capabilities=LocalPlatformCapabilities.current
+    val downloadLocationConfigurable = LocalDownloadLocationConfigurable.current
     val hidden=buildSet {
         if(!capabilities.supportsAutoBackup)add(SettingsSectionType.BACKUP)
         if(!capabilities.requiresPermissions)add(SettingsSectionType.PERMISSIONS)
@@ -56,7 +58,10 @@ fun SettingsScreen(onBack:(()->Unit)?,onOpenSection:(SettingsSectionType)->Unit,
         "App" to listOf(SettingsSectionType.NOTIFICATIONS,SettingsSectionType.PERMISSIONS,SettingsSectionType.ADVANCED,SettingsSectionType.ABOUT)
     )
     val sections=SettingsSectionType.entries.filterNot{it in hidden}
-    val indexed=remember(hidden){settingsSearchEntries().filterNot{it.section in hidden}}
+    val indexed = remember(hidden, state.preferences, capabilities, downloadLocationConfigurable) {
+        settingsSearchEntries(state.preferences, capabilities, downloadLocationConfigurable)
+            .filterNot { it.section in hidden }
+    }
     val labels=indexed.map { Triple(it,stringResource(it.title),stringResource(it.section.titleRes)) }
     val results=remember(labels,query){labels.filter{(_,title,parent)->"$title $parent".contains(query.trim(),true)}}
     Scaffold(topBar={Column {
@@ -81,7 +86,7 @@ fun SettingsScreen(onBack:(()->Unit)?,onOpenSection:(SettingsSectionType)->Unit,
                         Icon(DriveIcons.KeyboardArrowRight,null,tint=MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                groups.forEachIndexed { index,(title,items) ->
+                groups.forEach { (title,items) ->
                     SettingsSectionTitle(title.uppercase())
                     SettingsGroup {
                         items.filterNot{it in hidden}.forEach { section->add{SectionRow(section){onOpenSection(section)}} }

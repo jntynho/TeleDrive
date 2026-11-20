@@ -207,4 +207,5 @@
     <string name="onboarding_resend_in">إعادة الإرسال متاحة خلال %1$d ث</string>
     <string name="onboarding_verification_code_label">رمز التحقق</string>
     <string name="onboarding_change_phone_number">تغيير رقم الهاتف</string>
+    <string name="onboarding_qr_expired">انتهت صلاحية رمز QR. أعد المحاولة للحصول على رمز جديد.</string>
 </resources>

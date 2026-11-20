@@ -255,6 +255,18 @@ class NativeSignInUiTest {
         capture("qr")
     }
 
+    @Test fun expiredQrCodeCanRequestAnotherCode() {
+        compose.onNodeWithText("Get started").performClick()
+        compose.waitUntil(5000) { compose.onNodeWithText("United Kingdom").isDisplayed() }
+        compose.onNodeWithText("Sign in by QR code", substring = false).performClick()
+        compose.waitUntil(5000) { model.uiState.value.qrLink != null }
+        compose.runOnIdle { auth.value = TelegramAuthState.WaitingForPhoneNumber }
+        compose.waitUntil(5000) { model.uiState.value.qrLink == null }
+
+        compose.onNodeWithText("Retry", substring = false).assertIsEnabled().performClick()
+        compose.waitUntil(5000) { model.uiState.value.qrLink != null }
+    }
+
     @Test fun permissionsAskOnlyForTheSelectedAccessAndDoNotBlockContinue(){
         compose.runOnIdle{auth.value=TelegramAuthState.Ready}
         compose.waitUntil(5000){compose.onNodeWithText("Permissions",substring=false).isDisplayed()}

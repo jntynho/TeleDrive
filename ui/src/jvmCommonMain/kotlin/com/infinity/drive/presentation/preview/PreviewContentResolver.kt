@@ -9,6 +9,7 @@ import com.infinity.drive.resources.preview_only_zip
 import com.infinity.drive.resources.preview_read_failed
 import com.infinity.drive.core.common.SafeLog
 import com.infinity.drive.core.files.AppStoragePaths
+import com.infinity.drive.core.files.FileImporter
 import com.infinity.drive.core.crypto.CryptoKeys
 import com.infinity.drive.core.crypto.StreamCrypto
 import com.infinity.drive.core.crypto.WrappedKeyRepository
@@ -30,6 +31,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import net.lingala.zip4j.ZipFile
 import java.io.File
 import java.nio.file.Files
@@ -50,7 +53,8 @@ class PreviewContentResolver(
     private val filePartDao: FilePartDao,
     private val settingsRepository: SettingsRepository,
     private val dispatchers: DispatcherProvider,
-    private val hiddenAccess:com.infinity.drive.core.security.HiddenContentAccess
+    private val hiddenAccess:com.infinity.drive.core.security.HiddenContentAccess,
+    private val fileImporter: FileImporter
 ) {
 
     fun resolve(file: DriveFile): Flow<PreviewContent> = flow {
@@ -59,6 +63,22 @@ class PreviewContentResolver(
         val localPath = file.localPath?.takeIf { File(it).exists() }
         if (localPath != null) {
             emit(fromLocal(file, localPath))
+            return@flow
+        }
+        val localUri = file.localPath?.takeIf { it.startsWith("content://") && fileImporter.describe(it) != null }
+        if (localUri != null) {
+            val content = when {
+                MimeTypes.isImage(file.mimeType) || MimeTypes.isVideo(file.mimeType) ||
+                    MimeTypes.isAudio(file.mimeType) || MimeTypes.isPdf(file.mimeType) ->
+                    fromLocal(file, localUri)
+                MimeTypes.isText(file.mimeType) || MimeTypes.isArchive(file.mimeType) ||
+                    MimeTypes.isApk(file.mimeType, file.name) ||
+                    StructuredDocumentReader.supports(file.name, file.mimeType) ->
+                    materializeLocalPreview(file, localUri)?.let { fromLocal(file, it.absolutePath) }
+                        ?: PreviewContent.Failed(Res.string.preview_read_failed)
+                else -> PreviewContent.Unsupported(Res.string.preview_no_preview_for_type)
+            }
+            emit(content)
             return@flow
         }
 
@@ -212,10 +232,7 @@ class PreviewContentResolver(
         onProgress: suspend (Long, Long) -> Unit
     ): File? {
         val previewDir = File(storagePaths.cacheDir, "previews").apply { mkdirs() }
-        val revision = listOf(file.id, file.remoteFileId.orEmpty(), file.modifiedAt.toString()).joinToString("\u0000")
-        val cacheName = MessageDigest.getInstance("SHA-256").digest(revision.toByteArray())
-            .joinToString("") { "%02x".format(it) }
-        val target = File(previewDir, cacheName)
+        val target = File(previewDir, previewCacheName(file, file.remoteFileId.orEmpty()))
         if (target.exists() && target.length() > 0) {
             cacheDao.touch(target.absolutePath, System.currentTimeMillis())
             return target
@@ -256,6 +273,34 @@ class PreviewContentResolver(
         }
 
         if (!success) return null
+        recordPreview(file, target)
+        return target
+    }
+
+    private suspend fun materializeLocalPreview(file: DriveFile, uri: String): File? {
+        val context = currentCoroutineContext()
+        val prepared = fileImporter.prepare(uri) { context.ensureActive() } ?: return null
+        val source = File(prepared.path)
+        if (!fileImporter.isStaged(prepared.path)) return source.takeIf(File::isFile)
+        try {
+            val previewDir = File(storagePaths.cacheDir, "previews").apply { mkdirs() }
+            val target = File(previewDir, previewCacheName(file, uri))
+            if (!source.isFile) return null
+            Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            recordPreview(file, target)
+            return target
+        } finally {
+            fileImporter.discard(prepared)
+        }
+    }
+
+    private fun previewCacheName(file: DriveFile, source: String): String {
+        val revision = listOf(file.id, source, file.modifiedAt.toString()).joinToString("\u0000")
+        return MessageDigest.getInstance("SHA-256").digest(revision.toByteArray())
+            .joinToString("") { "%02x".format(it) }
+    }
+
+    private suspend fun recordPreview(file: DriveFile, target: File) {
         val now = System.currentTimeMillis()
         cacheDao.upsert(
             CacheEntryEntity(
@@ -268,7 +313,6 @@ class PreviewContentResolver(
                 lastAccessAt = now
             )
         )
-        return target
     }
 
     companion object {

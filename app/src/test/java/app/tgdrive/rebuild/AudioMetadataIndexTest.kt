@@ -46,7 +46,7 @@ class AudioMetadataIndexTest {
         val store=object:HiddenLockStore{override suspend fun read():HiddenLockRecord?=null;override suspend fun write(record:HiddenLockRecord){};override suspend fun clear(){}}
         val hidden=HiddenContentAccess(HiddenLockManager(store,ownerScope=backgroundScope),fake<FileDao>{_,_->null},fake<FolderDao>{_,_->null})
         val settings=fake<SettingsRepository>{name,_->if(name=="getPreferences")flowOf(UserPreferences())else error(name)}
-        val resolver=PreviewContentResolver(paths,telegram,StreamCrypto(),keys,fake<CacheDao>{_,_->Unit},fake<FilePartDao>{_,_->emptyList<Any>()},settings,dispatchers,hidden)
+        val resolver=PreviewContentResolver(paths,telegram,StreamCrypto(),keys,fake<CacheDao>{_,_->Unit},fake<FilePartDao>{_,_->emptyList<Any>()},settings,dispatchers,hidden,fake<com.infinity.drive.core.files.FileImporter>{name,_->error(name)})
         return AndroidAudioPlayback(context,resolver,TelegramDataSourceFactory(telegram,StreamCrypto(),keys),files,dispatcher,backgroundScope)
     }
     @Test fun durableTagsDisplayForCloudOnlyFilesWithoutOpeningTelegram()=runTest {

@@ -86,7 +86,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -152,7 +151,6 @@ import com.infinity.drive.presentation.components.FileInfoSheet
 import com.infinity.drive.presentation.components.LoadingState
 import com.infinity.drive.presentation.components.RenameDialog
 import kotlinx.coroutines.delay
-import java.io.File
 import kotlin.time.Duration.Companion.milliseconds
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
@@ -958,26 +956,6 @@ private const val SEPARATOR = "/"
 private const val ROW_FADE_MS = 180
 private const val CHEVRON_ROTATE_MS = 220
 private val INDENT_STEP = 16.dp
-
-private fun shareFile(context: Context, file: DriveFile, chooserTitle: String) {
-    val localPath = file.localPath ?: return
-    val uri = FileProvider.getUriForFile(
-        context,
-        "${context.packageName}.fileprovider",
-        File(localPath)
-    )
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = file.mimeType
-        putExtra(Intent.EXTRA_STREAM, uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
-    context.startActivity(
-        Intent.createChooser(
-            intent,
-            chooserTitle
-        )
-    )
-}
 
 /** Height the overlaid preview toolbar covers at the top of the screen. */
 val PreviewTopBarHeight = 64.dp

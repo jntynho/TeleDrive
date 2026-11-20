@@ -55,7 +55,7 @@ class AudioQueueRegressionTest {
         val keys=fake<WrappedKeyRepository>{_,_->null}
         val telegram=fake<TelegramClient>{name,_->error("Unexpected Telegram call $name")}
         val dispatchers=object:DispatcherProvider {override val main=dispatcher;override val io=dispatcher;override val default=dispatcher}
-        val resolver=PreviewContentResolver(paths,telegram,StreamCrypto(),keys,fake<CacheDao>{_,_->Unit},fake<FilePartDao>{_,_->emptyList<Any>()},settings(),dispatchers,openHiddenAccess())
+        val resolver=PreviewContentResolver(paths,telegram,StreamCrypto(),keys,fake<CacheDao>{_,_->Unit},fake<FilePartDao>{_,_->emptyList<Any>()},settings(),dispatchers,openHiddenAccess(),fake<com.infinity.drive.core.files.FileImporter>{name,_->error(name)})
         return AndroidAudioPlayback(context,resolver,TelegramDataSourceFactory(telegram,StreamCrypto(),keys),files,dispatcher,CoroutineScope(SupervisorJob()+dispatcher))
     }
     @Test fun `trash audio requires a viewer lease and stops when that viewer closes`()=runTest {

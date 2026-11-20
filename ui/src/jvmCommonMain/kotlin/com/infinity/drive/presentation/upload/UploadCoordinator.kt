@@ -21,6 +21,7 @@ class UploadCoordinator(private val fileRepository:FileRepository,
     data class Answer(val choice:Choice,val applyToAll:Boolean=false)
     data class Conflict(val name:String,val size:Long,val existing:DriveFile,val folderName:String,
         val bothName:String,val remaining:Int,val reply:CompletableDeferred<Answer>)
+    private data class Resolution(val answer: Answer?, val name: String, val replacedId: String? = null)
     private val _conflict=MutableStateFlow<Conflict?>(null)
     val conflict=_conflict.asStateFlow()
     private val _messages=MutableSharedFlow<UiText>(extraBufferCapacity=16)
@@ -30,8 +31,8 @@ class UploadCoordinator(private val fileRepository:FileRepository,
         SafeLog.e("UploadCoordinator","Import failed",error)
         _messages.tryEmit(UiText.Resource(Res.string.files_import_failed))
     })
-    private suspend fun choice(name:String,size:Long,target:String?,remaining:Int,apply:Answer?):Pair<Answer?,String> {
-        val existing=fileRepository.findNameClash(name,target)?:return null to name
+    private suspend fun choice(name:String,size:Long,target:String?,remaining:Int,apply:Answer?):Resolution {
+        val existing=fileRepository.findNameClash(name,target)?:return Resolution(null, name)
         val siblings=fileRepository.observeFiles(com.infinity.drive.domain.model.FileQuerySpec(folderId=target,filterByFolder=true,respectHiddenLock=false,showHidden=true,showArchived=true)).first()
         val taken=siblings.map{it.name.lowercase()}.toSet()
         val alternate=FileNameUtils.uniqueName(name){it.lowercase() in taken}
@@ -44,12 +45,26 @@ class UploadCoordinator(private val fileRepository:FileRepository,
                 try{request.reply.await()}finally{guard.cancel()}
             }}finally{_conflict.value=null}
         }
-        if(answer.choice==Choice.REPLACE){
-            // Trash keeps the previous remote copy; never delete it permanently to replace a name.
-            val result=trash.moveFilesToTrash(listOf(existing.id))
-            if(result is AppResult.Failure)error("Could not move the old copy to Trash")
+        return Resolution(
+            answer, if (answer.choice == Choice.KEEP_BOTH) alternate else name,
+            existing.id.takeIf { answer.choice == Choice.REPLACE }
+        )
+    }
+
+    private suspend fun queueReplacement(file: DriveFile, replacedId: String, batchId: String? = null): Int {
+        val queued = if (file.hasRemoteCopy) 0 else {
+            val ids = listOf(file.id)
+            val result = if (batchId == null) transferRepository.enqueueUploads(ids)
+                else transferRepository.enqueueUploads(ids, batchId)
+            check(result is AppResult.Success && result.value == 1) { "Could not queue the replacement" }
+            result.value
         }
-        return answer to if(answer.choice==Choice.KEEP_BOTH)alternate else name
+        if (file.id != replacedId) {
+            check(trash.moveFilesToTrash(listOf(replacedId)) is AppResult.Success) {
+                "Could not move the old copy to Trash"
+            }
+        }
+        return queued
     }
     fun answer(answer:Answer){_conflict.value?.reply?.complete(answer)}
 
@@ -79,14 +94,16 @@ class UploadCoordinator(private val fileRepository:FileRepository,
                     val destination=fileRepository.resolveImportFolder(source.relativeFolder,target)
                     staged=(if(copyImmediately)fileImporter.import(source.reference)else fileImporter.describe(source.reference))?:error("The file provider could not read this file")
                     if(settings.preferences.first().let{it.storageChatId to it.onboardingComplete}!=context)throw CancellationException("Drive changed")
-                    val (answer,name)=choice(staged.name,staged.sizeBytes,destination,sources.size-index,apply)
+                    val (answer,name,replacedId)=choice(staged.name,staged.sizeBytes,destination,sources.size-index,apply)
                     if(answer?.applyToAll==true)apply=answer
                     if(answer?.choice==Choice.SKIP){fileImporter.discard(staged);staged=null;skipped++;continue}
-                    when(val result=fileRepository.registerImport(staged,destination,name,allowDuplicate=answer!=null)){
+                    if(settings.preferences.first().let{it.storageChatId to it.onboardingComplete}!=context)throw CancellationException("Drive changed")
+                    when(val result=fileRepository.registerImport(staged,destination,name,allowDuplicate=answer!=null,expectedDrive=context.first)){
                         is AppResult.Success -> {
                             // Registration owns staged bytes from this point; a failed enqueue can be recovered.
                             staged=null
-                            if(!result.value.hasRemoteCopy)pending+=result.value.id
+                            if (replacedId != null) imported += queueReplacement(result.value, replacedId, batchId)
+                            else if (!result.value.hasRemoteCopy) pending += result.value.id
                         }
                         is AppResult.Failure -> error("Could not register this file")
                     }
@@ -113,21 +130,31 @@ class UploadCoordinator(private val fileRepository:FileRepository,
             }
             var apply:Answer?=null
             val ids=mutableListOf<String>()
+            var queued = 0
             for((index,document)in documents.withIndex()){
                 try {
                     if (settings.preferences.first().let { it.storageChatId != expectedDrive || !it.onboardingComplete || it.encryptFiles }) {
                         throw CancellationException("Drive or encryption changed")
                     }
-                    val(answer,name)=choice(document.fileName,document.sizeBytes,target,documents.size-index,apply)
+                    val(answer,name,replacedId)=choice(document.fileName,document.sizeBytes,target,documents.size-index,apply)
                     if(answer?.applyToAll==true)apply=answer
                     if(answer?.choice==Choice.SKIP)continue
+                    if (settings.preferences.first().let { it.storageChatId != expectedDrive || !it.onboardingComplete || it.encryptFiles }) {
+                        throw CancellationException("Drive or encryption changed")
+                    }
                     val row=fileRepository.importTelegramFile(document,target,name,expectedDrive)
-                    if(row is AppResult.Success)ids+=row.value.id
+                    if (row is AppResult.Success) {
+                        if (replacedId != null) queued += queueReplacement(row.value, replacedId)
+                        else ids += row.value.id
+                    }
                 }catch(cancel:CancellationException){throw cancel}
                 catch(error:Exception){SafeLog.w("UploadCoordinator","Could not import Telegram file",error)}
             }
-            val result=transferRepository.enqueueUploads(ids)
-            _messages.tryEmit(if(result is AppResult.Success && result.value > 0)UiText.Resource(Res.string.files_import_uploading,result.value)else UiText.Resource(Res.string.files_import_failed))
+            if (ids.isNotEmpty()) {
+                val result = transferRepository.enqueueUploads(ids)
+                if (result is AppResult.Success) queued += result.value
+            }
+            _messages.tryEmit(if(queued > 0)UiText.Resource(Res.string.files_import_uploading,queued)else UiText.Resource(Res.string.files_import_failed))
         }}
     }
 }

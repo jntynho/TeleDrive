@@ -119,8 +119,15 @@ fun NoteEditorScreen(
     CollectSnackbarMessages(viewModel.messages, snackbarHostState)
     var confirmDiscard by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     val owner=androidx.lifecycle.compose.LocalLifecycleOwner.current
-    fun requestBack(){if(state.saving)return;if(state.dirty)confirmDiscard=true else onBack()}
-    com.infinity.drive.presentation.common.AppBackHandler(state.dirty||state.saving){requestBack()}
+    fun requestBack() {
+        if (state.saving) return
+        when {
+            state.loading || state.loadError != null -> onBack()
+            state.dirty -> confirmDiscard = true
+            else -> viewModel.leaveEditor(keepDraft = false, onDone = onBack)
+        }
+    }
+    com.infinity.drive.presentation.common.AppBackHandler(true) { requestBack() }
     LaunchedEffect(viewModel,owner){owner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED){viewModel.saved.collect{onBack()}}}
     if (confirmDiscard) androidx.compose.material3.AlertDialog(
         onDismissRequest = { confirmDiscard = false },

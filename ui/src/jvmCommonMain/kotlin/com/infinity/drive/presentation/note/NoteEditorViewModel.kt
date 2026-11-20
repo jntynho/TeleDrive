@@ -69,7 +69,7 @@ class NoteEditorViewModel(
     private val _saved = Channel<Unit>(Channel.CONFLATED)
     val saved = _saved.receiveAsFlow()
     private var editingFileId = route.fileId
-    private var initialTitle = ""
+    private var initialTitle = route.title.orEmpty()
     private var initialBody = ""
     private var draftJob: Job? = null
     private var draftSlot: String? = null
@@ -78,7 +78,8 @@ class NoteEditorViewModel(
     init {
         val fileId = route.fileId
         if (fileId == null && draftStore == null) {
-            _uiState.update { it.copy(body = route.sharedText.orEmpty(), loading = false, dirty = !route.sharedText.isNullOrBlank()) }
+            val body = route.sharedText.orEmpty()
+            _uiState.update { it.copy(title = initialTitle, body = body, loading = false, dirty = body.isNotEmpty()) }
         } else {
             viewModelScope.launch {
                 val chat = settings?.preferences?.first()?.storageChatId
@@ -92,9 +93,10 @@ class NoteEditorViewModel(
                 if (fileId == null) {
                     val draft = readDraft()
                     val body = draft?.body ?: route.sharedText.orEmpty()
+                    val title = draft?.title ?: initialTitle
                     _uiState.update { it.copy(
-                        title = draft?.title.orEmpty(), body = body, loading = false,
-                        dirty = body.isNotBlank() || !draft?.title.isNullOrBlank()
+                        title = title, body = body, loading = false,
+                        dirty = body.isNotEmpty() || title != initialTitle
                     ) }
                 } else load(fileId)
             }

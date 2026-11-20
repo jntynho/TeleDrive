@@ -33,6 +33,7 @@ import com.infinity.drive.domain.repository.FileRepository
 import com.infinity.drive.domain.repository.SettingsRepository
 import com.infinity.drive.domain.usecase.DecideBackupActionUseCase
 import com.infinity.drive.domain.usecase.EvaluateExclusionsUseCase
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -110,12 +111,20 @@ class BackupRepositoryImpl(
             totalBytes = scan.preview.uploadBytes,
             startedAt = System.currentTimeMillis()
         )
-        backupDao.upsertSession(session)
-        for (batch in scan.uploads.chunked(ENQUEUE_BATCH)) {
-            val fileIds = batch.map { registerFile(it, backupFolderIdFor(it), scan.chatId) }
-            transferRepository.enqueueBackupBatch(fileIds, session.id)
+        var queued = 0
+        try {
+            backupDao.upsertSession(session)
+            for (batch in scan.uploads.chunked(ENQUEUE_BATCH)) {
+                val fileIds = batch.map { registerFile(it, backupFolderIdFor(it, scan.chatId), scan.chatId) }
+                when (val result = transferRepository.enqueueBackupBatch(fileIds, session.id)) {
+                    is AppResult.Success -> queued += result.value
+                    is AppResult.Failure -> return result
+                }
+            }
+        } finally {
+            if (queued == 0) withContext(NonCancellable) { backupSessionTracker.refresh(session.id) }
         }
-        return AppResult.Success(session.id)
+        return AppResult.Success(session.id.takeIf { queued > 0 })
     }
 
     private suspend fun scanBackup(applyLinks: Boolean): AppResult<BackupScan> {
@@ -224,7 +233,7 @@ class BackupRepositoryImpl(
             return true
         }
         if (applyLinks) {
-            if (reviveTrashedUpload(candidate)) return true
+            if (reviveTrashedUpload(candidate, chatId)) return true
         } else {
             val trashed = fileDao.trashedMatches(candidate.name, candidate.length(), chatId)
             if (trashed.isNotEmpty()) {
@@ -236,22 +245,25 @@ class BackupRepositoryImpl(
     }
 
     /**
-     * A file uploaded by hand already carries its remote mapping, so a folder
-     * added to backup later must claim it instead of uploading a second copy.
+     * Claim a manually uploaded file when its verified remote hash still
+     * matches the local copy.
      */
     private suspend fun linkedUpload(candidate: File, chatId: Long): FileEntity? =
-        fileDao.byLocalPath(candidate.absolutePath)?.takeIf {
-            it.chatId == chatId && it.messageId != null && it.backupState == BackupState.BACKED_UP
+        fileDao.liveByLocalPath(candidate.absolutePath, chatId)?.takeIf {
+            it.messageId != null && it.backupState == BackupState.BACKED_UP &&
+                it.sizeBytes == candidate.length() && it.contentHash != null &&
+                it.contentHash.equals(Hashing.sha256(candidate), ignoreCase = true)
         }
 
     /**
      * A file deleted inside the app but still on disk is restored rather than
      * uploaded again, so the drive keeps one copy with its original history.
      */
-    private suspend fun reviveTrashedUpload(candidate: File): Boolean {
+    private suspend fun reviveTrashedUpload(candidate: File, chatId: Long): Boolean {
         val revived = fileRepository.reviveTrashedCopy(
             localPath = candidate.absolutePath,
-            folderId = backupFolderIdFor(candidate)
+            folderId = backupFolderIdFor(candidate, chatId),
+            expectedDrive = chatId
         ) ?: return false
         if (!revived.hasRemoteCopy) return false
         recordBackedUp(candidate, revived.id, revived.contentHash)
@@ -268,10 +280,8 @@ class BackupRepositoryImpl(
         val matches = fileDao.unlinkedRemoteMatches(candidate.name, candidate.length(), chatId)
         if (matches.isEmpty()) return false
 
-        val localHash = Hashing.sha256(candidate)
-        val match = matches.firstOrNull { it.contentHash != null && it.contentHash == localHash }
-            ?: matches.singleOrNull()?.takeIf { it.contentHash == null }
-            ?: return false
+        val localHash = Hashing.sha256(candidate) ?: return false
+        val match = matches.firstOrNull { localHash.equals(it.contentHash, ignoreCase = true) } ?: return false
 
         if (applyLinks) {
             fileDao.setLocalPath(match.id, candidate.absolutePath)
@@ -299,10 +309,10 @@ class BackupRepositoryImpl(
      * Mirrors the device folder structure at the drive root, so backed-up
      * files share the same tree as manual uploads instead of a separate silo.
      */
-    private suspend fun backupFolderIdFor(source: File): String? {
+    private suspend fun backupFolderIdFor(source: File, chatId: Long): String? {
         val parent = source.parentFile?.absolutePath ?: return null
         val relative = relativeToStorageRoot(parent)
-        return if (relative.isEmpty()) null else folderPathResolver.resolveOrCreate(relative)
+        return if (relative.isEmpty()) null else folderPathResolver.resolveOrCreateForDrive(relative, chatId)
     }
 
     /** Strips the primary or removable volume mount point from [absolutePath]. */
@@ -330,11 +340,12 @@ class BackupRepositoryImpl(
     private suspend fun registerFile(
         source: File,
         folderId: String?,
-        chatId: Long?
+        chatId: Long
     ): String {
-        fileDao.byLocalPath(source.absolutePath)?.let { existing ->
+        fileDao.liveByLocalPath(source.absolutePath, chatId)?.let { existing ->
             val changed = existing.sizeBytes != source.length() ||
-                    existing.modifiedAt != source.lastModified()
+                    existing.modifiedAt != source.lastModified() ||
+                    existing.contentHash?.equals(Hashing.sha256(source), ignoreCase = true) == false
             if (changed) {
                 val media = mediaMetadataExtractor.extract(
                     source, MimeTypes.fromFileName(source.name)

@@ -21,6 +21,7 @@ import com.infinity.drive.domain.repository.SettingsRepository
 import com.infinity.drive.domain.repository.TransferRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
@@ -162,7 +163,7 @@ internal class AndroidFolderSync(
                             uploadNew(plan.drive, cloudRoot, entry, source)
                         } else {
                             verifyRemote(plan.drive, entry.remote)
-                            versions.replace(entry.remote.id, source.source.uri.toString())
+                            versions.replace(entry.remote, source.source.uri.toString(), source.digest)
                         }
                         up++
                         record.put(entry.path.lowercase(), source.digest)
@@ -190,18 +191,18 @@ internal class AndroidFolderSync(
         val name = entry.path.substringAfterLast('/')
         check(activeDrive() == drive && repository.findNameClash(name, folder) == null &&
             access.canReadFolder(folder) && !access.protectedFolder(folder))
-        val source = importer.prepare(local.source.uri.toString()) { currentCoroutineContext().ensureActive() }
-            ?: error("The selected file is unavailable.")
+        val source = versions.prepareVerified(local.source.uri.toString(), local.digest)
         var kept = false
         try {
-            val actual = File(source.path)
-            check(actual.isFile && reader.copyLocal(actual, source.sizeBytes, DISCARD) == local.digest)
             val result = repository.registerImport(source, folder, name, expectedDrive = drive)
             val created = (result as? AppResult.Success)?.value ?: error("Could not register this file.")
             kept = true
             if (!created.hasRemoteCopy) check(transfers.enqueueUpload(created.id) is AppResult.Success)
         } finally {
-            if (!kept) importer.discard(source)
+            if (!kept) withContext(NonCancellable) {
+                if (source.path in files.allLocalPaths()) importer.registered(source.path)
+                else importer.discard(source)
+            }
         }
     }
 

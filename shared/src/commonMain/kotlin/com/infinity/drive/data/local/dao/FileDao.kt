@@ -121,8 +121,8 @@ interface FileDao {
     @Query("SELECT * FROM files WHERE id IN (:ids)")
     fun observeByIds(ids: List<String>): Flow<List<FileEntity>>
 
-    @Query("SELECT * FROM files WHERE localPath = :path LIMIT 1")
-    suspend fun byLocalPath(path: String): FileEntity?
+    @Query("SELECT * FROM files WHERE localPath = :path AND chatId IS :chatId AND trashedAt IS NULL LIMIT 1")
+    suspend fun liveByLocalPath(path: String, chatId: Long?): FileEntity?
 
     @Query(
         """SELECT * FROM files
@@ -338,13 +338,13 @@ interface FileDao {
 
     @Query(
         """UPDATE files SET trashedAt = :trashedAt, preTrashFolderId = folderId, folderId = NULL
-           WHERE id IN (:ids)"""
+           WHERE id IN (:ids) AND trashedAt IS NULL"""
     )
     suspend fun moveToTrash(ids: List<String>, trashedAt: Long)
 
     @Query(
         """UPDATE files SET folderId = preTrashFolderId, trashedAt = NULL, preTrashFolderId = NULL
-           WHERE id IN (:ids)"""
+           WHERE id IN (:ids) AND trashedAt IS NOT NULL"""
     )
     suspend fun restoreFromTrash(ids: List<String>)
 
@@ -469,7 +469,6 @@ interface FileDao {
            WHERE trashedAt IS NULL
              AND (localPath IS NOT NULL OR importReference IS NOT NULL OR sourceMessageId IS NOT NULL)
              AND uploadRequested = 1
-             AND (messageId IS NULL OR lower(name) LIKE '%.md')
              AND backupState IN ('NONE', 'FAILED')
              AND chatId IS :chatId"""
     )
@@ -478,12 +477,12 @@ interface FileDao {
     @Query(
         """SELECT id FROM files
            WHERE trashedAt IS NULL
-             AND (messageId IS NULL OR lower(name) LIKE '%.md')
              AND backupState = 'QUEUED'
+             AND uploadRequested = 1
              AND chatId IS :chatId
-             AND id NOT IN (
-               SELECT fileId FROM transfers
-               WHERE state IN ('QUEUED', 'RUNNING', 'PAUSED')
+             AND NOT EXISTS (
+               SELECT 1 FROM transfers
+               WHERE fileId = files.id AND state IN ('QUEUED', 'RUNNING', 'PAUSED')
              )"""
     )
     suspend fun queuedWithoutTransferFileIds(chatId: Long?): List<String>

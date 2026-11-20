@@ -27,6 +27,27 @@ class GalleryQueryRegressionTest {
         backupState=BackupState.NONE,createdAt=1,modifiedAt=modified,addedAt=1)
     private fun database()=Room.inMemoryDatabaseBuilder(RuntimeEnvironment.getApplication(),DriveInfinityDatabase::class.java).allowMainThreadQueries().build()
 
+    @Test fun repeatedTrashAndRestoreRequestsPreserveTheOriginalFolder() = runTest {
+        val db = database()
+        try {
+            val files = db.fileDao()
+            val folder = FolderEntity("photos", 1, null, "Photos", createdAt = 1, modifiedAt = 1)
+            db.folderDao().upsert(folder)
+            files.upsert(file("photo", chat = 1).copy(folderId = folder.id))
+
+            files.moveToTrash(listOf("photo"), 10)
+            files.moveToTrash(listOf("photo"), 20)
+            assertEquals(folder.id, files.byId("photo")?.preTrashFolderId)
+            assertEquals(10L, files.byId("photo")?.trashedAt)
+
+            files.restoreFromTrash(listOf("photo"))
+            files.restoreFromTrash(listOf("photo"))
+            assertEquals(folder.id, files.byId("photo")?.folderId)
+        } finally {
+            db.close()
+        }
+    }
+
     @Test fun albumCoverAndNullChannelQueriesStayInsideTheirChannel()=runTest {
         val db=database()
         try {
@@ -36,6 +57,24 @@ class GalleryQueryRegressionTest {
             assertEquals("local",dao.observeAlbumsScoped(false,false,null).first().single().coverFileId)
             assertEquals(listOf("local"),dao.idList(FileQueryBuilder.buildIds(FileQuerySpec(scopeToChat=true)) ))
         }finally{db.close()}
+    }
+
+    @Test fun aPendingReplacementCanBeRetriedEvenWithAnOlderRemoteCopy() = runTest {
+        val db = database()
+        try {
+            val dao = db.fileDao()
+            val local = file("replacement", chat = 1).copy(
+                messageId = 20, remoteFileId = "old-copy", localPath = "/staged/new.jpg",
+                uploadRequested = true
+            )
+            dao.upsert(local)
+            dao.upsert(local.copy(id = "nothing-to-upload", uploadRequested = false))
+            assertEquals(listOf(local.id), dao.localOnlyFileIds(1))
+            dao.upsert(local.copy(backupState = BackupState.QUEUED))
+            assertEquals(listOf(local.id), dao.queuedWithoutTransferFileIds(1))
+        } finally {
+            db.close()
+        }
     }
 
     @Test fun albumCoverVersionTracksNewArtworkWithoutChangingTheFileTimestamp()=runTest {

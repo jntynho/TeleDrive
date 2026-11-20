@@ -180,7 +180,7 @@ interface FileRepository {
     /** Creates [relativePath] under [parentId], reusing folders that exist. */
     suspend fun resolveImportFolder(relativePath: String, parentId: String?): String?
 
-    suspend fun reviveTrashedCopy(localPath: String, folderId: String?): DriveFile?
+    suspend fun reviveTrashedCopy(localPath: String, folderId: String?, expectedDrive: Long? = null): DriveFile?
 
     /** Removes only the local copy; remote copy must be verified first. */
     suspend fun deleteLocalCopy(ids: List<String>): AppResult<LocalCleanup>

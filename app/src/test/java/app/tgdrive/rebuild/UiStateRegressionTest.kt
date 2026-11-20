@@ -6,6 +6,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
 import com.infinity.drive.core.common.AppError
 import com.infinity.drive.core.common.AppResult
+import com.infinity.drive.core.crypto.StreamCrypto
+import com.infinity.drive.core.crypto.WrappedKeyRepository
+import com.infinity.drive.core.files.AppStoragePaths
+import com.infinity.drive.core.files.NoteDraftStore
 import com.infinity.drive.domain.model.*
 import com.infinity.drive.domain.repository.ChannelRepository
 import com.infinity.drive.presentation.channels.ChannelsViewModel
@@ -25,6 +29,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
+import kotlin.io.path.createTempDirectory
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -173,6 +178,44 @@ class UiStateRegressionTest {
         } finally {
             clear(vm)
             Dispatchers.resetMain()
+        }
+    }
+
+    @Test fun newNoteUsesTheTitleSuppliedByTextRecognition() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val directory = createTempDirectory("note-title-").toFile()
+        val storage = object : AppStoragePaths {
+            override val filesDir = directory
+            override val cacheDir = directory
+            override val externalCacheDir = null
+            override val externalStorageRoot = null
+        }
+        val keys = fake<WrappedKeyRepository> { method, _ ->
+            when (method) {
+                "get" -> null
+                else -> error(method)
+            }
+        }
+        val settings = fake<SettingsRepository> { method, _ ->
+            when (method) {
+                "getPreferences" -> flowOf(UserPreferences(storageChatId = -1L))
+                else -> error(method)
+            }
+        }
+        val vm = NoteEditorViewModel(
+            fake<FileRepository> { method, _ -> error(method) },
+            fake<TransferRepository> { method, _ -> error(method) },
+            SavedStateHandle(mapOf("title" to "Meeting agenda", "sharedText" to "Review the milestone")),
+            draftStore = NoteDraftStore(storage, keys, StreamCrypto()),
+            settings = settings
+        )
+        try {
+            val state = vm.uiState.first { !it.loading }
+            assertEquals("Meeting agenda", state.title)
+        } finally {
+            clear(vm)
+            Dispatchers.resetMain()
+            directory.deleteRecursively()
         }
     }
 

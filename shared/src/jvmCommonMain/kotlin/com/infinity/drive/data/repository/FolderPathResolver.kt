@@ -34,9 +34,10 @@ class FolderPathResolver(
     /** Resolves a path without creating anything. Null when it does not exist. */
     suspend fun resolveExisting(path: String): String? {
         if (path.isBlank()) return null
+        val chatId = activeChannel.id()
         var parentId: String? = null
         for (segment in path.split('/').filter { it.isNotBlank() }.take(MAX_DEPTH)) {
-            val match = folderDao.childrenOf(parentId, activeChannel.id())
+            val match = folderDao.childrenOf(parentId, chatId)
                 .firstOrNull { it.name.equals(segment, ignoreCase = true) }
                 ?: return null
             parentId = match.id
@@ -57,20 +58,27 @@ class FolderPathResolver(
         path: String,
         leafId: String? = null,
         startParentId: String? = null
+    ): String? = resolveOrCreateForDrive(path, activeChannel.id(), leafId, startParentId)
+
+    internal suspend fun resolveOrCreateForDrive(
+        path: String,
+        chatId: Long?,
+        leafId: String? = null,
+        startParentId: String? = null
     ): String? {
         if (path.isBlank()) return startParentId
         return creationMutex.withLock {
             var parentId: String? = startParentId
             val segments = path.split('/').filter { it.isNotBlank() }.take(MAX_DEPTH)
             for ((index, segment) in segments.withIndex()) {
-                val existing = folderDao.childrenOf(parentId, activeChannel.id())
+                val existing = folderDao.childrenOf(parentId, chatId)
                     .firstOrNull { it.name.equals(segment, ignoreCase = true) }
                 parentId = existing?.id ?: run {
                     val now = System.currentTimeMillis()
                     val folder = FolderEntity(
                         id = leafId.takeIf { index == segments.lastIndex }
                             ?: UUID.randomUUID().toString(),
-                        chatId = activeChannel.id(),
+                        chatId = chatId,
                         parentId = parentId,
                         name = segment,
                         createdAt = now,

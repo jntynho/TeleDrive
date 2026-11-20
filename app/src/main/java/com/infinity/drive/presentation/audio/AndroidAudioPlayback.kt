@@ -241,7 +241,7 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
                 ensureActive()
                 val item=MediaItem.Builder().setMediaId(file.id).setMediaMetadata(MediaMetadata.Builder().setDisplayTitle(file.name.substringBeforeLast('.')).build())
                 when(content){
-                    is PreviewContent.LocalMedia->player.setMediaItem(item.setUri(Uri.fromFile(File(content.path))).build())
+                    is PreviewContent.LocalMedia->player.setMediaItem(item.setUri(com.infinity.drive.presentation.preview.localPlaybackUri(content.path)).build())
                     is PreviewContent.StreamedMedia->{
                         val factory=if(content.parts.isNotEmpty())sources.createParted(content.parts,content.encrypted,content.nominalBytesPerSecond)else sources.create(content.remoteFileId)
                         player.setMediaSource(ProgressiveMediaSource.Factory(factory).createMediaSource(item.setUri("telegram://audio/${file.id}").build()))
@@ -278,7 +278,7 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
                 val item=MediaItem.Builder().setMediaId(next.id).setMediaMetadata(MediaMetadata.Builder().setTitle(next.name.substringBeforeLast('.')).build())
                 val source=when(content){
                     is PreviewContent.LocalMedia->ProgressiveMediaSource.Factory(androidx.media3.datasource.DefaultDataSource.Factory(appContext))
-                        .createMediaSource(item.setUri(Uri.fromFile(File(content.path))).build())
+                        .createMediaSource(item.setUri(com.infinity.drive.presentation.preview.localPlaybackUri(content.path)).build())
                     is PreviewContent.StreamedMedia->{val factory=if(content.parts.isNotEmpty())sources.createParted(content.parts,content.encrypted,content.nominalBytesPerSecond)else sources.create(content.remoteFileId)
                         ProgressiveMediaSource.Factory(factory).createMediaSource(item.setUri("telegram://audio/${next.id}").build())}
                     else->return@launch

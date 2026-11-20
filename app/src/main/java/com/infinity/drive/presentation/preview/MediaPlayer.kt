@@ -155,7 +155,7 @@ internal fun MediaPlayer(
                         .setPreferredTextLanguage(null)
                         .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build()
                     when (content) {
-                        is PreviewContent.LocalMedia -> setMediaItem(MediaItem.Builder().setUri(android.net.Uri.fromFile(java.io.File(content.path))).setMediaId(fileId).setMediaMetadata(MediaMetadata.Builder().setTitle(title).build()).build())
+                        is PreviewContent.LocalMedia -> setMediaItem(MediaItem.Builder().setUri(localPlaybackUri(content.path)).setMediaId(fileId).setMediaMetadata(MediaMetadata.Builder().setTitle(title).build()).build())
                         is PreviewContent.StreamedMedia -> {
                             val factory = if (content.parts.isNotEmpty()) {
                                 dataSourceFactory.createParted(content.parts, content.encrypted,content.nominalBytesPerSecond)
@@ -375,7 +375,8 @@ internal fun MediaPlayer(
                         val file=repository.getFile(fileId)?:error("File unavailable")
                         val path=file.localPath
                         if(path!=null){
-                            val uri=androidx.core.content.FileProvider.getUriForFile(context,context.packageName+".fileprovider",java.io.File(path))
+                            val uri = if (path.startsWith("content://")) android.net.Uri.parse(path)
+                                else androidx.core.content.FileProvider.getUriForFile(context, context.packageName + ".fileprovider", java.io.File(path))
                             context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW).setDataAndType(uri,file.mimeType).addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION))
                         }else{
                             check(transfers.enqueueDownload(fileId).isSuccess){"Couldn't queue the download"}
@@ -515,3 +516,7 @@ private const val CONTROLLER_TIMEOUT_MS = 3_000L
 private val AUDIO_ICON_SIZE = 96.dp
 
 private val ARTWORK_SIZE = 260.dp
+
+internal fun localPlaybackUri(path: String): android.net.Uri =
+    if (path.startsWith("content://")) android.net.Uri.parse(path)
+    else android.net.Uri.fromFile(java.io.File(path))

@@ -83,12 +83,10 @@
     <string name="notification_channel_transfers_desc">تقدّم الرفع والتنزيل</string>
     <string name="notification_channel_updates">تحديثات التطبيق</string>
     <string name="notification_channel_updates_desc">إشعار عند توفّر إصدار جديد</string>
-    <string name="notification_download_failed">تعذّر التنزيل</string>
     <string name="notification_transfers_active">جارٍ نقل الملفات</string>
     <string name="notification_update_message">يمكن تنزيل %1$s %2$s الآن</string>
     <string name="notification_update_skip">تخطّي هذا الإصدار</string>
     <string name="notification_update_title">يتوفّر تحديث جديد</string>
-    <string name="notification_upload_failed">تعذّر الرفع</string>
     <plurals name="notification_transfer_failures">
         <item quantity="zero">عدد عمليات النقل المتعثّرة %d</item>
         <item quantity="one">تعثّرت عملية نقل واحدة</item>

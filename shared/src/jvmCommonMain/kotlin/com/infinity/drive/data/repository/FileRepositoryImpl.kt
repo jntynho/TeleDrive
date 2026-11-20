@@ -753,10 +753,13 @@ class FileRepositoryImpl(
     ): AppResult<DriveFile> {
         val source = File(localPath)
         if (!source.exists() || !source.isFile) return AppResult.Failure(AppError.NotFound)
-        if(!allowDuplicate)fileDao.byLocalPath(localPath)?.takeIf { it.trashedAt == null }?.let {
-            return AppResult.Success(it.toDomain())
+        if (!allowDuplicate) {
+            fileDao.liveByLocalPath(source.absolutePath, drive)?.let { return AppResult.Success(it.toDomain()) }
+            reviveTrashedCopyInDrive(source, folderId, drive)?.let {
+                fileImporter.registered(source.absolutePath)
+                return AppResult.Success(it)
+            }
         }
-        if(!allowDuplicate)reviveTrashedCopy(localPath, folderId)?.let { return AppResult.Success(it) }
 
         val name = displayName ?: source.name
         val mime = MimeTypes.fromFileName(name)
@@ -931,31 +934,34 @@ class FileRepositoryImpl(
         val source = File(localPath)
         if (!source.exists() || !source.isFile) return null
 
-        /* Re-importing the very same path is the commonest duplicate of all,
-           and it needs no hashing to recognize. Rows without a remote copy do
-           not count: an interrupted upload must not block its own retry. */
-        fileDao.byLocalPath(source.absolutePath)
-            ?.takeIf { it.trashedAt == null }
+        // Include pending copies so the Takeout importer can wait for an upload before copying it.
+        val drive = activeChannel.id()
+        fileDao.liveByLocalPath(source.absolutePath, drive)?.takeIf { it.messageId == null }
             ?.let { return it.toDomain() }
 
-        val candidates = fileDao.liveMatchesBySize(source.length(), activeChannel.id())
+        val candidates = fileDao.liveMatchesBySize(source.length(), drive)
         if (candidates.isEmpty()) return null
 
         val localHash = knownHash ?: Hashing.sha256(source) ?: return null
         return candidates.firstOrNull { candidate ->
-            val hash=candidate.contentHash ?: candidate.localPath?.let{Hashing.sha256(File(it))}?.also{fileDao.upsert(candidate.copy(contentHash=it))}
-            hash==localHash
-        }?.copy(contentHash=localHash)?.toDomain()
+            // Live local bytes can identify a pending copy but cannot establish the hash of a remote one.
+            val hash = candidate.contentHash ?: candidate.localPath
+                ?.takeIf { candidate.messageId == null }
+                ?.let { Hashing.sha256(File(it)) }
+            localHash.equals(hash, ignoreCase = true)
+        }?.copy(contentHash = localHash)?.toDomain()
     }
 
-    override suspend fun reviveTrashedCopy(localPath: String, folderId: String?): DriveFile? {
-        val source = File(localPath)
+    override suspend fun reviveTrashedCopy(localPath: String, folderId: String?, expectedDrive: Long?): DriveFile? =
+        reviveTrashedCopyInDrive(File(localPath), folderId, expectedDrive ?: activeChannel.id())
+
+    private suspend fun reviveTrashedCopyInDrive(source: File, folderId: String?, drive: Long?): DriveFile? {
         if (!source.exists() || !source.isFile) return null
 
         val candidates = fileDao.trashedMatches(
             source.name,
             source.length(),
-            activeChannel.id()
+            drive
         )
         if (candidates.isEmpty()) return null
 

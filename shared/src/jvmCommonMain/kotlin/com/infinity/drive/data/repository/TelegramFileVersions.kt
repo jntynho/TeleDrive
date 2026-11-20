@@ -1,6 +1,9 @@
 package com.infinity.drive.data.repository
 
+import com.infinity.drive.core.files.AppStoragePaths
 import com.infinity.drive.core.files.FileImporter
+import com.infinity.drive.core.files.FileNameUtils
+import com.infinity.drive.core.files.ImportedFile
 import com.infinity.drive.core.security.HiddenContentAccess
 import com.infinity.drive.core.telegram.RemoteDocument
 import com.infinity.drive.core.telegram.TelegramClient
@@ -14,10 +17,14 @@ import com.infinity.drive.domain.model.BackupState
 import com.infinity.drive.domain.repository.TransferRepository
 import com.infinity.drive.core.common.AppResult
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.OutputStream
+import java.util.UUID
 
 class TelegramFileVersions(
     private val client: TelegramClient,
@@ -28,7 +35,9 @@ class TelegramFileVersions(
     private val access: HiddenContentAccess,
     private val importer: FileImporter,
     private val transfers: TransferRepository,
-    private val transferRows: TransferDao
+    private val transferRows: TransferDao,
+    private val reader: DriveContentReader,
+    private val storage: AppStoragePaths
 ) {
     private data class Archived(val revision: Long, val manifest: RemoteFileManifest)
 
@@ -72,23 +81,51 @@ class TelegramFileVersions(
         return ids
     }
 
-    suspend fun replace(fileId: String, reference: String) = withContext(Dispatchers.IO) { staging.withLock {
-        val original = readable(fileId)
-        val source = importer.prepare(reference) { ensureActive() } ?: error("The file is no longer available.")
-        commit(original, source)
-    } }
-
-    private suspend fun commit(original: FileEntity, source: com.infinity.drive.core.files.ImportedFile) {
-        try {
-            val current = readable(original.id)
-            check(current.modifiedAt == original.modifiedAt && current.messageId == original.messageId) {
-                "The current file changed. Open it again before replacing it."
+    suspend fun replace(reviewed: FileEntity, reference: String, expectedContentHash: String) =
+        withContext(Dispatchers.IO) {
+            staging.withLock {
+                requireCurrentRevision(reviewed)
+                val source = prepareVerified(reference, expectedContentHash)
+                commit(reviewed, source)
             }
+        }
+
+    /** Verifies a private copy of the reviewed bytes on the caller's I/O context. */
+    suspend fun prepareVerified(reference: String, expectedContentHash: String): ImportedFile {
+        val context = kotlinx.coroutines.currentCoroutineContext()
+        val source = importer.prepare(reference) { context.ensureActive() }
+            ?: error("The selected file is unavailable.")
+        val snapshot = if (importer.isStaged(source.path)) null else File(
+            storage.filesDir, "imports/${UUID.randomUUID()}/${FileNameUtils.sanitize(source.name)}"
+        )
+        val staged = if (snapshot == null) source else source.copy(path = snapshot.absolutePath)
+        try {
+            val input = File(source.path)
+            val hash = if (snapshot == null) {
+                reader.copyLocal(input, source.sizeBytes, discardOutput)
+            } else {
+                importer.reserve(snapshot.absolutePath)
+                check(requireNotNull(snapshot.parentFile).mkdirs())
+                snapshot.outputStream().buffered().use { reader.copyLocal(input, source.sizeBytes, it) }
+            }
+            check(hash.equals(expectedContentHash, ignoreCase = true)) {
+                "The selected file changed since the sync review."
+            }
+            return staged
+        } catch (error: Throwable) {
+            importer.discard(staged)
+            throw error
+        }
+    }
+
+    private suspend fun commit(original: FileEntity, source: ImportedFile) {
+        try {
+            val current = requireCurrentRevision(original)
             check(source.sizeBytes > 0 && transferRows.unfinishedIdsForFiles(listOf(original.id)).isEmpty()) {
                 "Wait for pending transfers before replacing this file."
             }
-            check(com.infinity.drive.core.files.FileNameUtils.extensionOf(source.name)
-                .equals(com.infinity.drive.core.files.FileNameUtils.extensionOf(current.name), true)) {
+            check(FileNameUtils.extensionOf(source.name)
+                .equals(FileNameUtils.extensionOf(current.name), true)) {
                 "Choose the same file type as the current version."
             }
             files.upsert(current.copy(localPath = source.path, sizeBytes = source.sizeBytes,
@@ -99,9 +136,19 @@ class TelegramFileVersions(
                 "The new revision was saved locally. Retry the upload from Activity."
             }
         } finally {
-            if (files.byId(original.id)?.localPath != source.path) importer.discard(source)
+            withContext(NonCancellable) {
+                if (files.byId(original.id)?.localPath != source.path) importer.discard(source)
+            }
         }
     }
+
+    private suspend fun requireCurrentRevision(reviewed: FileEntity): FileEntity =
+        readable(reviewed.id).also { current ->
+            check(current.chatId == reviewed.chatId && current.modifiedAt == reviewed.modifiedAt &&
+                current.messageId == reviewed.messageId && current.backupState == BackupState.BACKED_UP) {
+                "The current file changed. Open it again before replacing it."
+            }
+        }
 
     private suspend fun readable(id: String): FileEntity {
         val file = files.byId(id) ?: error("This file is no longer available.")
@@ -119,5 +166,9 @@ class TelegramFileVersions(
 
     companion object {
         const val PREFIX = "tdh1:"
+        private val discardOutput = object : OutputStream() {
+            override fun write(value: Int) = Unit
+            override fun write(buffer: ByteArray, offset: Int, length: Int) = Unit
+        }
     }
 }

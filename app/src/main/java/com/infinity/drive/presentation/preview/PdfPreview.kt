@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -76,13 +77,18 @@ fun PdfPreview(path: String, modifier: Modifier = Modifier) {
     val error = remember(path) { mutableStateOf<String?>(null) }
 
     val openFailedMessage = stringResource(Res.string.preview_pdf_open_failed)
-    DisposableEffect(path) {
+    val context = LocalContext.current
+    DisposableEffect(path, context) {
         try {
-            val descriptor = ParcelFileDescriptor.open(
-                File(path),
-                ParcelFileDescriptor.MODE_READ_ONLY
-            )
-            rendererState.value = PdfRenderer(descriptor)
+            val descriptor = if (path.startsWith("content://")) {
+                requireNotNull(context.contentResolver.openFileDescriptor(android.net.Uri.parse(path), "r"))
+            } else ParcelFileDescriptor.open(File(path), ParcelFileDescriptor.MODE_READ_ONLY)
+            rendererState.value = try {
+                PdfRenderer(descriptor)
+            } catch (error: Exception) {
+                runCatching { descriptor.close() }
+                throw error
+            }
         } catch (_: Exception) {
             error.value = openFailedMessage
         }

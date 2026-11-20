@@ -254,7 +254,6 @@ fun AppNavHost(
             UnderBottomBar {
                 SettingsScreen(
                     onBack = null,
-                    onOpenActivity={navController.navigateOnce(Route.Transfers)},
                     onOpenSetting={section,title->navController.navigateOnce(Route.SettingsSection(section.name,title))},
                     onOpenSection = { section ->
                         navController.navigateOnce(Route.SettingsSection(section.name))

@@ -1,6 +1,22 @@
 package app.tgdrive.rebuild
 
 import android.app.Application
+import android.content.ContentProvider
+import android.content.ContentValues
+import android.content.pm.ProviderInfo
+import android.database.MatrixCursor
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.compose.material3.Text
+import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModelStore
+import com.infinity.drive.core.files.NoteDraft
+import com.infinity.drive.core.files.NoteDraftStore
+import com.infinity.drive.domain.model.ViewMode
+import com.infinity.drive.presentation.note.NoteEditorScreen
+import com.infinity.drive.presentation.note.NoteEditorViewModel
+import com.infinity.drive.presentation.theme.DriveInfinityTheme
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.*
@@ -11,6 +27,7 @@ import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import com.infinity.drive.core.crypto.CredentialCipher
 import com.infinity.drive.data.local.dao.FileDao
 import com.infinity.drive.data.local.entity.FileEntity
+import com.infinity.drive.data.mapper.toDomain
 import com.infinity.drive.domain.model.FileCategory
 import com.infinity.drive.domain.model.BackupState
 import org.koin.core.context.GlobalContext
@@ -20,8 +37,11 @@ import com.infinity.drive.domain.model.UserPreferences
 import com.infinity.drive.domain.repository.SettingsRepository
 import com.infinity.drive.presentation.DriveInfinityApp
 import com.infinity.drive.presentation.platform.ProvidePlatformActions
+import com.infinity.drive.presentation.preview.PreviewContent
+import com.infinity.drive.presentation.preview.PreviewContentResolver
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.last
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -40,6 +60,7 @@ import org.robolectric.android.controller.ActivityController
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.annotation.LooperMode
+import org.robolectric.shadows.ShadowContentResolver
 
 /** Real modules, database, view models and navigation, with device key wrapping faked. */
 @RunWith(RobolectricTestRunner::class)
@@ -82,6 +103,137 @@ class RebuiltUiTest {
         if(::activity.isInitialized)activity.pause().stop().destroy()
         stopKoin()
     }
+    @Test fun selectingTheSameLocalFileInSeparateDrivesCreatesIndependentRows() = runBlocking {
+        val koin = GlobalContext.get()
+        val settings = koin.get<SettingsRepository>()
+        val files = koin.get<com.infinity.drive.domain.repository.FileRepository>()
+        val source = File(RuntimeEnvironment.getApplication().cacheDir, "per-drive-import.txt")
+        source.writeText("A file that belongs to two separate drives")
+        try {
+            settings.update { it.copy(storageChatId = -1001L) }
+            val first = files.importLocalFile(source.absolutePath, null)
+                as com.infinity.drive.core.common.AppResult.Success
+            settings.update { it.copy(storageChatId = -1002L) }
+            org.junit.Assert.assertNull(files.findDuplicate(source.absolutePath))
+            val second = files.importLocalFile(source.absolutePath, null)
+                as com.infinity.drive.core.common.AppResult.Success
+            org.junit.Assert.assertEquals(-1002L, second.value.chatId)
+            org.junit.Assert.assertNotEquals(first.value.id, second.value.id)
+        } finally {
+            source.delete()
+        }
+    }
+
+    @Test fun settingsSearchHidesGridColumnsWhileGalleryUsesListMode() {
+        val settings = GlobalContext.get().get<SettingsRepository>()
+        runBlocking { settings.update { it.copy(galleryViewMode = ViewMode.LIST) } }
+        compose.waitUntil(15_000) { compose.onNodeWithText("Your library").isDisplayed() }
+        compose.onNodeWithTag("navigation-settings").performClick()
+        compose.onNodeWithContentDescription("Search settings").performClick()
+        compose.onNode(hasSetTextAction()).performTextInput("grid columns")
+        compose.onNodeWithText("Gallery grid columns", substring = false).assertDoesNotExist()
+        compose.onNodeWithText("No settings found").assertIsDisplayed()
+
+        runBlocking { settings.update { it.copy(galleryViewMode = ViewMode.GRID) } }
+        val result = compose.onNodeWithText("Gallery grid columns", substring = false)
+        compose.waitUntil(5_000) { result.isDisplayed() }
+        result.performClick()
+        result.assertIsDisplayed()
+    }
+
+    @Test fun matchingLocalBytesDoNotInventTheHashOfAnUnverifiedRemoteFile() = runBlocking {
+        val koin = GlobalContext.get()
+        val dao = koin.get<FileDao>()
+        val files = koin.get<com.infinity.drive.domain.repository.FileRepository>()
+        val settings = koin.get<SettingsRepository>()
+        val cache = RuntimeEnvironment.getApplication().cacheDir
+        val original = File.createTempFile("original-", ".txt", cache)
+        val incoming = File.createTempFile("incoming-", ".txt", cache)
+        try {
+            original.writeText("current bytes")
+            incoming.writeText("current bytes")
+            settings.update { it.copy(storageChatId = -1001L) }
+            val local = files.importLocalFile(original.path, null)
+                as com.infinity.drive.core.common.AppResult.Success
+            val row = requireNotNull(dao.byId(local.value.id))
+            dao.upsert(row.copy(messageId = 42, remoteFileId = "remote", backupState = BackupState.BACKED_UP))
+            org.junit.Assert.assertNull(files.findDuplicate(incoming.path))
+            org.junit.Assert.assertNull(dao.byId(row.id)?.contentHash)
+        } finally {
+            original.delete()
+            incoming.delete()
+        }
+    }
+
+    @Test fun aDownloadedPdfWithAnAndroidContentUriDoesNotAskToDownloadAgain() = runBlocking {
+        val context = RuntimeEnvironment.getApplication()
+        val authority = "saved.download.test"
+        val uri = Uri.parse("content://$authority/42")
+        val provider = object : ContentProvider() {
+            override fun onCreate() = true
+            override fun getType(uri: Uri) = "application/pdf"
+            override fun query(uri: Uri, projection: Array<out String>?, selection: String?,
+                selectionArgs: Array<out String>?, sortOrder: String?) =
+                MatrixCursor(arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE))
+                    .apply { addRow(arrayOf<Any>("Report.pdf", 123)) }
+            override fun insert(uri: Uri, values: ContentValues?): Uri? = null
+            override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?) = 0
+            override fun update(uri: Uri, values: ContentValues?, selection: String?,
+                selectionArgs: Array<out String>?) = 0
+        }.apply { attachInfo(context, ProviderInfo().apply { this.authority = authority }) }
+        ShadowContentResolver.registerProviderInternal(authority, provider)
+        val koin = GlobalContext.get()
+        val dao = koin.get<FileDao>()
+        val file = requireNotNull(dao.byId("Report.pdf")).copy(
+            localPath = uri.toString(), messageId = 42L, remoteFileId = "downloaded",
+            backupState = BackupState.BACKED_UP
+        )
+        dao.upsert(file)
+        val result = koin.get<PreviewContentResolver>().resolve(file.toDomain()).last()
+        org.junit.Assert.assertEquals(PreviewContent.Pdf(uri.toString()), result)
+    }
+
+    @Test fun leavingARevertedNoteClearsItsPersistedDraftBeforeClosing() {
+        val koin = GlobalContext.get()
+        val files = koin.get<com.infinity.drive.domain.repository.FileRepository>()
+        val settings = koin.get<SettingsRepository>()
+        val drafts = koin.get<NoteDraftStore>()
+        val drive = -1001L
+        val id = runBlocking {
+            settings.update { it.copy(storageChatId = drive) }
+            val saved = files.saveNote(null, null, "Audit note", "Original text")
+                as com.infinity.drive.core.common.AppResult.Success
+            saved.value
+        }
+        val slot = "$drive:note:$id"
+        runBlocking { drafts.write(slot, NoteDraft("Audit note", "Changed draft")) }
+        val lifetime = ViewModelStore()
+        val closed = mutableStateOf(false)
+        val model = NoteEditorViewModel(
+            files, koin.get(), SavedStateHandle(mapOf("fileId" to id)),
+            draftStore = drafts, settings = settings
+        ).also { lifetime.put("editor", it) }
+        try {
+            activity.get().setContent {
+                DriveInfinityTheme {
+                    if (closed.value) Text("Closed editor")
+                    else NoteEditorScreen(viewModel = model, onBack = {
+                        lifetime.clear()
+                        closed.value = true
+                    })
+                }
+            }
+            compose.waitUntil(5_000) { compose.onNodeWithText("Changed draft", substring = false).isDisplayed() }
+            compose.onNode(hasText("Changed draft") and hasSetTextAction()).performTextReplacement("Original text")
+            compose.runOnIdle { org.junit.Assert.assertFalse(model.uiState.value.dirty) }
+            compose.onNodeWithContentDescription("Back").performClick()
+            compose.waitUntil(5_000) { compose.onNodeWithText("Closed editor", substring = false).isDisplayed() }
+            org.junit.Assert.assertNull(runBlocking { drafts.read(slot) })
+        } finally {
+            lifetime.clear()
+        }
+    }
+
     @Test fun hiddenLockStaysInHiddenAndRetiredActionsAreAbsentFromSettings(){
         compose.waitUntil(15_000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("Hidden",substring=false).performClick()

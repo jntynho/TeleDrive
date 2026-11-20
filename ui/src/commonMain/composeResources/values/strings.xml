@@ -1074,4 +1074,5 @@
     <string name="onboarding_resend_in">Resend available in %1$d s</string>
     <string name="onboarding_verification_code_label">Verification code</string>
     <string name="onboarding_change_phone_number">Change phone number</string>
+    <string name="onboarding_qr_expired">This QR code expired. Try again to get a new one.</string>
 </resources>

@@ -24,6 +24,7 @@ import com.infinity.drive.resources.onboarding_api_hash_short
 import com.infinity.drive.resources.onboarding_api_id_number
 import com.infinity.drive.resources.onboarding_enter_phone
 import com.infinity.drive.resources.onboarding_no_account
+import com.infinity.drive.resources.onboarding_qr_expired
 import com.infinity.drive.resources.recovery_import_configure
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -81,7 +82,11 @@ class OnboardingViewModel(
                     current.step in listOf(OnboardingStep.API_CREDENTIALS, OnboardingStep.PHONE) && current.working ->
                         current.copy(step = OnboardingStep.PHONE, working = false, error = null)
 
-                    current.qrLink != null -> current.copy(working = false, qrLink = null)
+                    current.qrLink != null -> current.copy(
+                        working = false,
+                        qrLink = null,
+                        error = UiText.Resource(Res.string.onboarding_qr_expired)
+                    )
                     else -> current
                 }
 
@@ -423,10 +428,7 @@ class OnboardingViewModel(
      * The drive is always shown before setup continues, so the user sees which
      * channel their files will live in. An account with none gets one created.
      */
-    fun onPermissionsResolved() {
-        _uiState.update { it.copy(working = true, error = null) }
-        viewModelScope.launch { loadOrCreateDrive() }
-    }
+    fun onPermissionsResolved() = retryDriveSetup()
 
     /** Retried from the drive step once the account has room again. */
     fun retryDriveSetup() {
@@ -436,15 +438,23 @@ class OnboardingViewModel(
     }
 
     private suspend fun loadOrCreateDrive() {
-        var channels = refreshChannels()
+        var channels = emptyList<DriveChannel>()
         var created = false
         var failure: UiText? = null
-        if (channels.isEmpty()) {
-            when (val result = channelRepository.create(DEFAULT_DRIVE_LABEL)) {
-                is AppResult.Success -> created = true
-                is AppResult.Failure -> failure = result.error.toUiText()
+        when (val discovery = channelRepository.refresh()) {
+            is AppResult.Failure -> failure = discovery.error.toUiText()
+            is AppResult.Success -> {
+                channels = discovery.value
+                if (channels.isEmpty()) {
+                    when (val result = channelRepository.create(DEFAULT_DRIVE_LABEL)) {
+                        is AppResult.Success -> {
+                            channels = listOf(result.value)
+                            created = true
+                        }
+                        is AppResult.Failure -> failure = result.error.toUiText()
+                    }
+                }
             }
-            channels = refreshChannels()
         }
         _uiState.update {
             it.copy(
@@ -459,24 +469,22 @@ class OnboardingViewModel(
         }
     }
 
-    private suspend fun refreshChannels(): List<DriveChannel> =
-        when (val result = channelRepository.refresh()) {
-            is AppResult.Success -> result.value
-            is AppResult.Failure -> emptyList()
-        }
-
     fun selectChannel(chatId: Long) = _uiState.update { it.copy(selectedChatId = chatId) }
 
     fun confirmChannel() {
-        val chatId = _uiState.value.selectedChatId ?: run {
-            advancePastChannel()
-            return
-        }
-        _uiState.update { it.copy(working = true) }
+        val state = _uiState.value
+        if (state.step != OnboardingStep.CHANNEL_SELECT || state.working) return
+        val chatId = state.selectedChatId ?: return
+        _uiState.update { it.copy(working = true, error = null) }
         viewModelScope.launch {
-            channelRepository.switchTo(chatId, index = false)
-            _uiState.update { it.copy(working = false) }
-            advancePastChannel()
+            when (val result = channelRepository.switchTo(chatId, index = false)) {
+                is AppResult.Success -> {
+                    _uiState.update { it.copy(working = false) }
+                    advancePastChannel()
+                }
+                is AppResult.Failure ->
+                    _uiState.update { it.copy(working = false, error = result.error.toUiText()) }
+            }
         }
     }
 
