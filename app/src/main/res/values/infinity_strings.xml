@@ -73,12 +73,10 @@
     <string name="device_accounts_title">Telegram accounts</string>
     <string name="device_accounts_switch">Switch account</string>
     <string name="device_accounts_primary">Primary account</string>
-    <string name="device_accounts_description">Each account keeps a separate sign-in, drive and transfer queue. Switching accounts restarts TeleDrive.</string>
     <string name="device_accounts_error">Could not switch accounts. Try again.</string>
     <string name="device_accounts_current">%1$s · Active</string>
     <string name="device_accounts_active">Active</string>
     <string name="device_accounts_add">Add account</string>
-    <string name="device_accounts_name">Account label</string>
     <string name="folder_sync_title">Folder sync</string>
     <string name="folder_sync_subtitle">Compare a device folder and its Telegram drive folder</string>
     <string name="folder_sync_failed">The folder could not be synchronized. Check access and try again.</string>
@@ -94,4 +92,6 @@
     <string name="folder_sync_conflict">Conflict · both copies kept</string>
     <string name="folder_sync_review">Review changes</string>
     <string name="folder_sync_apply">Apply</string>
+    <string name="device_accounts_pending">Finish signing in</string>
+    <string name="device_accounts_add_detail">Sign in to Telegram to add this account.</string>
 </resources>

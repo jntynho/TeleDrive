@@ -825,17 +825,21 @@ class RebuiltUiTest {
         compose.onNodeWithText("Broken", substring = false).assertIsDisplayed()
     }
 
-    @Test fun customThemeIsSavedAndCanBeDeletedInAppearance() {
+    @Test fun appearanceOmitsAddingThemesAndKeepsExistingThemesEditable() {
+        val settings = GlobalContext.get().get<SettingsRepository>()
+        val theme = requireNotNull(com.infinity.drive.domain.model.AccentColour.TIDAL.themeDefinition())
+            .copy(id = "legacy-theme", name = "Blue Hour")
+        runBlocking { settings.update { it.copy(customThemes = listOf(theme), selectedCustomThemeId = theme.id) } }
         compose.waitUntil(15_000) { compose.onNodeWithText("Your library", substring = false).isDisplayed() }
         compose.onNodeWithTag("navigation-settings").performClick()
         compose.onNodeWithText("Appearance", substring = false).performScrollTo().performClick()
-        compose.onNodeWithContentDescription("Add Custom").performScrollTo().performClick()
-        compose.onNodeWithTag("custom-theme-name").performScrollTo().performTextReplacement("Blue Hour")
+        compose.onNodeWithContentDescription("Add Custom").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Edit custom theme").performScrollTo().performClick()
+        compose.onNodeWithTag("custom-theme-name").performScrollTo().assertTextContains("Blue Hour")
         compose.onNodeWithText("Primary", substring = false).performScrollTo().performClick()
         compose.onNodeWithTag("custom-theme-colour-hex").performTextReplacement("#164F69")
         compose.onNodeWithText("Apply color", substring = false).performScrollTo().performClick()
         compose.onNodeWithText("Save theme", substring = false).performClick()
-        val settings = GlobalContext.get().get<SettingsRepository>()
         compose.waitUntil(5000) {
             compose.waitForIdle()
             runBlocking { settings.preferences.first().selectedCustomTheme?.light?.primary == 0xFF164F69L }

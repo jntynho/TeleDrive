@@ -19,6 +19,9 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.FilledIconButton
@@ -40,6 +43,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.semantics.setText
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -122,6 +126,16 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.infinity.drive.resources.Res
+import com.infinity.drive.resources.onboarding_verification_code_label
+import com.infinity.drive.resources.onboarding_resend_in
+import com.infinity.drive.resources.onboarding_no_matching_countries
+import com.infinity.drive.resources.onboarding_search_countries
+import com.infinity.drive.resources.onboarding_loading_countries
+import com.infinity.drive.resources.onboarding_retry_countries
+import com.infinity.drive.resources.onboarding_full_number
+import com.infinity.drive.resources.onboarding_phone_title
+import com.infinity.drive.resources.common_retry
+import com.infinity.drive.resources.onboarding_change_phone_number
 import com.infinity.drive.resources.app_name
 import com.infinity.drive.resources.backup
 import com.infinity.drive.resources.common_try_again
@@ -278,21 +292,23 @@ fun OnboardingScreen(
                     IconButton(viewModel::backFromSignIn,enabled=!state.working){Icon(DriveIcons.ArrowBack,"Back")}
                     Text("TeleDrive",style=MaterialTheme.typography.titleMedium)
                 }
-                if (!state.working) recoveryScreens?.AccountProfilesSetting(compact = true)
-                BoxWithConstraints(Modifier.weight(1f)){
+                recoveryScreens?.AccountProfilesSetting(compact = true, enabled = !state.working)
+                BoxWithConstraints(Modifier.weight(1f), contentAlignment = Alignment.TopCenter){
                     val body:@Composable (Modifier)->Unit={modifier->
                         val scroll=rememberScrollState()
                         LaunchedEffect(state.step){scroll.scrollTo(0)}
                         BoxWithConstraints(modifier){
                         val viewportHeight=maxHeight
+                        val entryPage = state.step in signInFormSteps && !state.qrMode
+                        val pageAlignment = if (entryPage) Alignment.CenterStart else Alignment.BottomStart
                         Column(Modifier.fillMaxWidth().verticalScroll(scroll).heightIn(min=viewportHeight)){
-                            AnimatedContent(state.step,modifier=Modifier.fillMaxWidth().heightIn(min=viewportHeight),contentAlignment=Alignment.BottomStart,transitionSpec={
+                            AnimatedContent(state.step,modifier=Modifier.fillMaxWidth().heightIn(min=viewportHeight),contentAlignment=pageAlignment,transitionSpec={
                                 (com.infinity.drive.presentation.navigation.NavigationTransitions.enter(targetState.ordinal>=initialState.ordinal)
                                     togetherWith com.infinity.drive.presentation.navigation.NavigationTransitions.exit(targetState.ordinal>=initialState.ordinal))
                                     .using(SizeTransform(clip=true){_,_->snap()})
                             },label="sign-in-step"){step->
                                 val pageInput=inputs.getOrPut(step){InlineInputController()}
-                                Box(Modifier.fillMaxWidth().heightIn(min=viewportHeight),contentAlignment=Alignment.BottomStart){
+                                Box(Modifier.fillMaxWidth().heightIn(min=viewportHeight),contentAlignment=pageAlignment){
                                 CompositionLocalProvider(LocalInlineInput provides pageInput,com.infinity.drive.presentation.input.LocalInlineDrafts provides viewModel.inputDrafts){
                                     formStates.SaveableStateProvider(step.name){
                         when (step) {
@@ -322,6 +338,7 @@ fun OnboardingScreen(
                                     working = state.working,
                                     error = state.error,
                                     link = state.qrLink,
+                                    onRetry = viewModel::startQrLogin,
                                     onCancel = viewModel::cancelQrLogin
                                 )
                             } else PhoneStep(
@@ -333,6 +350,7 @@ fun OnboardingScreen(
                                 onUseQrCode = viewModel::startQrLogin,
                                 onRecover = openRecovery,
                                 onOpenProxy = onOpenProxy,
+                                onChangePhone = viewModel::restartPhoneSignIn,
                                 working = state.working,
                                 error = state.error,
                                 registrationRequired = state.registrationRequired,
@@ -345,6 +363,7 @@ fun OnboardingScreen(
                                 phoneNumber = state.codePhoneNumber,
                                 channel = state.codeChannel,
                                 codeLength = state.codeLength,
+                                resendSeconds = state.resendSeconds,
                                 onSubmit = viewModel::submitCode,
                                 onResend = viewModel::resendCode
                             )
@@ -392,17 +411,20 @@ fun OnboardingScreen(
                         }
                         }
                     }
-                    val entryForm=state.step in setOf(OnboardingStep.API_CREDENTIALS,OnboardingStep.PHONE,OnboardingStep.CODE,OnboardingStep.EMAIL_ADDRESS,OnboardingStep.EMAIL_CODE,OnboardingStep.PASSWORD)&&!(state.step==OnboardingStep.PHONE&&state.qrMode)
+                    val entryForm = state.step in signInFormSteps && !state.qrMode
                     val controls:@Composable (Modifier)->Unit={modifier->
                         if(entryForm){
-                            Column(modifier.padding(horizontal=24.dp).padding(top=8.dp,bottom=16.dp)){
+                            Column(modifier.padding(horizontal = 24.dp).padding(top = 10.dp, bottom = 16.dp)){
                                 val action=input.action
                                 val label=action?.label?:when(state.step){OnboardingStep.CODE,OnboardingStep.EMAIL_CODE->"Verify";OnboardingStep.PASSWORD->"Sign in";else->"Continue"}
-                                BigButton(label,onClick={action?.invoke?.invoke()},enabled=action?.enabled==true&&!state.working,loading=action?.working==true)
+                                BigButton(label,onClick={action?.invoke?.invoke()},enabled=action?.enabled==true&&!state.working,loading=state.working)
                             }
                         }
                     }
-                    Column(Modifier.fillMaxSize()) {body(Modifier.weight(1f).fillMaxWidth());controls(Modifier.fillMaxWidth())}
+                    Column(Modifier.widthIn(max = 540.dp).fillMaxWidth().fillMaxHeight()) {
+                        body(Modifier.weight(1f).fillMaxWidth())
+                        controls(Modifier.fillMaxWidth())
+                    }
                 }
             }
         }
@@ -525,7 +547,6 @@ private fun OnboardingPage(
     iconPainter: Painter? = null,
     title: String,
     description: String,
-    iconSize: androidx.compose.ui.unit.Dp = 28.dp,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Column(
@@ -534,12 +555,18 @@ private fun OnboardingPage(
             .padding(horizontal = PAGE_PADDING, vertical = PAGE_VERTICAL_PADDING),
         horizontalAlignment = Alignment.Start
     ) {
-        if(icon!=null&&icon != DriveIcons.PhoneAndroid){
-            Icon(icon,null,Modifier.size(iconSize),tint=MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(20.dp))
+        if (icon != null || iconPainter != null) {
+            Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
+                    val tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    if (icon != null) Icon(icon, null, Modifier.size(26.dp), tint = tint)
+                    else if (iconPainter != null) Icon(iconPainter, null, Modifier.size(26.dp), tint = tint)
+                }
+            }
+            Spacer(Modifier.height(16.dp))
         }
         StepTitle(title=title,description=description,centered=false)
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(22.dp))
         content()
     }
 }
@@ -790,6 +817,7 @@ private fun QrStep(
     working: Boolean,
     error: UiText?,
     link: String?,
+    onRetry: () -> Unit,
     onCancel: () -> Unit
 ) {
     var openFailed by remember { mutableStateOf(false) }
@@ -820,7 +848,8 @@ private fun QrStep(
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(QR_PADDING)) {
                     if (link == null) {
-                        CircularProgressIndicator(modifier = Modifier.padding(QR_PADDING))
+                        if (error == null) CircularProgressIndicator(modifier = Modifier.padding(QR_PADDING))
+                        else Icon(DriveIcons.QrCode2, null, Modifier.size(32.dp), tint = Color.DarkGray)
                     } else {
                         QrCode(
                             content = link,
@@ -861,6 +890,11 @@ private fun QrStep(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error
             )
+            if (link == null) {
+                TextButton(onRetry, enabled = !working, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                    Text(stringResource(Res.string.common_retry))
+                }
+            }
             Spacer(Modifier.height(8.dp))
         } else {
             Row(
@@ -947,59 +981,69 @@ private fun PhoneStep(
     onUseQrCode: () -> Unit,
     onRecover: (() -> Unit)?,
     onOpenProxy: () -> Unit,
+    onChangePhone: () -> Unit,
     onSubmit: (String) -> Unit
 ) {
-    var national by rememberSaveable { mutableStateOf("") }
+    var number by rememberSaveable { mutableStateOf("") }
     var picking by rememberSaveable { mutableStateOf(false) }
-    var typedBeforeCountries by rememberSaveable { mutableStateOf(false) }
-    val manual = countryLoadState == CountryLoadState.FAILED || typedBeforeCountries
-    val callingCode = if (manual) "" else selectedCountry?.callingCode.orEmpty()
+    var fullNumber by rememberSaveable { mutableStateOf(false) }
+    val manual = fullNumber || countryLoadState == CountryLoadState.FAILED || number.startsWith('+')
+    val callingCode = selectedCountry?.callingCode.orEmpty()
+    val phone = signInPhoneNumber(number, callingCode.takeUnless { manual }.orEmpty())
 
     LaunchedEffect(Unit) { onLoadCountries() }
 
     OnboardingPage(
         icon = DriveIcons.PhoneAndroid,
-        title = "Your phone number",
-        description = "Please confirm your country code\nand enter your phone number."
+        title = stringResource(Res.string.onboarding_phone_title),
+        description = stringResource(Res.string.onboarding_phone_number_telegram_account)
     ) {
         if (!manual) {
             CountryField(
                 country = selectedCountry,
-                loading = countryLoadState == CountryLoadState.LOADING,
+                loading = countryLoadState == CountryLoadState.LOADING && selectedCountry == null,
                 enabled = !working && countries.isNotEmpty(),
                 onClick = { picking = true }
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
         }
         OnboardingField(
-            value = national,
-            onChange = { entry ->
-                if (countryLoadState == CountryLoadState.LOADING) typedBeforeCountries = true
-                national = entry.filter { it.isDigit() }
-            },
+            value = number,
+            onChange = { number = normalizePhoneEntry(it).take(64) },
             label = stringResource(Res.string.onboarding_phone_number),
-            supportingText = if (manual) {
-                stringResource(Res.string.onboarding_include_country_code_like)
-            } else {
-                null
-            },
+            supportingText = if (manual) stringResource(Res.string.onboarding_include_country_code_like) else null,
             keyboardType = KeyboardType.Phone,
-            autoFocus=true,
+            autoFocus = true,
             enabled = !working,
-            prefix = "+$callingCode",
-            onPaste={raw->
-                val digits=raw.mapNotNull{ch->Character.digit(ch,10).takeIf{it>=0}?.digitToChar()}.joinToString("")
-                val international=raw.trimStart().startsWith("+")||raw.trimStart().startsWith("00")
-                val number=if(raw.trimStart().startsWith("00"))digits.removePrefix("00")else digits
-                val country=if(international)countries.sortedByDescending{it.callingCode.length}.firstOrNull{number.startsWith(it.callingCode)}else null
-                if(country!=null){onSelectCountry(country);typedBeforeCountries=false;national=number.removePrefix(country.callingCode)}
-                else{if(international)typedBeforeCountries=true;national=number}
-            }
+            prefix = if (!manual && callingCode.isNotBlank()) "+$callingCode" else null
         )
-        ErrorAndAction(working,error,"Continue",national.isNotBlank()&&!registrationRequired){onSubmit("+$callingCode$national")}
+        ErrorAndAction(working, error, stringResource(Res.string.onboarding_action_continue), phone != null && !registrationRequired) {
+            phone?.let(onSubmit)
+        }
+        if (registrationRequired) {
+            TextButton(onChangePhone, enabled = !working) {
+                Text(stringResource(Res.string.onboarding_change_phone_number))
+            }
+        } else if (countryLoadState == CountryLoadState.FAILED || !manual || countries.isNotEmpty()) {
+            TextButton(
+                onClick = {
+                    if (countryLoadState == CountryLoadState.FAILED) onLoadCountries()
+                    else if (manual && countries.isNotEmpty()) picking = true
+                    else fullNumber = true
+                },
+                enabled = !working,
+                modifier = Modifier.align(Alignment.Start)
+            ) {
+                Text(stringResource(when {
+                    countryLoadState == CountryLoadState.FAILED -> Res.string.onboarding_retry_countries
+                    manual && countries.isNotEmpty() -> Res.string.onboarding_choose_country
+                    else -> Res.string.onboarding_full_number
+                }))
+            }
+        }
         TextButton(
             onClick = onUseQrCode,
-            enabled = !working,
+            enabled = !working && !registrationRequired,
             modifier = Modifier.align(Alignment.CenterHorizontally)
         ) {
             Icon(
@@ -1010,7 +1054,7 @@ private fun PhoneStep(
             Spacer(Modifier.width(8.dp))
             Text(stringResource(Res.string.onboarding_qr_sign_in))
         }
-        if (onRecover != null) {
+        if (onRecover != null && !registrationRequired) {
             TextButton(onRecover, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                 Text(stringResource(Res.string.recovery_import_title))
             }
@@ -1024,6 +1068,8 @@ private fun PhoneStep(
             countries = countries,
             onDismiss = { picking = false },
             onSelect = { country ->
+                if (number.startsWith("+${country.callingCode}")) number = number.removePrefix("+${country.callingCode}")
+                if (!number.startsWith('+')) fullNumber = false
                 onSelectCountry(country)
                 picking = false
             }
@@ -1036,9 +1082,19 @@ private fun CountryField(country:Country?,loading:Boolean,enabled:Boolean,onClic
     Surface(onClick=onClick,enabled=enabled,shape=RoundedCornerShape(22.dp),color=MaterialTheme.colorScheme.surfaceContainerLow,
         border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),modifier=Modifier.fillMaxWidth().heightIn(min=58.dp)){
         Row(Modifier.padding(horizontal=16.dp,vertical=16.dp),verticalAlignment=Alignment.CenterVertically){
-            Text(country?.name?:if(loading)"Loading countries…"else"Country",Modifier.weight(1f),style=MaterialTheme.typography.bodyLarge,
-                color=if(country==null)MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
-            if(loading)CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp)else Icon(DriveIcons.ChevronRight,null,Modifier.size(24.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(DriveIcons.Language, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(12.dp))
+            Text(
+                country?.name ?: stringResource(if (loading) Res.string.onboarding_loading_countries else Res.string.onboarding_country),
+                Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge,
+                color = if (country == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+            )
+            if (country != null) {
+                Text("+${country.callingCode}", style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr))
+                Spacer(Modifier.width(6.dp))
+            }
+            if (loading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            else Icon(DriveIcons.ChevronDown, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -1046,7 +1102,7 @@ private fun CountryField(country:Country?,loading:Boolean,enabled:Boolean,onClic
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CountryPickerSheet(countries:List<Country>,onDismiss:()->Unit,onSelect:(Country)->Unit){
-    var query by remember{mutableStateOf("")}
+    var query by rememberSaveable{mutableStateOf("")}
     val matches=remember(countries,query){countries.filter{query.isBlank()||it.name.contains(query,true)||it.callingCode.contains(query)||it.isoCode.equals(query,true)}}
     val density=androidx.compose.ui.platform.LocalDensity.current
     val limit=with(density){androidx.compose.ui.platform.LocalWindowInfo.current.containerSize.height.toDp()*.85f}
@@ -1054,10 +1110,14 @@ private fun CountryPickerSheet(countries:List<Country>,onDismiss:()->Unit,onSele
         val closeThen=com.infinity.drive.presentation.components.LocalSheetCloseThen.current
         CompositionLocalProvider(LocalInlineInput provides null){
             Column(Modifier.fillMaxWidth().heightIn(max=limit).padding(horizontal=20.dp)){
-                Text("Choose country",style=MaterialTheme.typography.titleLarge)
+                Text(stringResource(Res.string.onboarding_choose_country),style=MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.height(12.dp))
-                OnboardingField(query,{query=it},"Search countries",autoFocus=true)
+                OnboardingField(query,{query=it},stringResource(Res.string.onboarding_search_countries))
                 LazyColumn(Modifier.weight(1f).fillMaxWidth()){
+                    if (matches.isEmpty()) item {
+                        Text(stringResource(Res.string.onboarding_no_matching_countries), Modifier.padding(vertical = 20.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     items(matches,key={"${it.isoCode}_${it.callingCode}"}){country->
                         Row(Modifier.fillMaxWidth().clickable{closeThen{onSelect(country)}}.padding(vertical=14.dp),verticalAlignment=Alignment.CenterVertically){
                             Text(country.name,Modifier.weight(1f));Text("+${country.callingCode}",color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1162,13 +1222,13 @@ private fun CodeStep(
     phoneNumber: String,
     channel: CodeDeliveryChannel,
     codeLength: Int?,
+    resendSeconds: Int,
     onSubmit: (String) -> Unit,
     onResend: () -> Unit
 ) {
     var code by com.infinity.drive.presentation.input.inlineDraft("phone-code")
     OnboardingPage(
         icon = DriveIcons.Sms,
-        iconSize = 64.dp,
         title = if(channel==CodeDeliveryChannel.TELEGRAM_APP)"Check Telegram"else"Enter your code",
         description = codeDeliveryText(channel, phoneNumber)
     ) {
@@ -1183,18 +1243,22 @@ private fun CodeStep(
         )
         TextButton(
             onClick = onResend,
-            enabled = !working,
+            enabled = !working && resendSeconds == 0,
             modifier = Modifier.align(Alignment.CenterHorizontally)
-        ) { Text(stringResource(Res.string.onboarding_resend_code)) }
+        ) {
+            Text(if (resendSeconds > 0) stringResource(Res.string.onboarding_resend_in, resendSeconds)
+                 else stringResource(Res.string.onboarding_resend_code))
+        }
     }
 }
 
 /** One real text editor supports the phone IME, paste and accessibility; slots only decorate it. */
 @Composable
 private fun VerificationInput(value:String,onChange:(String)->Unit,length:Int?,enabled:Boolean,numeric:Boolean=true){
+    val label = stringResource(Res.string.onboarding_verification_code_label)
     val slots=length?.takeIf{numeric&&it in 1..8}
     if(slots==null){
-        OnboardingField(value,{onChange(if(length!=null)it.take(length.coerceAtLeast(0))else it)},"Verification code",
+        OnboardingField(value,{onChange(if(length!=null)it.take(length.coerceAtLeast(0))else it)},label,
             keyboardType=if(numeric)KeyboardType.Number else KeyboardType.Text,enabled=enabled,autoFocus=true)
         return
     }
@@ -1205,14 +1269,14 @@ private fun VerificationInput(value:String,onChange:(String)->Unit,length:Int?,e
         keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.NumberPassword,imeAction=ImeAction.Done,autoCorrectEnabled=false),
         keyboardActions=KeyboardActions(onDone={action?.action?.takeIf{it.enabled&&!it.working}?.invoke?.invoke()}),
         cursorBrush=SolidColor(MaterialTheme.colorScheme.primary),
-        modifier=Modifier.fillMaxWidth().height(60.dp).focusRequester(focus).semantics{contentDescription="Verification code"},
+        modifier=Modifier.fillMaxWidth().height(60.dp).focusRequester(focus).semantics{contentDescription=label},
         decorationBox={editor->Box{
-            Row(Modifier.fillMaxSize(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+            Row(Modifier.fillMaxSize().clearAndSetSemantics {},horizontalArrangement=Arrangement.spacedBy(6.dp)){
                 repeat(slots){index->
-                    val active=index==value.length.coerceAtMost(slots-1)
+                    val active = index == value.length
                     Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)
                         .border(if(active)1.5.dp else 1.dp,if(active)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,RoundedCornerShape(18.dp)),contentAlignment=Alignment.Center){
-                        Text(value.getOrNull(index)?.toString().orEmpty(),style=MaterialTheme.typography.headlineSmall)
+                        Text(value.getOrNull(index)?.toString().orEmpty(),style=if (slots > 6) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge)
                     }
                 }
             }
@@ -1413,7 +1477,7 @@ internal fun normalizeSignInDigits(value:String,allowPlus:Boolean=false):String 
 
 @Composable
 private fun OnboardingField(value:String,onChange:(String)->Unit,label:String,supportingText:String?=null,
-    keyboardType:KeyboardType=KeyboardType.Text,password:Boolean=false,enabled:Boolean=true,prefix:String?=null,onPaste:((String)->Unit)?=null,autoFocus:Boolean=false,next:Boolean=false){
+    keyboardType:KeyboardType=KeyboardType.Text,password:Boolean=false,enabled:Boolean=true,prefix:String?=null,autoFocus:Boolean=false,next:Boolean=false){
     val focus=remember{FocusRequester()}
     val action=LocalInlineInput.current
     val keyboard=androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
@@ -1421,18 +1485,20 @@ private fun OnboardingField(value:String,onChange:(String)->Unit,label:String,su
     var reveal by remember{mutableStateOf(false)}
     LaunchedEffect(autoFocus){if(autoFocus){androidx.compose.runtime.withFrameNanos{};focus.requestFocus()}}
     OutlinedTextField(value=value,onValueChange={next->
-        if(onPaste!=null&&next.trimStart().startsWith("+")&&next.length>value.length+1)onPaste(normalizeSignInDigits(next,allowPlus=true))
-        else onChange(when(keyboardType){
+        onChange(when(keyboardType){
             KeyboardType.Number,KeyboardType.NumberPassword->normalizeSignInDigits(next)
             KeyboardType.Phone->normalizeSignInDigits(next,allowPlus=true)
             else->next
         })
     },label={Text(label)},singleLine=true,enabled=enabled,shape=RoundedCornerShape(22.dp),
         modifier=Modifier.fillMaxWidth().focusRequester(focus),
-        prefix=prefix?.let{{Text(it)}},
+        textStyle = if (keyboardType in setOf(KeyboardType.Phone, KeyboardType.Email, KeyboardType.Number)) {
+            LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+        } else LocalTextStyle.current,
+        prefix = prefix?.let { code -> { Text(code, style = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)) } },
         supportingText=supportingText?.let{{Text(it)}},
         visualTransformation=if(password&&!reveal)PasswordVisualTransformation()else VisualTransformation.None,
-        trailingIcon=if(password){{IconButton({reveal=!reveal}){Icon(if(reveal)DriveIcons.VisibilityOff else DriveIcons.Visibility,if(reveal)"Hide password"else"Show password")}}}else null,
+        trailingIcon=if(password){{IconButton({reveal=!reveal}, enabled = enabled){Icon(if(reveal)DriveIcons.VisibilityOff else DriveIcons.Visibility,if(reveal)"Hide password"else"Show password")}}}else null,
         keyboardOptions=KeyboardOptions(keyboardType=if(password&&keyboardType==KeyboardType.Text)KeyboardType.Password else keyboardType,imeAction=if(next)ImeAction.Next else ImeAction.Done,autoCorrectEnabled=false),
         keyboardActions=KeyboardActions(onNext={focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Next)},onDone={if(action==null)keyboard?.hide()else action.action?.takeIf{it.enabled&&!it.working}?.invoke?.invoke()}),
         colors=OutlinedTextFieldDefaults.colors(focusedContainerColor=MaterialTheme.colorScheme.surfaceContainerLow,
@@ -1469,8 +1535,38 @@ private fun ErrorAndAction(working:Boolean,error:UiText?,actionLabel:String,enab
     val latestAction by rememberUpdatedState(onAction)
     SideEffect{if(input!=null)input.action=InlineAction(actionLabel,enabled,working){latestAction()}}
     DisposableEffect(input){onDispose{input?.action=null}}
-    error?.let{Text(it.resolve(),Modifier.padding(top=12.dp,bottom=8.dp).semantics{liveRegion=LiveRegionMode.Polite},color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodyMedium)}
+    error?.let {
+        Surface(
+            Modifier.fillMaxWidth().padding(top = 12.dp).semantics { liveRegion = LiveRegionMode.Polite },
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer
+        ) {
+            Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(DriveIcons.ErrorOutline, null, Modifier.size(19.dp))
+                Text(it.resolve(), style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
     if(input==null)BigButton(actionLabel,onAction,enabled&&!working,working)
+}
+
+private val signInFormSteps = setOf(
+    OnboardingStep.API_CREDENTIALS, OnboardingStep.PHONE, OnboardingStep.CODE,
+    OnboardingStep.EMAIL_ADDRESS, OnboardingStep.EMAIL_CODE, OnboardingStep.PASSWORD
+)
+
+internal fun normalizePhoneEntry(value: String): String {
+    val normalized = normalizeSignInDigits(value, allowPlus = true)
+    return if (normalized.startsWith("00")) "+" + normalized.drop(2) else normalized
+}
+
+internal fun signInPhoneNumber(input: String, callingCode: String): String? {
+    val number = normalizePhoneEntry(input)
+    val full = if (number.startsWith('+')) number else if (callingCode.isNotEmpty() && number.isNotEmpty()) {
+        "+$callingCode$number"
+    } else return null
+    return full.takeIf { it.length in 6..16 && it[1] in '1'..'9' && it.drop(2).all { digit -> digit in '0'..'9' } }
 }
 
 private val EmphasizedEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)

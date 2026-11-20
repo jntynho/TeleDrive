@@ -1,5 +1,8 @@
 package com.infinity.drive.presentation.settings
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -9,7 +12,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -65,11 +67,14 @@ internal fun DashboardStylesSheet(
     onDismiss: () -> Unit,
     viewModel: SettingsViewModel = koinViewModel()
 ) {
-    DriveBottomSheet(onDismissRequest = onDismiss) {
+    DriveBottomSheet(
+        onDismissRequest = onDismiss,
+        contentWindowInsets = { WindowInsets.safeDrawing.only(WindowInsetsSides.Vertical) }
+    ) {
         Column(Modifier.fillMaxWidth().testTag("dashboard-style-sheet"), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 stringResource(Res.string.settings_dashboard_style),
-                Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
                 style = MaterialTheme.typography.titleLarge
             )
             DashboardStylePreferences(viewModel, usage, updatedLabel)
@@ -110,7 +115,6 @@ fun DashboardStyleSelector(
     val styles = DashboardStyle.entries
     val pager = rememberPagerState(initialPage = selectedStyle.ordinal) { styles.size }
     val scope = rememberCoroutineScope()
-    val fontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
 
     Column(
@@ -122,7 +126,9 @@ fun DashboardStyleSelector(
         }
         HorizontalPager(
             state = pager,
-            modifier = Modifier.fillMaxWidth().testTag("dashboard-style-carousel"),
+            modifier = Modifier.fillMaxWidth()
+                .animateContentSize(tween(220, easing = FastOutSlowInEasing), alignment = Alignment.TopStart)
+                .testTag("dashboard-style-carousel"),
             pageSpacing = 12.dp,
             key = { styles[it].name }
         ) { index ->
@@ -134,7 +140,7 @@ fun DashboardStyleSelector(
                 Modifier.fillMaxWidth().testTag("dashboard-option-${style.name}"),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(Modifier.heightIn(min = 56.dp * fontScale), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(style.label, style = MaterialTheme.typography.titleLarge)
                     Text(style.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -177,7 +183,11 @@ fun DashboardStyleSelector(
             ) {
                 Icon(if (rtl) DriveIcons.ChevronRight else DriveIcons.ChevronLeft, "Previous dashboard style")
             }
-            Text("${page + 1} / ${styles.size}", style = MaterialTheme.typography.labelLarge.copy(textDirection = TextDirection.Ltr))
+            Text(
+                "${page + 1} / ${styles.size}",
+                style = MaterialTheme.typography.labelLarge.copy(textDirection = TextDirection.Ltr),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             FilledTonalIconButton(
                 onClick = { scope.launch { pager.animateScrollToPage(page + 1) } },
                 enabled = page < styles.lastIndex && !pager.isScrollInProgress

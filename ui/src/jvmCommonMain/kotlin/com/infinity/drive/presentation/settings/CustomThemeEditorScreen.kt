@@ -63,7 +63,6 @@ import com.infinity.drive.presentation.theme.toStoredColour
 import com.infinity.drive.presentation.theme.withAmoledBackground
 import com.infinity.drive.resources.Res
 import com.infinity.drive.resources.common_back
-import java.util.UUID
 import kotlinx.serialization.json.Json
 import org.jetbrains.compose.resources.stringResource
 
@@ -103,7 +102,7 @@ private val themeDraftSaver = Saver<CustomTheme, String>(
 @Composable
 internal fun CustomThemeEditorScreen(
     preferences: UserPreferences,
-    themeId: String?,
+    themeId: String,
     onBack: () -> Unit,
     onSave: (CustomTheme) -> Unit
 ) {
@@ -112,20 +111,13 @@ internal fun CustomThemeEditorScreen(
     val builtIn = remember { AccentColour.presets.map { it.editorDefinition() } }
     val baseThemes = builtIn + preferences.customThemes
     val original = preferences.customThemes.firstOrNull { it.id == themeId }
-    val source = original
-        ?: preferences.selectedCustomTheme
-        ?: remember(preferences.accentColour) { preferences.accentColour.editorDefinition() }
-
-    var draft by rememberSaveable(themeId, stateSaver = themeDraftSaver) {
-        val initial = original ?: source.copy(
-            id = UUID.randomUUID().toString(),
-            name = generateSequence(1) { it + 1 }.map { "Custom theme $it" }.first { candidate ->
-                preferences.customThemes.none { it.name.equals(candidate, ignoreCase = true) }
-            }
-        )
-        mutableStateOf(initial)
+    if (original == null) {
+        androidx.compose.runtime.LaunchedEffect(themeId) { onBack() }
+        return
     }
-    var sourceLabel by rememberSaveable(themeId) { mutableStateOf(source.name) }
+
+    var draft by rememberSaveable(themeId, stateSaver = themeDraftSaver) { mutableStateOf(original) }
+    var sourceLabel by rememberSaveable(themeId) { mutableStateOf(original.name) }
     var tone by rememberSaveable(themeId) { mutableStateOf(PreviewTone.LIGHT) }
     var advanced by rememberSaveable(themeId) { mutableStateOf(false) }
     var coreColour by rememberSaveable(themeId) { mutableStateOf<PaletteColour?>(null) }
@@ -186,7 +178,7 @@ internal fun CustomThemeEditorScreen(
     Scaffold(
         topBar = {
             LibraryHeader(
-                title = if (themeId == null) "New custom theme" else "Edit custom theme",
+                title = "Edit custom theme",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(DriveIcons.ArrowBack, contentDescription = stringResource(Res.string.common_back))

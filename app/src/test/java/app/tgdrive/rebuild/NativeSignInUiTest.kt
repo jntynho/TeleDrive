@@ -64,6 +64,7 @@ class NativeSignInUiTest {
             when(method.name){
                 "getAuthState"->auth
                 "getConnectionState"->MutableStateFlow(TelegramConnectionState.READY)
+                "restartAuthentication"->{auth.value=TelegramAuthState.WaitingForPhoneNumber;AppResult.Success(Unit)}
                 "hasCredentials"->flowOf(true)
                 "startFromStoredCredentials"->AppResult.Success(storedCredentials)
                 "countries"->AppResult.Success(CountryList(listOf(country,Country("FR","France","33")),country))
@@ -277,6 +278,30 @@ class NativeSignInUiTest {
         compose.onNodeWithText("Continue",substring=false).performClick()
         compose.waitUntil(5000){compose.onNodeWithContentDescription("Verification code").isDisplayed()}
         compose.onNodeWithText("Verify",substring=false).assertIsDisplayed()
+    }
+
+
+    @Test fun fullInternationalNumberDoesNotRepeatTheSelectedCountryCode() {
+        compose.onNodeWithText("Get started").performClick()
+        compose.waitUntil(5000) { compose.onNodeWithText("United Kingdom").isDisplayed() }
+        compose.onNode(hasSetTextAction()).performTextReplacement("٠٠٣٣ ٦١٢٣٤٥٦٧٨")
+        compose.onNodeWithText("Continue", substring = false).performClick()
+        compose.waitUntil(5000) { compose.onNodeWithText("Check Telegram").isDisplayed() }
+        assertEquals("+33612345678", phone)
+        compose.onNode(hasText("Resend available in", substring = true)).assertIsNotEnabled()
+        compose.onNodeWithText("%d", substring = true).assertDoesNotExist()
+    }
+
+
+    @Test fun registrationRequiredCanReturnToEditablePhoneEntry() {
+        compose.onNodeWithText("Get started").performClick()
+        compose.waitUntil(5000) { compose.onNodeWithText("United Kingdom").isDisplayed() }
+        compose.runOnIdle { auth.value = TelegramAuthState.RegistrationRequired }
+        compose.onNodeWithText("Continue", substring = false).assertIsNotEnabled()
+        compose.onNodeWithText("Change phone number", substring = false).performScrollTo().performClick()
+        compose.waitUntil(5000) { !model.uiState.value.registrationRequired }
+        compose.onNode(hasSetTextAction()).performTextReplacement("7700900123")
+        compose.onNodeWithText("Continue", substring = false).assertIsEnabled()
     }
 
 }

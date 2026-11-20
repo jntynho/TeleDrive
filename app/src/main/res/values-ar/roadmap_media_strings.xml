@@ -12,12 +12,10 @@
     <string name="device_accounts_title">حسابات Telegram</string>
     <string name="device_accounts_switch">تبديل الحساب</string>
     <string name="device_accounts_primary">الحساب الرئيسي</string>
-    <string name="device_accounts_description">لكل حساب جلسة وقرص وقائمة نقل مستقلة. يعيد تبديل الحساب تشغيل TeleDrive.</string>
     <string name="device_accounts_error">تعذّر تبديل الحساب. حاول مرة أخرى.</string>
     <string name="device_accounts_current">%1$s · نشط</string>
     <string name="device_accounts_active">نشط</string>
     <string name="device_accounts_add">إضافة حساب</string>
-    <string name="device_accounts_name">اسم الحساب</string>
     <string name="folder_sync_title">مزامنة مجلد</string>
     <string name="folder_sync_subtitle">مقارنة مجلد على الجهاز بنظيره في قرص Telegram</string>
     <string name="folder_sync_failed">تعذّرت مزامنة المجلد. تحقّق من الوصول وأعد المحاولة.</string>
@@ -33,4 +31,6 @@
     <string name="folder_sync_conflict">تعارض · تم الاحتفاظ بالنسختين</string>
     <string name="folder_sync_review">مراجعة التغييرات</string>
     <string name="folder_sync_apply">تطبيق</string>
+    <string name="device_accounts_pending">إكمال تسجيل الدخول</string>
+    <string name="device_accounts_add_detail">سجّل الدخول إلى Telegram لإضافة الحساب.</string>
 </resources>

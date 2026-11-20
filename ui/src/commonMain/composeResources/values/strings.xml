@@ -1065,4 +1065,13 @@
     <string name="transfers_cancel_upload">Cancel upload</string>
     <string name="transfers_cancel_upload_title">Cancel upload?</string>
     <string name="transfers_cancel_upload_message">Stop this upload and remove it from the queue.</string>
+    <string name="onboarding_phone_title">Your phone number</string>
+    <string name="onboarding_full_number">Enter full international number</string>
+    <string name="onboarding_retry_countries">Reload countries</string>
+    <string name="onboarding_loading_countries">Loading countries…</string>
+    <string name="onboarding_search_countries">Search countries</string>
+    <string name="onboarding_no_matching_countries">No matching countries</string>
+    <string name="onboarding_resend_in">Resend available in %1$d s</string>
+    <string name="onboarding_verification_code_label">Verification code</string>
+    <string name="onboarding_change_phone_number">Change phone number</string>
 </resources>

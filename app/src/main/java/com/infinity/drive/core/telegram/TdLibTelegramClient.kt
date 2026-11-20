@@ -207,7 +207,7 @@ internal class TdLibTelegramClient(
             is TdApi.AuthorizationStateReady -> {
                 val expected = recoveryPreferences.getLong("expected-account", 0)
                 if (expected == 0L) {
-                    _authState.value = TelegramAuthState.Ready
+                    markReady(generation)
                 } else {
                     _authState.value = TelegramAuthState.Initializing
                     scope.launch { verifyRecoveredAccount(generation, expected) }
@@ -232,6 +232,30 @@ internal class TdLibTelegramClient(
         }
     }
 
+    private fun markReady(generation: Int, knownUser: TdApi.User? = null) {
+        _authState.value = TelegramAuthState.Ready
+        val activeClient = client ?: return
+        val profileId = DeviceAccounts.activeId
+        scope.launch {
+            try {
+                val user = knownUser ?: sendVia(activeClient, TdApi.GetMe())
+                if (generation == clientGeneration && client === activeClient && authState.value == TelegramAuthState.Ready) {
+                    rememberAccountIdentity(profileId, user)
+                }
+            } catch (_: TelegramException) {
+                // The profile will be refreshed the next time its details are loaded.
+            }
+        }
+    }
+
+    private fun rememberAccountIdentity(profileId: String, user: TdApi.User) {
+        if (user.id <= 0L) return
+        val name = listOf(user.firstName, user.lastName).map(String::trim).filter(String::isNotEmpty).joinToString(" ")
+        val username = user.usernames?.editableUsername?.takeIf(String::isNotBlank)
+            ?: user.usernames?.activeUsernames?.firstOrNull()
+        DeviceAccounts(context).rememberIdentity(profileId, name, username)
+    }
+
     private suspend fun verifyRecoveredAccount(generation: Int, expected: Long) {
         if (generation != clientGeneration) return
         val active = client ?: return
@@ -240,7 +264,7 @@ internal class TdLibTelegramClient(
             if (generation != clientGeneration || client !== active) return
             if (user.id == expected) {
                 clearRecoveryAccount()
-                _authState.value = TelegramAuthState.Ready
+                markReady(generation, user)
                 return
             }
             // Never publish Ready for a different account, including after a restart.
@@ -419,7 +443,10 @@ internal class TdLibTelegramClient(
             parametersReady = false
             _authState.value = TelegramAuthState.Closed
         }
-        if (File(storagePaths.filesDir, "tdlib").deleteRecursively()) clearRecoveryAccount()
+        if (File(storagePaths.filesDir, "tdlib").deleteRecursively()) {
+            clearRecoveryAccount()
+            DeviceAccounts(context).rememberIdentity(DeviceAccounts.activeId, "", null)
+        }
         start(current)
     }
 
@@ -461,6 +488,7 @@ internal class TdLibTelegramClient(
             _authState.value = TelegramAuthState.Closed
         }
         if (File(storagePaths.filesDir, "tdlib").deleteRecursively()) clearRecoveryAccount()
+        DeviceAccounts(context).rememberIdentity(DeviceAccounts.activeId, "", null)
     }
 
     override suspend fun getLoginRecovery(): TelegramLoginRecovery? {
@@ -477,7 +505,10 @@ internal class TdLibTelegramClient(
     }
 
     override suspend fun getCurrentUser(): TelegramUser {
+        val generation = clientGeneration
+        val profileId = DeviceAccounts.activeId
         val user = send(TdApi.GetMe())
+        if (generation == clientGeneration && authState.value == TelegramAuthState.Ready) rememberAccountIdentity(profileId, user)
         return TelegramUser(
             id = user.id,
             firstName = user.firstName,

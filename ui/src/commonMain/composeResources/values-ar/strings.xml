@@ -198,4 +198,13 @@
     <string name="transfers_cancel_upload">إلغاء الرفع</string>
     <string name="transfers_cancel_upload_title">إلغاء الرفع؟</string>
     <string name="transfers_cancel_upload_message">أوقف عملية الرفع هذه وأزلها من قائمة الانتظار.</string>
+    <string name="onboarding_phone_title">رقم هاتفك</string>
+    <string name="onboarding_full_number">إدخال الرقم الدولي كاملاً</string>
+    <string name="onboarding_retry_countries">إعادة تحميل البلدان</string>
+    <string name="onboarding_loading_countries">جارٍ تحميل البلدان…</string>
+    <string name="onboarding_search_countries">البحث عن بلد</string>
+    <string name="onboarding_no_matching_countries">لا توجد بلدان مطابقة</string>
+    <string name="onboarding_resend_in">إعادة الإرسال متاحة خلال %1$d ث</string>
+    <string name="onboarding_verification_code_label">رمز التحقق</string>
+    <string name="onboarding_change_phone_number">تغيير رقم الهاتف</string>
 </resources>

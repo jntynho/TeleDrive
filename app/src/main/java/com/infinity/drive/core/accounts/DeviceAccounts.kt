@@ -17,53 +17,84 @@ import org.json.JSONObject
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
-internal data class DeviceAccount(val id: String, val label: String)
+internal data class DeviceAccount(val id: String, val label: String = "", val username: String? = null)
 
 internal class DeviceAccounts(context: Context) {
     private val store = context.getSharedPreferences("teledrive-device-accounts", Context.MODE_PRIVATE)
 
     fun profiles(): List<DeviceAccount> {
         val json = runCatching { JSONArray(store.getString("profiles", "[]")) }.getOrDefault(JSONArray())
-        return listOf(DeviceAccount(PRIMARY, "")) + (0 until json.length()).mapNotNull { index ->
+        val saved = (0 until json.length()).mapNotNull { index ->
             val item = json.optJSONObject(index) ?: return@mapNotNull null
             val id = item.optString("id")
-            val label = item.optString("label")
-            if (idPattern.matches(id) && label.isNotBlank()) DeviceAccount(id, label) else null
+            if (id != PRIMARY && !idPattern.matches(id)) return@mapNotNull null
+            DeviceAccount(id, item.optString("label"), item.optString("username").takeIf(String::isNotBlank))
         }.distinctBy(DeviceAccount::id)
+        return listOf(saved.firstOrNull { it.id == PRIMARY } ?: DeviceAccount(PRIMARY)) + saved.filter { it.id != PRIMARY }
     }
 
     fun selected(): String = store.getString("active", PRIMARY)
         ?.takeIf { id -> profiles().any { it.id == id } } ?: PRIMARY
 
-    fun create(label: String): DeviceAccount {
-        require(label.isNotBlank() && label.length <= 40)
-        val profiles = profiles()
-        check(profiles.size < 5)
-        val added = DeviceAccount(UUID.randomUUID().toString(), label)
-        val saved = JSONArray()
-        (profiles.drop(1) + added).forEach { profile ->
-            saved.put(JSONObject().put("id", profile.id).put("label", profile.label))
+    fun rememberIdentity(id: String, name: String, username: String?) = synchronized(profileLock) {
+        val items = profiles()
+        val previous = items.firstOrNull { it.id == id } ?: return@synchronized
+        val updated = previous.copy(label = name.trim(), username = username?.trim()?.takeIf(String::isNotBlank))
+        if (updated != previous) {
+            store.edit().putString("profiles", encode(items.map { if (it.id == id) updated else it })).apply()
         }
-        check(store.edit().putString("profiles", saved.toString()).commit())
-        return added
+    }
+
+    suspend fun addAndActivate(activity: Activity) {
+        val items = profiles()
+        val unfinished = items.firstOrNull {
+            it.id != PRIMARY && it.id != activeId && it.label.isBlank() && it.username == null
+        }
+        if (unfinished != null) {
+            activate(activity, unfinished.id)
+        } else {
+            check(items.size < MAX_PROFILES)
+            val newAccount = DeviceAccount(UUID.randomUUID().toString())
+            switch(activity, newAccount.id, newAccount)
+        }
     }
 
     suspend fun activate(activity: Activity, next: String) {
-        require(profiles().any { it.id == next } && next != activeId)
+        require(profiles().any { it.id == next })
+        switch(activity, next)
+    }
+
+    private suspend fun switch(activity: Activity, next: String, newAccount: DeviceAccount? = null) {
+        require(next != activeId)
         withContext(Dispatchers.IO) {
-            // Existing jobs are tied to the currently open database. Recovery resumes its queue
-            // when this profile is selected again, and no job migrates to another identity.
+            // Existing jobs remain associated with this profile's database.
             WorkManager.getInstance(activity).cancelAllWork().result.get(10, TimeUnit.SECONDS)
             activity.getSystemService(NotificationManager::class.java)?.cancelAll()
-            check(store.edit().putString("active", next).commit())
+            synchronized(profileLock) {
+                val editor = store.edit().putString("active", next)
+                if (newAccount != null) {
+                    val items = profiles()
+                    check(items.size < MAX_PROFILES)
+                    editor.putString("profiles", encode(items + newAccount))
+                }
+                check(editor.commit())
+            }
         }
         activity.startActivity(Intent(activity, AccountSwitchActivity::class.java)
             .putExtra(AccountSwitchActivity.PROCESS, Process.myPid())
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
     }
 
+    private fun encode(accounts: List<DeviceAccount>): String = JSONArray().apply {
+        accounts.forEach { profile ->
+            put(JSONObject().put("id", profile.id).put("label", profile.label).put("username", profile.username))
+        }
+    }.toString()
+
     companion object {
         const val PRIMARY = "primary"
+        const val MAX_PROFILES = 5
+        private val profileLock = Any()
         private val idPattern = Regex("[0-9a-f-]{36}")
 
         @Volatile var activeId: String = PRIMARY

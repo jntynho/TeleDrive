@@ -183,6 +183,32 @@ class DashboardStylesUiTest {
         assertTrue(darkStyles.isEmpty())
         capture("dashboard-style-carousel")
     }
+    @Test @Config(qualifiers = "w320dp-h840dp-xhdpi")
+    @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+    fun selectorLetsTheSheetGrowForLongerDescriptions() {
+        show {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 1.6f)) {
+                com.infinity.drive.presentation.components.DriveBottomSheet(onDismissRequest = {}) {
+                    DashboardStyleSelector(
+                        LibraryOverview(12, 2048, listOf(1024, 1024, 0, 0)),
+                        "Updated just now", DashboardStyle.CLASSIC, emptySet()
+                    ) { _, _ -> }
+                }
+            }
+        }
+
+        val carousel = compose.onNodeWithTag("dashboard-style-carousel")
+        val classicHeight = carousel.fetchSemanticsNode().size.height
+        repeat(DashboardStyle.SPECTRUM.ordinal) {
+            compose.onNodeWithContentDescription("Next dashboard style").performClick()
+        }
+        compose.onNodeWithText(DashboardStyle.SPECTRUM.description).assertIsDisplayed()
+        val spectrumHeight = carousel.fetchSemanticsNode().size.height
+        assertTrue("Longer descriptions should grow the preview", spectrumHeight > classicHeight)
+        compose.onNodeWithTag("apply-dashboard-SPECTRUM").performScrollTo().assertIsDisplayed()
+    }
+
     @Test @Config(qualifiers="w320dp-h1200dp-xhdpi")
     fun largeTextPreservesEqualFramesAndReadableTotalsForEveryStyle(){
         var style by mutableStateOf(DashboardStyle.CLASSIC)

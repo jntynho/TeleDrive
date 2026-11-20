@@ -192,7 +192,7 @@ fun SettingsSectionScreen(
     if (section == SettingsSectionType.APPEARANCE && customTheme != null) {
         CustomThemeEditorScreen(
             preferences = state.preferences,
-            themeId = customTheme.takeIf(String::isNotEmpty),
+            themeId = customTheme,
             onBack = { customThemePage = null },
             onSave = { theme ->
                 viewModel.update { it.saveCustomTheme(theme) }
@@ -274,7 +274,7 @@ fun SettingsSectionScreen(
                 SettingsSectionType.APPEARANCE -> androidx.compose.animation.Crossfade(navigationOptions,animationSpec=androidx.compose.animation.core.tween(240),label="navigationPreferencesPage"){open->
                     if (open) NavigationBarSection(state, viewModel)
                     else AppearanceSection(state, viewModel, onDashboardStyles,
-                        onNavigation = { navigationOptions = true }, onCustomTheme = { customThemePage = it.orEmpty() })
+                        onNavigation = { navigationOptions = true }, onCustomTheme = { customThemePage = it })
                 }
                 SettingsSectionType.PLAYBACK -> PlaybackSection(state, viewModel)
                 SettingsSectionType.NOTIFICATIONS -> NotificationsSection(state, viewModel)
@@ -932,7 +932,7 @@ private fun AppearanceSection(
     viewModel: SettingsViewModel,
     onDashboardStyles: () -> Unit,
     onNavigation: () -> Unit,
-    onCustomTheme: (String?) -> Unit
+    onCustomTheme: (String) -> Unit
 ) {
     val prefs = state.preferences
     var showThemeDialog by remember { mutableStateOf(false) }
@@ -986,8 +986,7 @@ private fun AppearanceSection(
                 onSelect = { colour -> viewModel.update { it.selectAccentColour(colour) } },
                 onSelectCustom = { id -> viewModel.update { it.selectCustomTheme(id) } },
                 onEditCustom = onCustomTheme,
-                onDeleteCustom = { id -> viewModel.update { it.deleteCustomTheme(id) } },
-                onAddCustom = { onCustomTheme(null) }
+                onDeleteCustom = { id -> viewModel.update { it.deleteCustomTheme(id) } }
             )
         }
         add {

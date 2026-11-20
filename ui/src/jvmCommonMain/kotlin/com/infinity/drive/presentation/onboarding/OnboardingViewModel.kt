@@ -25,6 +25,9 @@ import com.infinity.drive.resources.onboarding_api_id_number
 import com.infinity.drive.resources.onboarding_enter_phone
 import com.infinity.drive.resources.onboarding_no_account
 import com.infinity.drive.resources.recovery_import_configure
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -47,6 +50,10 @@ class OnboardingViewModel(
 ) : ViewModel() {
 
     private var submittingRecovery = false
+    private var resettingPhone = false
+    private var signInAction: Job? = null
+    private var resendCountdown: Job? = null
+    private var countryRequest: Job? = null
     val inputDrafts=com.infinity.drive.presentation.input.InlineDrafts()
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
@@ -59,13 +66,18 @@ class OnboardingViewModel(
 
     private fun onAuthStateChanged(state: TelegramAuthState) {
         if (state == TelegramAuthState.Ready && submittingRecovery) return
-        if(state is TelegramAuthState.Ready)inputDrafts.clear()
+        if (state is TelegramAuthState.Ready) inputDrafts.clear()
+        resendCountdown?.cancel()
         _uiState.update { current ->
             when (state) {
                 /* Falling back here from a QR wait means the token died, so the
                    cached link is dropped and a fresh one can be asked for. */
                 is TelegramAuthState.WaitingForPhoneNumber -> when {
                     submittingRecovery -> current
+                    resettingPhone -> current.copy(
+                        step = OnboardingStep.PHONE, working = false, error = null,
+                        qrMode = false, qrLink = null, registrationRequired = false, resendSeconds = 0
+                    )
                     current.step in listOf(OnboardingStep.API_CREDENTIALS, OnboardingStep.PHONE) && current.working ->
                         current.copy(step = OnboardingStep.PHONE, working = false, error = null)
 
@@ -79,12 +91,16 @@ class OnboardingViewModel(
                     error = null,
                     codePhoneNumber = state.phoneNumber,
                     codeChannel = state.channel,
-                    codeLength = state.codeLength
+                    codeLength = state.codeLength,
+                    resendSeconds = state.resendTimeoutSeconds.coerceAtLeast(0)
                 )
                 /* Signing in by QR is a different face of the phone step, not
                    a step of its own, so this only carries the link across. */
                 is TelegramAuthState.WaitingForQrScan -> current.copy(
+                    step = OnboardingStep.PHONE,
                     working = false,
+                    error = null,
+                    qrMode = true,
                     qrLink = state.link
                 )
 
@@ -111,7 +127,10 @@ class OnboardingViewModel(
                 )
 
                 is TelegramAuthState.RegistrationRequired -> current.copy(
+                    step = OnboardingStep.PHONE,
                     working = false,
+                    qrMode = false,
+                    qrLink = null,
                     registrationRequired = true,
                     error = UiText.Resource(Res.string.onboarding_no_account)
                 )
@@ -146,6 +165,14 @@ class OnboardingViewModel(
                     } else current
 
                 else -> current
+            }
+        }
+        if (state is TelegramAuthState.WaitingForCode) {
+            resendCountdown = viewModelScope.launch {
+                repeat(state.resendTimeoutSeconds.coerceAtLeast(0)) {
+                    delay(1000)
+                    _uiState.update { current -> current.copy(resendSeconds = (current.resendSeconds - 1).coerceAtLeast(0)) }
+                }
             }
         }
     }
@@ -191,9 +218,9 @@ class OnboardingViewModel(
      * anything that stops this call will stop the login too.
      */
     fun loadCountries() {
-        if (_uiState.value.countries.isNotEmpty()) return
+        if (_uiState.value.countries.isNotEmpty() || countryRequest?.isActive == true) return
         _uiState.update { it.copy(countryLoadState = CountryLoadState.LOADING) }
-        viewModelScope.launch {
+        countryRequest = viewModelScope.launch {
             val fetched = withTimeoutOrNull(COUNTRY_LOAD_TIMEOUT_MS.milliseconds) {
                 telegramAuthRepository.countries()
             }
@@ -291,12 +318,13 @@ class OnboardingViewModel(
     }
 
     fun submitPhone(phone: String) {
-        if (phone.isBlank()) {
+        val normalized = signInPhoneNumber(phone, "")
+        if (normalized == null) {
             _uiState.update { it.copy(error = UiText.Resource(Res.string.onboarding_enter_phone)) }
             return
         }
         _uiState.update { it.copy(qrLink = null, qrMode = false) }
-        runAction { telegramAuthRepository.submitPhoneNumber(phone.trim()) }
+        runAction { telegramAuthRepository.submitPhoneNumber(normalized) }
     }
 
     /** Telegram keeps the link fresh by re-emitting the state, so one call is enough. */
@@ -305,6 +333,7 @@ class OnboardingViewModel(
      * there is an error, so a link already in hand just reopens the page.
      */
     fun startQrLogin() {
+        if (_uiState.value.working) return
         _uiState.update { it.copy(qrMode = true, error = null) }
         if (_uiState.value.qrLink != null) return
         runAction { telegramAuthRepository.requestQrCodeAuthentication() }
@@ -315,9 +344,35 @@ class OnboardingViewModel(
      * for another device to confirm, so the session is restarted to land back
      * on the phone step. The link is dropped with it.
      */
-    fun cancelQrLogin() {
-        _uiState.update { it.copy(qrMode = false, qrLink = null, error = null) }
-        viewModelScope.launch { telegramAuthRepository.restartAuthentication() }
+    fun cancelQrLogin() = restartPhoneSignIn()
+
+    fun restartPhoneSignIn() {
+        if (_uiState.value.working || signInAction?.isActive == true) return
+        resettingPhone = true
+        runAction {
+            try {
+                val result = telegramAuthRepository.restartAuthentication()
+                if (result is AppResult.Failure) result
+                else {
+                    val phone = withTimeoutOrNull(15_000) {
+                        telegramAuthRepository.authState.first {
+                            it == TelegramAuthState.WaitingForPhoneNumber || it is TelegramAuthState.Failed
+                        }
+                    }
+                    when (phone) {
+                        TelegramAuthState.WaitingForPhoneNumber -> {
+                            onAuthStateChanged(phone)
+                            inputDrafts.clear()
+                            AppResult.Success(Unit)
+                        }
+                        is TelegramAuthState.Failed -> AppResult.Failure(AppError.AuthenticationFailed(phone.message))
+                        else -> AppResult.Failure(AppError.Timeout())
+                    }
+                }
+            } finally {
+                resettingPhone = false
+            }
+        }
     }
 
     fun setSignInTheme(dark: Boolean) {
@@ -330,14 +385,13 @@ class OnboardingViewModel(
     fun backFromSignIn() {
         val current=_uiState.value
         if(current.working)return
-        if(current.qrMode){cancelQrLogin();return}
+        if(current.qrMode||current.registrationRequired){restartPhoneSignIn();return}
         if(current.step==OnboardingStep.PHONE||current.step==OnboardingStep.API_CREDENTIALS){
             _uiState.update{it.copy(step=OnboardingStep.WELCOME,error=null)}
             return
         }
         if(current.step !in setOf(OnboardingStep.CODE,OnboardingStep.PASSWORD,OnboardingStep.EMAIL_ADDRESS,OnboardingStep.EMAIL_CODE))return
-        _uiState.update{it.copy(step=OnboardingStep.PHONE,working=true,error=null,qrMode=false,qrLink=null)}
-        runAction{telegramAuthRepository.restartAuthentication()}
+        restartPhoneSignIn()
     }
 
     fun submitEmailAddress(email: String) {
@@ -361,7 +415,8 @@ class OnboardingViewModel(
     }
 
     fun resendCode() {
-        runAction { telegramAuthRepository.resendCode() }
+        if (_uiState.value.resendSeconds > 0 || _uiState.value.working) return
+        runAction(waitForTransition = false) { telegramAuthRepository.resendCode() }
     }
 
     /**
@@ -476,14 +531,30 @@ class OnboardingViewModel(
         }
     }
 
-    private fun runAction(block: suspend () -> AppResult<*>) {
+    private fun runAction(waitForTransition: Boolean = true, block: suspend () -> AppResult<*>) {
+        if (signInAction?.isActive == true) return
         _uiState.update { it.copy(working = true, error = null) }
-        viewModelScope.launch {
-            when (val result = block()) {
-                is AppResult.Success -> Unit
-                is AppResult.Failure -> _uiState.update {
-                    it.copy(working = false, error = result.error.toUiText())
+        signInAction = viewModelScope.launch {
+            try {
+                when (val result = block()) {
+                    is AppResult.Failure -> _uiState.update { it.copy(working = false, error = result.error.toUiText()) }
+                    is AppResult.Success -> {
+                        if (!waitForTransition) {
+                            _uiState.update { it.copy(working = false) }
+                        } else if (_uiState.value.working && telegramAuthRepository.authState.value != TelegramAuthState.Ready) {
+                            val moved = withTimeoutOrNull(15_000) {
+                                uiState.first { !it.working }
+                            }
+                            if (moved == null && telegramAuthRepository.authState.value != TelegramAuthState.Ready) {
+                                _uiState.update { it.copy(working = false, error = AppError.Timeout().toUiText()) }
+                            }
+                        }
+                    }
                 }
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (_: Exception) {
+                _uiState.update { it.copy(working = false, error = AppError.Unknown().toUiText()) }
             }
         }
     }

@@ -26,7 +26,8 @@ interface PlatformScreens {
         compact: Boolean = false,
         profileName: String? = null,
         username: String? = null,
-        photoPath: String? = null
+        photoPath: String? = null,
+        enabled: Boolean = true
     ) = Unit
 
     @Composable

@@ -31,8 +31,9 @@ object AndroidPlatformScreens : PlatformScreens {
         compact: Boolean,
         profileName: String?,
         username: String?,
-        photoPath: String?
-    ) = com.infinity.drive.presentation.platform.AccountProfilesSetting(compact, profileName, username, photoPath)
+        photoPath: String?,
+        enabled: Boolean
+    ) = com.infinity.drive.presentation.platform.AccountProfilesSetting(compact, profileName, username, photoPath, enabled)
 
     @Composable
     override fun FolderSyncSetting() = com.infinity.drive.presentation.sync.FolderSyncSetting()

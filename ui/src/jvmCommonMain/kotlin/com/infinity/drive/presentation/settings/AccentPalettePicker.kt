@@ -3,7 +3,6 @@ package com.infinity.drive.presentation.settings
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -36,14 +34,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import app.tgdrive.ui.DriveIcons
@@ -71,8 +65,7 @@ internal fun AccentColourPicker(
     onSelect: (AccentColour) -> Unit,
     onSelectCustom: (String) -> Unit,
     onEditCustom: (String) -> Unit,
-    onDeleteCustom: (String) -> Unit,
-    onAddCustom: () -> Unit
+    onDeleteCustom: (String) -> Unit
 ) {
     val dark = when (preferences.theme) {
         AppTheme.LIGHT -> false
@@ -160,29 +153,7 @@ internal fun AccentColourPicker(
                     onSelect = { onSelectCustom(theme.id) }
                 )
             }
-            Column(
-                Modifier.width(accentCellWidth).clip(MaterialTheme.shapes.small)
-                    .clickable(role = Role.Button, onClick = onAddCustom)
-                    .semantics { contentDescription = "Add Custom" }
-                    .padding(vertical = 6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                    Canvas(Modifier.size(42.dp)) {
-                        drawCircle(
-                            color = colors.outline,
-                            radius = (size.minDimension - 2.dp.toPx()) / 2,
-                            style = Stroke(1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(5f, 4f)))
-                        )
-                    }
-                    Icon(DriveIcons.Add, null, Modifier.size(21.dp), tint = colors.onSurface)
-                }
-                Text(
-                    "Add Custom", Modifier.clearAndSetSemantics {},
-                    style = MaterialTheme.typography.labelSmall,
-                    textAlign = TextAlign.Center
-                )
-            }
+
         }
     }
 

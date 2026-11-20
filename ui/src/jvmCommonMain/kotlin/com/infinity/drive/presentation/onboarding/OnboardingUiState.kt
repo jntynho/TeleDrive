@@ -13,6 +13,7 @@ data class OnboardingUiState(
     val codePhoneNumber: String = "",
     val codeChannel: CodeDeliveryChannel = CodeDeliveryChannel.TELEGRAM_APP,
     val codeLength: Int? = null,
+    val resendSeconds: Int = 0,
     val passwordHint: String? = null,
     val registrationRequired: Boolean = false,
     val qrLink: String? = null,
