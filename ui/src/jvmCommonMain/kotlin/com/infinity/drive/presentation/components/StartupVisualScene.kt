@@ -32,7 +32,7 @@ fun StartupVisualScene(page:Int,library:Boolean,glass:Boolean=false){
                     else->{
                         app.tgdrive.ui.ExpandableLibraryHeader("Settings","",{},true,{},"Search settings",requestSearchFocus=false)
                         Surface(shape=RoundedCornerShape(topStart=28.dp,topEnd=28.dp),color=MaterialTheme.colorScheme.surfaceContainerLow){
-                            Column{SheetActionRow("Download",DriveIcons.Download){};SheetActionRow("Send in Telegram",DriveIcons.Share){};SheetActionRow("Details",DriveIcons.Info){}}
+                            Column{SheetActionRow("Download",DriveIcons.Download){};SheetActionRow("Send in Telegram",DriveIcons.Telegram){};SheetActionRow("Details",DriveIcons.Info){}}
                         }
                     }
                 }

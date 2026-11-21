@@ -179,7 +179,7 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Bo
                     SheetActionRow("Download",DriveIcons.Download,enabled=!working&&(current.hasRemoteCopy||current.hasLocalCopy)){
                         run(false){requireSuccess(transfers.enqueueSaveToPhone(current.id));message="Saving to Downloads. You can follow its progress in Activity."}
                     }
-                    SheetActionRow("Send in Telegram",DriveIcons.Share,enabled=!working){
+                    SheetActionRow("Send in Telegram",DriveIcons.Telegram,enabled=!working){
                         run(false){page=if(telegramActions.needsOriginal(current))"send-original"else"send"}
                     }
                     SheetActionRow("Share",DriveIcons.Share,enabled=!working){run{val path=obtain();sharer.share(listOf(path),current.mimeType,"Share ${current.name}")}}

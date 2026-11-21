@@ -214,7 +214,7 @@ fun NotesScreen(
                                 }
                             }
                         },
-                        leadingContent = { Icon(DriveIcons.EditNote, null) },
+                        leadingContent = { Icon(DriveIcons.Notes, null) },
                         trailingContent = {
                             Row {
                                 if (note.backupState in setOf(BackupState.NONE, BackupState.FAILED)) {

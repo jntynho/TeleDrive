@@ -74,6 +74,26 @@ class IconsaxIconsTest {
         }
     }
 
+    @Test fun notesAndShareActionsUseDistinctGlyphsInBothStyles() {
+        val style = mutableStateOf(IconStyle.Outline)
+        var rendered = emptyList<ImageVector>()
+        compose.setContent {
+            CompositionLocalProvider(LocalIconStyle provides style.value) {
+                val vectors = listOf(DriveIcons.Notes, DriveIcons.Share, DriveIcons.Telegram)
+                SideEffect { rendered = vectors }
+            }
+        }
+        IconStyle.entries.forEach { choice ->
+            compose.runOnIdle { style.value = choice }
+            compose.runOnIdle {
+                val variant = choice.name.lowercase()
+                assertEquals(listOf("iconsax:$variant/note-text", "iconsax:$variant/export", "teledrive:$variant/telegram"),
+                    rendered.map { it.name })
+                assertEquals(3, rendered.map { it.root }.toSet().size)
+            }
+        }
+    }
+
     private fun checkVectors(vectors: List<ImageVector>, style: String) {
         assertEquals(listOf("home-2", "sun", "moon").map { "iconsax:$style/$it" }, vectors.map { it.name })
         vectors.forEach { icon ->

@@ -115,8 +115,9 @@ class SettingsRepositoryImpl(
             selectedCustomThemeId = this[PreferenceKeys.SELECTED_CUSTOM_THEME],
             iconStyle = enumOrDefault(this[PreferenceKeys.ICON_STYLE], defaults.iconStyle),
             dashboardStyle = DashboardStyle.fromStored(this[PreferenceKeys.DASHBOARD_STYLE]),
-            dashboardDarkStyles = (this[PreferenceKeys.DASHBOARD_DARK_STYLES] ?: defaults.dashboardDarkStyles)
-                .filterTo(mutableSetOf()){name->DashboardStyle.entries.any{it.name==name}},
+            dashboardDarkStyles = DashboardStyle.storedStyleNames(
+                this[PreferenceKeys.DASHBOARD_DARK_STYLES] ?: defaults.dashboardDarkStyles
+            ),
             backupMaxFileSizeMb = maximum,
             maxCacheSizeMb = this[PreferenceKeys.MAX_CACHE_SIZE_MB] ?: defaults.maxCacheSizeMb,
             trashAutoClearDays = this[PreferenceKeys.TRASH_AUTO_CLEAR_DAYS]
@@ -220,8 +221,7 @@ class SettingsRepositoryImpl(
             ?: remove(PreferenceKeys.SELECTED_CUSTOM_THEME)
         this[PreferenceKeys.ICON_STYLE] = prefs.iconStyle.name
         this[PreferenceKeys.DASHBOARD_STYLE] = prefs.dashboardStyle.name
-        this[PreferenceKeys.DASHBOARD_DARK_STYLES] = prefs.dashboardDarkStyles
-            .filterTo(mutableSetOf()){name->DashboardStyle.entries.any{it.name==name}}
+        this[PreferenceKeys.DASHBOARD_DARK_STYLES] = DashboardStyle.storedStyleNames(prefs.dashboardDarkStyles)
         this[PreferenceKeys.BACKUP_MAX_FILE_SIZE_MB] = prefs.backupMaxFileSizeMb
         this[PreferenceKeys.MAX_CACHE_SIZE_MB] = prefs.maxCacheSizeMb
         this[PreferenceKeys.TRASH_AUTO_CLEAR_DAYS] = prefs.trashAutoClearDays

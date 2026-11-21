@@ -82,22 +82,30 @@ enum class AppIconStyle(val label: String) {
     OUTLINE("Outline"),
     BROKEN("Broken")
 }
-enum class DashboardStyle(val label:String,val description:String) {
-    CLASSIC("Classic","Warm paper and a simple storage summary"),
-    ORBIT("Orbit","A balanced ring with your library at its centre"),
-    MOSAIC("Mosaic","A clear breakdown of photos, videos, audio and files"),
-    RIBBON("Ribbon","A flowing storage ribbon and compact totals"),
-    HORIZON("Horizon", "Your cloud library against a layered skyline"),
-    STRATA("Strata", "A refined summary with softly layered file categories"),
-    SPECTRUM("Spectrum", "A bar chart compares storage used by each media category"),
-    LEDGER("Ledger", "Telegram storage and storage on this device, side by side"),
-    BEACON("Beacon", "A bold storage total with a warm geometric accent");
+enum class DashboardStyle(val label: String, val description: String) {
+    CLASSIC("Classic", "A warm storage summary"),
+    ORBIT("Orbit", "Storage in a ring"),
+    BLOOM("Bloom", "File sizes by category"),
+    RIBBON("Ribbon", "A ribbon of file types"),
+    MIST("Mist", "A soft cloud summary"),
+    STRATA("Strata", "File types in layers"),
+    TIDE("Tide", "Storage share by type"),
+    COVE("Cove", "Cloud and device storage"),
+    BEACON("Beacon", "A warm storage total");
 
     companion object {
-        fun fromStored(value:String?):DashboardStyle=when(value){
-            "AURORA"->HORIZON
-            "COMPACT"->STRATA
-            else->entries.firstOrNull{it.name==value}?:CLASSIC
+        fun fromStored(value: String?): DashboardStyle = storedStyle(value) ?: CLASSIC
+
+        fun storedStyleNames(values: Set<String>): Set<String> =
+            values.mapNotNullTo(mutableSetOf()) { storedStyle(it)?.name }
+
+        private fun storedStyle(value: String?): DashboardStyle? = when (value) {
+            "MOSAIC" -> BLOOM
+            "AURORA", "HORIZON" -> MIST
+            "SPECTRUM" -> TIDE
+            "LEDGER" -> COVE
+            "COMPACT" -> STRATA
+            else -> entries.firstOrNull { it.name == value }
         }
     }
 }

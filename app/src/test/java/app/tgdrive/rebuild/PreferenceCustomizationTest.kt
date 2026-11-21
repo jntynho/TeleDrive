@@ -51,13 +51,15 @@ class PreferenceCustomizationTest {
     @Test fun replacedDashboardStylesMigrateWithoutResettingOtherPreferences()=runBlocking{
         val store=Store();val repository=SettingsRepositoryImpl(store,cipher)
         repository.update{it.copy(accentColour=AccentColour.TEAL)}
-        listOf("AURORA" to DashboardStyle.HORIZON,"COMPACT" to DashboardStyle.STRATA).forEach{(old,new)->
-            store.edit{it[PreferenceKeys.DASHBOARD_STYLE]=old}
-            assertEquals(new,repository.preferences.first().dashboardStyle)
-            assertEquals(AccentColour.TEAL,repository.preferences.first().accentColour)
+        val replacements = mapOf("MOSAIC" to "BLOOM", "HORIZON" to "MIST", "SPECTRUM" to "TIDE",
+            "LEDGER" to "COVE", "AURORA" to "MIST", "COMPACT" to "STRATA")
+        replacements.forEach { (old, new) ->
+            store.edit { it[PreferenceKeys.DASHBOARD_STYLE] = old }
+            assertEquals(new, repository.preferences.first().dashboardStyle.name)
+            assertEquals(AccentColour.TEAL, repository.preferences.first().accentColour)
         }
-        store.edit{it[PreferenceKeys.DASHBOARD_DARK_STYLES]=setOf("STRATA","unknown-style")}
-        assertEquals(setOf("STRATA"),repository.preferences.first().dashboardDarkStyles)
+        store.edit { it[PreferenceKeys.DASHBOARD_DARK_STYLES] = replacements.keys + "unknown-style" }
+        assertEquals(replacements.values.toSet(), repository.preferences.first().dashboardDarkStyles)
     }
 
     @Test fun customThemesPreserveBothPalettesAndTheFallbackAcrossRepositoryRecreation() = runBlocking {

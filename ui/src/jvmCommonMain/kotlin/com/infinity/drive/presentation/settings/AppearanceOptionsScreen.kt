@@ -1,6 +1,5 @@
 package com.infinity.drive.presentation.settings
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
@@ -18,6 +17,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -116,6 +116,12 @@ fun DashboardStyleSelector(
     val pager = rememberPagerState(initialPage = selectedStyle.ordinal) { styles.size }
     val scope = rememberCoroutineScope()
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    var previewTones by rememberSaveable(darkStyles) { mutableStateOf(hashMapOf<String, Boolean>()) }
+    val page = pager.settledPage
+    val active = styles[page]
+    val appliedTone = active.name in darkStyles
+    val activeTone = previewTones[active.name] ?: appliedTone
+    val applied = selectedStyle == active && activeTone == appliedTone
 
     Column(
         modifier.widthIn(max = 520.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -126,23 +132,23 @@ fun DashboardStyleSelector(
         }
         HorizontalPager(
             state = pager,
-            modifier = Modifier.fillMaxWidth()
-                .animateContentSize(tween(220, easing = FastOutSlowInEasing), alignment = Alignment.TopStart)
-                .testTag("dashboard-style-carousel"),
+            modifier = Modifier.fillMaxWidth().testTag("dashboard-style-carousel"),
             pageSpacing = 12.dp,
             key = { styles[it].name }
         ) { index ->
             val style = styles[index]
-            val savedDark = style.name in darkStyles
-            var dark by rememberSaveable(savedDark) { mutableStateOf(savedDark) }
-            val applied = selectedStyle == style && dark == savedDark
+            val dark = previewTones[style.name] ?: (style.name in darkStyles)
             Column(
                 Modifier.fillMaxWidth().testTag("dashboard-option-${style.name}"),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(style.label, style = MaterialTheme.typography.titleLarge)
-                    Text(style.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(style.label, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        style.description, style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, minLines = 1, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
                 LibraryDashboard(
                     usage, {}, showAddAction = false, updatedLabel = updatedLabel, style = style.name, dark = dark,
@@ -150,7 +156,7 @@ fun DashboardStyleSelector(
                         val ink = LocalContentColor.current
                         IconToggleButton(
                             checked = dark,
-                            onCheckedChange = { dark = it },
+                            onCheckedChange = { previewTones = HashMap(previewTones).apply { put(style.name, it) } },
                             modifier = Modifier.testTag("dashboard-tone-${style.name}").semantics { contentDescription = "Dark preview" },
                             colors = IconButtonDefaults.iconToggleButtonColors(
                                 containerColor = ink.copy(alpha = .09f), contentColor = ink,
@@ -161,24 +167,24 @@ fun DashboardStyleSelector(
                         }
                     }
                 )
-                Button(
-                    onClick = { onApply(style, dark) },
-                    enabled = !applied,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("apply-dashboard-${style.name}")
-                        .semantics { selected = applied; contentDescription = "Use ${style.label} dashboard" }
-                ) {
-                    if (applied) {
-                        Icon(DriveIcons.Check, null, Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    Text(if (applied) "Applied" else "Use this style")
-                }
             }
         }
-        val page = pager.settledPage
+        Button(
+            onClick = { onApply(active, activeTone) },
+            enabled = !applied && !pager.isScrollInProgress,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("apply-dashboard-${active.name}")
+                .semantics { selected = applied; contentDescription = "Use ${active.label} dashboard" }
+        ) {
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                if (applied) {
+                    Icon(DriveIcons.Check, null, Modifier.align(Alignment.CenterStart).size(20.dp))
+                }
+                Text(if (applied) "Applied" else "Use this style", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             FilledTonalIconButton(
-                onClick = { scope.launch { pager.animateScrollToPage(page - 1) } },
+                onClick = { scope.launch { pager.animateScrollToPage(page - 1, animationSpec = tween(240, easing = FastOutSlowInEasing)) } },
                 enabled = page > 0 && !pager.isScrollInProgress
             ) {
                 Icon(if (rtl) DriveIcons.ChevronRight else DriveIcons.ChevronLeft, "Previous dashboard style")
@@ -189,7 +195,7 @@ fun DashboardStyleSelector(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             FilledTonalIconButton(
-                onClick = { scope.launch { pager.animateScrollToPage(page + 1) } },
+                onClick = { scope.launch { pager.animateScrollToPage(page + 1, animationSpec = tween(240, easing = FastOutSlowInEasing)) } },
                 enabled = page < styles.lastIndex && !pager.isScrollInProgress
             ) {
                 Icon(if (rtl) DriveIcons.ChevronLeft else DriveIcons.ChevronRight, "Next dashboard style")

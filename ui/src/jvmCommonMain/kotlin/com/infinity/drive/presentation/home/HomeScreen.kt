@@ -196,7 +196,7 @@ fun HomeScreen(
                 Spacer(Modifier.height(20.dp))
                 app.tgdrive.ui.LibraryBrowse(listOf(
                     app.tgdrive.ui.LibraryShortcut("All files", DriveIcons.Folder, onOpenFiles),
-                    app.tgdrive.ui.LibraryShortcut("Note", DriveIcons.EditNote, onOpenNotes),
+                    app.tgdrive.ui.LibraryShortcut("Note", DriveIcons.Notes, onOpenNotes),
                     app.tgdrive.ui.LibraryShortcut("Favorites", DriveIcons.Star) { onOpenCollection(CollectionType.FAVORITES) },
                     app.tgdrive.ui.LibraryShortcut("Archived", app.tgdrive.ui.LibraryIcons.Archive) { onOpenCollection(CollectionType.ARCHIVED) },
                     app.tgdrive.ui.LibraryShortcut("Hidden", app.tgdrive.ui.LibraryIcons.Hidden) { onOpenCollection(CollectionType.HIDDEN) },

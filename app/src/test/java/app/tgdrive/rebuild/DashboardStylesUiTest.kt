@@ -50,7 +50,7 @@ class DashboardStylesUiTest {
         file.outputStream().use{compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG,100,it)}
     }
     @Test @OptIn(ExperimentalLayoutApi::class)
-    fun allStylesMatchTheOriginalClassicBeforeTheHeightIncrease(){
+    fun allStylesShareAFrameThatFitsTheOriginalClassic(){
         var scale by mutableStateOf(1f)
         var choice by mutableStateOf(DashboardStyle.CLASSIC)
         show{
@@ -81,10 +81,13 @@ class DashboardStylesUiTest {
         listOf(1f,2f).forEach{fontScale->
             compose.runOnIdle{scale=fontScale}
             val reference=compose.onNodeWithTag("original-classic").fetchSemanticsNode().size.height
+            compose.runOnIdle { choice = DashboardStyle.CLASSIC }
+            val sharedHeight = compose.onNodeWithTag("library-card").fetchSemanticsNode().size.height
+            assertTrue("Shared height fits the original card", sharedHeight >= reference)
             DashboardStyle.entries.forEach{style->
                 compose.runOnIdle{choice=style}
                 val height=compose.onNodeWithTag("library-card").fetchSemanticsNode().size.height
-                assertEquals("Original height for $style at font scale $fontScale",reference,height)
+                assertEquals("Shared height for $style at font scale $fontScale",sharedHeight,height)
             }
         }
     }
@@ -99,16 +102,20 @@ class DashboardStylesUiTest {
             compose.runOnIdle{style=choice}
             compose.onNodeWithText("24.8 GB",substring=false).assertIsDisplayed()
             compose.onNodeWithText("1284 files",substring=false).assertIsDisplayed()
-            compose.onNodeWithText("%",substring=true).assertDoesNotExist()
+            if (choice == DashboardStyle.TIDE) {
+                listOf("35%", "43%", "12%", "10%").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
+            } else {
+                compose.onNodeWithText("%",substring=true).assertDoesNotExist()
+            }
             capture("dashboard-${choice.name.lowercase()}")
         }
     }
-    @Test fun mosaicPairsAllFourMediaCategoriesWithTheirSizes() {
+    @Test fun bloomPairsAllFourMediaCategoriesWithTheirSizes() {
         show {
             Column(Modifier.padding(16.dp)) {
                 LibraryDashboard(
                     LibraryOverview(4, 10_485_760, listOf(1_048_576, 2_097_152, 3_145_728, 4_194_304)),
-                    {}, showAddAction = false, style = DashboardStyle.MOSAIC.name
+                    {}, showAddAction = false, style = DashboardStyle.BLOOM.name
                 )
             }
         }
@@ -174,7 +181,7 @@ class DashboardStylesUiTest {
         assertEquals(0, applies)
         assertEquals(setOf("ORBIT"), darkStyles)
         compose.onNodeWithTag("dashboard-style-carousel").performTouchInput { swipeRight() }
-        compose.onNodeWithTag("dashboard-option-MOSAIC").assertIsDisplayed()
+        compose.onNodeWithTag("dashboard-option-BLOOM").assertIsDisplayed()
         compose.onNodeWithContentDescription("Previous dashboard style").performClick()
         orbitTone.assertIsOff()
         orbitApply.assertIsEnabled().performClick()
@@ -185,7 +192,7 @@ class DashboardStylesUiTest {
     }
     @Test @Config(qualifiers = "w320dp-h840dp-xhdpi")
     @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-    fun selectorLetsTheSheetGrowForLongerDescriptions() {
+    fun selectorKeepsSheetAndApplyButtonStableAcrossStyles() {
         show {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, 1.6f)) {
@@ -199,14 +206,14 @@ class DashboardStylesUiTest {
         }
 
         val carousel = compose.onNodeWithTag("dashboard-style-carousel")
-        val classicHeight = carousel.fetchSemanticsNode().size.height
-        repeat(DashboardStyle.SPECTRUM.ordinal) {
+        val firstBounds = carousel.fetchSemanticsNode().boundsInRoot
+        val initialApply = compose.onNodeWithTag("apply-dashboard-CLASSIC").fetchSemanticsNode().boundsInRoot
+        DashboardStyle.entries.drop(1).forEach { style ->
             compose.onNodeWithContentDescription("Next dashboard style").performClick()
+            assertEquals("Stable preview for ${style.label}", firstBounds, carousel.fetchSemanticsNode().boundsInRoot)
+            assertEquals("Stable apply action for ${style.label}", initialApply,
+                compose.onNodeWithTag("apply-dashboard-${style.name}").fetchSemanticsNode().boundsInRoot)
         }
-        compose.onNodeWithText(DashboardStyle.SPECTRUM.description).assertIsDisplayed()
-        val spectrumHeight = carousel.fetchSemanticsNode().size.height
-        assertTrue("Longer descriptions should grow the preview", spectrumHeight > classicHeight)
-        compose.onNodeWithTag("apply-dashboard-SPECTRUM").performScrollTo().assertIsDisplayed()
     }
 
     @Test @Config(qualifiers="w320dp-h1200dp-xhdpi")

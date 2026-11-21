@@ -70,7 +70,8 @@ def kotlin_name(icon):
 
 
 def emit_vector(style, icon, paths, suffix=""):
-    yield f'        {style} = {{ vector("iconsax:{style}/{icon}") {{'
+    name = f"teledrive:{style}/telegram" if icon == "teledrive-telegram" else f"iconsax:{style}/{icon}"
+    yield f'        {style} = {{ vector("{name}") {{'
     # Iconsax's horizontal ellipsis rotates to a vertical overflow control.
     if icon == "more":
         yield "            addGroup(rotate = 90f, pivotX = 12f, pivotY = 12f)"
