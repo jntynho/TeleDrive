@@ -30,6 +30,7 @@ import com.infinity.drive.core.files.StandardBackupFolder
 import com.infinity.drive.core.permissions.manifestPermission
 import com.infinity.drive.core.permissions.openAllFilesAccess
 import com.infinity.drive.core.permissions.openAppSettings
+import com.infinity.drive.core.update.AndroidReleaseInstaller
 import com.infinity.drive.domain.model.AppTheme
 import com.infinity.drive.domain.model.UserPreferences
 import com.infinity.drive.domain.repository.SettingsRepository
@@ -78,6 +79,7 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
         settingsRepository.preferences.collect{audio.updateLibraryContext(it.storageChatId,it.onboardingComplete)}
     }
 
+    val appUpdateInstaller = remember(activity) { activity?.let(::AndroidReleaseInstaller) }
     val urlOpener = remember(context) { UrlOpener { url -> openLink(context, url) } }
     val telegramLinkOpener = remember(context) { AndroidTelegramLinkOpener(context) }
 
@@ -302,6 +304,7 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
         LocalSensitiveClipboard provides sensitiveClipboard,
         LocalHiddenContentAccess provides org.koin.compose.koinInject<com.infinity.drive.core.security.HiddenContentAccess>(),
         LocalAppVersion provides BuildConfig.VERSION_NAME,
+        LocalAppUpdateInstaller provides appUpdateInstaller,
         LocalPlatformScreens provides AndroidPlatformScreens,
         LocalPlatformCapabilities provides capabilities
     ) {

@@ -28,18 +28,26 @@ class UpdateChecker(
             SafeLog.w(TAG,"Update check failed",e);return@withContext null
         }
 
-        val release = runCatching {
-            json.decodeFromString(GitHubRelease.serializer(), payload)
-        }.getOrElse{if(strict)throw it;return@withContext null}
+        runCatching { decodeLatest(payload) }.getOrElse { if (strict) throw it; null }
+    }
 
-        if (release.draft || release.preRelease) return@withContext null
+    internal fun decodeLatest(payload: String): AppRelease? {
+        val release = json.decodeFromString(GitHubRelease.serializer(), payload)
         val latest = release.tag.removePrefix("v").trim()
-        if (!isNewer(latest, if(currentBuild>0)"$currentVersion-build.$currentBuild"else currentVersion)) return@withContext null
+        if (release.draft || release.preRelease || !AppUpdateAsset.releaseVersion.matches(latest)) return null
+        if (!isNewer(latest, if (currentBuild > 0) "$currentVersion-build.$currentBuild" else currentVersion)) return null
 
-        AppRelease(
+        return AppRelease(
             version = latest,
             notes = release.body.orEmpty().trim(),
-            pageUrl = release.pageUrl
+            pageUrl = "${AppLinks.REPOSITORY}/releases/tag/v$latest",
+            androidAssets = release.assets.mapNotNull { asset ->
+                val abi = AppUpdateAsset.supportedAbis.firstOrNull { asset.name == "tg-drive-$it.apk" }
+                    ?: return@mapNotNull null
+                val digest = asset.digest?.takeIf { it.startsWith("sha256:") } ?: return@mapNotNull null
+                AppUpdateAsset(abi, asset.url, asset.size, digest.removePrefix("sha256:"))
+                    .takeIf { asset.state == "uploaded" && it.belongsTo(latest) }
+            }
         )
     }
 
@@ -82,10 +90,19 @@ class UpdateChecker(
     @Serializable
     private data class GitHubRelease(
         @SerialName("tag_name") val tag: String,
-        @SerialName("html_url") val pageUrl: String,
         val body: String? = null,
         val draft: Boolean = false,
-        @SerialName("prerelease") val preRelease: Boolean = false
+        @SerialName("prerelease") val preRelease: Boolean = false,
+        val assets: List<GitHubAsset> = emptyList()
+    )
+
+    @Serializable
+    private data class GitHubAsset(
+        val name: String = "",
+        @SerialName("browser_download_url") val url: String = "",
+        val size: Long = 0,
+        val digest: String? = null,
+        val state: String = ""
     )
 
     private companion object {

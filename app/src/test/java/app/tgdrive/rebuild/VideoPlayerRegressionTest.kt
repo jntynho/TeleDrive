@@ -98,10 +98,16 @@ class VideoPlayerRegressionTest {
         }}
     }
 
-    private fun install(video:FakeVideo,compact:Boolean=false) {
+    private fun install(video:FakeVideo,compact:Boolean=false,narrow:Boolean=false) {
         activity.get().setContent { DriveInfinityTheme(darkTheme=true) {
-            Box((if(compact)Modifier.size(393.dp,300.dp)else Modifier.fillMaxSize()).background(androidx.compose.ui.graphics.Color.Black)) {
-                PlayerControls(video.player,true,false,PlayerResizeMode.FIT,{},{})
+            val bounds = when {
+                narrow -> Modifier.size(224.dp, 350.dp)
+                compact -> Modifier.size(393.dp, 300.dp)
+                else -> Modifier.fillMaxSize()
+            }
+            val onPictureInPicture: (() -> Unit)? = if (narrow) ({}) else null
+            Box(bounds.background(androidx.compose.ui.graphics.Color.Black)) {
+                PlayerControls(video.player,true,false,PlayerResizeMode.FIT,{},{}, onPictureInPicture = onPictureInPicture)
             }
         }}
         compose.waitForIdle()
@@ -174,14 +180,23 @@ class VideoPlayerRegressionTest {
         assertTrue("Elapsed and total time start at the left edge of the timeline",
             kotlin.math.abs(time.left - timeline.left) < 2f)
     }
-    @Test fun seekAndToolsShareAHorizontalAxisInPortraitAndLandscape() {
+    @Test fun fullWidthSeekSitsAboveTimeAndToolsInPortraitAndLandscape() {
         for (compact in listOf(false, true)) {
             install(FakeVideo(), compact)
             val tools = compose.onNodeWithContentDescription("Playback speed, 1×").assertIsDisplayed()
                 .fetchSemanticsNode().boundsInRoot
+            val orientation = compose.onNodeWithContentDescription("Rotation: follow device").assertIsDisplayed()
+                .fetchSemanticsNode().boundsInRoot
+            val time = compose.onNodeWithText("0:12 / 2:00").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
             val seek = compose.onNodeWithContentDescription("Seek video").assertIsDisplayed()
                 .fetchSemanticsNode().boundsInRoot
-            assertTrue("Seek $seek and tools $tools must share a center line", kotlin.math.abs(seek.center.y - tools.center.y) < 3f)
+            val timeline = compose.onNodeWithTag("video-timeline").fetchSemanticsNode().boundsInRoot
+            // The slider reserves half its thumb at both ends and the touch targets can have invisible padding.
+            val thumbWidth = 14 * activity.get().resources.displayMetrics.density
+            assertTrue("Seek $seek must span timeline $timeline above tools $tools",
+                seek.center.y < tools.top && seek.width >= timeline.width - thumbWidth - 2f)
+            assertTrue("The time and tools must share a center line", kotlin.math.abs(time.center.y - tools.center.y) < 3f)
+            assertEquals(tools.size, orientation.size)
         }
     }
     @Test fun compactControlsDoNotOverlapTheSeekTrack() {
@@ -192,6 +207,13 @@ class VideoPlayerRegressionTest {
         val screenshot=File("build/design-previews/video-controls-compact.png")
         screenshot.parentFile?.mkdirs()
         screenshot.outputStream().use { compose.onRoot().captureToImage().asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG,100,it) }
+    }
+    @Test fun toolsRemainReachableBesideTheTimeInANarrowWindow() {
+        install(FakeVideo(), narrow = true)
+        val time = compose.onNodeWithText("0:12 / 2:00").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val rotation = compose.onNodeWithContentDescription("Rotation: follow device").performScrollTo()
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertTrue("Scrolling tools keeps their row aligned with the time", kotlin.math.abs(time.center.y - rotation.center.y) < 3f)
     }
     @Test fun landscapeTransportIsSmallerButKeepsComfortableTouchTargets() {
         val video=FakeVideo()

@@ -2,6 +2,6 @@
 package com.infinity.drive.core.update
 
 object AppLinks {
-    const val REPOSITORY = "https://github.com/jntynho/TG-Drive"
+    const val REPOSITORY = "https://github.com/jntynho/TeleDrive"
     const val UPSTREAM = "https://github.com/ZHINFINITY/DriveInfinity"
 }

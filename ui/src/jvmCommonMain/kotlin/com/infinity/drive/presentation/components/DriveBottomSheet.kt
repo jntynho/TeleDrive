@@ -11,6 +11,8 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 
@@ -46,6 +48,7 @@ fun DriveBottomSheet(
     onDismissRequest: () -> Unit,
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     contentWindowInsets: @Composable () -> WindowInsets = { WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom) },
+    contractOnDismiss: Boolean = false,
     content: @Composable ColumnScope.(dismiss:()->Unit) -> Unit
 ) {
     val parent=LocalSheetHost.current
@@ -59,9 +62,19 @@ fun DriveBottomSheet(
         try{sheetState.hide();latestDismiss();action()}finally{closing=false}
     }}}
     val dismiss:()->Unit={closeThen{}}
+    val contraction = if (contractOnDismiss) {
+        val hiding = closing || (sheetState.targetValue == SheetValue.Hidden && sheetState.currentValue != SheetValue.Hidden)
+        val scale by animateFloatAsState(if (hiding) .96f else 1f, tween(200), label = "sheetContraction")
+        Modifier.graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+            transformOrigin = TransformOrigin(.5f, 1f)
+        }
+    } else Modifier
     MaterialTheme(motionScheme=SheetMotion){
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = {if(!closing)latestDismiss()},
+        modifier = contraction,
         sheetState = sheetState,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         containerColor = surface,

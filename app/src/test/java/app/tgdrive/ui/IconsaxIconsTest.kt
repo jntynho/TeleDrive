@@ -74,12 +74,21 @@ class IconsaxIconsTest {
         }
     }
 
-    @Test fun notesAndShareActionsUseDistinctGlyphsInBothStyles() {
+    @Test fun noteAndFileActionsUseDistinctGlyphsInBothStyles() {
         val style = mutableStateOf(IconStyle.Outline)
         var rendered = emptyList<ImageVector>()
         compose.setContent {
             CompositionLocalProvider(LocalIconStyle provides style.value) {
-                val vectors = listOf(DriveIcons.Notes, DriveIcons.Share, DriveIcons.Telegram)
+                val vectors = listOf(
+                    DriveIcons.Notes,
+                    LibraryIcons.Download,
+                    DriveIcons.DriveFileMove,
+                    LibraryIcons.Favorite,
+                    LibraryIcons.Archive,
+                    DriveIcons.Share,
+                    DriveIcons.Telegram,
+                    LibraryIcons.ShowInTelegram
+                )
                 SideEffect { rendered = vectors }
             }
         }
@@ -87,9 +96,20 @@ class IconsaxIconsTest {
             compose.runOnIdle { style.value = choice }
             compose.runOnIdle {
                 val variant = choice.name.lowercase()
-                assertEquals(listOf("iconsax:$variant/note-text", "iconsax:$variant/export", "teledrive:$variant/telegram"),
-                    rendered.map { it.name })
-                assertEquals(3, rendered.map { it.root }.toSet().size)
+                assertEquals(
+                    listOf(
+                        "iconsax:$variant/note-text",
+                        "iconsax:$variant/import",
+                        "teledrive:$variant/folder-move",
+                        "teledrive:$variant/favorite-star",
+                        "iconsax:$variant/archive",
+                        "iconsax:$variant/share",
+                        "teledrive:$variant/telegram",
+                        "teledrive:$variant/show-in-telegram"
+                    ),
+                    rendered.map { it.name }
+                )
+                assertEquals(8, rendered.map { it.root }.toSet().size)
             }
         }
     }

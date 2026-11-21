@@ -22,7 +22,7 @@ fun HomeSkeleton(modifier:Modifier=Modifier,bottomPadding:androidx.compose.ui.un
             Spacer(Modifier.height(20.dp))
             LibraryBrowse(listOf(
                 LibraryShortcut("All files",DriveIcons.Folder){}, LibraryShortcut("Activity",app.tgdrive.ui.LibraryIcons.Activity){},
-                LibraryShortcut("Favorites",DriveIcons.Star){}, LibraryShortcut("Archived",app.tgdrive.ui.LibraryIcons.Archive){},
+                LibraryShortcut("Favorites",LibraryIcons.Favorite){}, LibraryShortcut("Archived",LibraryIcons.Archive){},
                 LibraryShortcut("Hidden",app.tgdrive.ui.LibraryIcons.Hidden){}, LibraryShortcut("Trash",DriveIcons.Delete){}
             ),loading=true)
         }}

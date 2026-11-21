@@ -1,0 +1,10 @@
+<resources>
+    <string name="about_update_install">Install update</string>
+    <string name="about_update_release_page">View release on GitHub</string>
+    <string name="about_update_downloading">Downloading update…</string>
+    <string name="about_update_permission">Allow TeleDrive to install the update in Android settings, then return and tap Install update.</string>
+    <string name="about_update_installer_opened">Confirm the update in the Android installer.</string>
+    <string name="about_update_download_failed">Could not download the update. Check your connection and available storage, then try again.</string>
+    <string name="about_update_verification_failed">Could not verify the update. Nothing was installed.</string>
+    <string name="about_update_installer_unavailable">The Android installer is unavailable. You can view the release on GitHub.</string>
+</resources>

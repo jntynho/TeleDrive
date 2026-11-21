@@ -64,7 +64,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.flow.map
@@ -326,7 +325,20 @@ fun PreviewScreen(
     ) { _ ->
         Box(modifier = Modifier.fillMaxSize().background(if(immersive)Color.Black else MaterialTheme.colorScheme.background)) {
             if(pagedFile.category==FileCategory.AUDIO){
-                com.infinity.drive.presentation.audio.FullscreenAudioPlayer(currentFile,true,Modifier.fillMaxSize())
+                com.infinity.drive.presentation.audio.FullscreenAudioPlayer(
+                    currentFile, true, Modifier.fillMaxSize(), onSwipeDismiss = onBack,
+                    headerActions = {
+                        if (viewModel.fromTrash) {
+                            IconButton({ viewModel.showInfo(currentFile) }) {
+                                Icon(DriveIcons.Info, "File details", tint = Color.White)
+                            }
+                        } else if (canStreamExternally) {
+                            IconButton(::openInPlayer) {
+                                Icon(DriveIcons.OpenInNew, externalTitle, tint = Color.White)
+                            }
+                        }
+                    }
+                )
             }else HorizontalPager(
                 state = pagerState,
                 beyondViewportPageCount = 1,
@@ -364,7 +376,7 @@ fun PreviewScreen(
             }
 
             val isVideo = currentFile.category == FileCategory.VIDEO
-            AnimatedVisibility(
+            if (pagedFile.category != FileCategory.AUDIO) AnimatedVisibility(
                 visible = chromeShown,
                 enter = fadeIn(tween(220, easing = LinearOutSlowInEasing)) +
                     if (isVideo) slideInVertically(tween(260, easing = LinearOutSlowInEasing)) { -it / 4 } else androidx.compose.animation.EnterTransition.None,
@@ -379,22 +391,7 @@ fun PreviewScreen(
                         ) else androidx.compose.ui.graphics.SolidColor(Color.Transparent)
                     )
                 ) {
-                if(currentFile.category==FileCategory.AUDIO)CenterAlignedTopAppBar(
-                    expandedHeight=com.infinity.drive.presentation.audio.audioHeaderHeight(),
-                    title={com.infinity.drive.presentation.audio.AudioNowPlayingTitle(currentFile)},
-                    navigationIcon = {
-                        IconButton(onBack) { Icon(DriveIcons.ArrowBack, stringResource(Res.string.common_back)) }
-                    },
-                    actions = {
-                        if (viewModel.fromTrash) {
-                            IconButton({ viewModel.showInfo(currentFile) }) { Icon(DriveIcons.Info, "File details") }
-                        } else if (canStreamExternally) {
-                            IconButton(::openInPlayer) { Icon(DriveIcons.OpenInNew, externalTitle) }
-                        }
-                    },
-                    colors=TopAppBarDefaults.topAppBarColors(containerColor=Color.Transparent,scrolledContainerColor=Color.Transparent,
-                        titleContentColor=Color.White,navigationIconContentColor=Color.White,actionIconContentColor=Color.White)
-                )else TopAppBar(
+                TopAppBar(
                     windowInsets = if (isVideo) {
                         WindowInsets.statusBarsIgnoringVisibility.only(WindowInsetsSides.Top)
                             .union(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))

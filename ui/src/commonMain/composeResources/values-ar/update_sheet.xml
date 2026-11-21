@@ -1,0 +1,13 @@
+<resources>
+    <string name="about_update_title">التحديث إلى %1$s</string>
+    <string name="about_update_from">الإصدار المثبّت %1$s، والمتاح %2$s</string>
+    <string name="about_update_later">لاحقًا</string>
+    <string name="about_update_install">تثبيت التحديث</string>
+    <string name="about_update_release_page">عرض الإصدار على GitHub</string>
+    <string name="about_update_downloading">جارٍ تنزيل التحديث…</string>
+    <string name="about_update_permission">اسمح لـ TeleDrive بتثبيت التحديث في إعدادات Android، ثم عُد واضغط على تثبيت التحديث.</string>
+    <string name="about_update_installer_opened">أكّد التحديث في مثبّت Android.</string>
+    <string name="about_update_download_failed">تعذّر تنزيل التحديث. تحقّق من الاتصال ومساحة التخزين ثم أعد المحاولة.</string>
+    <string name="about_update_verification_failed">تعذّر التحقّق من التحديث، ولم يُثبّت.</string>
+    <string name="about_update_installer_unavailable">مثبّت Android غير متاح. يمكنك عرض الإصدار على GitHub.</string>
+</resources>

@@ -661,8 +661,16 @@ class RebuiltUiTest {
         compose.waitUntil(15_000){compose.onAllNodesWithText("Midnight City",substring=false).fetchSemanticsNodes().isNotEmpty()}
         compose.runOnUiThread{playback.value=playback.value.copy(playing=true)}
         compose.onNodeWithText("Midnight City",substring=false).performClick()
-        try {compose.waitUntil(10_000){runCatching{compose.onNodeWithContentDescription("Back",useUnmergedTree=false).assertIsDisplayed();true}.getOrDefault(false)}}
-        catch(error:Throwable){capture("audio-route-failure");throw error}
+        try {
+            compose.waitUntil(10_000) { compose.onNodeWithContentDescription("Seek audio").isDisplayed() }
+        } catch (error: Throwable) {
+            capture("audio-route-failure")
+            throw error
+        }
+        compose.onNodeWithContentDescription("Back").assertDoesNotExist()
+        val inHeader = hasAnyAncestor(hasTestTag("audio-track-labels"))
+        compose.onNode(hasText("Midnight City", substring = false) and inHeader).assertIsDisplayed()
+        compose.onNode(hasText("M83", substring = false) and inHeader).assertIsDisplayed()
         capture("now-playing")
         compose.onNodeWithContentDescription("Open lyrics").assertDoesNotExist()
         compose.onNodeWithText("Second lyric", substring = false).assertIsDisplayed()
@@ -681,10 +689,25 @@ class RebuiltUiTest {
         org.junit.Assert.assertFalse(playback.value.playing)
         compose.onNodeWithContentDescription("Playback options").assertDoesNotExist()
         compose.onNodeWithContentDescription("Sleep timer").assertDoesNotExist()
-        // Stop can also arrive from the media notification/session after the old menu was removed.
-        compose.runOnUiThread{player.stop()}
-        compose.waitUntil(5_000){playback.value.file==null}
+        compose.onAllNodesWithContentDescription("Play audio").onLast().performClick()
+        compose.runOnUiThread {
+            val dispatcher = activity.get().onBackPressedDispatcher
+            dispatcher.dispatchOnBackStarted(androidx.activity.BackEventCompat(0f, 100f, 0f, 0))
+            dispatcher.dispatchOnBackProgressed(androidx.activity.BackEventCompat(160f, 100f, .6f, 0))
+        }
+        compose.onNodeWithContentDescription("Seek audio").assertIsDisplayed()
+        compose.runOnUiThread { activity.get().onBackPressedDispatcher.onBackPressed() }
         compose.onNodeWithText("Your library").assertIsDisplayed()
+        compose.onNodeWithTag("audio-mini-player").assertIsDisplayed()
+        assertTrue(playback.value.playing)
+        org.junit.Assert.assertEquals(90_000L, playback.value.positionMs)
+
+        compose.onNodeWithText("Midnight City", substring = false).performClick()
+        compose.waitUntil(10_000) { compose.onNodeWithContentDescription("Seek audio").isDisplayed() }
+        // A stop from the media notification/session still closes the expanded player.
+        compose.runOnUiThread { player.stop() }
+        compose.waitUntil(5_000) { compose.onNodeWithText("Your library").isDisplayed() }
+        org.junit.Assert.assertNull(playback.value.file)
         compose.onNodeWithText("Midnight City",substring=false).assertDoesNotExist()
     }
 

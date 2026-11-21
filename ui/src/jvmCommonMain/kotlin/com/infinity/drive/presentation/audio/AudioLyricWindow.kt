@@ -7,7 +7,6 @@ import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,10 +41,10 @@ internal fun audioLyricLineHeight(): Dp =
     with(LocalDensity.current) { MaterialTheme.typography.bodyMedium.lineHeight.toDp() } + 4.dp
 
 @Composable
-internal fun AudioLyricWindow(fileId: String, rawLyrics: String?, lineHeight: Dp) {
+internal fun AudioLyricWindow(fileId: String, rawLyrics: String?, lineHeight: Dp, modifier: Modifier = Modifier) {
     val lyrics = remember(rawLyrics) { AudioLyricsParser.parse(rawLyrics) }
     Box(
-        Modifier.fillMaxWidth().height(lineHeight * 3).clipToBounds().testTag("audio-lyrics-slot"),
+        modifier.fillMaxWidth().height(lineHeight * 3).clipToBounds().testTag("audio-lyrics-slot"),
         contentAlignment = Alignment.Center
     ) {
         if (lyrics.cues.any { it.text.isNotBlank() }) {
@@ -106,10 +105,10 @@ private fun TimedLyricLines(fileId: String, lyrics: AudioLyrics, lineHeight: Dp)
             ) {
                 Text(
                     cue.text,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     color = Color.White.copy(alpha = if (softenWithShadow) .35f else 1f),
                     style = if (softenWithShadow) style.copy(shadow = fallbackShadow) else style,
-                    textAlign = TextAlign.Center,
+                    textAlign = TextAlign.Start,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

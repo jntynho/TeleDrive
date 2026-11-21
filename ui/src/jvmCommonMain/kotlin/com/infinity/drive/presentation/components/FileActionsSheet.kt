@@ -3,6 +3,7 @@ package com.infinity.drive.presentation.components
 import app.tgdrive.ui.DriveIcons
 import app.tgdrive.ui.elasticVerticalScroll as verticalScroll
 import app.tgdrive.ui.ElasticLazyColumn as LazyColumn
+import app.tgdrive.ui.LibraryIcons
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
@@ -176,18 +177,18 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Bo
                 }
                 else->{
                     if(!isOpen)SheetActionRow("Open",DriveIcons.FileOpen,enabled=!working){closeThen(onOpen)}
-                    SheetActionRow("Download",DriveIcons.Download,enabled=!working&&(current.hasRemoteCopy||current.hasLocalCopy)){
+                    SheetActionRow("Download",LibraryIcons.Download,enabled=!working&&(current.hasRemoteCopy||current.hasLocalCopy)){
                         run(false){requireSuccess(transfers.enqueueSaveToPhone(current.id));message="Saving to Downloads. You can follow its progress in Activity."}
                     }
                     SheetActionRow("Send in Telegram",DriveIcons.Telegram,enabled=!working){
                         run(false){page=if(telegramActions.needsOriginal(current))"send-original"else"send"}
                     }
                     SheetActionRow("Share",DriveIcons.Share,enabled=!working){run{val path=obtain();sharer.share(listOf(path),current.mimeType,"Share ${current.name}")}}
-                    SheetActionRow(if(current.isFavorite)"Remove from Favourite"else"Add To Favourite",if(current.isFavorite)DriveIcons.StarFilled else DriveIcons.Star,enabled=!working){run(close=false){repository.setFilesFavorite(listOf(current.id),!current.isFavorite)}}
+                    SheetActionRow(if(current.isFavorite)"Remove from Favourite"else"Add To Favourite",LibraryIcons.Favorite,enabled=!working){run(close=false){repository.setFilesFavorite(listOf(current.id),!current.isFavorite)}}
                     SheetActionRow("Rename",DriveIcons.Edit,enabled=!working){page="rename"}
                     SheetActionRow("Move",DriveIcons.DriveFileMove,enabled=!working){page="move"}
                     SheetActionRow("Show in folder",DriveIcons.FolderOpen,enabled=!working){closeThen{if(revealFile!=null)revealFile(current)else navigateFolder(current.folderId)}}
-                    SheetActionRow("Show in Telegram",DriveIcons.OpenInNew,enabled=!working){
+                    SheetActionRow("Show in Telegram",LibraryIcons.ShowInTelegram,enabled=!working){
                         run(false){
                             val latest=repository.getFile(current.id)?:error("This file is no longer available")
                             if(telegramActions.references(latest).isEmpty()){page="upload-show";return@run}
@@ -197,7 +198,7 @@ fun FileActionsSheet(file:DriveFile,onDismiss:()->Unit,onOpen:()->Unit,isOpen:Bo
                             message="Opened Telegram. For a private channel, select the account that owns this drive. Split files open at their first part."
                         }
                     }
-                    SheetActionRow(if(current.isArchived)"Unarchive"else"Archive",app.tgdrive.ui.LibraryIcons.Archive,enabled=!working){run{repository.setFilesArchived(listOf(current.id),!current.isArchived)}}
+                    SheetActionRow(if(current.isArchived)"Unarchive"else"Archive",LibraryIcons.Archive,enabled=!working){run{repository.setFilesArchived(listOf(current.id),!current.isArchived)}}
                     extraActions()
                     SheetActionRow("Move to Trash",DriveIcons.DeleteOutline,enabled=!working){page="trash"}
                 }

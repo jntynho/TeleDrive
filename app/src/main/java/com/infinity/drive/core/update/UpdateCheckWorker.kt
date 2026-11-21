@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.first
 
 /**
  * Looks for a release while the app is closed. Only the notification comes from
- * here: tapping it opens the app, which checks again and shows the dialog, so
+ * here: tapping it opens the app, which checks again and shows the update sheet, so
  * the release notes are never served from a stale copy.
  */
 class UpdateCheckWorker(

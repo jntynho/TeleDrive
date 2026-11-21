@@ -7,8 +7,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.unit.Density
@@ -70,13 +73,13 @@ class MediaSurfaceRegressionTest {
         activity=Robolectric.buildActivity(ComponentActivity::class.java).setup().visible()
     }
     @After fun stop(){activity.pause().stop().destroy();stopKoin()}
-    private fun install(largeText:Boolean=false){activity.get().setContent{DriveInfinityTheme{
+    private fun install(largeText:Boolean=false,onSwipeDismiss:(()->Unit)?=null){activity.get().setContent{DriveInfinityTheme{
         CompositionLocalProvider(LocalAudioPlayback provides player){
             val density=LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density,if(largeText)2f else 1f)){
                 Box(if(largeText)Modifier.size(320.dp,640.dp)else Modifier.fillMaxSize()){
                     val current by playback.collectAsState()
-                    FullscreenAudioPlayer(current.file!!,true,Modifier.fillMaxSize())
+                    FullscreenAudioPlayer(current.file!!,true,Modifier.fillMaxSize(),onSwipeDismiss=onSwipeDismiss)
                 }
             }
         }
@@ -104,7 +107,9 @@ class MediaSurfaceRegressionTest {
         val cover = compose.onNodeWithTag("audio-cover").fetchSemanticsNode().boundsInRoot
         val slot = compose.onNodeWithTag("audio-lyrics-slot").fetchSemanticsNode().boundsInRoot
         val labels = compose.onNodeWithTag("audio-track-labels").fetchSemanticsNode().boundsInRoot
-        assertTrue(labels.bottom <= slot.top)
+        assertTrue(labels.bottom <= cover.top)
+        assertEquals(cover.left, labels.left, 1f)
+        assertTrue(cover.bottom <= slot.top)
         assertTrue(slot.bottom <= controls.top)
 
         val initial = playback.value
@@ -123,7 +128,8 @@ class MediaSurfaceRegressionTest {
             assertEquals(cover, compose.onNodeWithTag("audio-cover").fetchSemanticsNode().boundsInRoot)
             assertEquals(slot, compose.onNodeWithTag("audio-lyrics-slot").fetchSemanticsNode().boundsInRoot)
             if (next == timed) {
-                compose.onNodeWithText("السطر الثاني Sky 42").assertIsDisplayed()
+                val arabic = lyricLayout("السطر الثاني Sky 42")
+                assertEquals(arabic.size.width.toFloat(), arabic.getLineRight(0), 1f)
                 compose.onNodeWithTag("audio-previous-lyric").assertIsDisplayed()
                 compose.onNodeWithTag("audio-next-lyric").assertIsDisplayed()
                 capture("audio-player-portrait")
@@ -146,7 +152,7 @@ class MediaSurfaceRegressionTest {
         compose.onNodeWithTag("audio-next-lyric").assertIsDisplayed()
 
         compose.runOnIdle { player.seek(5_000) }
-        compose.onNodeWithText("Opening").assertIsDisplayed()
+        assertEquals(0f, lyricLayout("Opening").getLineLeft(0), 1f)
         compose.onNodeWithTag("audio-next-lyric").assertDoesNotExist()
 
         compose.runOnIdle { player.seek(10_000) }
@@ -176,8 +182,8 @@ class MediaSurfaceRegressionTest {
         val labels=compose.onNodeWithTag("audio-track-labels").fetchSemanticsNode().boundsInRoot
         val cover=compose.onNodeWithTag("audio-cover").fetchSemanticsNode().boundsInRoot
         val controls=compose.onNodeWithTag("audio-controls").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        assertTrue(cover.bottom<=labels.top)
-        assertTrue(labels.bottom<=controls.top)
+        assertTrue(labels.bottom<=cover.top)
+        assertTrue(cover.bottom<=controls.top)
         compose.onNodeWithContentDescription("Next audio").assertIsDisplayed()
     }
     @Test @Config(qualifiers="w844dp-h390dp-xhdpi")
@@ -188,7 +194,8 @@ class MediaSurfaceRegressionTest {
         val cover=compose.onNodeWithTag("audio-cover").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         val labels=compose.onNodeWithTag("audio-track-labels").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         val controls=compose.onNodeWithTag("audio-controls").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        assertTrue(cover.right<labels.left)
+        assertTrue(labels.bottom<=cover.top)
+        assertTrue(cover.right<controls.left)
         assertTrue(labels.bottom<=controls.top)
         compose.onNodeWithTag("audio-play").assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
         compose.onNodeWithContentDescription("Next audio").assertIsDisplayed()
@@ -204,6 +211,36 @@ class MediaSurfaceRegressionTest {
         assertEquals("second",playback.value.file?.id)
         assertEquals(0L,playback.value.positionMs)
     }
+    @Test fun audioSwipePullSettlesAndOnlyDismissesFromTheContent() {
+        var dismissals = 0
+        install(onSwipeDismiss = { dismissals++ })
+        val cover = compose.onNodeWithTag("audio-cover")
+        val seek = compose.onNodeWithContentDescription("Seek audio")
+        val original = cover.fetchSemanticsNode().boundsInRoot
+
+        // A short pull returns the contents to their initial position.
+        cover.performTouchInput { swipe(center, center + Offset(0f, 36.dp.toPx())) }
+        compose.waitForIdle()
+        assertEquals(0, dismissals)
+        assertEquals(original, cover.fetchSemanticsNode().boundsInRoot)
+
+        // A gesture starting on the seek bar stays independent of the dismissal.
+        seek.performTouchInput { swipe(center, center + Offset(0f, 125.dp.toPx())) }
+        compose.waitForIdle()
+        assertEquals(0, dismissals)
+
+        cover.performTouchInput { swipe(center, center + Offset(0f, 125.dp.toPx())) }
+        compose.waitForIdle()
+        assertEquals(1, dismissals)
+    }
+
+    private fun lyricLayout(text: String): TextLayoutResult {
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText(text).assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        return layouts.single()
+    }
+
     private fun capture(name:String){
         val out=File("build/design-previews/$name.png").apply{parentFile?.mkdirs()}
         out.outputStream().use{compose.onRoot().captureToImage().asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}

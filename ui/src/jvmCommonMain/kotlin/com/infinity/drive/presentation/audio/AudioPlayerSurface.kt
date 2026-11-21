@@ -3,12 +3,18 @@ package com.infinity.drive.presentation.audio
 import app.tgdrive.ui.*
 import coil3.request.crossfade
 import androidx.compose.animation.*
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.tween
 import app.tgdrive.ui.elasticVerticalScroll as verticalScroll
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.verticalDrag
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,12 +31,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.infinity.drive.domain.model.DriveFile
@@ -38,9 +50,12 @@ import com.infinity.drive.domain.repository.FileRepository
 import com.infinity.drive.presentation.common.Formatters
 import com.infinity.drive.presentation.platform.*
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlin.math.abs
 
 @Composable
 fun LibraryAudioMiniPlayer(){
@@ -86,13 +101,11 @@ fun LibraryAudioMiniPlayer(){
     if(expanded&&state.file!=null&&openPlayer==null){
         androidx.compose.ui.window.Dialog(onDismissRequest={expanded=false},properties=androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth=false,decorFitsSystemWindows=false)){
             Surface(Modifier.fillMaxSize(),color=Color.Black){
-                Box(Modifier.fillMaxSize().ambientArtwork(state).systemBarsPadding()){
-                    NowPlayingContent(state.file!!,modifier=Modifier.fillMaxSize().padding(top=audioHeaderHeight()))
-                    Row(Modifier.fillMaxWidth().height(audioHeaderHeight()).padding(end=24.dp),verticalAlignment=Alignment.CenterVertically){
-                        IconButton({expanded=false}){Icon(DriveIcons.ArrowBack,"Back to library",tint=Color.White)}
-                        AudioNowPlayingTitle(state.file!!,Modifier.weight(1f))
+                FullscreenAudioPlayer(state.file!!, true, Modifier.fillMaxSize(), headerActions = {
+                    IconButton({ expanded = false }) {
+                        Icon(DriveIcons.ArrowBack, "Back to library", tint = Color.White)
                     }
-                }
+                })
             }
         }
     }
@@ -106,20 +119,129 @@ private fun MiniPlayerProgress(fileId:String){
 }
 
 @Composable
-fun FullscreenAudioPlayer(file:DriveFile,isActivePage:Boolean,modifier:Modifier=Modifier,onTrackChanged:(String)->Unit={}){
-    val audio=LocalAudioPlayback.current
-    val state by remember(audio){audio.state.map{it.copy(positionMs=0)}.distinctUntilChanged()}.collectAsStateWithLifecycle(remember(audio){audio.state.value.copy(positionMs=0)})
-    Box(modifier.fillMaxSize().ambientArtwork(if(isActivePage)state else state.copy(playing=false)).systemBarsPadding().padding(top=audioHeaderHeight())){
-        NowPlayingContent(if(isActivePage)state.file?:file else file,Modifier.fillMaxSize())
+fun FullscreenAudioPlayer(
+    file: DriveFile,
+    isActivePage: Boolean,
+    modifier: Modifier = Modifier,
+    onTrackChanged: (String) -> Unit = {},
+    onSwipeDismiss: (() -> Unit)? = null,
+    headerActions: @Composable RowScope.() -> Unit = {}
+) {
+    val audio = LocalAudioPlayback.current
+    val state by remember(audio) { audio.state.map { it.copy(positionMs = 0) }.distinctUntilChanged() }
+        .collectAsStateWithLifecycle(remember(audio) { audio.state.value.copy(positionMs = 0) })
+    val displayedFile = if (isActivePage) state.file ?: file else file
+    val metadata = state.metadata.takeIf { state.file?.id == displayedFile.id } ?: AudioMetadata()
+    val scope = rememberCoroutineScope()
+    val dismiss = rememberUpdatedState(onSwipeDismiss)
+
+    BoxWithConstraints(modifier.fillMaxSize().ambientArtwork(if (isActivePage) state else state.copy(playing = false))) {
+        val swipe = if (isActivePage && onSwipeDismiss != null) {
+            val distance = with(LocalDensity.current) { 80.dp.toPx() }
+            val height = with(LocalDensity.current) { maxHeight.toPx() }
+            remember(scope, distance, height) { AudioDismissDrag(scope, distance, height) { dismiss.value?.invoke() } }
+        } else null
+
+        Column(Modifier.fillMaxSize().graphicsLayer {
+            translationY = swipe?.offset ?: 0f
+            alpha = 1f - (swipe?.progress ?: 0f)
+        }.systemBarsPadding()) {
+            // The metadata is always anchored to the physical left, even in a right-to-left app.
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp).heightIn(min = 64.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    AudioTrackLabels(displayedFile, metadata, Modifier.weight(1f).audioDismissGesture(swipe))
+                    headerActions()
+                }
+            }
+            NowPlayingContent(displayedFile, Modifier.weight(1f), swipe)
+        }
     }
 }
 
 @Composable
-fun audioHeaderHeight()=maxOf(56.dp,(32*androidx.compose.ui.platform.LocalDensity.current.fontScale).dp)
+private fun AudioTrackLabels(file: DriveFile, metadata: AudioMetadata, modifier: Modifier) {
+    val labels = Triple(
+        file.id,
+        metadata.title?.takeIf(String::isNotBlank) ?: file.name.substringBeforeLast('.'),
+        metadata.artist?.takeIf(String::isNotBlank) ?: file.extension.uppercase().ifBlank { "Audio" }
+    )
+    Crossfade(labels, modifier.testTag("audio-track-labels"), animationSpec = tween(240), label = "audioTrackLabels") { (_, name, artist) ->
+        Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(name, Modifier.fillMaxWidth(), color = Color.White,
+                style = MaterialTheme.typography.headlineSmall.copy(textDirection = TextDirection.Content),
+                fontWeight = FontWeight.Bold, textAlign = TextAlign.Left, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(artist, Modifier.fillMaxWidth(), color = Color.White.copy(alpha = .62f),
+                style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content),
+                textAlign = TextAlign.Left, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
 
-@Composable
-fun AudioNowPlayingTitle(file:DriveFile,modifier:Modifier=Modifier){
-    Text("Now playing", modifier, color = Color.White, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+private class AudioDismissDrag(
+    private val scope: CoroutineScope,
+    private val threshold: Float,
+    private val height: Float,
+    private val onDismiss: () -> Unit
+) {
+    var offset by mutableFloatStateOf(0f)
+        private set
+
+    val progress: Float get() = (offset / height.coerceAtLeast(1f)).coerceIn(0f, 1f)
+    var closing = false
+        private set
+    private var animation: Job? = null
+    private var dragging = false
+
+    fun start(): Boolean {
+        if (dragging || closing) return false
+        dragging = true
+        animation?.cancel()
+        return true
+    }
+
+    fun move(delta: Float) {
+        offset = (offset + delta).coerceIn(0f, height)
+    }
+
+    fun finish(completed: Boolean) {
+        dragging = false
+        val dismissed = completed && offset >= threshold
+        closing = dismissed
+        animation = scope.launch {
+            animate(offset, if (dismissed) height else 0f, animationSpec = tween(if (dismissed) 210 else 180)) { value, _ ->
+                offset = value
+            }
+            if (dismissed) onDismiss()
+        }
+    }
+}
+
+/** A pull can start on the header, artwork or lyric window and leaves the playback controls to handle touch. */
+private fun Modifier.audioDismissGesture(drag: AudioDismissDrag?, scroll: ScrollState? = null): Modifier {
+    if (drag == null) return this
+    return pointerInput(drag, scroll) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            if (drag.closing || (scroll != null && scroll.value > 0)) return@awaitEachGesture
+            var rejected = false
+            val start = awaitTouchSlopOrCancellation(down.id) { change, overSlop ->
+                if (overSlop.y <= 0f || abs(overSlop.x) >= overSlop.y) rejected = true
+                if (!rejected) {
+                    rejected = !drag.start()
+                    if (!rejected) {
+                        drag.move(overSlop.y)
+                        change.consume()
+                    }
+                }
+            } ?: return@awaitEachGesture
+            val completed = verticalDrag(start.id) { change ->
+                drag.move(change.positionChange().y)
+                change.consume()
+            }
+            drag.finish(completed)
+        }
+    }
 }
 
 @Composable
@@ -220,7 +342,7 @@ private val singleRowTransportWidth = 256.dp
 
 /** Artwork, labels and transport have reserved bounds; asynchronous metadata never moves them. */
 @Composable
-internal fun NowPlayingContent(file:DriveFile,modifier:Modifier=Modifier){
+private fun NowPlayingContent(file:DriveFile,modifier:Modifier=Modifier,swipe:AudioDismissDrag?=null){
     val player=LocalAudioPlayback.current
     val playback by remember(player){player.state.map{it.copy(positionMs=if(it.positionMs>3000)3001 else 0)}.distinctUntilChanged()}.collectAsStateWithLifecycle(remember(player){player.state.value})
     val active=playback.file?.id==file.id
@@ -237,18 +359,16 @@ internal fun NowPlayingContent(file:DriveFile,modifier:Modifier=Modifier){
             val typography = MaterialTheme.typography
             val density = LocalDensity.current
             val wide = maxWidth > viewportHeight
-            val titleHeight = with(density) {
-                maxOf(56.dp, typography.headlineSmall.lineHeight.toDp() + typography.bodyLarge.lineHeight.toDp() + 4.dp)
-            }
+            val scroll = rememberScrollState()
             val noticeHeight = with(density) { maxOf(32.dp, typography.bodySmall.lineHeight.toDp() * 2) }
             val transportHeight = with(density) { 128.dp + typography.labelSmall.lineHeight.toDp() } +
                 if (maxWidth < singleRowTransportWidth) 48.dp else 0.dp
             val lyricLineHeight = audioLyricLineHeight()
             val cover = if (wide) minOf(viewportHeight - 24.dp, maxWidth * .43f).coerceAtLeast(48.dp)
-                else minOf(maxWidth, viewportHeight - titleHeight - transportHeight - noticeHeight -
-                    lyricLineHeight * 3 - 42.dp, 420.dp).coerceAtLeast(48.dp)
+                else minOf(maxWidth, viewportHeight - transportHeight - noticeHeight - lyricLineHeight * 3 - 34.dp, 420.dp).coerceAtLeast(48.dp)
             val artwork: @Composable () -> Unit = {
-                TrackArtwork(file, state.metadata, Modifier.size(cover).clip(RoundedCornerShape(16.dp)).testTag("audio-cover"))
+                TrackArtwork(file, state.metadata, Modifier.size(cover).clip(RoundedCornerShape(16.dp))
+                    .audioDismissGesture(swipe, if (wide) null else scroll).testTag("audio-cover"))
             }
             val favorite= favoriteOverride?:file.isFavorite
             val controls:@Composable ()->Unit={
@@ -266,16 +386,6 @@ internal fun NowPlayingContent(file:DriveFile,modifier:Modifier=Modifier){
                     }
                 }
             }
-            val title:@Composable ()->Unit={
-                val labels=Triple(file.id,state.metadata.title?.takeIf(String::isNotBlank)?:file.name.substringBeforeLast('.'),
-                    state.metadata.artist?.takeIf(String::isNotBlank)?:file.extension.uppercase().ifBlank{"Audio"})
-                Crossfade(labels,Modifier.fillMaxWidth().height(titleHeight).testTag("audio-track-labels"),animationSpec=tween(240),label="audioTrackLabels"){(_,name,artist)->
-                    Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
-                        Text(name,color=Color.White,style=MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,maxLines=1,overflow=TextOverflow.Ellipsis)
-                        Text(artist,color=Color.White.copy(alpha=.75f),style=MaterialTheme.typography.bodyLarge,maxLines=1,overflow=TextOverflow.Ellipsis)
-                    }
-                }
-            }
             val notice:@Composable ()->Unit={
                 Box(Modifier.fillMaxWidth().height(noticeHeight).testTag("audio-status"),contentAlignment=Alignment.CenterStart){
                     val error=state.error?:state.queueError?:favoriteError
@@ -284,9 +394,7 @@ internal fun NowPlayingContent(file:DriveFile,modifier:Modifier=Modifier){
                 }
             }
             val details: @Composable () -> Unit = {
-                title()
-                Spacer(Modifier.height(6.dp))
-                AudioLyricWindow(file.id, state.metadata.lyrics, lyricLineHeight)
+                AudioLyricWindow(file.id, state.metadata.lyrics, lyricLineHeight, Modifier.audioDismissGesture(swipe, scroll))
                 Spacer(Modifier.height(12.dp))
                 controls()
                 notice()
@@ -295,11 +403,11 @@ internal fun NowPlayingContent(file:DriveFile,modifier:Modifier=Modifier){
                 Row(Modifier.fillMaxSize().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(24.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     artwork()
-                    Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                    Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(scroll),
                         verticalArrangement = Arrangement.Center) { details() }
                 }
             } else {
-                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.Center) {
+                Column(Modifier.fillMaxSize().verticalScroll(scroll), verticalArrangement = Arrangement.Center) {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { artwork() }
                     Spacer(Modifier.height(22.dp))
                     details()

@@ -79,6 +79,7 @@ import com.infinity.drive.domain.model.AppLanguage
 import com.infinity.drive.domain.model.AppTheme
 import com.infinity.drive.presentation.applock.LockScreen
 import com.infinity.drive.presentation.platform.LocalAppVersion
+import com.infinity.drive.presentation.platform.LocalPresentAppUpdate
 import com.infinity.drive.presentation.platform.LocalUrlOpener
 import com.infinity.drive.presentation.navigation.AppNavHost
 import com.infinity.drive.presentation.navigation.BottomBarHeight
@@ -93,7 +94,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
-import com.infinity.drive.presentation.components.UpdateDialog
+import com.infinity.drive.presentation.components.UpdateSheet
 import com.infinity.drive.presentation.components.SessionBrokenDialog
 
 @Composable
@@ -164,6 +165,7 @@ fun DriveInfinityApp(
         CompositionLocalProvider(
             (LocalLocaleList as ProvidableCompositionLocal<LocaleList>) provides targetLocaleList,
             LocalLayoutDirection provides targetDirection,
+            LocalPresentAppUpdate provides viewModel::presentUpdate,
             app.tgdrive.ui.LocalDashboardStyle provides state.dashboardStyle.name,
             app.tgdrive.ui.LocalDashboardDark provides state.dashboardDark
         ) {
@@ -202,14 +204,10 @@ fun DriveInfinityApp(
                 SessionBrokenDialog(onSignInAgain = viewModel::resetSession)
             }
             pendingUpdate?.takeIf { !state.loading && !state.locked&&!preparing }?.let { release ->
-                UpdateDialog(
+                UpdateSheet(
                     currentVersion = LocalAppVersion.current,
                     onOpenUrl = urlOpener::open,
                     release = release,
-                    onDownload = {
-                        viewModel.dismissUpdate()
-                        urlOpener.open(release.pageUrl)
-                    },
                     onDismiss = viewModel::dismissUpdate
                 )
             }

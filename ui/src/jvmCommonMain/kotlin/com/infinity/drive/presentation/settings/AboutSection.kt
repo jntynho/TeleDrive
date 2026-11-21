@@ -11,7 +11,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.infinity.drive.core.update.AppLinks
-import com.infinity.drive.presentation.components.UpdateDialog
+import com.infinity.drive.presentation.components.UpdateSheet
 import com.infinity.drive.presentation.platform.*
 import com.infinity.drive.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -62,6 +62,20 @@ fun AboutSection(state:SettingsUiState,viewModel:SettingsViewModel){
     }
     Text("Made possible by open source.",Modifier.fillMaxWidth().padding(horizontal=24.dp,vertical=24.dp),
         style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-    (update as? UpdateState.Available)?.let{available->UpdateDialog(currentVersion=LocalAppVersion.current,release=available.release,
-        onOpenUrl=opener::open,onDownload={viewModel.dismissUpdate();opener.open(available.release.pageUrl)},onDismiss=viewModel::dismissUpdate)}
+    (update as? UpdateState.Available)?.let { available ->
+        val present = LocalPresentAppUpdate.current
+        if (present != null) {
+            LaunchedEffect(available) {
+                present(available.release)
+                viewModel.dismissUpdate()
+            }
+        } else {
+            UpdateSheet(
+                currentVersion = LocalAppVersion.current,
+                release = available.release,
+                onOpenUrl = opener::open,
+                onDismiss = viewModel::dismissUpdate
+            )
+        }
+    }
 }

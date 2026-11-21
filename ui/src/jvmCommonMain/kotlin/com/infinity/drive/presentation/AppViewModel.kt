@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.infinity.drive.core.update.AppRelease
 import com.infinity.drive.core.update.UpdateChecker
@@ -173,7 +174,7 @@ class AppViewModel(
             }
             settingsRepository.update { it.copy(lastUpdateCheckAt = System.currentTimeMillis()) }
             if (!force && release?.version == prefs.skippedUpdateVersion) return@launch
-            _pendingUpdate.value = release
+            release?.let(::presentUpdate)
         }
     }
 
@@ -196,6 +197,10 @@ class AppViewModel(
             }
             _sessionBroken.value = false
         }
+    }
+
+    fun presentUpdate(release: AppRelease) {
+        _pendingUpdate.update { current -> if (current?.version == release.version) current else release }
     }
 
     fun dismissUpdate() {

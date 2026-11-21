@@ -137,7 +137,7 @@ fun PlayerControls(
                     Text("Playback speed",Modifier.padding(horizontal=24.dp,vertical=12.dp),style=MaterialTheme.typography.titleLarge)
                     listOf(.5f,.75f,1f,1.25f,1.5f,1.75f,2f).forEach{value->
                         ListItem(headlineContent={Text(if(value==1f)"Normal · 1×"else speedLabel(value))},
-                            leadingContent={Icon(MediaIcons.VideoSpeed,null)},
+                            leadingContent={Icon(MediaIcons.VideoDockSpeed,null)},
                             trailingContent={if(kotlin.math.abs(value-rate)<.001f)Icon(DriveIcons.Check,"Selected")},
                             colors=ListItemDefaults.colors(containerColor=Color.Transparent),
                             modifier=Modifier.clickable{closeThen{player.setPlaybackSpeed(value);speedMenu=false;onInteraction()}})
@@ -150,8 +150,6 @@ fun PlayerControls(
         BoxWithConstraints(Modifier.fillMaxSize()){
             val viewportHeight=maxHeight
             val compact=maxWidth>viewportHeight||viewportHeight<400.dp
-            val iconSize=if(compact)28.dp else 32.dp
-            val playSize=if(compact)32.dp else 38.dp
             val playTarget=if(compact)56.dp else 64.dp
             val density=LocalDensity.current
             val dockInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
@@ -162,44 +160,56 @@ fun PlayerControls(
             val safeWidth = with(density) {
                 (dockInsets.getLeft(this, direction) + dockInsets.getRight(this, direction)).toDp()
             }
-            val timeHeight = maxOf(20.dp, (20 * density.fontScale).dp)
-            val toolCount = 3 + (if (canChooseTracks) 1 else 0) + (if (onPictureInPicture != null) 1 else 0)
+            val dockWidth = (maxWidth - dockPadding * 2 - safeWidth).coerceAtLeast(0.dp)
+            val timeWidth = (100.dp * density.fontScale.coerceAtLeast(1f)).coerceAtMost(dockWidth * .55f)
             val shortViewport = viewportHeight < 240.dp
-            val inlineTools = maxWidth - dockPadding * 2 - safeWidth >=
-                48.dp * toolCount + 8.dp + 112.dp * density.fontScale.coerceAtLeast(1f)
-            val bottomReserved = 48.dp + timeHeight + (if (inlineTools) 0.dp else 48.dp) +
-                (if (shortViewport) 48.dp else 0.dp) + 16.dp + safeBottom
+            val toolRowHeight = maxOf(48.dp, 20.dp * density.fontScale)
+            val bottomReserved = 48.dp + toolRowHeight + (if (shortViewport) 48.dp else 0.dp) +
+                16.dp + safeBottom
             val transportOffset=minOf(0.dp,viewportHeight/2-bottomReserved-playTarget/2-12.dp)
             val ended=playbackState==Player.STATE_ENDED
             val canSeek=seekable&&duration>0
-            if(viewportHeight>=240.dp)Row(Modifier.align(Alignment.Center).offset(y=transportOffset).testTag("video-transport"),verticalAlignment=Alignment.CenterVertically,
+            val playIcon = when {
+                ended -> MediaIcons.VideoRestart
+                requested -> MediaIcons.VideoPause
+                else -> MediaIcons.VideoStart
+            }
+            val playDescription = if (ended) "Replay" else if (requested) "Pause" else "Play"
+            val togglePlayback = {
+                onInteraction()
+                when {
+                    ended -> { player.seekTo(0); player.play() }
+                    player.playWhenReady -> player.pause()
+                    else -> player.play()
+                }
+            }
+            if(!shortViewport)Row(Modifier.align(Alignment.Center).offset(y=transportOffset).testTag("video-transport"),verticalAlignment=Alignment.CenterVertically,
                 horizontalArrangement=Arrangement.spacedBy(if(compact)20.dp else 28.dp)){
-                SeekButton(DriveIcons.Replay10,"Back 10 seconds",iconSize,canSeek){onInteraction();player.seekTo(videoSeekTarget(player.currentPosition,-10_000,player.duration))}
-                IconButton(onClick={onInteraction();when{ended->{player.seekTo(0);player.play()};player.playWhenReady->player.pause();else->player.play()}},
+                SeekButton(DriveIcons.Replay10,"Back 10 seconds",canSeek){onInteraction();player.seekTo(videoSeekTarget(player.currentPosition,-10_000,player.duration))}
+                IconButton(onClick = togglePlayback,
                     modifier=Modifier.size(playTarget).clip(CircleShape).background(Color.Black.copy(alpha=.5f)).testTag("video-play")){
                     Box(contentAlignment=Alignment.Center){
                         if(playbackState==Player.STATE_BUFFERING&&requested)CircularProgressIndicator(
                             Modifier.size(if(compact)40.dp else 50.dp),color=Color.White.copy(alpha=.55f),strokeWidth=1.5.dp)
-                        Icon(if (ended) DriveIcons.Autorenew else if (!requested) MediaIcons.Play else MediaIcons.Pause,
-                            if(ended)"Replay"else if(requested)"Pause"else"Play",Modifier.size(playSize),tint=Color.White)
+                        Icon(playIcon, playDescription, Modifier.size(24.dp), tint = Color.White)
                     }
                 }
-                SeekButton(DriveIcons.Forward10,"Forward 10 seconds",iconSize,canSeek){onInteraction();player.seekTo(videoSeekTarget(player.currentPosition,10_000,player.duration))}
+                SeekButton(DriveIcons.Forward10,"Forward 10 seconds",canSeek){onInteraction();player.seekTo(videoSeekTarget(player.currentPosition,10_000,player.duration))}
             }
             val tools: @Composable () -> Unit = {
                 if (canChooseTracks) {
-                    VideoToolButton(MediaIcons.VideoTracks, stringResource(R.string.video_track_picker)) {
+                    VideoToolButton(MediaIcons.VideoDockTracks, stringResource(R.string.video_track_picker)) {
                         onInteraction()
                         trackMenu = true
                     }
                 }
                 if (onPictureInPicture != null) {
-                    VideoToolButton(MediaIcons.VideoPip, stringResource(R.string.video_picture_in_picture)) {
+                    VideoToolButton(MediaIcons.VideoDockPip, stringResource(R.string.video_picture_in_picture)) {
                         onInteraction()
                         onPictureInPicture()
                     }
                 }
-                VideoToolButton(MediaIcons.VideoSpeed, "Playback speed, ${speedLabel(rate)}") {
+                VideoToolButton(MediaIcons.VideoDockSpeed, "Playback speed, ${speedLabel(rate)}") {
                     onInteraction()
                     speedMenu = true
                 }
@@ -235,14 +245,22 @@ fun PlayerControls(
                     bufferedFraction = if (duration > 0) buffered.toFloat() / duration else 0f,
                     bufferedColor = Color.White.copy(alpha = .4f),
                     modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Seek video" })
-                val total = if (duration > 0) Formatters.duration(duration) else "--:--"
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                    Box(Modifier.fillMaxWidth().heightIn(min = timeHeight), contentAlignment = Alignment.CenterStart) {
+                    val total = if (duration > 0) Formatters.duration(duration) else "--:--"
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = toolRowHeight),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
                             "${Formatters.duration(elapsed)} / $total", color = Color.White.copy(alpha = .88f),
                             style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.testTag("video-timeline-time")
+                            modifier = Modifier.weight(1f).testTag("video-timeline-time")
                         )
+                        Row(
+                            Modifier.widthIn(max = (dockWidth - timeWidth).coerceAtLeast(0.dp))
+                                .horizontalScroll(rememberScrollState()),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) { tools() }
                     }
                 }
             }
@@ -254,39 +272,18 @@ fun PlayerControls(
             ) {
                 if (shortViewport) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        SeekButton(DriveIcons.Replay10, "Back 10 seconds", 22.dp, canSeek) {
+                        SeekButton(DriveIcons.Replay10, "Back 10 seconds", canSeek) {
                             onInteraction()
                             player.seekTo(videoSeekTarget(player.currentPosition, -10_000, player.duration))
                         }
-                        VideoToolButton(
-                            if (ended) DriveIcons.Autorenew else if (requested) MediaIcons.Pause else MediaIcons.Play,
-                            if (ended) "Replay" else if (requested) "Pause" else "Play"
-                        ) {
-                            onInteraction()
-                            when {
-                                ended -> { player.seekTo(0); player.play() }
-                                player.playWhenReady -> player.pause()
-                                else -> player.play()
-                            }
-                        }
-                        SeekButton(DriveIcons.Forward10, "Forward 10 seconds", 22.dp, canSeek) {
+                        VideoToolButton(playIcon, playDescription, action = togglePlayback)
+                        SeekButton(DriveIcons.Forward10, "Forward 10 seconds", canSeek) {
                             onInteraction()
                             player.seekTo(videoSeekTarget(player.currentPosition, 10_000, player.duration))
                         }
                     }
                 }
-                if (inlineTools) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Column(Modifier.weight(1f).testTag("video-timeline")) { timeline() }
-                        Row { tools() }
-                    }
-                } else {
-                    Column(Modifier.fillMaxWidth().testTag("video-timeline")) { timeline() }
-                    Row(
-                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.End
-                    ) { tools() }
-                }
+                Column(Modifier.fillMaxWidth().testTag("video-timeline")) { timeline() }
             }
         }
     }
@@ -295,14 +292,14 @@ fun PlayerControls(
 @Composable
 private fun VideoToolButton(icon: ImageVector, label: String, iconRotation: Float = 0f, action: () -> Unit) {
     IconButton(action, modifier = Modifier.size(48.dp).semantics { contentDescription = label }) {
-        Icon(icon, null, Modifier.size(22.dp).graphicsLayer { rotationZ = iconRotation }, tint = Color.White)
+        Icon(icon, null, Modifier.size(24.dp).graphicsLayer { rotationZ = iconRotation }, tint = Color.White)
     }
 }
 
 @Composable
-private fun SeekButton(icon:ImageVector,description:String,size:androidx.compose.ui.unit.Dp,enabled:Boolean,onClick:()->Unit){
+private fun SeekButton(icon:ImageVector,description:String,enabled:Boolean,onClick:()->Unit){
     IconButton(onClick,enabled=enabled,modifier=Modifier.size(48.dp).clip(CircleShape).background(Color.Black.copy(alpha=.4f))){
-        Icon(icon, description, Modifier.size(size), tint = Color.White.copy(alpha = if (enabled) 1f else .35f))
+        Icon(icon, description, Modifier.size(24.dp), tint = Color.White.copy(alpha = if (enabled) 1f else .35f))
     }
 }
 private fun speedLabel(value:Float)=if(value%1f==0f)"${value.toInt()}×"else"${value}×"
@@ -312,7 +309,7 @@ enum class PlayerResizeMode(val description: String) {
     ZOOM("Scaling: crop to fill"),
     FILL("Scaling: stretch");
 
-    val icon: ImageVector @Composable get() = if (this == ZOOM) MediaIcons.VideoCrop else MediaIcons.VideoFit
+    val icon: ImageVector @Composable get() = if (this == ZOOM) MediaIcons.VideoDockCrop else MediaIcons.VideoDockFit
 
     fun next(): PlayerResizeMode = if (this == FIT) ZOOM else FIT
 }
@@ -335,7 +332,7 @@ internal enum class PlayerRotation(
         ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     );
 
-    val icon: ImageVector @Composable get() = if (this == AUTO) MediaIcons.VideoOrientation else MediaIcons.VideoOrientationLocked
+    val icon: ImageVector @Composable get() = if (this == AUTO) MediaIcons.VideoDockRotate else MediaIcons.VideoDockRotateLocked
 
     fun next(): PlayerRotation = entries[(ordinal + 1) % entries.size]
 }

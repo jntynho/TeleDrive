@@ -4,6 +4,7 @@ package com.infinity.drive.presentation.home
 import app.tgdrive.ui.ElasticLazyColumn as LazyColumn
 import app.tgdrive.ui.DriveIcons
 import app.tgdrive.ui.LibraryDashboard
+import app.tgdrive.ui.LibraryIcons
 import app.tgdrive.ui.LibraryOverview
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -197,8 +198,8 @@ fun HomeScreen(
                 app.tgdrive.ui.LibraryBrowse(listOf(
                     app.tgdrive.ui.LibraryShortcut("All files", DriveIcons.Folder, onOpenFiles),
                     app.tgdrive.ui.LibraryShortcut("Note", DriveIcons.Notes, onOpenNotes),
-                    app.tgdrive.ui.LibraryShortcut("Favorites", DriveIcons.Star) { onOpenCollection(CollectionType.FAVORITES) },
-                    app.tgdrive.ui.LibraryShortcut("Archived", app.tgdrive.ui.LibraryIcons.Archive) { onOpenCollection(CollectionType.ARCHIVED) },
+                    app.tgdrive.ui.LibraryShortcut("Favorites", LibraryIcons.Favorite) { onOpenCollection(CollectionType.FAVORITES) },
+                    app.tgdrive.ui.LibraryShortcut("Archived", LibraryIcons.Archive) { onOpenCollection(CollectionType.ARCHIVED) },
                     app.tgdrive.ui.LibraryShortcut("Hidden", app.tgdrive.ui.LibraryIcons.Hidden) { onOpenCollection(CollectionType.HIDDEN) },
                     app.tgdrive.ui.LibraryShortcut("Trash", DriveIcons.Delete, onOpenTrash)
                 ))
