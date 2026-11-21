@@ -233,12 +233,25 @@ class DashboardStylesUiTest {
             assertEquals(bounds,compose.onNodeWithTag("library-card").fetchSemanticsNode().boundsInRoot)
             compose.onNodeWithText("24.8 GB",substring=false).assertIsDisplayed()
             compose.onNodeWithText("1284 files",substring=false).assertIsDisplayed()
-            val layouts=mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
-            compose.onNodeWithText("24.8 GB",substring=false).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult){it(layouts)}
+            val details = when (choice) {
+                DashboardStyle.BLOOM -> listOf("Photos", "Videos", "Audio", "Files", "8.8 GB", "10.6 GB", "3.0 GB", "2.4 GB")
+                DashboardStyle.TIDE -> listOf("Photos", "Videos", "Audio", "Files", "35%", "43%", "12%", "10%")
+                DashboardStyle.COVE -> listOf("Stored in Telegram", "On this device", "0 B")
+                else -> emptyList()
+            }
             capture("dashboard-${choice.name.lowercase()}-large-text")
-            // Check the visible line, rather than the paragraph's wider allocation rectangle.
-            val clipped=layouts.any{it.didOverflowHeight||it.isLineEllipsized(0)||it.getLineEnd(0,visibleEnd=true)<it.layoutInput.text.length}
-            assertFalse("Total must remain fully readable in ${choice.name}",clipped)
+            (listOf("24.8 GB") + details).forEach { label ->
+                val node = compose.onNodeWithText(label, substring = false).assertIsDisplayed()
+                val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+                node.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
+                val clipped = layouts.any {
+                    it.didOverflowHeight || it.lineCount == 0 ||
+                        it.getLineEnd(it.lineCount - 1, visibleEnd = true) < it.layoutInput.text.length
+                }
+                assertFalse("$label must remain fully readable in ${choice.name}", clipped)
+                assertTrue("$label must be fully inside the card in ${choice.name}",
+                    node.fetchSemanticsNode().boundsInRoot.bottom <= bounds.bottom)
+            }
         }
     }
 }

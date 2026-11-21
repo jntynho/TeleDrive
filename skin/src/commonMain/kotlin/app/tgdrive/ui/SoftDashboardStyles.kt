@@ -8,9 +8,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
@@ -55,7 +58,7 @@ internal fun SoftDashboard(
     val brush = if (style == "MIST") Brush.radialGradient(listOf(glow, surface))
         else Brush.linearGradient(listOf(glow, surface))
 
-    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides ink) {
+    CompositionLocalProvider(LocalContentColor provides ink) {
         Box(modifier.clip(RoundedCornerShape(27.dp)).background(brush)) {
             Column(
                 Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 14.dp),
@@ -69,7 +72,7 @@ internal fun SoftDashboard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            if (style == "TIDE") "Storage breakdown" else "Your library",
+                            if (style == "TIDE") "Storage share" else "Your library",
                             Modifier.weight(1f).skeleton(loading),
                             style = MaterialTheme.typography.titleMedium,
                             maxLines = 1,
@@ -98,8 +101,8 @@ internal fun SoftDashboard(
                         Text(fileCount(usage, loading), Modifier.skeleton(loading),
                             style = MaterialTheme.typography.labelMedium)
                         Text(updated, Modifier.weight(1f).skeleton(loading), color = muted,
-                            style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                            style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.End)
                     }
                 }
             }
@@ -149,7 +152,7 @@ private fun LibraryTotal(usage: LibraryOverview, loading: Boolean, muted: Color)
         DashboardAmount(usage.bytes, loading)
         Text("Stored in Telegram", Modifier.weight(1f).skeleton(loading), color = muted,
             style = MaterialTheme.typography.labelMedium,
-            textAlign = androidx.compose.ui.text.style.TextAlign.End, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            textAlign = TextAlign.End, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -172,12 +175,16 @@ private fun BloomContents(usage: LibraryOverview, loading: Boolean, dark: Boolea
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    Box(
-                        Modifier.size(if (largeText) 30.dp else 44.dp)
-                            .clip(RoundedCornerShape(17.dp)).background(Color(backgrounds[index])).skeleton(loading),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(icons[index], null, Modifier.size(19.dp), tint = Color(tints[index]))
+                    if (largeText) {
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(Color(tints[index])).skeleton(loading))
+                    } else {
+                        Box(
+                            Modifier.size(44.dp).clip(RoundedCornerShape(17.dp))
+                                .background(Color(backgrounds[index])).skeleton(loading),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(icons[index], null, Modifier.size(19.dp), tint = Color(tints[index]))
+                        }
                     }
                     Text(categoryNames[index], Modifier.skeleton(loading), color = muted,
                         style = MaterialTheme.typography.labelSmall)
@@ -207,7 +214,7 @@ private fun TideContents(usage: LibraryOverview, loading: Boolean, dark: Boolean
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    Box(Modifier.widthIn(max = 56.dp).fillMaxWidth().height(if (largeText) 28.dp else 52.dp)
+                    Box(Modifier.widthIn(max = 56.dp).fillMaxWidth().height(if (largeText) 16.dp else 52.dp)
                         .clip(RoundedCornerShape(15.dp)).background(track).skeleton(loading)
                     ) {
                         Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(shares[index] / scale)
@@ -230,21 +237,35 @@ private fun CoveContents(usage: LibraryOverview, loading: Boolean, dark: Boolean
     val cloud = Color(if (dark) 0xFF44382C else 0xFFFDF8F1)
     val device = Color(if (dark) 0xFF3D3228 else 0xFFF8EEE2)
     val storagePanel: @Composable (String, Long, Boolean, Color, Modifier) -> Unit = { label, bytes, local, background, modifier ->
-        Column(
-            modifier.clip(RoundedCornerShape(19.dp)).background(background).padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Box(Modifier.size(30.dp).clip(RoundedCornerShape(11.dp)).background(iconSurface).skeleton(loading),
+        val panel = modifier.clip(RoundedCornerShape(19.dp)).background(background).padding(12.dp)
+        val storageIcon: @Composable () -> Unit = {
+            Box(
+                Modifier.size(30.dp).clip(RoundedCornerShape(11.dp)).background(iconSurface).skeleton(loading),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(if (local) DriveIcons.PhoneAndroid else DriveIcons.CloudQueue, null,
                     Modifier.size(18.dp), tint = accent)
             }
+        }
+        val storageText: @Composable () -> Unit = {
             val value = if (loading) (if (local) "3.4 GB" else "24.8 GB") else formatLibraryBytes(bytes)
-            Text(value, Modifier.skeleton(loading), style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(label, Modifier.skeleton(loading), color = muted,
-                style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(value, Modifier.skeleton(loading), style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(label, Modifier.skeleton(loading), color = muted, style = MaterialTheme.typography.labelMedium,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        if (largeText) {
+            Row(panel, horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                storageIcon()
+                storageText()
+            }
+        } else {
+            Column(panel, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                storageIcon()
+                storageText()
+            }
         }
     }
     if (largeText) {

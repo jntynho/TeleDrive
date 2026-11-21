@@ -231,7 +231,7 @@ private fun StrataBody(usage:LibraryOverview,loading:Boolean,colours:List<Color>
 
 @Composable
 private fun dashboardFrameHeight(width: Dp, usage: LibraryOverview, loading: Boolean, updated: String, fontScale: Float): Dp {
-    val expanded = 244.dp + 108.dp * (fontScale - 1f).coerceAtLeast(0f)
+    val expanded = 244.dp + 156.dp * (fontScale - 1f).coerceAtLeast(0f)
     return maxOf(expanded, originalClassicHeight(width, usage, loading, updated))
 }
 
