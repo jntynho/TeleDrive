@@ -44,6 +44,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -95,6 +99,11 @@ fun NoteEditorScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val paragraphDirection = if (LocalLayoutDirection.current == LayoutDirection.Rtl) {
+        TextDirection.ContentOrRtl
+    } else TextDirection.ContentOrLtr
+    val titleStyle = MaterialTheme.typography.headlineSmall.copy(textDirection = paragraphDirection, textAlign = TextAlign.Start)
+    val bodyStyle = MaterialTheme.typography.bodyLarge.copy(textDirection = paragraphDirection, textAlign = TextAlign.Start)
     var body by remember(state.loading) { mutableStateOf(TextFieldValue(state.body)) }
 
     LaunchedEffect(state.body) {
@@ -266,10 +275,10 @@ fun NoteEditorScreen(
                 placeholder = {
                     Text(
                         text = stringResource(Res.string.note_title_hint),
-                        style = MaterialTheme.typography.headlineSmall
+                        style = titleStyle
                     )
                 },
-                textStyle = MaterialTheme.typography.headlineSmall,
+                textStyle = titleStyle,
                 singleLine = true,
                 enabled = !state.saving,
                 colors = borderlessColors(),
@@ -313,7 +322,8 @@ fun NoteEditorScreen(
                     body = it
                     viewModel.setBody(it.text)
                 },
-                placeholder = { Text(stringResource(Res.string.note_body_hint)) },
+                placeholder = { Text(stringResource(Res.string.note_body_hint), style = bodyStyle) },
+                textStyle = bodyStyle,
                 enabled = !state.saving,
                 colors = borderlessColors(),
                 modifier = Modifier

@@ -162,7 +162,14 @@
       "Previous": "previous",
       "Rotate": "rotate-left",
       "Speed": "speedometer",
-      "PictureInPicture": "teledrive-picture-in-picture"
+      "PictureInPicture": "teledrive-picture-in-picture",
+      "VideoSpeed": "teledrive-video-speed",
+      "VideoFit": "teledrive-video-fit",
+      "VideoCrop": "teledrive-video-crop",
+      "VideoTracks": "teledrive-video-tracks",
+      "VideoPip": "teledrive-video-pip",
+      "VideoOrientation": "teledrive-video-orientation",
+      "VideoOrientationLocked": "teledrive-video-orientation-locked"
     }
   },
   "site": {
@@ -818,6 +825,38 @@
       "teledrive-picture-in-picture": [
         {"d": "M9.5 18.5H5C3.9 18.5 3 17.6 3 16.5V7.5C3 6.4 3.9 5.5 5 5.5H19C20.1 5.5 21 6.4 21 7.5V9", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
         {"d": "M14 11H20C20.55 11 21 11.45 21 12V17.5C21 18.05 20.55 18.5 20 18.5H14C13.45 18.5 13 18.05 13 17.5V12C13 11.45 13.45 11 14 11Z", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"}
+      ],
+      "teledrive-video-speed": [
+        {"d": "M4 16a8 8 0 1 1 16 0", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M6.5 18.5h11", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M12 15l4-4", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M6 13h1m5-5v1m5 4h1", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"}
+      ],
+      "teledrive-video-fit": [
+        {"d": "M3.5 9V5.5a2 2 0 0 1 2-2H9m6 0h3.5a2 2 0 0 1 2 2V9m0 6v3.5a2 2 0 0 1-2 2H15m-6 0H5.5a2 2 0 0 1-2-2V15", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M8 10h8v4H8z", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"}
+      ],
+      "teledrive-video-crop": [
+        {"d": "M7 3v12a2 2 0 0 0 2 2h12", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M3 7h12a2 2 0 0 1 2 2v12", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M12 12l3-3", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"}
+      ],
+      "teledrive-video-tracks": [
+        {"d": "M6 5h12a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H9l-4 2v-2a3 3 0 0 1-2-3V8a3 3 0 0 1 3-3Z", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M7 10h10M7 14h3m2 0h5", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"}
+      ],
+      "teledrive-video-pip": [
+        {"d": "M10 18H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M13 12h6.5a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5H13a1.5 1.5 0 0 1-1.5-1.5v-4A1.5 1.5 0 0 1 13 12Z", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M6 8l3 3m0-2v2H7", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"}
+      ],
+      "teledrive-video-orientation": [
+        {"d": "M6 8a7 7 0 0 1 12-1l1.5 2m0-3v3h-3M18 16a7 7 0 0 1-12 1l-1.5-2m0 3v-3h3", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M10 9.5h4v5h-4z", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"}
+      ],
+      "teledrive-video-orientation-locked": [
+        {"d": "M9 3.5h6a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M10 11h4v4h-4zM11 11v-1a1 1 0 0 1 2 0v1", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"}
       ],
       "teledrive-telegram": [
         {"d": "M2.8 10.9L20.4 4.1C21.2 3.8 21.8 4.3 21.6 5.2L18.7 19.3C18.5 20.3 17.9 20.5 17.1 19.9L12.8 16.7L10.6 18.8C10 19.3 9.5 19.1 9.4 18.3L8.8 14.3L3 12.5C2 12.2 1.9 11.3 2.8 10.9Z", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
@@ -1600,6 +1639,38 @@
         {"d": "M3 11V7.5C3 6.4 3.9 5.5 5 5.5H19C20.1 5.5 21 6.4 21 7.5V9", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
         {"d": "M3 14V16.5C3 17.6 3.9 18.5 5 18.5H9.5", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
         {"d": "M14 11H20C20.55 11 21 11.45 21 12V17.5C21 18.05 20.55 18.5 20 18.5H14C13.45 18.5 13 18.05 13 17.5V12C13 11.45 13.45 11 14 11Z", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"}
+      ],
+      "teledrive-video-speed": [
+        {"d": "M4 16a8 8 0 0 1 2.3-5.7", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M8.7 8.7A8 8 0 0 1 20 16", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M6.5 18.5h11", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M12 15l4-4", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"}
+      ],
+      "teledrive-video-fit": [
+        {"d": "M3.5 9V5.5a2 2 0 0 1 2-2H9m6 0h3.5a2 2 0 0 1 2 2V9m0 6v3.5a2 2 0 0 1-2 2H15m-6 0H5.5a2 2 0 0 1-2-2V15", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M8 12v-2h8v4h-5", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"}
+      ],
+      "teledrive-video-crop": [
+        {"d": "M7 3v8m0 2v2a2 2 0 0 0 2 2h12", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M3 7h12a2 2 0 0 1 2 2v3m0 2v7", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M12 12l3-3", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"}
+      ],
+      "teledrive-video-tracks": [
+        {"d": "M3 10V8a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H9l-4 2v-2a3 3 0 0 1-2-3v-2", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M7 10h10M7 14h3m2 0h5", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"}
+      ],
+      "teledrive-video-pip": [
+        {"d": "M3 10V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2M3 13v3a2 2 0 0 0 2 2h5", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M13 12h6.5a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5H13a1.5 1.5 0 0 1-1.5-1.5v-4A1.5 1.5 0 0 1 13 12Z", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M6 8l3 3m0-2v2H7", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"}
+      ],
+      "teledrive-video-orientation": [
+        {"d": "M6 8a7 7 0 0 1 5-3M14 5a7 7 0 0 1 4 2l1.5 2m0-3v3h-3M18 16a7 7 0 0 1-5 3m-3 0a7 7 0 0 1-4-2l-1.5-2m0 3v-3h3", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M10 12v-2.5h4v5h-2", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"}
+      ],
+      "teledrive-video-orientation-locked": [
+        {"d": "M7 10V5.5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V13", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},
+        {"d": "M10 11h4v4h-4zM11 11v-1a1 1 0 0 1 2 0v1", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"}
       ],
       "teledrive-telegram": [
         {"d": "M5.8 13.4L3 12.5C2 12.2 1.9 11.3 2.8 10.9L20.4 4.1C21.2 3.8 21.8 4.3 21.6 5.2L20.8 9.1", "strokeWidth": 1.5, "strokeLineCap": "round", "strokeLineJoin": "round"},

@@ -665,12 +665,14 @@ class RebuiltUiTest {
         catch(error:Throwable){capture("audio-route-failure");throw error}
         capture("now-playing")
         compose.onNodeWithContentDescription("Open lyrics").assertDoesNotExist()
+        compose.onNodeWithText("Second lyric", substring = false).assertIsDisplayed()
         compose.onNodeWithText("First lyric",substring=true).assertDoesNotExist()
         compose.onNodeWithText("Third lyric",substring=true).assertDoesNotExist()
         compose.onNodeWithContentDescription("Seek audio").performSemanticsAction(
             androidx.compose.ui.semantics.SemanticsActions.SetProgress
         ){change->assertTrue(change(90_000f))}
         org.junit.Assert.assertEquals(90_000L,playback.value.positionMs)
+        compose.onNodeWithText("Third lyric", substring = false).assertIsDisplayed()
         compose.onNodeWithContentDescription("Previous audio").performClick()
         compose.onAllNodesWithContentDescription("Next audio").onLast().performClick()
         org.junit.Assert.assertEquals(1,previous)
@@ -858,20 +860,96 @@ class RebuiltUiTest {
         compose.waitUntil(15_000) { compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Note", substring = false).performScrollTo().performClick()
         compose.waitUntil(5_000) {
-            compose.onAllNodesWithContentDescription("Keep note available offline").fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("Offline test note", substring = false).fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithContentDescription("Keep note available offline").performClick()
+        compose.onNodeWithContentDescription("More actions").performClick()
+        compose.onNodeWithText("Keep note available offline").performClick()
         compose.waitUntil(5_000) { runBlocking { repo.getFile(id)?.offlinePinned == true } }
         org.junit.Assert.assertEquals(BackupState.NONE, runBlocking { repo.getFile(id)?.backupState })
         org.junit.Assert.assertEquals("Text available locally", runBlocking {
             (repo.readNote(id) as com.infinity.drive.core.common.AppResult.Success).value
         })
 
-        compose.onNodeWithContentDescription("Stop keeping note offline").performClick()
+        compose.onNodeWithContentDescription("More actions").performClick()
+        compose.onNodeWithText("Stop keeping note offline").performClick()
         compose.waitUntil(5_000) { runBlocking { repo.getFile(id)?.offlinePinned == false } }
         org.junit.Assert.assertEquals("Text available locally", runBlocking {
             (repo.readNote(id) as com.infinity.drive.core.common.AppResult.Success).value
         })
+    }
+
+    @Test fun noteSwipesKeepTheirPhysicalDirectionsInRtl() {
+        val koin = GlobalContext.get()
+        val files = koin.get<com.infinity.drive.domain.repository.FileRepository>()
+        val transfers = koin.get<com.infinity.drive.domain.repository.TransferRepository>()
+        val chatId = -1001L
+        val noteId = "remote-swipe-note"
+        runBlocking {
+            koin.get<SettingsRepository>().update { it.copy(storageChatId = chatId) }
+            koin.get<FileDao>().upsert(
+                FileEntity(
+                    id = noteId, folderId = null, name = "Remote swipe note.md", sizeBytes = 123,
+                    mimeType = "text/markdown", category = FileCategory.DOCUMENT, localPath = null,
+                    contentHash = null, chatId = chatId, messageId = 10, remoteFileId = "remote-document",
+                    remoteUniqueId = null, backupState = BackupState.BACKED_UP,
+                    createdAt = 1, modifiedAt = 1, addedAt = 1
+                )
+            )
+        }
+        compose.runOnUiThread {
+            activity.get().setContent {
+                DriveInfinityTheme {
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Rtl
+                    ) {
+                        com.infinity.drive.presentation.note.NotesScreen({}, {}, {}, {})
+                    }
+                }
+            }
+        }
+        val card = compose.onNodeWithText("Remote swipe note", substring = false)
+        compose.waitUntil(5_000) { card.isDisplayed() }
+        compose.onNodeWithText("Download", substring = false).assertDoesNotExist()
+        compose.onNodeWithText("Move to trash", substring = false).assertDoesNotExist()
+        val actions = card.fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.CustomActions]
+        org.junit.Assert.assertEquals(listOf("Download", "Move to trash"), actions.map { it.label })
+
+        card.performTouchInput { swipeRight() }
+        compose.onNodeWithText("Move note to trash?").assertIsDisplayed()
+        compose.onNodeWithText("Cancel").performClick()
+        org.junit.Assert.assertFalse(runBlocking { files.getFile(noteId)!!.isTrashed })
+        card.performTouchInput { swipeLeft() }
+        compose.waitUntil(5_000) {
+            runBlocking {
+                transfers.observeLatestForFile(noteId).first()?.type == com.infinity.drive.domain.model.TransferType.DOWNLOAD
+            }
+        }
+        org.junit.Assert.assertTrue(runBlocking { files.getFile(noteId)!!.offlinePinned })
+        compose.onNodeWithText("Move note to trash?").assertDoesNotExist()
+    }
+
+    @Test fun noteSelectionCanSelectAllAndConfirmsBeforeMovingNotesToTrash() {
+        val repo = GlobalContext.get().get<com.infinity.drive.domain.repository.FileRepository>()
+        val ids = runBlocking {
+            listOf("First selection note", "Second selection note").map { title ->
+                (repo.saveNote(null, null, title, "Body") as com.infinity.drive.core.common.AppResult.Success).value
+            }
+        }
+        compose.waitUntil(15_000) { compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Note", substring = false).performScrollTo().performClick()
+        val firstNote = compose.onNodeWithText("First selection note", substring = false)
+        compose.waitUntil(5_000) { firstNote.isDisplayed() }
+        firstNote.performTouchInput { longClick() }
+        compose.onNodeWithText("1 selected").assertIsDisplayed()
+        compose.onNodeWithText("Select all").performClick()
+        compose.onNodeWithText("2 selected").assertIsDisplayed()
+        compose.onNodeWithContentDescription("More actions").performClick()
+        compose.onNodeWithText("Move to trash").performClick()
+        compose.onNodeWithText("Move 2 to trash?").assertIsDisplayed()
+        org.junit.Assert.assertTrue(runBlocking { ids.none { repo.getFile(it)!!.isTrashed } })
+        compose.onNodeWithText("Move to trash").performClick()
+        compose.waitUntil(5_000) { runBlocking { ids.all { repo.getFile(it)!!.isTrashed } } }
+        compose.onNodeWithText("2 selected").assertDoesNotExist()
     }
 
     @Test fun dirtyNoteAsksBeforeLeavingAndCancelKeepsTheDraft(){

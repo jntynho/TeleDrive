@@ -98,31 +98,69 @@ class MediaSurfaceRegressionTest {
         compose.onNodeWithContentDescription("Preparing photo").assertDoesNotExist()
     }
 
-    @Test fun audioControlsAndArtworkKeepTheirBoundsAndEmbeddedLyricsStayAbsent(){
+    @Test fun audioControlsAndArtworkKeepTheirBoundsAsLyricsArriveAndTracksChange() {
         install()
-        val controls=compose.onNodeWithTag("audio-controls").fetchSemanticsNode().boundsInRoot
-        val cover=compose.onNodeWithTag("audio-cover").fetchSemanticsNode().boundsInRoot
-        val states=listOf(
-            playback.value.copy(metadata=AudioMetadata(lyrics="[00:00.00]First\n[00:30.00]Second\n[01:00.00]Third"),positionMs=30_000),
-            playback.value.copy(file=file("second"),loading=true),
-            playback.value.copy(error="Couldn't play this audio. Retry."),
-            playback.value.copy(metadata=AudioMetadata(lyrics="A long plain lyric with no timestamps that must not resize the player controls."))
+        val controls = compose.onNodeWithTag("audio-controls").fetchSemanticsNode().boundsInRoot
+        val cover = compose.onNodeWithTag("audio-cover").fetchSemanticsNode().boundsInRoot
+        val slot = compose.onNodeWithTag("audio-lyrics-slot").fetchSemanticsNode().boundsInRoot
+        val labels = compose.onNodeWithTag("audio-track-labels").fetchSemanticsNode().boundsInRoot
+        assertTrue(labels.bottom <= slot.top)
+        assertTrue(slot.bottom <= controls.top)
+
+        val initial = playback.value
+        val timed = initial.copy(metadata = AudioMetadata(lyrics =
+            "[00:00.00]First\n[00:30.00]السطر الثاني Sky 42\n[01:00.00]Third"), positionMs = 30_000)
+        val states = listOf(
+            timed,
+            initial.copy(file = file("second"), loading = true),
+            initial.copy(error = "Couldn't play this audio. Retry."),
+            initial.copy(metadata = AudioMetadata(lyrics = "A long plain lyric with no timestamps"))
         )
-        states.forEach{next->
-            compose.runOnUiThread{playback.value=next}
+        states.forEach { next ->
+            compose.runOnUiThread { playback.value = next }
             compose.waitForIdle()
-            assertEquals(controls,compose.onNodeWithTag("audio-controls").fetchSemanticsNode().boundsInRoot)
-            assertEquals(cover,compose.onNodeWithTag("audio-cover").fetchSemanticsNode().boundsInRoot)
+            assertEquals(controls, compose.onNodeWithTag("audio-controls").fetchSemanticsNode().boundsInRoot)
+            assertEquals(cover, compose.onNodeWithTag("audio-cover").fetchSemanticsNode().boundsInRoot)
+            assertEquals(slot, compose.onNodeWithTag("audio-lyrics-slot").fetchSemanticsNode().boundsInRoot)
+            if (next == timed) {
+                compose.onNodeWithText("السطر الثاني Sky 42").assertIsDisplayed()
+                compose.onNodeWithTag("audio-previous-lyric").assertIsDisplayed()
+                compose.onNodeWithTag("audio-next-lyric").assertIsDisplayed()
+                capture("audio-player-portrait")
+            } else {
+                compose.onNodeWithTag("audio-current-lyric").assertDoesNotExist()
+            }
         }
+        compose.onNodeWithText("A long plain lyric", substring = true).assertDoesNotExist()
         compose.onNodeWithContentDescription("Sleep timer").assertDoesNotExist()
         compose.onNodeWithContentDescription("Playback options").assertDoesNotExist()
         compose.onNodeWithContentDescription("Show lyrics").assertDoesNotExist()
         compose.onNodeWithContentDescription("Open lyrics").assertDoesNotExist()
-        compose.onNodeWithText("No embedded lyrics available").assertDoesNotExist()
-        compose.onNodeWithTag("audio-lyrics-slot").assertDoesNotExist()
-        compose.onNodeWithText("A long plain lyric",substring=true).assertDoesNotExist()
-        capture("audio-player-portrait")
     }
+
+    @Test fun timedLyricsFollowSeeksAndRespectStartEmptyAndEndCues() {
+        playback.value = playback.value.copy(metadata = AudioMetadata(lyrics = "[00:05]Opening\n[00:10]\n[00:15]Last"))
+        install()
+        compose.onNodeWithTag("audio-current-lyric").assertDoesNotExist()
+        compose.onNodeWithTag("audio-previous-lyric").assertDoesNotExist()
+        compose.onNodeWithTag("audio-next-lyric").assertIsDisplayed()
+
+        compose.runOnIdle { player.seek(5_000) }
+        compose.onNodeWithText("Opening").assertIsDisplayed()
+        compose.onNodeWithTag("audio-next-lyric").assertDoesNotExist()
+
+        compose.runOnIdle { player.seek(10_000) }
+        compose.onNodeWithTag("audio-current-lyric").assertDoesNotExist()
+
+        compose.runOnIdle { player.seek(120_000) }
+        compose.onNodeWithText("Last").assertIsDisplayed()
+        compose.onNodeWithTag("audio-next-lyric").assertDoesNotExist()
+
+        compose.runOnIdle { player.seek(5_000) }
+        compose.onNodeWithText("Opening").assertIsDisplayed()
+        compose.onNodeWithText("Last").assertDoesNotExist()
+    }
+
     @Test fun favoriteButtonPersistsTheCurrentTrackWithoutMovingPlaybackControls(){
         install()
         val before=compose.onNodeWithTag("audio-play").fetchSemanticsNode().boundsInRoot
@@ -132,7 +170,9 @@ class MediaSurfaceRegressionTest {
         assertEquals(before,compose.onNodeWithTag("audio-play").fetchSemanticsNode().boundsInRoot)
     }
     @Test fun largeTextKeepsTheArtworkLabelsAndTransportSeparated(){
+        playback.value = playback.value.copy(metadata = AudioMetadata(lyrics = "[00:00]Large text"))
         install(largeText=true)
+        compose.onNodeWithText("Large text").assertIsDisplayed()
         val labels=compose.onNodeWithTag("audio-track-labels").fetchSemanticsNode().boundsInRoot
         val cover=compose.onNodeWithTag("audio-cover").fetchSemanticsNode().boundsInRoot
         val controls=compose.onNodeWithTag("audio-controls").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
@@ -142,7 +182,9 @@ class MediaSurfaceRegressionTest {
     }
     @Test @Config(qualifiers="w844dp-h390dp-xhdpi")
     fun landscapeUsesSeparateArtworkAndControlsColumnsWithComfortableTargets(){
+        playback.value = playback.value.copy(metadata = AudioMetadata(lyrics = "[00:00]First\n[00:01]Second\n[00:02]Third"), positionMs = 1_000)
         install()
+        compose.onNodeWithText("Second").assertIsDisplayed()
         val cover=compose.onNodeWithTag("audio-cover").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         val labels=compose.onNodeWithTag("audio-track-labels").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         val controls=compose.onNodeWithTag("audio-controls").assertIsDisplayed().fetchSemanticsNode().boundsInRoot

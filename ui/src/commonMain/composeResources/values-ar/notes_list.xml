@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notes_search_close">إغلاق البحث</string>
+    <string name="notes_search_clear">مسح البحث</string>
+    <string name="common_clear_selection">إلغاء التحديد</string>
+    <string name="common_confirm_trash_count_title">هل تريد نقل العناصر المحددة (%1$d) إلى سلة المهملات؟</string>
+    <string name="common_deselect_all">إلغاء تحديد الكل</string>
+    <string name="common_move_trash">نقل إلى سلة المهملات</string>
+    <string name="common_select_all">تحديد الكل</string>
+    <string name="common_selection_count">عدد العناصر المحددة: %1$d</string>
+    <string name="notes_select">تحديد الملاحظة</string>
+    <string name="notes_trash_title">هل تريد نقل الملاحظة إلى سلة المهملات؟</string>
+    <string name="notes_trash_selection_message">يمكنك استعادة هذه الملاحظات من سلة المهملات لاحقًا.</string>
+    <string name="notes_trash_failed">تعذّر نقل الملاحظات إلى سلة المهملات.</string>
+    <string name="notes_upload_queue_failed">تعذّر إضافة الملاحظة إلى قائمة انتظار الرفع.</string>
+</resources>

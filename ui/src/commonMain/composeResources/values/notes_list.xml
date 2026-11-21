@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notes_search_close">Close search</string>
+    <string name="notes_search_clear">Clear search</string>
+    <string name="notes_select">Select note</string>
+    <string name="notes_trash_title">Move note to trash?</string>
+    <string name="notes_trash_selection_message">You can restore these notes from trash later.</string>
+    <string name="notes_trash_failed">Couldn’t move the notes to trash.</string>
+    <string name="notes_upload_queue_failed">Couldn’t queue this note for upload.</string>
+</resources>

@@ -54,10 +54,14 @@ class GalleryQueryRegressionTest {
             val dao = db.fileDao()
             val row = file("note", name = "Note.md", chat = 1)
             dao.upsert(row.copy(localPath = "/notes/new.md", modifiedAt = 2))
-            dao.attachDownloadedCopy(row.id, "/offline/old.md", previousPath = null, revision = 1)
+            dao.attachDownloadedCopy(row.id, "/offline/old.md", previousPath = null, revision = 1, remoteId = null)
             assertEquals("/notes/new.md", dao.byId(row.id)?.localPath)
+            dao.upsert(row.copy(remoteFileId = "new-remote"))
+            assertEquals(0, dao.attachDownloadedCopy(row.id, "/offline/old-remote.md",
+                previousPath = null, revision = 1, remoteId = "old-remote"))
+            assertNull(dao.byId(row.id)?.localPath)
             dao.upsert(row)
-            dao.attachDownloadedCopy(row.id, "/offline/copy.md", previousPath = null, revision = 1)
+            dao.attachDownloadedCopy(row.id, "/offline/copy.md", previousPath = null, revision = 1, remoteId = null)
             assertEquals("/offline/copy.md", dao.byId(row.id)?.localPath)
         } finally {
             db.close()

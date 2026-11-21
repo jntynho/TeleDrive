@@ -492,7 +492,7 @@ class TransferExecutor(
 
         if(transfer.type==TransferType.RESTORE){
             val original=entity.localPath?.let(::File)?.takeIf{it.isFile}
-            if(original!=null)return finalizeDownload(transfer,entity.id,original.absolutePath,alreadyPlain=true)
+            if(original!=null)return finalizeDownload(transfer,entity,original.absolutePath,alreadyPlain=true)
         }
         if (filePartDao.countOf(entity.id) > 1) return downloadInParts(transfer, entity)
 
@@ -519,7 +519,7 @@ class TransferExecutor(
                         }
 
                         is TelegramDownloadEvent.Completed -> {
-                            outcome = finalizeDownload(transfer, entity.id, event.localPath)
+                            outcome = finalizeDownload(transfer, entity, event.localPath)
                         }
                     }
                 }
@@ -567,7 +567,7 @@ class TransferExecutor(
                             transferDao.setStage(transfer.id, null, System.currentTimeMillis())
                             outcome = finalizeDownload(
                                 transfer = transfer,
-                                fileId = entity.id,
+                                original = entity,
                                 tdlibPath = event.localPath,
                                 alreadyPlain = true
                             )
@@ -598,16 +598,17 @@ class TransferExecutor(
 
     private suspend fun finalizeDownload(
         transfer: TransferEntity,
-        fileId: String,
+        original: FileEntity,
         tdlibPath: String,
         alreadyPlain: Boolean = false
     ): Outcome {
+        val fileId = original.id
         val entity = fileDao.byId(fileId)
             ?: return Outcome.Failed(messages.fileRecordMissing)
         val source = File(tdlibPath)
         if (!source.exists()) return Outcome.Failed(messages.downloadedMissing)
 
-        val key = if (entity.isEncrypted && !alreadyPlain) {
+        val key = if (original.isEncrypted && !alreadyPlain) {
             wrappedKeyRepository.get(CryptoKeys.CONTENT)
                 ?: return Outcome.Failed(messages.keyMissing)
         } else {
@@ -616,11 +617,13 @@ class TransferExecutor(
 
         val folderPath = folderPathResolver.pathOf(entity.folderId)
         val keepOffline = entity.offlinePinned && transfer.type != TransferType.RESTORE
-        if (keepOffline && entity.name.endsWith(".md", ignoreCase = true) && entity.localPath != null) {
+        val isNote = original.name.endsWith(".md", ignoreCase = true) || original.mimeType == "text/markdown"
+        if (keepOffline && isNote && entity.localPath?.let { File(it).isFile } == true) {
             transferDao.setCompleted(transfer.id, System.currentTimeMillis())
             return Outcome.Completed
         }
-        val savedPath = (if (keepOffline) offlineWriter(entity.id) else downloadWriter).write(
+        val offlineId = if (isNote) "${entity.id}/${java.util.UUID.randomUUID()}" else entity.id
+        val savedPath = (if (keepOffline) offlineWriter(offlineId) else downloadWriter).write(
             fileName = entity.name,
             mimeType = entity.mimeType,
             folderPath = folderPath
@@ -640,8 +643,11 @@ class TransferExecutor(
             }
         )
 
-        if (keepOffline) {
-            fileDao.attachDownloadedCopy(fileId, savedPath, entity.localPath, entity.modifiedAt)
+        if (keepOffline || isNote) {
+            // A local note may already contain unpublished edits. A public download must leave that path alone.
+            val attached = if (isNote && !keepOffline && original.localPath != null) 0
+                else fileDao.attachDownloadedCopy(fileId, savedPath, original.localPath, original.modifiedAt, original.remoteFileId)
+            if (isNote && keepOffline && attached == 0) File(savedPath).parentFile?.deleteRecursively()
         } else if (!(transfer.type == TransferType.RESTORE && entity.offlinePinned && entity.localPath != null)) {
             fileDao.setLocalPath(fileId, savedPath)
         }

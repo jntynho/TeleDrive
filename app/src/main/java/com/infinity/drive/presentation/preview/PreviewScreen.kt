@@ -13,6 +13,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animateFloatAsState
@@ -20,13 +24,16 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -155,7 +162,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @androidx.annotation.OptIn(UnstableApi::class)
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun PreviewScreen(
     onBack: () -> Unit,
@@ -356,22 +363,27 @@ fun PreviewScreen(
                 )
             }
 
+            val isVideo = currentFile.category == FileCategory.VIDEO
             AnimatedVisibility(
                 visible = chromeShown,
-                enter = fadeIn(tween(200)),
-                exit = fadeOut(tween(160)),
-                modifier = Modifier.align(Alignment.TopCenter).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(if(immersive)androidx.compose.ui.graphics.Color.Black.copy(alpha=.65f)else androidx.compose.ui.graphics.Color.Transparent,androidx.compose.ui.graphics.Color.Transparent)))
+                enter = fadeIn(tween(220, easing = LinearOutSlowInEasing)) +
+                    if (isVideo) slideInVertically(tween(260, easing = LinearOutSlowInEasing)) { -it / 4 } else androidx.compose.animation.EnterTransition.None,
+                exit = fadeOut(tween(160)) +
+                    if (isVideo) slideOutVertically(tween(190, easing = FastOutSlowInEasing)) { -it / 4 } else androidx.compose.animation.ExitTransition.None,
+                modifier = Modifier.align(Alignment.TopCenter)
             ) {
+                Box(
+                    Modifier.fillMaxWidth().background(
+                        if (immersive) androidx.compose.ui.graphics.Brush.verticalGradient(
+                            listOf(Color.Black.copy(alpha = .65f), Color.Transparent)
+                        ) else androidx.compose.ui.graphics.SolidColor(Color.Transparent)
+                    )
+                ) {
                 if(currentFile.category==FileCategory.AUDIO)CenterAlignedTopAppBar(
                     expandedHeight=com.infinity.drive.presentation.audio.audioHeaderHeight(),
                     title={com.infinity.drive.presentation.audio.AudioNowPlayingTitle(currentFile)},
                     navigationIcon = {
-                        androidx.compose.material3.FilledIconButton(
-                            onBack,
-                            colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
-                                containerColor = Color(0xFF302A40), contentColor = Color.White
-                            )
-                        ) { Icon(DriveIcons.ArrowBack, stringResource(Res.string.common_back)) }
+                        IconButton(onBack) { Icon(DriveIcons.ArrowBack, stringResource(Res.string.common_back)) }
                     },
                     actions = {
                         if (viewModel.fromTrash) {
@@ -383,6 +395,10 @@ fun PreviewScreen(
                     colors=TopAppBarDefaults.topAppBarColors(containerColor=Color.Transparent,scrolledContainerColor=Color.Transparent,
                         titleContentColor=Color.White,navigationIconContentColor=Color.White,actionIconContentColor=Color.White)
                 )else TopAppBar(
+                    windowInsets = if (isVideo) {
+                        WindowInsets.statusBarsIgnoringVisibility.only(WindowInsetsSides.Top)
+                            .union(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+                    } else TopAppBarDefaults.windowInsets,
                     expandedHeight=maxOf(52.dp,(28*androidx.compose.ui.platform.LocalDensity.current.fontScale).dp),
                     title = {
                         Text(
@@ -437,6 +453,7 @@ fun PreviewScreen(
                         actionIconContentColor=if(immersive||currentFile.category==FileCategory.AUDIO)Color.White else MaterialTheme.colorScheme.onSurface
                     )
                 )
+                }
             }
         }
     }

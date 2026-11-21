@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
 import androidx.media3.common.Player
@@ -43,7 +44,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 
 /** Playback controls in both orientations with track selection when the video offers choices. */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun PlayerControls(
     player:Player,visible:Boolean,audioOnly:Boolean,resizeMode:PlayerResizeMode,
@@ -136,7 +137,7 @@ fun PlayerControls(
                     Text("Playback speed",Modifier.padding(horizontal=24.dp,vertical=12.dp),style=MaterialTheme.typography.titleLarge)
                     listOf(.5f,.75f,1f,1.25f,1.5f,1.75f,2f).forEach{value->
                         ListItem(headlineContent={Text(if(value==1f)"Normal · 1×"else speedLabel(value))},
-                            leadingContent={Icon(MediaIcons.Speed,null)},
+                            leadingContent={Icon(MediaIcons.VideoSpeed,null)},
                             trailingContent={if(kotlin.math.abs(value-rate)<.001f)Icon(DriveIcons.Check,"Selected")},
                             colors=ListItemDefaults.colors(containerColor=Color.Transparent),
                             modifier=Modifier.clickable{closeThen{player.setPlaybackSpeed(value);speedMenu=false;onInteraction()}})
@@ -153,9 +154,21 @@ fun PlayerControls(
             val playSize=if(compact)32.dp else 38.dp
             val playTarget=if(compact)56.dp else 64.dp
             val density=LocalDensity.current
-            val safeBottom=with(density){WindowInsets.safeDrawing.getBottom(this).toDp()}
-            val timeHeight=maxOf(20.dp,(20*density.fontScale).dp)
-            val bottomReserved=48.dp+timeHeight+48.dp+16.dp+safeBottom
+            val dockInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
+                .union(WindowInsets.navigationBarsIgnoringVisibility.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
+            val direction = LocalLayoutDirection.current
+            val dockPadding = if (compact) 12.dp else 16.dp
+            val safeBottom = with(density) { dockInsets.getBottom(this).toDp() }
+            val safeWidth = with(density) {
+                (dockInsets.getLeft(this, direction) + dockInsets.getRight(this, direction)).toDp()
+            }
+            val timeHeight = maxOf(20.dp, (20 * density.fontScale).dp)
+            val toolCount = 3 + (if (canChooseTracks) 1 else 0) + (if (onPictureInPicture != null) 1 else 0)
+            val shortViewport = viewportHeight < 240.dp
+            val inlineTools = maxWidth - dockPadding * 2 - safeWidth >=
+                48.dp * toolCount + 8.dp + 112.dp * density.fontScale.coerceAtLeast(1f)
+            val bottomReserved = 48.dp + timeHeight + (if (inlineTools) 0.dp else 48.dp) +
+                (if (shortViewport) 48.dp else 0.dp) + 16.dp + safeBottom
             val transportOffset=minOf(0.dp,viewportHeight/2-bottomReserved-playTarget/2-12.dp)
             val ended=playbackState==Player.STATE_ENDED
             val canSeek=seekable&&duration>0
@@ -173,17 +186,38 @@ fun PlayerControls(
                 }
                 SeekButton(DriveIcons.Forward10,"Forward 10 seconds",iconSize,canSeek){onInteraction();player.seekTo(videoSeekTarget(player.currentPosition,10_000,player.duration))}
             }
-            val speed:@Composable ()->Unit={
-                IconButton({onInteraction();speedMenu=true},modifier=Modifier.semantics{contentDescription="Playback speed, ${speedLabel(rate)}"}){
-                    Icon(MediaIcons.Speed,null,Modifier.size(26.dp),tint=Color.White)
+            val tools: @Composable () -> Unit = {
+                if (canChooseTracks) {
+                    VideoToolButton(MediaIcons.VideoTracks, stringResource(R.string.video_track_picker)) {
+                        onInteraction()
+                        trackMenu = true
+                    }
+                }
+                if (onPictureInPicture != null) {
+                    VideoToolButton(MediaIcons.VideoPip, stringResource(R.string.video_picture_in_picture)) {
+                        onInteraction()
+                        onPictureInPicture()
+                    }
+                }
+                VideoToolButton(MediaIcons.VideoSpeed, "Playback speed, ${speedLabel(rate)}") {
+                    onInteraction()
+                    speedMenu = true
+                }
+                VideoToolButton(resizeMode.icon, resizeMode.description) {
+                    onInteraction()
+                    onCycleResizeMode()
+                }
+                VideoToolButton(rotation.icon, rotation.description,
+                    iconRotation = if (rotation == PlayerRotation.LANDSCAPE) 90f else 0f) {
+                    onInteraction()
+                    val next = rotation.next()
+                    if (orientationOwner != null) orientationOwner.select(next)
+                    else {
+                        fallbackRotation = next
+                        activity?.requestedOrientation = next.orientation
+                    }
                 }
             }
-            val fit:@Composable ()->Unit={IconButton({onInteraction();onCycleResizeMode()}){
-                Icon(resizeMode.icon,resizeMode.description,Modifier.size(24.dp),tint=Color.White)
-            }}
-            val rotate:@Composable ()->Unit={IconButton({onInteraction();val next=rotation.next();if(orientationOwner!=null)orientationOwner.select(next)else{fallbackRotation=next;activity?.requestedOrientation=next.orientation}}){
-                Icon(rotation.icon,rotation.description,Modifier.size(26.dp).graphicsLayer{rotationZ=if(rotation==PlayerRotation.LANDSCAPE)90f else 0f;alpha=if(rotation==PlayerRotation.AUTO).85f else 1f},tint=Color.White)
-            }}
             val timeline: @Composable () -> Unit = {
                 val current = interpolatedVideoPosition(player, position, visible,
                     requested && playbackState == Player.STATE_READY, rate)
@@ -206,49 +240,62 @@ fun PlayerControls(
                     Box(Modifier.fillMaxWidth().heightIn(min = timeHeight), contentAlignment = Alignment.CenterStart) {
                         Text(
                             "${Formatters.duration(elapsed)} / $total", color = Color.White.copy(alpha = .88f),
-                            style = MaterialTheme.typography.labelMedium, maxLines = 1,
+                            style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.testTag("video-timeline-time")
                         )
                     }
                 }
             }
-            Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                .background(Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.85f))))
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal+WindowInsetsSides.Bottom))
-                .padding(horizontal=if(compact)16.dp else 24.dp,vertical=8.dp)){
-                Column(Modifier.fillMaxWidth().testTag("video-timeline")) { timeline() }
-                Row(Modifier.fillMaxWidth().heightIn(min=48.dp).then(if(viewportHeight<240.dp)Modifier.horizontalScroll(rememberScrollState())else Modifier),verticalAlignment=Alignment.CenterVertically){
-                    if(viewportHeight<240.dp){
-                        SeekButton(DriveIcons.Replay10,"Back 10 seconds",iconSize,canSeek){onInteraction();player.seekTo(videoSeekTarget(player.currentPosition,-10_000,player.duration))}
-                        IconButton({onInteraction();if(ended){player.seekTo(0);player.play()}else if(player.playWhenReady)player.pause()else player.play()}){Icon(if (ended) DriveIcons.Autorenew else if (!requested) MediaIcons.Play else MediaIcons.Pause,if(ended)"Replay"else if(requested)"Pause"else"Play",Modifier.size(playSize),tint=Color.White)}
-                        SeekButton(DriveIcons.Forward10,"Forward 10 seconds",iconSize,canSeek){onInteraction();player.seekTo(videoSeekTarget(player.currentPosition,10_000,player.duration))}
-                    }
-                    if(viewportHeight>=240.dp)Spacer(Modifier.weight(1f))
-                    if (canChooseTracks) {
-                        IconButton(onClick = {
+            Column(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().testTag("video-bottom-dock")
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .85f))))
+                    .windowInsetsPadding(dockInsets)
+                    .padding(horizontal = dockPadding, vertical = 8.dp)
+            ) {
+                if (shortViewport) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                        SeekButton(DriveIcons.Replay10, "Back 10 seconds", 22.dp, canSeek) {
                             onInteraction()
-                            trackMenu = true
-                        }) {
-                            Icon(
-                                if (textTracks.isEmpty()) DriveIcons.AudioFile else DriveIcons.Subtitles,
-                                stringResource(R.string.video_track_picker),
-                                Modifier.size(24.dp),
-                                tint = Color.White
-                            )
+                            player.seekTo(videoSeekTarget(player.currentPosition, -10_000, player.duration))
+                        }
+                        VideoToolButton(
+                            if (ended) DriveIcons.Autorenew else if (requested) MediaIcons.Pause else MediaIcons.Play,
+                            if (ended) "Replay" else if (requested) "Pause" else "Play"
+                        ) {
+                            onInteraction()
+                            when {
+                                ended -> { player.seekTo(0); player.play() }
+                                player.playWhenReady -> player.pause()
+                                else -> player.play()
+                            }
+                        }
+                        SeekButton(DriveIcons.Forward10, "Forward 10 seconds", 22.dp, canSeek) {
+                            onInteraction()
+                            player.seekTo(videoSeekTarget(player.currentPosition, 10_000, player.duration))
                         }
                     }
-                    if (onPictureInPicture != null) {
-                        IconButton(onClick = { onInteraction(); onPictureInPicture() }) {
-                            Icon(
-                                MediaIcons.PictureInPicture, stringResource(R.string.video_picture_in_picture),
-                                Modifier.size(24.dp), tint = Color.White
-                            )
-                        }
+                }
+                if (inlineTools) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(Modifier.weight(1f).testTag("video-timeline")) { timeline() }
+                        Row { tools() }
                     }
-                    speed();fit();rotate()
+                } else {
+                    Column(Modifier.fillMaxWidth().testTag("video-timeline")) { timeline() }
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.End
+                    ) { tools() }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun VideoToolButton(icon: ImageVector, label: String, iconRotation: Float = 0f, action: () -> Unit) {
+    IconButton(action, modifier = Modifier.size(48.dp).semantics { contentDescription = label }) {
+        Icon(icon, null, Modifier.size(22.dp).graphicsLayer { rotationZ = iconRotation }, tint = Color.White)
     }
 }
 
@@ -265,7 +312,7 @@ enum class PlayerResizeMode(val description: String) {
     ZOOM("Scaling: crop to fill"),
     FILL("Scaling: stretch");
 
-    val icon: ImageVector @Composable get() = if (this == ZOOM) MediaIcons.Crop else MediaIcons.Fit
+    val icon: ImageVector @Composable get() = if (this == ZOOM) MediaIcons.VideoCrop else MediaIcons.VideoFit
 
     fun next(): PlayerResizeMode = if (this == FIT) ZOOM else FIT
 }
@@ -288,7 +335,7 @@ internal enum class PlayerRotation(
         ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     );
 
-    val icon: ImageVector @Composable get() = if (this == AUTO) MediaIcons.Rotate else DriveIcons.PhoneAndroid
+    val icon: ImageVector @Composable get() = if (this == AUTO) MediaIcons.VideoOrientation else MediaIcons.VideoOrientationLocked
 
     fun next(): PlayerRotation = entries[(ordinal + 1) % entries.size]
 }

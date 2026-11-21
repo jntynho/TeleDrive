@@ -176,6 +176,13 @@ object MediaIcons {
     val Rotate: ImageVector @Composable get() = IconsaxVectors.iconRotateLeft.current()
     val Speed: ImageVector @Composable get() = IconsaxVectors.iconSpeedometer.current()
     val PictureInPicture: ImageVector @Composable get() = IconsaxVectors.iconTeledrivePictureInPicture.current()
+    val VideoSpeed: ImageVector @Composable get() = IconsaxVectors.iconTeledriveVideoSpeed.current()
+    val VideoFit: ImageVector @Composable get() = IconsaxVectors.iconTeledriveVideoFit.current()
+    val VideoCrop: ImageVector @Composable get() = IconsaxVectors.iconTeledriveVideoCrop.current()
+    val VideoTracks: ImageVector @Composable get() = IconsaxVectors.iconTeledriveVideoTracks.current()
+    val VideoPip: ImageVector @Composable get() = IconsaxVectors.iconTeledriveVideoPip.current()
+    val VideoOrientation: ImageVector @Composable get() = IconsaxVectors.iconTeledriveVideoOrientation.current()
+    val VideoOrientationLocked: ImageVector @Composable get() = IconsaxVectors.iconTeledriveVideoOrientationLocked.current()
 }
 
 private object IconsaxVectors {
@@ -1849,6 +1856,91 @@ private object IconsaxVectors {
             stroked(1.5f, "M5.8 13.4L3 12.5C2 12.2 1.9 11.3 2.8 10.9L20.4 4.1C21.2 3.8 21.8 4.3 21.6 5.2L20.8 9.1", cap = StrokeCap.Round, join = StrokeJoin.Round)
             stroked(1.5f, "M20.2 12L18.7 19.3C18.5 20.3 17.9 20.5 17.1 19.9L12.8 16.7L10.6 18.8C10 19.3 9.5 19.1 9.4 18.3L8.8 14.3", cap = StrokeCap.Round, join = StrokeJoin.Round)
             stroked(1.5f, "M8.8 14.3L17.6 7.9L12.8 16.7", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } }
+    )
+
+    val iconTeledriveVideoCrop = IconVariants(
+        outline = { vector("teledrive:outline/video-crop") {
+            stroked(1.5f, "M7 3v12a2 2 0 0 0 2 2h12", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M3 7h12a2 2 0 0 1 2 2v12", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M12 12l3-3", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } },
+        broken = { vector("teledrive:broken/video-crop") {
+            stroked(1.5f, "M7 3v8m0 2v2a2 2 0 0 0 2 2h12", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M3 7h12a2 2 0 0 1 2 2v3m0 2v7", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M12 12l3-3", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } }
+    )
+
+    val iconTeledriveVideoFit = IconVariants(
+        outline = { vector("teledrive:outline/video-fit") {
+            stroked(1.5f, "M3.5 9V5.5a2 2 0 0 1 2-2H9m6 0h3.5a2 2 0 0 1 2 2V9m0 6v3.5a2 2 0 0 1-2 2H15m-6 0H5.5a2 2 0 0 1-2-2V15", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M8 10h8v4H8z", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } },
+        broken = { vector("teledrive:broken/video-fit") {
+            stroked(1.5f, "M3.5 9V5.5a2 2 0 0 1 2-2H9m6 0h3.5a2 2 0 0 1 2 2V9m0 6v3.5a2 2 0 0 1-2 2H15m-6 0H5.5a2 2 0 0 1-2-2V15", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M8 12v-2h8v4h-5", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } }
+    )
+
+    val iconTeledriveVideoOrientation = IconVariants(
+        outline = { vector("teledrive:outline/video-orientation") {
+            stroked(1.5f, "M6 8a7 7 0 0 1 12-1l1.5 2m0-3v3h-3M18 16a7 7 0 0 1-12 1l-1.5-2m0 3v-3h3", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M10 9.5h4v5h-4z", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } },
+        broken = { vector("teledrive:broken/video-orientation") {
+            stroked(1.5f, "M6 8a7 7 0 0 1 5-3M14 5a7 7 0 0 1 4 2l1.5 2m0-3v3h-3M18 16a7 7 0 0 1-5 3m-3 0a7 7 0 0 1-4-2l-1.5-2m0 3v-3h3", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M10 12v-2.5h4v5h-2", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } }
+    )
+
+    val iconTeledriveVideoOrientationLocked = IconVariants(
+        outline = { vector("teledrive:outline/video-orientation-locked") {
+            stroked(1.5f, "M9 3.5h6a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M10 11h4v4h-4zM11 11v-1a1 1 0 0 1 2 0v1", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } },
+        broken = { vector("teledrive:broken/video-orientation-locked") {
+            stroked(1.5f, "M7 10V5.5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V13", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M10 11h4v4h-4zM11 11v-1a1 1 0 0 1 2 0v1", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } }
+    )
+
+    val iconTeledriveVideoPip = IconVariants(
+        outline = { vector("teledrive:outline/video-pip") {
+            stroked(1.5f, "M10 18H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M13 12h6.5a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5H13a1.5 1.5 0 0 1-1.5-1.5v-4A1.5 1.5 0 0 1 13 12Z", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M6 8l3 3m0-2v2H7", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } },
+        broken = { vector("teledrive:broken/video-pip") {
+            stroked(1.5f, "M3 10V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2M3 13v3a2 2 0 0 0 2 2h5", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M13 12h6.5a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5H13a1.5 1.5 0 0 1-1.5-1.5v-4A1.5 1.5 0 0 1 13 12Z", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M6 8l3 3m0-2v2H7", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } }
+    )
+
+    val iconTeledriveVideoSpeed = IconVariants(
+        outline = { vector("teledrive:outline/video-speed") {
+            stroked(1.5f, "M4 16a8 8 0 1 1 16 0", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M6.5 18.5h11", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M12 15l4-4", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M6 13h1m5-5v1m5 4h1", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } },
+        broken = { vector("teledrive:broken/video-speed") {
+            stroked(1.5f, "M4 16a8 8 0 0 1 2.3-5.7", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M8.7 8.7A8 8 0 0 1 20 16", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M6.5 18.5h11", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M12 15l4-4", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } }
+    )
+
+    val iconTeledriveVideoTracks = IconVariants(
+        outline = { vector("teledrive:outline/video-tracks") {
+            stroked(1.5f, "M6 5h12a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H9l-4 2v-2a3 3 0 0 1-2-3V8a3 3 0 0 1 3-3Z", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M7 10h10M7 14h3m2 0h5", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } },
+        broken = { vector("teledrive:broken/video-tracks") {
+            stroked(1.5f, "M3 10V8a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H9l-4 2v-2a3 3 0 0 1-2-3v-2", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M7 10h10M7 14h3m2 0h5", cap = StrokeCap.Round, join = StrokeJoin.Round)
         } }
     )
 

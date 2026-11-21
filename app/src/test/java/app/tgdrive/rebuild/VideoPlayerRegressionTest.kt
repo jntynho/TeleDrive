@@ -174,6 +174,16 @@ class VideoPlayerRegressionTest {
         assertTrue("Elapsed and total time start at the left edge of the timeline",
             kotlin.math.abs(time.left - timeline.left) < 2f)
     }
+    @Test fun seekAndToolsShareAHorizontalAxisInPortraitAndLandscape() {
+        for (compact in listOf(false, true)) {
+            install(FakeVideo(), compact)
+            val tools = compose.onNodeWithContentDescription("Playback speed, 1×").assertIsDisplayed()
+                .fetchSemanticsNode().boundsInRoot
+            val seek = compose.onNodeWithContentDescription("Seek video").assertIsDisplayed()
+                .fetchSemanticsNode().boundsInRoot
+            assertTrue("Seek $seek and tools $tools must share a center line", kotlin.math.abs(seek.center.y - tools.center.y) < 3f)
+        }
+    }
     @Test fun compactControlsDoNotOverlapTheSeekTrack() {
         val video=FakeVideo();install(video,compact=true)
         val play=compose.onNodeWithContentDescription("Pause").assertIsDisplayed().fetchSemanticsNode().boundsInRoot

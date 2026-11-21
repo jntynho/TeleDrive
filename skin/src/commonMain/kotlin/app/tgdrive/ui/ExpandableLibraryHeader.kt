@@ -33,6 +33,10 @@ fun ExpandableLibraryHeader(
     navigationIcon:@Composable ()->Unit={}, actions:@Composable RowScope.()->Unit={},
     titleStyle:androidx.compose.ui.text.TextStyle?=null,
     requestSearchFocus:Boolean=true,
+    searchContentDescription:String="Search ${title.lowercase()}",
+    closeSearchContentDescription:String="Close search",
+    clearSearchContentDescription:String="Clear search",
+    searchBackIconModifier:Modifier=Modifier,
     actionsBeforeSearch:@Composable RowScope.()->Unit={}
 ) {
     val focus=LocalFocusManager.current
@@ -50,7 +54,7 @@ fun ExpandableLibraryHeader(
             },label="toolbarSearch"){ searching ->
                 Row(Modifier.fillMaxSize().padding(horizontal=8.dp),verticalAlignment=Alignment.CenterVertically) {
                     if(searching){
-                        IconButton(::close){Icon(DriveIcons.ArrowBack,"Close search")}
+                        IconButton(::close){Icon(DriveIcons.ArrowBack,closeSearchContentDescription,searchBackIconModifier)}
                         BasicTextField(query,onQueryChange,singleLine=true,
                             textStyle=MaterialTheme.typography.bodyLarge.copy(color=MaterialTheme.colorScheme.onSurface),
                             cursorBrush=SolidColor(MaterialTheme.colorScheme.primary),
@@ -58,7 +62,7 @@ fun ExpandableLibraryHeader(
                             keyboardActions=KeyboardActions(onSearch={keyboard?.hide()}),
                             modifier=Modifier.weight(1f).heightIn(min=48.dp).focusRequester(requester).semantics{contentDescription=placeholder},
                             decorationBox={input->Box(contentAlignment=Alignment.CenterStart){if(query.isEmpty())Text(placeholder,color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodyLarge);input()}})
-                        if(query.isNotEmpty())IconButton({onQueryChange("")}){Icon(DriveIcons.Close,"Clear search")}
+                        if(query.isNotEmpty())IconButton({onQueryChange("")}){Icon(DriveIcons.Close,clearSearchContentDescription)}
                         LaunchedEffect(expanded,owner,navigating){
                              if(expanded&&requestSearchFocus&&!navigating){
                                  owner.lifecycle.currentStateFlow.first{it.isAtLeast(Lifecycle.State.RESUMED)}
@@ -72,7 +76,7 @@ fun ExpandableLibraryHeader(
                         navigationIcon()
                         Text(title,Modifier.weight(1f).padding(start=8.dp),style=titleStyle?:MaterialTheme.typography.headlineLarge,maxLines=1,overflow=TextOverflow.Ellipsis)
                         if (androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Ltr) actionsBeforeSearch()
-                        IconButton({onExpandedChange(true)}){Icon(DriveIcons.Search,"Search ${title.lowercase()}")}
+                        IconButton({onExpandedChange(true)}){Icon(DriveIcons.Search,searchContentDescription)}
                         if (androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl) actionsBeforeSearch()
                         actions()
                     }

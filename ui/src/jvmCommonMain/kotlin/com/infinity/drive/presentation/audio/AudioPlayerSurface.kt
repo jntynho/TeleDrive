@@ -3,6 +3,7 @@ package com.infinity.drive.presentation.audio
 import app.tgdrive.ui.*
 import coil3.request.crossfade
 import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.ui.graphics.graphicsLayer
@@ -24,9 +25,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -38,11 +41,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.distinctUntilChanged
-
-private val audioInk = Color(0xFFF6F3FA)
-private val audioSecondary = Color(0xFFC7BFD3)
-private val audioAccent = Color(0xFFE7D9FF)
-private val audioPanel = Color(0xFF282336)
 
 @Composable
 fun LibraryAudioMiniPlayer(){
@@ -121,7 +119,7 @@ fun audioHeaderHeight()=maxOf(56.dp,(32*androidx.compose.ui.platform.LocalDensit
 
 @Composable
 fun AudioNowPlayingTitle(file:DriveFile,modifier:Modifier=Modifier){
-    Text("Now playing", modifier, color = audioInk, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+    Text("Now playing", modifier, color = Color.White, style = MaterialTheme.typography.titleMedium, maxLines = 1)
 }
 
 @Composable
@@ -137,11 +135,11 @@ internal fun AudioSeekBar(snapshot:AudioPlaybackState){
             onValueChangeFinished={if(player.state.value.file?.id==state.file?.id&&duration>0)scrub?.let{player.seek(it.toLong().coerceIn(0,duration))};scrub=null},
             enabled=state.file?.id==player.state.value.file?.id&&duration>0,
             valueRange=0f..duration.coerceAtLeast(1).toFloat(),trackHeight=5.dp,thumbSize=12.dp,
-            activeColor=audioAccent,inactiveColor=Color(0xFF554A69),
+            activeColor=Color.White,inactiveColor=Color.White.copy(alpha=.25f),
             modifier=Modifier.fillMaxWidth().semantics{contentDescription="Seek audio"})}
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){
-            Text(Formatters.duration(position),style=MaterialTheme.typography.labelSmall,color=audioSecondary,maxLines=1)
-            Text(if(duration>0)Formatters.duration(duration)else"--:--",style=MaterialTheme.typography.labelSmall,color=audioSecondary,maxLines=1)
+            Text(Formatters.duration(position),style=MaterialTheme.typography.labelSmall,color=Color.White.copy(alpha=.65f),maxLines=1)
+            Text(if(duration>0)Formatters.duration(duration)else"--:--",style=MaterialTheme.typography.labelSmall,color=Color.White.copy(alpha=.65f),maxLines=1)
         }
     }
 }
@@ -149,15 +147,18 @@ internal fun AudioSeekBar(snapshot:AudioPlaybackState){
 @Composable
 internal fun AudioTransport(state:AudioPlaybackState,isFavorite:Boolean?=null,favoriteEnabled:Boolean=true,onFavorite:()->Unit={}){
     val player=LocalAudioPlayback.current
-    val active=state.file?.id==player.state.value.file?.id
-    val pause=active&&((state.playing||state.playRequested)&&state.error==null)
+    val active = state.file?.id == player.state.value.file?.id
+    val pause = active && (state.playing || state.playRequested) && state.error == null
     val repeatButton: @Composable () -> Unit = {
         IconButton(player::cycleRepeat, enabled = active) {
             Icon(
                 if (state.repeatMode == AudioRepeatMode.ONE) DriveIcons.RepeatOne else DriveIcons.Repeat,
-                "Repeat: ${state.repeatMode.name.lowercase()}", Modifier.size(23.dp),
-                tint = if (!active) audioSecondary.copy(alpha = .35f)
-                    else if (state.repeatMode == AudioRepeatMode.OFF) audioSecondary else audioAccent
+                "Repeat: ${state.repeatMode.name.lowercase()}", Modifier.size(24.dp),
+                tint = Color.White.copy(alpha = when {
+                    !active -> .35f
+                    state.repeatMode == AudioRepeatMode.OFF -> .55f
+                    else -> 1f
+                })
             )
         }
     }
@@ -165,43 +166,43 @@ internal fun AudioTransport(state:AudioPlaybackState,isFavorite:Boolean?=null,fa
         val selected = isFavorite == true
         val selection by animateFloatAsState(if (selected) 1f else 0f, tween(220), label = "favoriteSelection")
         IconButton(onFavorite, enabled = active && favoriteEnabled) {
-            Box(Modifier.size(32.dp).background(audioAccent.copy(alpha = .18f * selection), CircleShape),
-                contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.size(32.dp)
+                    .background(Color.White.copy(alpha = .16f * selection), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
                 Icon(DriveIcons.Favorite, if (selected) "Remove from favorites" else "Add to favorites",
-                    Modifier.size(23.dp), tint = if (selected) audioAccent else audioSecondary)
+                    Modifier.size(24.dp), tint = Color.White.copy(alpha = if (active && favoriteEnabled) 1f else .35f))
             }
         }
     }
     BoxWithConstraints(Modifier.fillMaxWidth().testTag("audio-transport")) {
-        val splitUtilities = isFavorite != null && maxWidth < 260.dp
-        val playSize = if (splitUtilities) 60.dp else 68.dp
+        val splitUtilities = isFavorite != null && maxWidth < singleRowTransportWidth
         Column {
             Row(
-                Modifier.fillMaxWidth().heightIn(min = 80.dp),
+                Modifier.fillMaxWidth().height(80.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = if (isFavorite != null && !splitUtilities) Arrangement.SpaceBetween
-                else Arrangement.spacedBy(if (splitUtilities) 8.dp else 24.dp, Alignment.CenterHorizontally)
+                else Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
             ) {
                 if (isFavorite != null && !splitUtilities) repeatButton()
                 val canGoBack = active && (state.canSkipPrevious || state.positionMs > 3000)
                 IconButton(player::previous, enabled = canGoBack) {
-                    Icon(MediaIcons.Previous, "Previous audio", Modifier.size(26.dp),
-                        tint = if (canGoBack) audioInk else audioSecondary.copy(alpha = .4f))
+                    Icon(MediaIcons.Previous, "Previous audio", Modifier.size(28.dp),
+                        tint = Color.White.copy(alpha = if (canGoBack) 1f else .35f))
                 }
-                FilledIconButton(
+                IconButton(
                     onClick = { if (!active) state.file?.let(player::play) else player.toggle() },
-                    modifier = Modifier.size(playSize).testTag("audio-play"),
-                    shape = RoundedCornerShape(25.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = audioAccent, contentColor = Color(0xFF302642))
+                    modifier = Modifier.size(64.dp).testTag("audio-play")
                 ) {
                     Icon(if (pause) MediaIcons.Pause else MediaIcons.Play,
                         if (pause) "Pause audio" else if (active && state.error != null) "Retry audio" else "Play audio",
-                        Modifier.size(32.dp))
+                        Modifier.size(40.dp))
                 }
                 val canGoForward = active && state.canSkipNext
                 IconButton(player::next, enabled = canGoForward) {
-                    Icon(MediaIcons.Next, "Next audio", Modifier.size(26.dp),
-                        tint = if (canGoForward) audioInk else audioSecondary.copy(alpha = .4f))
+                    Icon(MediaIcons.Next, "Next audio", Modifier.size(28.dp),
+                        tint = Color.White.copy(alpha = if (canGoForward) 1f else .35f))
                 }
                 if (isFavorite != null && !splitUtilities) favoriteButton()
             }
@@ -214,6 +215,8 @@ internal fun AudioTransport(state:AudioPlaybackState,isFavorite:Boolean?=null,fa
         }
     }
 }
+
+private val singleRowTransportWidth = 256.dp
 
 /** Artwork, labels and transport have reserved bounds; asynchronous metadata never moves them. */
 @Composable
@@ -229,16 +232,24 @@ internal fun NowPlayingContent(file:DriveFile,modifier:Modifier=Modifier){
     val scope=rememberCoroutineScope()
 
     CompositionLocalProvider(LocalContentColor provides Color.White){
-        BoxWithConstraints(modifier.padding(horizontal = 20.dp)){
-            val viewportHeight=maxHeight
-            val fontScale=androidx.compose.ui.platform.LocalDensity.current.fontScale.coerceAtLeast(1f)
-            val wide=maxWidth>viewportHeight
-            val titleHeight=(56*fontScale).dp
-            val noticeHeight=(32*fontScale).dp
-            val transportHeight=(168+20*fontScale).dp + if (maxWidth < 296.dp) 48.dp else 0.dp
-            val cover=if(wide)minOf(viewportHeight-24.dp,maxWidth*.43f).coerceAtLeast(48.dp)
-                else minOf(maxWidth - 24.dp, (viewportHeight - titleHeight - transportHeight - noticeHeight - 52.dp).coerceAtLeast(48.dp), 360.dp).coerceAtLeast(48.dp)
-            val artwork:@Composable ()->Unit={TrackArtwork(file,state.metadata,Modifier.size(cover).clip(RoundedCornerShape(28.dp)).testTag("audio-cover"))}
+        BoxWithConstraints(modifier.padding(horizontal = 24.dp)) {
+            val viewportHeight = maxHeight
+            val typography = MaterialTheme.typography
+            val density = LocalDensity.current
+            val wide = maxWidth > viewportHeight
+            val titleHeight = with(density) {
+                maxOf(56.dp, typography.headlineSmall.lineHeight.toDp() + typography.bodyLarge.lineHeight.toDp() + 4.dp)
+            }
+            val noticeHeight = with(density) { maxOf(32.dp, typography.bodySmall.lineHeight.toDp() * 2) }
+            val transportHeight = with(density) { 128.dp + typography.labelSmall.lineHeight.toDp() } +
+                if (maxWidth < singleRowTransportWidth) 48.dp else 0.dp
+            val lyricLineHeight = audioLyricLineHeight()
+            val cover = if (wide) minOf(viewportHeight - 24.dp, maxWidth * .43f).coerceAtLeast(48.dp)
+                else minOf(maxWidth, viewportHeight - titleHeight - transportHeight - noticeHeight -
+                    lyricLineHeight * 3 - 42.dp, 420.dp).coerceAtLeast(48.dp)
+            val artwork: @Composable () -> Unit = {
+                TrackArtwork(file, state.metadata, Modifier.size(cover).clip(RoundedCornerShape(16.dp)).testTag("audio-cover"))
+            }
             val favorite= favoriteOverride?:file.isFavorite
             val controls:@Composable ()->Unit={
                 Column(Modifier.fillMaxWidth().testTag("audio-controls")){
@@ -260,8 +271,8 @@ internal fun NowPlayingContent(file:DriveFile,modifier:Modifier=Modifier){
                     state.metadata.artist?.takeIf(String::isNotBlank)?:file.extension.uppercase().ifBlank{"Audio"})
                 Crossfade(labels,Modifier.fillMaxWidth().height(titleHeight).testTag("audio-track-labels"),animationSpec=tween(240),label="audioTrackLabels"){(_,name,artist)->
                     Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
-                        Text(name,color=Color.White,style=MaterialTheme.typography.headlineSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,maxLines=1,overflow=TextOverflow.Ellipsis)
-                        Text(artist,color=audioSecondary,style=MaterialTheme.typography.bodyMedium,maxLines=1,overflow=TextOverflow.Ellipsis)
+                        Text(name,color=Color.White,style=MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,maxLines=1,overflow=TextOverflow.Ellipsis)
+                        Text(artist,color=Color.White.copy(alpha=.75f),style=MaterialTheme.typography.bodyLarge,maxLines=1,overflow=TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -273,17 +284,12 @@ internal fun NowPlayingContent(file:DriveFile,modifier:Modifier=Modifier){
                 }
             }
             val details: @Composable () -> Unit = {
-                Surface(
-                    Modifier.fillMaxWidth().testTag("audio-playback-panel"),
-                    shape = RoundedCornerShape(28.dp), color = audioPanel, contentColor = audioInk
-                ) {
-                    Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
-                        title()
-                        Spacer(Modifier.height(8.dp))
-                        controls()
-                        notice()
-                    }
-                }
+                title()
+                Spacer(Modifier.height(6.dp))
+                AudioLyricWindow(file.id, state.metadata.lyrics, lyricLineHeight)
+                Spacer(Modifier.height(12.dp))
+                controls()
+                notice()
             }
             if (wide) {
                 Row(Modifier.fillMaxSize().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(24.dp),
@@ -319,20 +325,35 @@ private fun artworkTone(metadata:AudioMetadata,index:Int):Color{
     return androidx.compose.ui.graphics.lerp(base,color,.38f)
 }
 
-/** Only artwork changes animate the background. Playback ticks never start a draw loop. */
+/** Slow draw-layer movement; playback/lifecycle pause cancels it without changing the layout. */
 @Composable
-internal fun Modifier.ambientArtwork(state: AudioPlaybackState): Modifier {
-    val base = Color(0xFF181522)
-    val colors = state.metadata.artworkColors
-    val first = animateColorAsState(colors.firstOrNull()?.let { Color(it.toInt()) } ?: base,
-        tween(700), label = "artworkColor")
-    val second = animateColorAsState(colors.getOrNull(1)?.let { Color(it.toInt()) } ?: base,
-        tween(700), label = "secondaryArtworkColor")
+internal fun Modifier.ambientArtwork(state:AudioPlaybackState):Modifier {
+    val frozen=remember{mutableFloatStateOf(.25f)}
+    val owner=androidx.lifecycle.compose.LocalLifecycleOwner.current
+    var resumed by remember(owner){mutableStateOf(owner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED))}
+    DisposableEffect(owner){
+        val observer=androidx.lifecycle.LifecycleEventObserver{_,_->resumed=owner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)}
+        owner.lifecycle.addObserver(observer);onDispose{owner.lifecycle.removeObserver(observer)}
+    }
+    val motion=if(state.playing&&resumed&&!app.tgdrive.ui.LocalNavigationInProgress.current){
+        val start=remember{frozen.floatValue}
+        androidx.compose.animation.core.rememberInfiniteTransition(label="ambientMotion").animateFloat(
+            initialValue=start,targetValue=if(start<.5f)1f else 0f,
+            animationSpec=androidx.compose.animation.core.infiniteRepeatable(tween(22000),androidx.compose.animation.core.RepeatMode.Reverse),label="ambientPhase")
+    }else null
+    DisposableEffect(motion){onDispose{if(motion!=null)frozen.floatValue=motion.value}}
+    val colors=state.metadata.artworkColors
+    val first=animateColorAsState(colors.firstOrNull()?.let{Color(it.toInt())}?:Color(0xFF70687D),tween(1400),label="artworkColor")
+    val second=animateColorAsState(colors.getOrNull(1)?.let{Color(it.toInt())}?:Color(0xFFA47759),tween(1400),label="secondaryArtworkColor")
     return drawBehind {
-        drawRect(Brush.verticalGradient(listOf(
-            androidx.compose.ui.graphics.lerp(base, first.value, .26f),
-            androidx.compose.ui.graphics.lerp(base, second.value, .14f)
-        )))
+        val base=Color(0xFF10151D)
+        val top=androidx.compose.ui.graphics.lerp(base,first.value,.32f)
+        val bottom=androidx.compose.ui.graphics.lerp(base,second.value,.32f)
+        drawRect(Brush.verticalGradient(listOf(top,bottom)))
+        drawRect(Brush.radialGradient(listOf(top.copy(alpha=.2f),Color.Transparent),
+            center=androidx.compose.ui.geometry.Offset(size.width*(motion?.value?:frozen.floatValue),size.height*.35f),radius=size.maxDimension*.8f))
+        drawRect(Brush.radialGradient(listOf(bottom.copy(alpha=.2f),Color.Transparent),
+            center=androidx.compose.ui.geometry.Offset(size.width*(1-(motion?.value?:frozen.floatValue)),size.height*.8f),radius=size.maxDimension*.7f))
     }
 }
 
@@ -343,12 +364,8 @@ private fun AudioArtwork(file:DriveFile,metadata:AudioMetadata,modifier:Modifier
         metadata.artworkPath?:if(file.hasLocalCopy||file.hasRemoteCopy)
             coil3.request.ImageRequest.Builder(context).data(com.infinity.drive.core.media.thumbnailModel(file)).crossfade(160).build()else null
     }
-    val fallback = if (metadata.artworkColors.isEmpty()) Color(0xFF3B3555) else artworkTone(metadata, 0)
-    Box(modifier.background(fallback).drawBehind {
-        drawCircle(Color.White.copy(alpha = .055f), radius = size.minDimension * .38f)
-        drawCircle(Color.White.copy(alpha = .06f), radius = size.minDimension * .27f)
-    }, contentAlignment = Alignment.Center) {
-        Icon(DriveIcons.MusicNote, null, Modifier.size(56.dp), tint = audioAccent.copy(alpha = .86f))
+    Box(modifier.background(Brush.linearGradient(listOf(artworkTone(metadata,0),artworkTone(metadata,1)))),contentAlignment=Alignment.Center){
+        Icon(DriveIcons.MusicNotes,null,Modifier.size(56.dp),tint=Color.White.copy(alpha=.5f))
         if(model!=null)coil3.compose.AsyncImage(model,file.name,Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Crop)
     }
 }

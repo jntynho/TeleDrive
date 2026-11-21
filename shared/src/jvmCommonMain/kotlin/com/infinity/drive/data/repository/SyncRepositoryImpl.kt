@@ -380,6 +380,7 @@ class SyncRepositoryImpl(
                 existing?.preTrashFolderId
             },
             pendingPublish = existing?.pendingPublish == true,
+            offlinePinned = existing?.offlinePinned == true,
             createdAt = manifest?.createdAt ?: existing?.createdAt
             ?: (document.dateSeconds * 1000L),
             modifiedAt = local?.modifiedAt ?: manifest?.modifiedAt ?: existing?.modifiedAt

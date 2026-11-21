@@ -84,13 +84,17 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
                 desiredIndex=queue.indexOf(next.id)
                 val old=mutable.value
                 mutable.value=AudioPlaybackState(file=next,playing=player.isPlaying,playRequested=requestedPlay,loading=player.playbackState==Player.STATE_BUFFERING,
-                    metadata=synchronized(metadataCache){metadataCache[metadataKey(next)]?:metadataCache[metadataKey(next)+":basic"]}?:AudioMetadata(),
+                    metadata=synchronized(metadataCache){metadataCache[detailedMetadataKey(next)]?:metadataCache[metadataKey(next)+":basic"]}?:AudioMetadata(),
                     durationMs=next.durationMs?:0,repeatMode=old.repeatMode,queueRevision=old.queueRevision)
                 refreshQueueState()
                 metadataJob=scope.launch{val basic=basicMetadata(next);if(epoch==playbackEpoch)mutable.update{it.copy(metadata=mergeMetadata(it.metadata,basic))};val info=metadata(next);if(epoch==playbackEpoch){mutable.update{it.copy(metadata=mergeMetadata(it.metadata,info))};publishMetadata()}}
                 scope.launch{if(epoch==playbackEpoch&&player.currentMediaItemIndex>0)player.removeMediaItems(0,player.currentMediaItemIndex);prepareNext()}
             }
-            override fun onIsPlayingChanged(isPlaying:Boolean){if(player.currentMediaItem?.mediaId==mutable.value.file?.id)mutable.update{it.copy(playing=isPlaying)}}
+            override fun onIsPlayingChanged(isPlaying:Boolean){
+                if(player.currentMediaItem?.mediaId==mutable.value.file?.id){
+                    mutable.update{it.copy(playing=isPlaying,positionMs=player.currentPosition.coerceAtLeast(0))}
+                }
+            }
             override fun onPlayWhenReadyChanged(playWhenReady:Boolean,reason:Int){
                 if(player.currentMediaItem?.mediaId!=mutable.value.file?.id)return
                 requestedPlay=playWhenReady
@@ -116,7 +120,7 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
                     title=metadata.title?.toString()?.takeIf(String::isNotBlank)?:it.metadata.title,
                     artist=metadata.artist?.toString()?.takeIf(String::isNotBlank)?:it.metadata.artist))}
                 val text=mutable.value.metadata
-                synchronized(metadataCache){metadataCache[metadataKey(track)+":basic"]=text}
+                synchronized(metadataCache){metadataCache[metadataKey(track)+":basic"]=text.copy(lyrics=null)}
                 persistMetadata(track,text,false,inspected=!text.title.isNullOrBlank()&&!text.artist.isNullOrBlank())
                 publishMetadata()
                 if(text.artworkPath!=null||artworkPending==metadataKey(track))return
@@ -129,7 +133,15 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
                             mutable.update{it.copy(metadata=it.metadata.copy(
                                 artworkColors=artwork.first.takeIf{it.isNotEmpty()}?:it.metadata.artworkColors,
                                 artworkPath=artwork.second?:it.metadata.artworkPath))}
-                            synchronized(metadataCache){metadataCache[metadataKey(track)]=mutable.value.metadata}
+                            synchronized(metadataCache) {
+                                val key = detailedMetadataKey(track)
+                                metadataCache[key]?.let { cached ->
+                                    metadataCache[key] = cached.copy(
+                                        artworkColors = artwork.first.ifEmpty { cached.artworkColors },
+                                        artworkPath = artwork.second ?: cached.artworkPath
+                                    )
+                                }
+                            }
                             publishMetadata()
                         }
                     }catch(cancel:CancellationException){throw cancel}
@@ -137,8 +149,36 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
                     finally{if(artworkPending==metadataKey(track))artworkPending=null}
                 }
             }
-            override fun onTracksChanged(tracks:Tracks){
-                mutable.update{it.copy(metadata=it.metadata.copy(resolved=true))}
+            override fun onTracksChanged(tracks: Tracks) {
+                val track = mutable.value.file ?: return
+                if (player.currentMediaItem?.mediaId != track.id) return
+                mutable.update { it.copy(metadata = it.metadata.copy(resolved = true)) }
+                val entries = tracks.groups.asSequence().filter { it.type == C.TRACK_TYPE_AUDIO }
+                    .flatMap { group ->
+                        (0 until group.length).asSequence().filter(group::isTrackSelected)
+                            .mapNotNull { group.getTrackFormat(it).metadata }
+                    }.take(8).toList()
+                applyLyricsMetadata(entries)
+            }
+
+            override fun onMetadata(metadata: Metadata) {
+                applyLyricsMetadata(listOf(metadata))
+            }
+
+            private fun applyLyricsMetadata(entries: List<Metadata>) {
+                val track = mutable.value.file ?: return
+                if (entries.isEmpty() || player.currentMediaItem?.mediaId != track.id) return
+                val epoch = playbackEpoch
+                scope.launch {
+                    val lyrics = withContext(ioDispatcher) {
+                        entries.mapNotNull(::streamedLyrics).fold(null as String?, ::preferTimedLyrics)
+                    } ?: return@launch
+                    if (playbackEpoch == epoch && mutable.value.file?.id == track.id) {
+                        mutable.update { state ->
+                            state.copy(metadata = state.metadata.copy(lyrics = preferTimedLyrics(state.metadata.lyrics, lyrics)))
+                        }
+                    }
+                }
             }
             override fun onPlayerError(error:PlaybackException){requestedPlay=false;mutable.update{it.copy(playing=false,loading=false,playRequested=false,error="Couldn't play this audio. Retry, or download an offline copy.")}}
         })
@@ -148,7 +188,10 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
             for(write in metadataWrites){
                 try {
                     files.storeAudioMetadata(write.file,AudioTags(write.value.title,write.value.artist,write.value.durationMs,write.inspected))
-                    if(write.inspected)writeMetadataCache(metadataKey(write.file)+(if(write.detailed)""else":basic"),write.value)
+                    if (write.inspected) {
+                        val key = if (write.detailed) detailedMetadataKey(write.file) else metadataKey(write.file) + ":basic"
+                        writeMetadataCache(key, write.value, write.detailed)
+                    }
                 }catch(cancel:CancellationException){throw cancel}catch(_:Exception){ /* Optional index writes never delay playback or the visible row. */ }
             }
         }
@@ -178,6 +221,9 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
     }
     private fun knownDuration()=player.duration.takeIf{it>0}?:mutable.value.metadata.durationMs?:mutable.value.file?.durationMs?:0L
     private fun metadataKey(file:DriveFile)=file.audioRevision()
+    // Detailed tags from a stream may never have had a chance to inspect the local audio.
+    private fun detailedMetadataKey(file: DriveFile): String =
+        metadataKey(file) + if (file.localPath.isNullOrBlank()) ":stream-tags" else ":embedded-tags"
     override fun updateLibraryContext(chatId:Long?,signedIn:Boolean){
         val next=chatId to signedIn
         if(libraryContext==next)return
@@ -222,7 +268,7 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
         // Listener callbacks from stop belong to the old item; install the new intent afterwards.
         player.stop();player.clearMediaItems();requestedPlay=autoplay
         val previous=mutable.value
-        val cached=synchronized(metadataCache){metadataCache[metadataKey(file)]?:metadataCache[metadataKey(file)+":basic"]}
+        val cached=synchronized(metadataCache){metadataCache[detailedMetadataKey(file)]?:metadataCache[metadataKey(file)+":basic"]}
         mutable.value=AudioPlaybackState(file=file,loading=true,playRequested=autoplay,metadata=cached?:AudioMetadata(durationMs=file.durationMs),durationMs=cached?.durationMs?:file.durationMs?:0,
             repeatMode=previous.repeatMode,sleepTimerMinutes=previous.sleepTimerMinutes,queueRevision=previous.queueRevision)
         refreshQueueState()
@@ -302,7 +348,7 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
     }
     private fun mergeMetadata(current:AudioMetadata,next:AudioMetadata)=AudioMetadata(
         next.title?.takeIf(String::isNotBlank)?:current.title,next.artist?.takeIf(String::isNotBlank)?:current.artist,
-        next.durationMs?:current.durationMs,next.artworkColors.ifEmpty{current.artworkColors},null,next.artworkPath?:current.artworkPath,current.resolved||next.resolved,next.failed)
+        next.durationMs?:current.durationMs,next.artworkColors.ifEmpty{current.artworkColors},preferTimedLyrics(current.lyrics,next.lyrics),next.artworkPath?:current.artworkPath,current.resolved||next.resolved,next.failed)
     override fun containsQueuedFile(id:String)=id in queue
     override fun setQueue(ids:List<String>){
         val next=ids.distinct()
@@ -374,7 +420,7 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
     private suspend fun readMetadata(file:DriveFile,detailed:Boolean):AudioMetadata = withContext(ioDispatcher) {
         if(hiddenAccess!=null&&!hiddenAccess.canRead(file.id))return@withContext AudioMetadata()
         val base=metadataKey(file)
-        val key=base+(if(detailed)""else":basic")
+        val key=if(detailed)detailedMetadataKey(file)else base+":basic"
         synchronized(metadataCache){metadataCache[key]}?.takeIf{it.resolved&&!it.failed}?.let{return@withContext it}
         val lock=metadataLocks[(base.hashCode() and Int.MAX_VALUE)%metadataLocks.size]
         lock.withLock {
@@ -385,6 +431,7 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
                 synchronized(metadataCache){metadataCache[key]=indexed}
                 return@withLock indexed
             }
+            val path=file.localPath?.takeIf{File(it).isFile}
             val disk=readMetadataCache(key)
             if(disk!=null){
                 synchronized(metadataCache){metadataCache[key]=disk}
@@ -392,13 +439,14 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
                 return@withLock disk
             }
             val fallback=indexed?:synchronized(metadataCache){metadataCache[base+":basic"]}?:AudioMetadata(durationMs=file.durationMs)
-            val path=file.localPath?.takeIf{File(it).isFile}
             val remote=file.remoteFileId?.takeIf{path==null&&!file.isEncrypted&&file.hasRemoteCopy}
             if(path==null&&(remote==null||mutable.value.file?.id==file.id))return@withLock fallback
-            val retryKey="$base:$path"
+            val retryKey="$key:$path"
             if(synchronized(metadataRetries){metadataRetries[retryKey]}?.let{android.os.SystemClock.elapsedRealtime()<it}==true)return@withLock fallback
+            var embeddedLyrics: String? = null
             try {
                 val result=metadataSlots.withPermit {
+                    embeddedLyrics = if (detailed && path != null) readEmbeddedLyrics(File(path)) else null
                     val retriever=MediaMetadataRetriever()
                     var source:android.media.MediaDataSource?=null
                     try {
@@ -414,7 +462,7 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
                             retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)?.takeIf(String::isNotBlank)
                                 ?:retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST)?.takeIf(String::isNotBlank)?:fallback.artist,
                             retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?:fallback.durationMs,
-                            picture?.let(::artworkColors).orEmpty(),null,picture?.let{saveArtwork(file,it)},resolved=true)
+                            picture?.let(::artworkColors).orEmpty(),embeddedLyrics,picture?.let{saveArtwork(file,it)},resolved=true)
                     }finally{runCatching{retriever.release()};runCatching{source?.close()}}
                 }
                 ensureActive()
@@ -429,7 +477,7 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
             catch(_:Exception){
                 // A transient failure is not "no tags" and must not poison the durable index.
                 synchronized(metadataRetries){metadataRetries[retryKey]=android.os.SystemClock.elapsedRealtime()+60_000}
-                fallback.copy(failed=true)
+                fallback.copy(lyrics = embeddedLyrics, failed = true)
             }
         }
     }
@@ -448,10 +496,10 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
         queue=if(values==null)listOf(file.id)else (0 until minOf(values.length(),2000)).map{values.getString(it)}.distinct()
         if(file.id !in queue)queue=listOf(file.id)
         desiredIndex=queue.indexOf(file.id)
-        mutable.value=AudioPlaybackState(file=file,metadata=synchronized(metadataCache){metadataCache[metadataKey(file)]?:metadataCache[metadataKey(file)+":basic"]}?:AudioMetadata(),positionMs=saved.optLong("position").coerceAtLeast(0),durationMs=file.durationMs?:0)
+        mutable.value=AudioPlaybackState(file=file,metadata=synchronized(metadataCache){metadataCache[detailedMetadataKey(file)]?:metadataCache[metadataKey(file)+":basic"]}?:AudioMetadata(),positionMs=saved.optLong("position").coerceAtLeast(0),durationMs=file.durationMs?:0)
         refreshQueueState()
         val epoch=playbackEpoch
-        metadataJob=scope.launch{val basic=basicMetadata(file);if(epoch==playbackEpoch&&mutable.value.file?.id==file.id)mutable.update{it.copy(metadata=mergeMetadata(it.metadata,basic))};val info=metadata(file);if(epoch==playbackEpoch&&mutable.value.file?.id==file.id)mutable.update{it.copy(metadata=info,durationMs=info.durationMs?:it.durationMs)}}
+        metadataJob=scope.launch{val basic=basicMetadata(file);if(epoch==playbackEpoch&&mutable.value.file?.id==file.id)mutable.update{it.copy(metadata=mergeMetadata(it.metadata,basic))};val info=metadata(file);if(epoch==playbackEpoch&&mutable.value.file?.id==file.id)mutable.update{it.copy(metadata=mergeMetadata(it.metadata,info),durationMs=info.durationMs?:it.durationMs)}}
     }
     private suspend fun saveSession(snapshot:AudioPlaybackState,chatId:Long?=libraryContext?.first,ids:List<String> = queue.toList()){
         val chat=snapshot.file?.chatId?:chatId
@@ -470,16 +518,18 @@ class AndroidAudioPlayback(context:Context, private val resolver:PreviewContentR
     private fun metadataDiskKey(key:String)=java.security.MessageDigest.getInstance("SHA-256").digest(key.toByteArray()).joinToString(""){"%02x".format(it)}
     private fun readMetadataCache(key:String):AudioMetadata?=runCatching {
         val file=File(appContext.cacheDir,"audio-tags/${metadataDiskKey(key)}.json")
-        if(!file.isFile||file.length()>100_000)return@runCatching null
+        if(!file.isFile||file.length()>256_000)return@runCatching null
         val j=org.json.JSONObject(file.readText())
         fun text(name:String)=j.optString(name).takeIf{it.isNotBlank()&&it!="null"}
         AudioMetadata(text("title"),text("artist"),j.optLong("duration").takeIf{it>0},
-            (0 until j.getJSONArray("colors").length()).map{j.getJSONArray("colors").getLong(it)},null,text("artwork")?.takeIf{File(it).isFile},true)
+            (0 until j.getJSONArray("colors").length()).map{j.getJSONArray("colors").getLong(it)},
+            text("lyrics")?.take(32_000),text("artwork")?.takeIf{File(it).isFile},true)
     }.getOrNull()
-    private fun writeMetadataCache(key:String,metadata:AudioMetadata){runCatching {
+    private fun writeMetadataCache(key:String,metadata:AudioMetadata,detailed:Boolean){runCatching {
         val dir=File(appContext.cacheDir,"audio-tags").apply{mkdirs()}
         val j=org.json.JSONObject().put("title",metadata.title).put("artist",metadata.artist).put("duration",metadata.durationMs?:0)
             .put("colors",org.json.JSONArray(metadata.artworkColors)).put("artwork",metadata.artworkPath)
+        if (detailed) j.put("lyrics", metadata.lyrics?.take(32_000))
         val target=File(dir,"${metadataDiskKey(key)}.json")
         val temp=File.createTempFile("tags-",".tmp",dir)
         try{temp.writeText(j.toString());temp.renameTo(target)}finally{temp.delete()}
@@ -600,7 +650,7 @@ private fun readEmbeddedLyrics(file:File):String? = readId3Lyrics(file) ?: runCa
                         val comment=text()
                         if(comment.substringBefore('=').uppercase() in listOf("LYRICS","UNSYNCEDLYRICS","SYNCEDLYRICS")){
                             val value=comment.substringAfter('=').take(32000)
-                            if(AudioLyricsParser.parse(value).cues.isNotEmpty())return@use value
+                            if(AudioLyricsParser.parse(value).cues.any { it.text.isNotBlank() })return@use value
                             if(plain==null)plain=value
                         }
                     }
@@ -628,6 +678,14 @@ private fun readEmbeddedLyrics(file:File):String? = readId3Lyrics(file) ?: runCa
     }
 }.getOrNull()?.takeIf{it.isNotBlank()}
 
+/** Keep an existing lyric when a metadata callback only supplies tags or untimed text. */
+private fun preferTimedLyrics(current: String?, next: String?): String? = when {
+    current.isNullOrBlank() -> next
+    next.isNullOrBlank() || current == next -> current
+    AudioLyricsParser.parse(next).cues.any { it.text.isNotBlank() } -> next
+    else -> current
+}
+
 /** Convert existing extractor entries only; timed lyrics win over an untimed fallback. */
 @androidx.annotation.OptIn(UnstableApi::class)
 internal fun streamedLyrics(metadata:androidx.media3.common.Metadata):String? {
@@ -647,7 +705,7 @@ internal fun streamedLyrics(metadata:androidx.media3.common.Metadata):String? {
             else->null
         }
         if(!text.isNullOrBlank()){
-            if(AudioLyricsParser.parse(text).cues.isNotEmpty())return text
+            if(AudioLyricsParser.parse(text).cues.any { it.text.isNotBlank() })return text
             if(plain==null)plain=text
         }
     }
