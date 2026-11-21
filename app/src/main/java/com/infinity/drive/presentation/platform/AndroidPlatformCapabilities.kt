@@ -14,8 +14,6 @@ class AndroidPlatformCapabilities : PlatformCapabilities {
 
     override val supportsScreenCaptureBlocking: Boolean = true
 
-    override val supportsBackdropBlur: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-
     override val supportsDynamicColor: Boolean =
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 }

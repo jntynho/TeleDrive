@@ -165,6 +165,15 @@ class VideoPlayerRegressionTest {
         compose.onNodeWithContentDescription("Subtitles").assertDoesNotExist()
         compose.onNodeWithContentDescription("More controls").assertDoesNotExist()
     }
+    @Test fun elapsedAndTotalTimeShareOneLeftAlignedLabel() {
+        install(FakeVideo().apply { position = 42_000; duration = 120_000 })
+        val time = compose.onNodeWithText("0:42 / 2:00").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val track = compose.onNodeWithContentDescription("Seek video").fetchSemanticsNode().boundsInRoot
+        assertTrue(time.top >= track.bottom)
+        val timeline = compose.onNodeWithTag("video-timeline").fetchSemanticsNode().boundsInRoot
+        assertTrue("Elapsed and total time start at the left edge of the timeline",
+            kotlin.math.abs(time.left - timeline.left) < 2f)
+    }
     @Test fun compactControlsDoNotOverlapTheSeekTrack() {
         val video=FakeVideo();install(video,compact=true)
         val play=compose.onNodeWithContentDescription("Pause").assertIsDisplayed().fetchSemanticsNode().boundsInRoot

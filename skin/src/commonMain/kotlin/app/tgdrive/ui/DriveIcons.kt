@@ -174,6 +174,8 @@ object MediaIcons {
     val Play: ImageVector @Composable get() = IconsaxVectors.iconPlay.current()
     val Previous: ImageVector @Composable get() = IconsaxVectors.iconPrevious.current()
     val Rotate: ImageVector @Composable get() = IconsaxVectors.iconRotateLeft.current()
+    val Speed: ImageVector @Composable get() = IconsaxVectors.iconSpeedometer.current()
+    val PictureInPicture: ImageVector @Composable get() = IconsaxVectors.iconTeledrivePictureInPicture.current()
 }
 
 private object IconsaxVectors {
@@ -1823,6 +1825,18 @@ private object IconsaxVectors {
         broken = { vector("iconsax:broken/tag") {
             stroked(1.5f, "M19.8305 15.45C21.6905 13.59 21.6905 10.57 19.8305 8.70005L15.3005 4.17005C14.3505 3.22005 13.0405 2.71005 11.7005 2.78005L6.70046 3.02005C4.70046 3.11005 3.11046 4.70005 3.01046 6.69005L2.77046 11.69C2.71046 13.03 3.21046 14.34 4.16046 15.29L8.69046 19.82C10.5505 21.68 13.5705 21.68 15.4405 19.82L16.9605 18.3", cap = StrokeCap.Round, join = StrokeJoin.Round)
             stroked(1.5f, "M7 9.5C7 10.88 8.12 12 9.5 12C10.88 12 12 10.88 12 9.5C12 8.12 10.88 7 9.5 7", cap = StrokeCap.Round)
+        } }
+    )
+
+    val iconTeledrivePictureInPicture = IconVariants(
+        outline = { vector("teledrive:outline/picture-in-picture") {
+            stroked(1.5f, "M9.5 18.5H5C3.9 18.5 3 17.6 3 16.5V7.5C3 6.4 3.9 5.5 5 5.5H19C20.1 5.5 21 6.4 21 7.5V9", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M14 11H20C20.55 11 21 11.45 21 12V17.5C21 18.05 20.55 18.5 20 18.5H14C13.45 18.5 13 18.05 13 17.5V12C13 11.45 13.45 11 14 11Z", cap = StrokeCap.Round, join = StrokeJoin.Round)
+        } },
+        broken = { vector("teledrive:broken/picture-in-picture") {
+            stroked(1.5f, "M3 11V7.5C3 6.4 3.9 5.5 5 5.5H19C20.1 5.5 21 6.4 21 7.5V9", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M3 14V16.5C3 17.6 3.9 18.5 5 18.5H9.5", cap = StrokeCap.Round, join = StrokeJoin.Round)
+            stroked(1.5f, "M14 11H20C20.55 11 21 11.45 21 12V17.5C21 18.05 20.55 18.5 20 18.5H14C13.45 18.5 13 18.05 13 17.5V12C13 11.45 13.45 11 14 11Z", cap = StrokeCap.Round, join = StrokeJoin.Round)
         } }
     )
 

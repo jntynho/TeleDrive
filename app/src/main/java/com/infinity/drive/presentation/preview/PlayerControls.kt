@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -134,7 +136,7 @@ fun PlayerControls(
                     Text("Playback speed",Modifier.padding(horizontal=24.dp,vertical=12.dp),style=MaterialTheme.typography.titleLarge)
                     listOf(.5f,.75f,1f,1.25f,1.5f,1.75f,2f).forEach{value->
                         ListItem(headlineContent={Text(if(value==1f)"Normal · 1×"else speedLabel(value))},
-                            leadingContent={Icon(DriveIcons.SlowMotionVideo,null)},
+                            leadingContent={Icon(MediaIcons.Speed,null)},
                             trailingContent={if(kotlin.math.abs(value-rate)<.001f)Icon(DriveIcons.Check,"Selected")},
                             colors=ListItemDefaults.colors(containerColor=Color.Transparent),
                             modifier=Modifier.clickable{closeThen{player.setPlaybackSpeed(value);speedMenu=false;onInteraction()}})
@@ -165,7 +167,7 @@ fun PlayerControls(
                     Box(contentAlignment=Alignment.Center){
                         if(playbackState==Player.STATE_BUFFERING&&requested)CircularProgressIndicator(
                             Modifier.size(if(compact)40.dp else 50.dp),color=Color.White.copy(alpha=.55f),strokeWidth=1.5.dp)
-                        Icon(if(ended||!requested)MediaIcons.Play else MediaIcons.Pause,
+                        Icon(if (ended) DriveIcons.Autorenew else if (!requested) MediaIcons.Play else MediaIcons.Pause,
                             if(ended)"Replay"else if(requested)"Pause"else"Play",Modifier.size(playSize),tint=Color.White)
                     }
                 }
@@ -173,7 +175,7 @@ fun PlayerControls(
             }
             val speed:@Composable ()->Unit={
                 IconButton({onInteraction();speedMenu=true},modifier=Modifier.semantics{contentDescription="Playback speed, ${speedLabel(rate)}"}){
-                    Icon(DriveIcons.SlowMotionVideo,null,Modifier.size(26.dp),tint=Color.White)
+                    Icon(MediaIcons.Speed,null,Modifier.size(26.dp),tint=Color.White)
                 }
             }
             val fit:@Composable ()->Unit={IconButton({onInteraction();onCycleResizeMode()}){
@@ -182,31 +184,43 @@ fun PlayerControls(
             val rotate:@Composable ()->Unit={IconButton({onInteraction();val next=rotation.next();if(orientationOwner!=null)orientationOwner.select(next)else{fallbackRotation=next;activity?.requestedOrientation=next.orientation}}){
                 Icon(rotation.icon,rotation.description,Modifier.size(26.dp).graphicsLayer{rotationZ=if(rotation==PlayerRotation.LANDSCAPE)90f else 0f;alpha=if(rotation==PlayerRotation.AUTO).85f else 1f},tint=Color.White)
             }}
-            val timeline:@Composable (Modifier)->Unit={trackModifier->
-                Box(trackModifier){
-                val displayPosition=interpolatedVideoPosition(player,position,visible,requested&&playbackState==Player.STATE_READY,rate)
-                SlimSlider(scrub?:displayPosition.coerceIn(0,duration).toFloat(),onValueChange={scrub=it;scrubbing(true);onInteraction()},
-                    onValueChangeFinished={if(canSeek)scrub?.let{player.seekTo(videoSeekTarget(it.toLong(),0,player.duration))};scrub=null;scrubbing(false);onInteraction()},
-                    valueRange=0f..duration.coerceAtLeast(1).toFloat(),enabled=canSeek,
-                    trackHeight=6.dp,thumbSize=14.dp,
-                    activeColor=Color.White,inactiveColor=Color.White.copy(alpha=.3f),
-                    bufferedFraction=if(duration>0)buffered.toFloat()/duration else 0f,bufferedColor=Color.White.copy(alpha=.4f),
-                    modifier=Modifier.fillMaxWidth().semantics{contentDescription="Seek video"})
+            val timeline: @Composable () -> Unit = {
+                val current = interpolatedVideoPosition(player, position, visible,
+                    requested && playbackState == Player.STATE_READY, rate)
+                val elapsed = (scrub?.toLong() ?: current).coerceIn(0, duration)
+                SlimSlider(elapsed.toFloat(), onValueChange = { scrub = it; scrubbing(true); onInteraction() },
+                    onValueChangeFinished = {
+                        if (canSeek) scrub?.let { player.seekTo(videoSeekTarget(it.toLong(), 0, player.duration)) }
+                        scrub = null
+                        scrubbing(false)
+                        onInteraction()
+                    },
+                    valueRange = 0f..duration.coerceAtLeast(1).toFloat(), enabled = canSeek,
+                    trackHeight = 6.dp, thumbSize = 14.dp,
+                    activeColor = Color.White, inactiveColor = Color.White.copy(alpha = .3f),
+                    bufferedFraction = if (duration > 0) buffered.toFloat() / duration else 0f,
+                    bufferedColor = Color.White.copy(alpha = .4f),
+                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Seek video" })
+                val total = if (duration > 0) Formatters.duration(duration) else "--:--"
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                    Box(Modifier.fillMaxWidth().heightIn(min = timeHeight), contentAlignment = Alignment.CenterStart) {
+                        Text(
+                            "${Formatters.duration(elapsed)} / $total", color = Color.White.copy(alpha = .88f),
+                            style = MaterialTheme.typography.labelMedium, maxLines = 1,
+                            modifier = Modifier.testTag("video-timeline-time")
+                        )
+                    }
                 }
             }
             Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .background(Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.85f))))
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal+WindowInsetsSides.Bottom))
                 .padding(horizontal=if(compact)16.dp else 24.dp,vertical=8.dp)){
-                timeline(Modifier.fillMaxWidth())
-                Row(Modifier.fillMaxWidth().heightIn(min=timeHeight),horizontalArrangement=Arrangement.SpaceBetween){
-                    Text(Formatters.duration((scrub?.toLong()?:position).coerceIn(0,duration)),color=Color.White.copy(alpha=.85f),style=MaterialTheme.typography.labelMedium,maxLines=1)
-                    Text(if(duration>0)Formatters.duration(duration)else"--:--",color=Color.White.copy(alpha=.85f),style=MaterialTheme.typography.labelMedium,maxLines=1)
-                }
+                Column(Modifier.fillMaxWidth().testTag("video-timeline")) { timeline() }
                 Row(Modifier.fillMaxWidth().heightIn(min=48.dp).then(if(viewportHeight<240.dp)Modifier.horizontalScroll(rememberScrollState())else Modifier),verticalAlignment=Alignment.CenterVertically){
                     if(viewportHeight<240.dp){
                         SeekButton(DriveIcons.Replay10,"Back 10 seconds",iconSize,canSeek){onInteraction();player.seekTo(videoSeekTarget(player.currentPosition,-10_000,player.duration))}
-                        IconButton({onInteraction();if(ended){player.seekTo(0);player.play()}else if(player.playWhenReady)player.pause()else player.play()}){Icon(if(ended||!requested)MediaIcons.Play else MediaIcons.Pause,if(requested)"Pause"else"Play",Modifier.size(playSize),tint=Color.White)}
+                        IconButton({onInteraction();if(ended){player.seekTo(0);player.play()}else if(player.playWhenReady)player.pause()else player.play()}){Icon(if (ended) DriveIcons.Autorenew else if (!requested) MediaIcons.Play else MediaIcons.Pause,if(ended)"Replay"else if(requested)"Pause"else"Play",Modifier.size(playSize),tint=Color.White)}
                         SeekButton(DriveIcons.Forward10,"Forward 10 seconds",iconSize,canSeek){onInteraction();player.seekTo(videoSeekTarget(player.currentPosition,10_000,player.duration))}
                     }
                     if(viewportHeight>=240.dp)Spacer(Modifier.weight(1f))
@@ -216,7 +230,7 @@ fun PlayerControls(
                             trackMenu = true
                         }) {
                             Icon(
-                                if (textTracks.isEmpty()) DriveIcons.Tune else DriveIcons.Subtitles,
+                                if (textTracks.isEmpty()) DriveIcons.AudioFile else DriveIcons.Subtitles,
                                 stringResource(R.string.video_track_picker),
                                 Modifier.size(24.dp),
                                 tint = Color.White
@@ -226,7 +240,7 @@ fun PlayerControls(
                     if (onPictureInPicture != null) {
                         IconButton(onClick = { onInteraction(); onPictureInPicture() }) {
                             Icon(
-                                DriveIcons.OpenInNew, stringResource(R.string.video_picture_in_picture),
+                                MediaIcons.PictureInPicture, stringResource(R.string.video_picture_in_picture),
                                 Modifier.size(24.dp), tint = Color.White
                             )
                         }
@@ -241,10 +255,7 @@ fun PlayerControls(
 @Composable
 private fun SeekButton(icon:ImageVector,description:String,size:androidx.compose.ui.unit.Dp,enabled:Boolean,onClick:()->Unit){
     IconButton(onClick,enabled=enabled,modifier=Modifier.size(48.dp).clip(CircleShape).background(Color.Black.copy(alpha=.4f))){
-        Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(2.dp)){
-            Icon(icon,description,Modifier.size(size),tint=Color.White.copy(alpha=if(enabled)1f else .35f))
-
-        }
+        Icon(icon, description, Modifier.size(size), tint = Color.White.copy(alpha = if (enabled) 1f else .35f))
     }
 }
 private fun speedLabel(value:Float)=if(value%1f==0f)"${value.toInt()}×"else"${value}×"
@@ -277,7 +288,7 @@ internal enum class PlayerRotation(
         ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     );
 
-    val icon: ImageVector @Composable get() = MediaIcons.Rotate
+    val icon: ImageVector @Composable get() = if (this == AUTO) MediaIcons.Rotate else DriveIcons.PhoneAndroid
 
     fun next(): PlayerRotation = entries[(ordinal + 1) % entries.size]
 }

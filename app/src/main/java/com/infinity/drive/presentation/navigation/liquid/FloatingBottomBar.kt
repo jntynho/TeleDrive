@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -30,18 +31,43 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.infinity.drive.presentation.navigation.liquid.liquid.lens
+import com.infinity.drive.presentation.navigation.liquid.liquid.vibrancy
 import com.infinity.drive.presentation.platform.LiquidNavigationItem
 import kotlin.math.roundToInt
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.blur
+import top.yukonga.miuix.kmp.blur.highlight.BloomStroke
+import top.yukonga.miuix.kmp.blur.highlight.Highlight
+import top.yukonga.miuix.kmp.blur.highlight.LightPosition
+import top.yukonga.miuix.kmp.blur.highlight.LightSource
 import top.yukonga.miuix.kmp.blur.drawBackdrop
+
+private val iosIndicatorSpecular: Highlight by lazy { Highlight(
+    width = 1.dp,
+    alpha = 1f,
+    style = BloomStroke(
+        color = Color.White.copy(alpha = 0.12f),
+        innerBlurRadius = 2.0.dp,
+        primaryLight = LightSource(
+            position = LightPosition(0.5f, -0.3f, -0.05f),
+            color = Color.White,
+            intensity = 1f,
+        ),
+        secondaryLight = LightSource(
+            position = LightPosition(0.5f, 0.8f, -0.5f),
+            color = Color.White,
+            intensity = 0.4f,
+        ),
+        dualPeak = true,
+    ),
+) }
 
 @Composable
 internal fun FloatingBottomBar(
     items: List<LiquidNavigationItem>,
     selectedIndex: Int,
     onSelected: (Int) -> Unit,
-    backdrop: Backdrop,
+    backdrop: Backdrop?,
     glass: Boolean,
     showLabels: Boolean,
     modifier: Modifier = Modifier
@@ -59,15 +85,17 @@ internal fun FloatingBottomBar(
         animationSpec = spring(stiffness = 550f),
         label = "navigationSelection"
     )
-    val surface = if (glass) {
+    val surface = if (glass && backdrop != null) {
         Modifier.drawBackdrop(
             backdrop = backdrop,
             shape = { CircleShape },
             effects = {
-                blur(10.dp.toPx(), 10.dp.toPx())
-                lens(refractionHeight = 12.dp.toPx(), refractionAmount = 10.dp.toPx())
+                vibrancy()
+                blur(4.dp.toPx(), 4.dp.toPx())
+                lens(refractionHeight = 24.dp.toPx(), refractionAmount = 24.dp.toPx())
             },
-            onDrawSurface = { drawRect(colors.surfaceContainerHigh.copy(alpha = .86f)) }
+            highlight = { iosIndicatorSpecular.copy(alpha = .75f) },
+            onDrawSurface = { drawRect(colors.surfaceContainer.copy(alpha = .56f)) }
         )
     } else {
         Modifier.background(colors.surfaceContainerHigh, CircleShape)
@@ -100,11 +128,23 @@ internal fun FloatingBottomBar(
             .padding(4.dp)
     ) {
         val tabWidth = maxWidth / items.size
+        val selectionSurface = if (glass && backdrop != null) {
+            Modifier.drawBackdrop(
+                backdrop = backdrop,
+                shape = { CircleShape },
+                effects = {
+                    blur(4.dp.toPx(), 4.dp.toPx())
+                    lens(refractionHeight = 10.dp.toPx(), refractionAmount = 14.dp.toPx(),
+                        depthEffect = true, chromaticAberration = .5f)
+                },
+                highlight = { iosIndicatorSpecular },
+                onDrawSurface = { drawRect(colors.primaryContainer.copy(alpha = .68f)) }
+            )
+        } else Modifier.background(colors.primaryContainer, CircleShape)
         Box(Modifier.matchParentSize()) {
             Box(
                 Modifier.offset { IntOffset((tabWidth.toPx() * position).roundToInt(), 0) }
-                    .width(tabWidth).fillMaxHeight()
-                    .background(colors.primaryContainer, CircleShape)
+                    .width(tabWidth).fillMaxHeight().then(selectionSurface)
             )
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

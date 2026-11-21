@@ -365,7 +365,14 @@ fun PreviewScreen(
                 if(currentFile.category==FileCategory.AUDIO)CenterAlignedTopAppBar(
                     expandedHeight=com.infinity.drive.presentation.audio.audioHeaderHeight(),
                     title={com.infinity.drive.presentation.audio.AudioNowPlayingTitle(currentFile)},
-                    navigationIcon={IconButton(onBack){Icon(DriveIcons.ArrowBack,stringResource(Res.string.common_back))}},
+                    navigationIcon = {
+                        androidx.compose.material3.FilledIconButton(
+                            onBack,
+                            colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
+                                containerColor = Color(0xFF302A40), contentColor = Color.White
+                            )
+                        ) { Icon(DriveIcons.ArrowBack, stringResource(Res.string.common_back)) }
+                    },
                     actions = {
                         if (viewModel.fromTrash) {
                             IconButton({ viewModel.showInfo(currentFile) }) { Icon(DriveIcons.Info, "File details") }

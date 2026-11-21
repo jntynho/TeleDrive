@@ -95,7 +95,7 @@ class AppViewModel(
             customTheme = prefs.selectedCustomTheme,
             iconStyle = prefs.iconStyle,
             locked = locked,
-            warmupGlass=prefs.floatingNavigationBar&&prefs.navigationBarBlur&&prefs.navigationBarStyle==com.infinity.drive.domain.model.NavigationBarStyle.FLOATING
+            warmupGlass=prefs.navigationBarBlur
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, AppUiState())
 

@@ -4,7 +4,7 @@ TeleDrive uses the Outline and Broken glyphs from the original Iconsax Free coll
 
 The path geometry is from the official `lusaxweb/iconsax` repository at `e5dba15361f69d34d0f3f3f35408a28fe74c5727`. TeleDrive selects the two 24 × 24 styles under `docs/Iconsax/Svg/All`, preserving path data, fill, stroke width, cap and join. Compose uses a tintable black brush and the website uses `currentColor`. [Pinned upstream source](https://github.com/lusaxweb/iconsax/tree/e5dba15361f69d34d0f3f3f35408a28fe74c5727/docs/Iconsax/Svg/All)
 
-The Telegram action uses an original TeleDrive paper-plane glyph, drawn on the same 24 × 24 grid in Outline and Broken.
+The Telegram and picture-in-picture actions use original TeleDrive glyphs drawn on the same 24 × 24 grid in Outline and Broken.
 
 The Android overflow control rotates the three-dot `more` glyph 90 degrees around its center in both styles.
 

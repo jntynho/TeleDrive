@@ -3,11 +3,13 @@ package com.infinity.drive.presentation
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.ui.graphics.rememberGraphicsLayer
-import com.infinity.drive.presentation.components.recordNavigationScene
-import com.infinity.drive.presentation.components.navigationBackdrop
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.background
@@ -24,7 +26,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
@@ -71,12 +73,8 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.intl.LocaleList
-import com.infinity.drive.domain.model.NavigationBarStyle
-import com.infinity.drive.presentation.navigation.activeNavigationStyle
-import com.infinity.drive.presentation.navigation.canBlur
 import com.infinity.drive.presentation.navigation.showsNavigationChrome
 import com.infinity.drive.presentation.platform.LocalLiquidNavigation
-import com.infinity.drive.presentation.platform.LocalPlatformCapabilities
 import com.infinity.drive.domain.model.AppLanguage
 import com.infinity.drive.domain.model.AppTheme
 import com.infinity.drive.presentation.applock.LockScreen
@@ -230,12 +228,8 @@ private fun MainScaffold(
 ) {
     val navigationSettings=org.koin.compose.koinInject<com.infinity.drive.domain.repository.SettingsRepository>()
     val navigationPreferences by navigationSettings.preferences.collectAsStateWithLifecycle(com.infinity.drive.domain.model.UserPreferences())
-    val navigationScene=rememberGraphicsLayer()
     val liquidNavigation = LocalLiquidNavigation.current
-    val style = navigationPreferences.activeNavigationStyle()
-    val useBlur = navigationPreferences.floatingNavigationBar && navigationPreferences.navigationBarBlur &&
-        style.canBlur(liquidNavigation?.supportsGlass == true, LocalPlatformCapabilities.current.supportsBackdropBlur)
-    val useLiquidRenderer = style == NavigationBarStyle.FLOATING && liquidNavigation != null
+    val useGlass = navigationPreferences.navigationBarBlur && liquidNavigation?.supportsGlass == true
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
@@ -323,6 +317,7 @@ private fun MainScaffold(
     }
 
     val showBottomChrome = showChrome && !keyboardVisible
+    val bottomVisibility = remember { MutableTransitionState(false) }.apply { targetState = showBottomChrome }
     val initialChromeHeight = if (useRail) 0.dp else BottomBarHeight
     var measuredChromeHeight by remember(useRail) { mutableStateOf(initialChromeHeight) }
     var bottomChromeHeight by remember(useRail) { mutableStateOf(initialChromeHeight) }
@@ -342,16 +337,14 @@ private fun MainScaffold(
         val railWidth = if (useRail && onboardingComplete) 80.dp + with(chromeDensity) { startInset.toDp() } else 0.dp
         CompositionLocalProvider(
             app.tgdrive.ui.LocalNavigationInProgress provides navigating,
-            com.infinity.drive.presentation.components.LocalNavigationScene provides navigationScene,
             LocalBottomBarHeight provides if (onboardingComplete && !keyboardVisible) bottomChromeHeight else 0.dp,
             com.infinity.drive.presentation.components.LocalRevealFileNavigation provides { file:com.infinity.drive.domain.model.DriveFile -> navController.navigateOnce(Route.Files(file.folderId,focusFileId=file.id)) },
             com.infinity.drive.presentation.components.LocalFileFolderNavigation provides { id:String? -> navController.navigateOnce(Route.Files(id)) },
             com.infinity.drive.presentation.navigation.LocalNavigationRailWidth provides railWidth
         ) {
-            val capture = useBlur && showBottomChrome && !useRail
+            val capture = useGlass && !useRail && (bottomVisibility.currentState || bottomVisibility.targetState)
             val host = Modifier.fillMaxSize()
-            val recordedHost = if (useLiquidRenderer) liquidNavigation?.capture(host, capture) ?: host
-                else host.recordNavigationScene(navigationScene, capture)
+            val recordedHost = liquidNavigation?.capture(host, capture) ?: host
             AppNavHost(navController, startDestination, modifier = recordedHost.testTag("navigation-host"))
         }
         if(useRail) AnimatedVisibility(visible=showChrome,
@@ -369,8 +362,13 @@ private fun MainScaffold(
                 }
             }
         }
-        AnimatedVisibility(visible=showBottomChrome,enter=fadeIn(tween(180)),exit=fadeOut(tween(180)),
-            modifier=Modifier.align(Alignment.BottomCenter).padding(start=railWidth)) {
+        AnimatedVisibility(
+            visibleState = bottomVisibility,
+            enter = fadeIn(tween(220, easing = LinearOutSlowInEasing)) +
+                slideInVertically(tween(300, easing = LinearOutSlowInEasing)) { it / 3 },
+            exit = fadeOut(tween(140)) + slideOutVertically(tween(180, easing = FastOutSlowInEasing)) { it / 4 },
+            modifier = Modifier.align(Alignment.BottomCenter).padding(start = railWidth)
+        ) {
             androidx.compose.foundation.layout.Column(
                 Modifier.onSizeChanged { size ->
                     if (showBottomChrome) {
@@ -382,9 +380,7 @@ private fun MainScaffold(
                     navController.navigateOnce(Route.Preview(fileId=id,categories="AUDIO",sortField=navigationPreferences.audioSortField.name,sortDescending=navigationPreferences.audioSortDirection==com.infinity.drive.domain.model.SortDirection.DESCENDING))
                 }){com.infinity.drive.presentation.audio.LibraryAudioMiniPlayer()}
                 if (!useRail) {
-                    CompositionLocalProvider(com.infinity.drive.presentation.components.LocalNavigationScene provides navigationScene) {
-                        BottomNavigationBar(style, useBlur, navigationPreferences.navigationBarLabels, topLevelIndex, navigateToTab)
-                    }
+                    BottomNavigationBar(useGlass, navigationPreferences.navigationBarLabels, topLevelIndex, navigateToTab)
                 }
             }
         }
@@ -393,68 +389,62 @@ private fun MainScaffold(
 
 @Composable
 private fun BottomNavigationBar(
-    style: NavigationBarStyle,
-    blur: Boolean,
+    glass: Boolean,
     showLabels: Boolean,
     selectedIndex: Int,
     onNavigate: (Int) -> Unit
 ) {
     val liquid = LocalLiquidNavigation.current
-    if (style == NavigationBarStyle.FLOATING && liquid != null) {
+    if (liquid != null) {
         val items = TopLevelDestination.entries.map {
             com.infinity.drive.presentation.platform.LiquidNavigationItem(
                 it.icon, stringResource(it.labelRes), "navigation-${it.name.lowercase()}"
             )
         }
-        liquid.Bar(items, selectedIndex, showLabels, blur, onNavigate)
+        liquid.Bar(items, selectedIndex, showLabels, glass, onNavigate)
         return
     }
-    val floating = style != NavigationBarStyle.STANDARD
-    val radius = when (style) {
-        NavigationBarStyle.STANDARD -> 0.dp
-        NavigationBarStyle.FLOATING -> 50.dp
-        NavigationBarStyle.MIUIX -> 28.dp
-    }
     val colors = MaterialTheme.colorScheme
-    Surface(
-        modifier = Modifier.fillMaxWidth()
-            .then(if (floating) Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp) else Modifier)
-            .navigationBackdrop(blur, radius),
-        shape = RoundedCornerShape(radius),
-        color = if (blur) colors.surfaceContainerHigh.copy(alpha = .88f) else colors.surfaceContainerHigh,
-        shadowElevation = if (floating) 6.dp else 0.dp
+    Box(
+        Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
     ) {
-        val fontScale = LocalDensity.current.fontScale
-        val height = (if (floating) 64.dp else BottomBarHeight) +
-            24.dp * if (showLabels) (fontScale - 1f).coerceAtLeast(0f) else 0f
-        val insets = if (floating) WindowInsets(0, 0, 0, 0) else androidx.compose.material3.NavigationBarDefaults.windowInsets
-        androidx.compose.material3.NavigationBar(
-            modifier = Modifier.heightIn(min = height),
-            containerColor = androidx.compose.ui.graphics.Color.Transparent,
-            tonalElevation = 0.dp,
-            windowInsets = insets
+        Surface(
+            modifier = Modifier.widthIn(max = 320.dp).fillMaxWidth(),
+            shape = androidx.compose.foundation.shape.CircleShape,
+            color = colors.surfaceContainerHigh,
+            shadowElevation = 6.dp
         ) {
-            TopLevelDestination.entries.forEachIndexed { index, destination ->
-                val label = stringResource(destination.labelRes)
-                NavigationBarItem(
-                    modifier = Modifier.testTag("navigation-${destination.name.lowercase()}")
-                        .then(if (showLabels) Modifier else Modifier.semantics { contentDescription = label }),
-                    selected = index == selectedIndex,
-                    onClick = { onNavigate(index) },
-                    icon = { Icon(destination.icon, null) },
-                    label = if (showLabels) ({
-                        Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 2,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                    }) else null,
-                    colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
-                        selectedIconColor = colors.onPrimaryContainer,
-                        selectedTextColor = colors.onSurface,
-                        indicatorColor = colors.primaryContainer,
-                        unselectedIconColor = colors.onSurfaceVariant,
-                        unselectedTextColor = colors.onSurfaceVariant
+            val fontScale = LocalDensity.current.fontScale
+            val height = 64.dp + 24.dp * if (showLabels) (fontScale - 1f).coerceAtLeast(0f) else 0f
+            androidx.compose.material3.NavigationBar(
+                modifier = Modifier.heightIn(min = height),
+                containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                tonalElevation = 0.dp,
+                windowInsets = WindowInsets(0, 0, 0, 0)
+            ) {
+                TopLevelDestination.entries.forEachIndexed { index, destination ->
+                    val label = stringResource(destination.labelRes)
+                    NavigationBarItem(
+                        modifier = Modifier.testTag("navigation-${destination.name.lowercase()}")
+                            .then(if (showLabels) Modifier else Modifier.semantics { contentDescription = label }),
+                        selected = index == selectedIndex,
+                        onClick = { onNavigate(index) },
+                        icon = { Icon(destination.icon, null) },
+                        label = if (showLabels) ({
+                            Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 2,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        }) else null,
+                        colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
+                            selectedIconColor = colors.onPrimaryContainer,
+                            selectedTextColor = colors.onSurface,
+                            indicatorColor = colors.primaryContainer,
+                            unselectedIconColor = colors.onSurfaceVariant,
+                            unselectedTextColor = colors.onSurfaceVariant
+                        )
                     )
-                )
+                }
             }
         }
     }

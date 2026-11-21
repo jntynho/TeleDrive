@@ -70,7 +70,7 @@ def kotlin_name(icon):
 
 
 def emit_vector(style, icon, paths, suffix=""):
-    name = f"teledrive:{style}/telegram" if icon == "teledrive-telegram" else f"iconsax:{style}/{icon}"
+    name = f"teledrive:{style}/{icon.removeprefix('teledrive-')}" if icon.startswith("teledrive-") else f"iconsax:{style}/{icon}"
     yield f'        {style} = {{ vector("{name}") {{'
     # Iconsax's horizontal ellipsis rotates to a vertical overflow control.
     if icon == "more":

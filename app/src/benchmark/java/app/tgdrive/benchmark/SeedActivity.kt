@@ -28,7 +28,7 @@ class SeedActivity:ComponentActivity(){
                     val koin=GlobalContext.get()
                     val settings=koin.get<SettingsRepository>()
                     settings.update{UserPreferences(onboardingComplete=true,instantBackupEnabled=false,updateCheckEnabled=false,
-                        floatingNavigationBar=true,navigationBarBlur=true,folderOwnershipRepaired=true)}
+                        navigationBarBlur=true,folderOwnershipRepaired=true)}
                     val db=koin.get<DriveInfinityDatabase>();db.clearAllTables()
                     koin.get<com.infinity.drive.domain.repository.FileRepository>().clearStartupCache()
                     val root=File(filesDir,"benchmark-fixtures").apply{mkdirs()}

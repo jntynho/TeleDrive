@@ -310,25 +310,13 @@ class RebuiltUiTest {
         compose.onNodeWithText("Appearance",substring=false).performScrollTo().performClick()
         compose.onNodeWithText("Floating navigation bar",substring=false).performScrollTo().performClick()
         compose.onAllNodesWithText("Floating navigation bar",substring=false).onFirst().assertIsDisplayed()
-        compose.onNodeWithText("Apply your preferred navigation style").assertIsDisplayed()
+        compose.onNodeWithText("Navigation bar style", substring=false).assertDoesNotExist()
+        compose.onNodeWithText("Enable custom navigation",substring=false).assertDoesNotExist()
         compose.onNodeWithText("Blur background",substring=false).assertIsNotEnabled()
-        compose.onNodeWithText("Navigation bar style",substring=false).assertIsNotEnabled()
         compose.onNodeWithTag("navigation-settings").performClick().assertIsSelected()
-        compose.onNodeWithText("Enable custom navigation").assertIsDisplayed()
-        capture("floating-before-tap")
-        compose.onNodeWithText("Apply your preferred navigation style").performClick()
-        capture("floating-after-tap")
         val repository=GlobalContext.get().get<SettingsRepository>()
-        compose.waitUntil(5000){compose.waitForIdle();runBlocking{repository.preferences.first().floatingNavigationBar}}
         compose.onNodeWithText("Show labels",substring=false).performClick()
-        capture("floating-label-after")
         compose.waitUntil(5000){compose.waitForIdle();!runBlocking{repository.preferences.first().navigationBarLabels}}
-        for(style in listOf(com.infinity.drive.domain.model.NavigationBarStyle.MIUIX,com.infinity.drive.domain.model.NavigationBarStyle.STANDARD,com.infinity.drive.domain.model.NavigationBarStyle.FLOATING)){
-            compose.onNodeWithText("Navigation bar style",substring=false).performClick()
-            compose.onNodeWithText(style.label,substring=false).performClick()
-            compose.waitUntil(5000){compose.waitForIdle();runBlocking{repository.preferences.first().navigationBarStyle==style}}
-            compose.onNodeWithTag("navigation-settings").assertIsSelected()
-        }
         capture("floating-navigation-settings")
         for(tab in listOf("home","gallery","audio","settings","audio","home")){
             compose.onNodeWithTag("navigation-$tab").performClick()
@@ -339,7 +327,7 @@ class RebuiltUiTest {
             }
             compose.onNodeWithTag("navigation-$tab").assertIsSelected()
         }
-        assertTrue(runBlocking{repository.preferences.first().floatingNavigationBar})
+        assertTrue(!runBlocking{repository.preferences.first().navigationBarLabels})
     }
 
     @Test fun fileActionsUseHeaderDetailsAndHideActionsForAnOpenFile(){
@@ -776,7 +764,7 @@ class RebuiltUiTest {
     @Test fun floatingBarKeepsTheActivityViewportFullHeight(){
         prepareActivityChannel()
         val settings=GlobalContext.get().get<SettingsRepository>()
-        runBlocking{settings.update{it.copy(floatingNavigationBar=true,navigationBarStyle=com.infinity.drive.domain.model.NavigationBarStyle.FLOATING)}}
+        runBlocking{settings.update{it.copy(navigationBarBlur=true)}}
         runBlocking{GlobalContext.get().get<com.infinity.drive.data.local.dao.TransferDao>().upsert(
             com.infinity.drive.data.local.entity.TransferEntity(id="viewport-task",type=com.infinity.drive.domain.model.TransferType.UPLOAD,fileId="Report.pdf",displayName="Report.pdf",localPath=null,chatId=-100701L,messageId=null,remoteFileId=null,sizeBytes=123,state=com.infinity.drive.domain.model.TransferState.COMPLETED,createdAt=1,updatedAt=1,completedAt=1))}
         compose.waitUntil(15000){compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty()}

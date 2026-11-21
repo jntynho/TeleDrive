@@ -29,9 +29,7 @@ data class UserPreferences(
 
     val theme: AppTheme = AppTheme.DARK,
     val language: AppLanguage = AppLanguage.ENGLISH,
-    val floatingNavigationBar:Boolean=false,
-    val navigationBarStyle:NavigationBarStyle=NavigationBarStyle.FLOATING,
-    val navigationBarBlur:Boolean=true,
+    val navigationBarBlur:Boolean=false,
     val navigationBarLabels:Boolean=true,
     val accentColour: AccentColour = AccentColour.BLUE,
     val customThemes: List<CustomTheme> = emptyList(),

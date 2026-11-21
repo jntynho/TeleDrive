@@ -136,9 +136,15 @@ class SettingsRepositoryImpl(
                 ?: defaults.keyBackupCreated,
             theme = enumOrDefault(this[PreferenceKeys.THEME], defaults.theme),
             language = AppLanguage.fromCode(this[PreferenceKeys.LANGUAGE]),
-            floatingNavigationBar = this[PreferenceKeys.FLOATING_NAVIGATION] ?: defaults.floatingNavigationBar,
-            navigationBarStyle = enumOrDefault(this[PreferenceKeys.NAVIGATION_STYLE],defaults.navigationBarStyle),
-            navigationBarBlur = this[PreferenceKeys.NAVIGATION_BLUR] ?: defaults.navigationBarBlur,
+            navigationBarBlur = if (this[PreferenceKeys.FLOATING_NAVIGATION] != null ||
+                this[PreferenceKeys.NAVIGATION_STYLE] != null
+            ) {
+                this[PreferenceKeys.FLOATING_NAVIGATION] == true &&
+                    this[PreferenceKeys.NAVIGATION_STYLE] != "MIUIX" &&
+                    (this[PreferenceKeys.NAVIGATION_BLUR] ?: true)
+            } else {
+                this[PreferenceKeys.NAVIGATION_BLUR] ?: defaults.navigationBarBlur
+            },
             navigationBarLabels = this[PreferenceKeys.NAVIGATION_LABELS] ?: defaults.navigationBarLabels,
             viewMode = if(this[PreferenceKeys.FILE_LIST_DEFAULT_APPLIED]==true)enumOrDefault(this[PreferenceKeys.VIEW_MODE], defaults.viewMode)else com.infinity.drive.domain.model.ViewMode.LIST,
             galleryViewMode = enumOrDefault(
@@ -234,8 +240,8 @@ class SettingsRepositoryImpl(
         this[PreferenceKeys.FOLDER_OWNERSHIP_REPAIRED] = prefs.folderOwnershipRepaired
         this[PreferenceKeys.THEME] = prefs.theme.name
         this[PreferenceKeys.LANGUAGE] = prefs.language.code
-        this[PreferenceKeys.FLOATING_NAVIGATION] = prefs.floatingNavigationBar
-        this[PreferenceKeys.NAVIGATION_STYLE] = prefs.navigationBarStyle.name
+        remove(PreferenceKeys.FLOATING_NAVIGATION)
+        remove(PreferenceKeys.NAVIGATION_STYLE)
         this[PreferenceKeys.NAVIGATION_BLUR] = prefs.navigationBarBlur
         this[PreferenceKeys.NAVIGATION_LABELS] = prefs.navigationBarLabels
         this[PreferenceKeys.FILE_LIST_DEFAULT_APPLIED] = true

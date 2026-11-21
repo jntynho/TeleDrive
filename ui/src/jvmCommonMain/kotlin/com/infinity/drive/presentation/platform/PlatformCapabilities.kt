@@ -22,9 +22,6 @@ interface PlatformCapabilities {
 
     /** True where the system offers wallpaper-derived color schemes. */
     val supportsDynamicColor: Boolean
-
-    /** True where a Compose graphics layer can apply a hardware backdrop blur. */
-    val supportsBackdropBlur: Boolean get() = false
 }
 
 val LocalPlatformCapabilities = staticCompositionLocalOf<PlatformCapabilities> {

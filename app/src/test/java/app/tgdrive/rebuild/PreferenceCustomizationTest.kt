@@ -20,6 +20,32 @@ class PreferenceCustomizationTest {
         override suspend fun updateData(transform:suspend (Preferences)->Preferences):Preferences=mutex.withLock{transform(state.value).also{state.value=it}}
     }
     private val cipher=object:CredentialCipher{override fun encrypt(plaintext:ByteArray)=plaintext.copyOf();override fun decrypt(ciphertext:ByteArray)=ciphertext.copyOf()}
+    @Test fun unifiedFloatingStylePreservesTheEffectiveGlassPreference() = runBlocking {
+        val store = Store()
+        val settings = SettingsRepositoryImpl(store, cipher)
+        assertFalse(settings.preferences.first().navigationBarBlur)
+        data class Legacy(val custom: Boolean, val style: String, val blur: Boolean, val expected: Boolean)
+        for ((custom, style, blur, expected) in listOf(
+            Legacy(false, "FLOATING", true, false),
+            Legacy(true, "FLOATING", true, true),
+            Legacy(true, "MIUIX", true, false),
+            Legacy(true, "FLOATING", false, false)
+        )) {
+            store.edit {
+                it[PreferenceKeys.FLOATING_NAVIGATION] = custom
+                it[PreferenceKeys.NAVIGATION_STYLE] = style
+                it[PreferenceKeys.NAVIGATION_BLUR] = blur
+            }
+            assertEquals(expected, settings.preferences.first().navigationBarBlur)
+            settings.update { it.copy(navigationBarLabels = false) }
+            assertNull(store.state.value[PreferenceKeys.NAVIGATION_STYLE])
+            assertNull(store.state.value[PreferenceKeys.FLOATING_NAVIGATION])
+            assertEquals(expected, settings.preferences.first().navigationBarBlur)
+        }
+        settings.update { it.copy(navigationBarBlur = true) }
+        assertTrue(settings.preferences.first().navigationBarBlur)
+    }
+
     @Test fun backgroundPlaybackDefaultsOnAndAnExplicitOffChoiceSurvives() = runBlocking {
         val store = Store()
         val preferences = SettingsRepositoryImpl(store, cipher)

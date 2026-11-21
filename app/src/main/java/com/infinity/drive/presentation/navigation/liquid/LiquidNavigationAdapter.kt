@@ -1,5 +1,6 @@
 package com.infinity.drive.presentation.navigation.liquid
 
+import android.os.Build
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -13,16 +14,15 @@ import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 
-@androidx.annotation.RequiresApi(33)
 @Composable
 fun rememberLiquidNavigation(): LiquidNavigation {
-    val backdrop = rememberLayerBackdrop { drawContent() }
+    val backdrop = if (Build.VERSION.SDK_INT >= 33) rememberLayerBackdrop { drawContent() } else null
     return remember(backdrop) {
         object : LiquidNavigation {
-            override val supportsGlass: Boolean get() = isRuntimeShaderSupported()
+            override val supportsGlass: Boolean get() = backdrop != null && isRuntimeShaderSupported()
 
             override fun capture(modifier: Modifier, enabled: Boolean): Modifier =
-                if (enabled) modifier.layerBackdrop(backdrop) else modifier
+                if (enabled && backdrop != null) modifier.layerBackdrop(backdrop) else modifier
 
             @Composable
             override fun Bar(

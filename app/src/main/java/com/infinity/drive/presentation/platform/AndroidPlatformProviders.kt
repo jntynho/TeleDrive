@@ -271,7 +271,7 @@ fun ProvidePlatformActions(content: @Composable () -> Unit) {
     val startupLoader=org.koin.compose.koinInject<coil3.ImageLoader>()
     val startupThumbnails=org.koin.compose.koinInject<com.infinity.drive.data.local.dao.ThumbnailDao>()
     val startupPreparation=remember(context,startupLoader,startupThumbnails){com.infinity.drive.presentation.startup.AndroidStartupPreparation(context,startupLoader,startupThumbnails)}
-    val liquidNavigation=if(android.os.Build.VERSION.SDK_INT>=33)com.infinity.drive.presentation.navigation.liquid.rememberLiquidNavigation()else null
+    val liquidNavigation = com.infinity.drive.presentation.navigation.liquid.rememberLiquidNavigation()
     val directoryTreeDocument = rememberAndroidDirectoryTreeDocument()
     val folderArchiveDocument = rememberAndroidFolderArchiveDocument()
     CompositionLocalProvider(

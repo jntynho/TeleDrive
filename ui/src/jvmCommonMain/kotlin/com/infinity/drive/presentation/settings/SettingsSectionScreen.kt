@@ -1,7 +1,6 @@
 // Modified for TG Drive: Android integration, safety fixes and visual adaptation; see third_party/driveinfinity/SOURCE.md.
 package com.infinity.drive.presentation.settings
 
-import com.infinity.drive.presentation.navigation.canBlur
 import app.tgdrive.ui.elasticVerticalScroll as verticalScroll
 import app.tgdrive.ui.DriveIcons
 import kotlinx.coroutines.flow.first
@@ -1229,50 +1228,14 @@ private fun ChannelCriteria() {
 @Composable
 private fun NavigationBarSection(state: SettingsUiState, viewModel: SettingsViewModel) {
     val prefs = state.preferences
-    val custom = prefs.floatingNavigationBar
-    val style = prefs.navigationBarStyle
-    val glass = style == com.infinity.drive.domain.model.NavigationBarStyle.FLOATING
     val glassSupported = com.infinity.drive.presentation.platform.LocalLiquidNavigation.current?.supportsGlass == true
-    val backdropSupported = LocalPlatformCapabilities.current.supportsBackdropBlur
-    val blurAvailable = custom && style.canBlur(glassSupported, backdropSupported)
-    var chooseStyle by remember { mutableStateOf(false) }
-    if (chooseStyle && custom) {
-        ChoiceDialog(
-            title = "Navigation bar style",
-            options = com.infinity.drive.domain.model.NavigationBarStyle.entries.map { it to it.label },
-            selected = style,
-            onSelect = { choice ->
-                chooseStyle = false
-                viewModel.update { it.copy(navigationBarStyle = choice) }
-            },
-            onDismiss = { chooseStyle = false }
-        )
-    }
     SettingsGroup {
         add {
             SettingsSwitchRow(
-                "Enable custom navigation", checked = custom, subtitle = "Apply your preferred navigation style",
-                onChange = { value -> viewModel.update { it.copy(floatingNavigationBar = value) } }
-            )
-        }
-        add {
-            SettingsClickRow(
-                "Navigation bar style", onClick = { chooseStyle = true },
-                subtitle = if (custom) style.label else "Standard is active", enabled = custom
-            )
-        }
-        add {
-            SettingsSwitchRow(
-                "Blur background", checked = blurAvailable && prefs.navigationBarBlur, enabled = blurAvailable,
+                "Blur background", checked = glassSupported && prefs.navigationBarBlur, enabled = glassSupported,
                 onChange = { value -> viewModel.update { it.copy(navigationBarBlur = value) } },
-                subtitle = when {
-                    !custom -> "Enable custom navigation to use blur"
-                    !style.supportsBlur -> "Miuix uses a solid background"
-                    glass && !glassSupported -> "Glass is unavailable on this device. Floating uses a solid background"
-                    !glass && !backdropSupported -> "Backdrop blur requires Android 12 or later"
-                    glass -> "Refracts the content behind the floating bar"
-                    else -> "Softens content behind the navigation bar"
-                }
+                subtitle = if (glassSupported) "Add the liquid glass effect to the floating bar"
+                    else "Floating uses a solid background on this device"
             )
         }
         add {
