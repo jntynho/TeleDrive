@@ -238,6 +238,67 @@ class UiStateRegressionTest {
         }finally{clear(vm);Dispatchers.resetMain()}
     }
 
+    @Test fun savingDuringUploadKeepsAnEncryptedRevisionAndQueuesItOnceIdle() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val directory = createTempDirectory("note-pending-").toFile()
+        val storage = object : AppStoragePaths {
+            override val filesDir = directory
+            override val cacheDir = directory
+            override val externalCacheDir = null
+            override val externalStorageRoot = null
+        }
+        val keys = fake<WrappedKeyRepository> { _, _ -> ByteArray(32) { 4 } }
+        val drafts = NoteDraftStore(storage, keys, StreamCrypto())
+        val busy = MutableStateFlow(true)
+        var readRemote = true
+        val written = mutableListOf<String>()
+        val files = fake<FileRepository> { method, args ->
+            when (method) {
+                "readNote" -> if (readRemote) AppResult.Success("original") else AppResult.Failure(AppError.NetworkUnavailable)
+                "observeFile" -> flowOf(null)
+                "saveNote" -> if (busy.value) AppResult.Failure(AppError.NoteTransferInProgress) else {
+                    written += args[3] as String
+                    AppResult.Success("existing")
+                }
+                else -> error(method)
+            }
+        }
+        var queued = 0
+        val transfers = fake<TransferRepository> { method, _ -> when (method) {
+            "observeUnfinishedForFile" -> busy
+            "enqueueUpload" -> { queued++; AppResult.Success("upload") }
+            else -> error(method)
+        } }
+        val settings = fake<SettingsRepository> { _, _ -> flowOf(UserPreferences(storageChatId = -1L)) }
+        fun model() = NoteEditorViewModel(
+            files, transfers, SavedStateHandle(mapOf("fileId" to "existing", "title" to "Note")),
+            draftStore = drafts, settings = settings
+        )
+        var editor = model()
+        try {
+            editor.uiState.first { !it.loading }
+            editor.setBody("revised")
+            editor.save()
+            editor.uiState.first { !it.saving }
+            assertFalse(editor.uiState.value.dirty)
+            assertEquals("revised", drafts.read("-1:note:existing:pending")?.body)
+            assertTrue(written.isEmpty())
+            clear(editor)
+
+            readRemote = false
+            busy.value = false
+            editor = model()
+            editor.uiState.first { !it.loading && !it.pendingSync && it.uploadState == BackupState.QUEUED }
+            assertEquals(listOf("revised"), written)
+            assertEquals(1, queued)
+            assertNull(drafts.read("-1:note:existing:pending"))
+        } finally {
+            clear(editor)
+            Dispatchers.resetMain()
+            directory.deleteRecursively()
+        }
+    }
+
     @Test fun failedNoteLoadCannotOverwriteTheOriginalAndCanRetry()=runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         var fail=true

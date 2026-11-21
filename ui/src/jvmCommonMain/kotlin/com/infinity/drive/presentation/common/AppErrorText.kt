@@ -72,6 +72,7 @@ fun AppError.toUiText(): UiText = when (this) {
         reason?.let(UiText::Plain) ?: UiText.Resource(Res.string.error_not_supported)
 
     is AppError.EncryptionFailure -> UiText.Resource(Res.string.error_encryption_failed)
+    AppError.NoteTransferInProgress -> UiText.Resource(Res.string.error_transfer_incomplete)
     is AppError.TransferFailed ->
         reason?.let(UiText::Plain) ?: UiText.Resource(Res.string.error_transfer_incomplete)
 

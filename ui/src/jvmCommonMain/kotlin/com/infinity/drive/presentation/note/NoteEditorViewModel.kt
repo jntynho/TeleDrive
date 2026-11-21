@@ -5,7 +5,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.infinity.drive.resources.Res
-import com.infinity.drive.resources.note_saved
+import com.infinity.drive.core.common.AppError
+import com.infinity.drive.core.common.SafeLog
+import com.infinity.drive.domain.model.BackupState
+import com.infinity.drive.domain.model.TransferState
+import com.infinity.drive.domain.model.TransferType
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import com.infinity.drive.core.common.AppResult
 import com.infinity.drive.core.files.FileImporter
 import com.infinity.drive.core.files.NoteDraft
@@ -45,7 +53,9 @@ data class NoteEditorUiState(
     val isNew: Boolean = true,
     val dirty: Boolean = false,
     val loadError: String? = null,
-    val attaching: Boolean = false
+    val attaching: Boolean = false,
+    val uploadState: BackupState? = null,
+    val pendingSync: Boolean = false
 )
 
 class NoteEditorViewModel(
@@ -73,6 +83,9 @@ class NoteEditorViewModel(
     private var initialBody = ""
     private var draftJob: Job? = null
     private var draftSlot: String? = null
+    private var noteChatId: Long? = null
+    private var uploadJob: Job? = null
+    private var pendingJob: Job? = null
     val canAttach: Boolean get() = importer != null
 
     init {
@@ -83,6 +96,7 @@ class NoteEditorViewModel(
         } else {
             viewModelScope.launch {
                 val chat = settings?.preferences?.first()?.storageChatId
+                noteChatId = chat
                 draftSlot = chat?.let {
                     when {
                         fileId != null -> "$it:note:$fileId"
@@ -107,21 +121,36 @@ class NoteEditorViewModel(
 
     private suspend fun load(fileId: String) {
         try {
-            when (val result = fileRepository.readNote(fileId)) {
-                is AppResult.Success -> {
-                    initialTitle = route.title ?: fileRepository.getFile(fileId)?.name.orEmpty()
-                    if (initialTitle.endsWith(".md", ignoreCase = true)) initialTitle = initialTitle.dropLast(3)
-                    initialBody = result.value
-                    val draft = readDraft()
-                    val title = draft?.title ?: initialTitle
-                    val body = draft?.body ?: initialBody
-                    _uiState.update {
-                        it.copy(title = title, body = body, loading = false,
-                            dirty = title != initialTitle || body != initialBody, loadError = null)
+            check(access?.canRead(fileId) != false)
+            val pending = draftSlot?.let { draftStore?.read("$it:pending") }
+            val draft = readDraft()
+            if (pending != null) {
+                initialTitle = pending.title
+                initialBody = pending.body
+            } else {
+                when (val result = fileRepository.readNote(fileId)) {
+                    is AppResult.Success -> {
+                        initialTitle = route.title ?: fileRepository.getFile(fileId)?.name.orEmpty()
+                        if (initialTitle.endsWith(".md", ignoreCase = true)) initialTitle = initialTitle.dropLast(3)
+                        initialBody = result.value
+                    }
+                    is AppResult.Failure -> {
+                        if (draft == null) {
+                            _uiState.update { it.copy(loading = false, loadError = "Couldn't open this note. Your original file is unchanged.") }
+                            return
+                        }
                     }
                 }
-                is AppResult.Failure -> _uiState.update{it.copy(loading=false,loadError="Couldn't open this note. Your original file is unchanged.")}
             }
+            val title = draft?.title ?: initialTitle
+            val body = draft?.body ?: initialBody
+            _uiState.update {
+                it.copy(title = title, body = body, loading = false,
+                    dirty = title != initialTitle || body != initialBody, loadError = null,
+                    pendingSync = pending != null)
+            }
+            observeUpload(fileId)
+            if (pending != null) watchPending(fileId)
         }catch(cancel:CancellationException){throw cancel}
         catch(_:Exception){_uiState.update{it.copy(loading=false,loadError="Couldn't open this note. Try again.")}}
     }
@@ -220,35 +249,159 @@ class NoteEditorViewModel(
         }
     }
 
-    fun save(){
-        val state=_uiState.value
-        if(state.saving||state.attaching||state.loading||state.loadError!=null||state.body.isBlank()||(!state.dirty&&!state.isNew))return
-        _uiState.update{it.copy(saving=true)}
-        viewModelScope.launch{
-            try {
-                when(val result=fileRepository.saveNote(editingFileId,route.folderId,state.title.trim(),state.body)){
-                    is AppResult.Success->{
-                        editingFileId=result.value
-                        initialTitle=state.title;initialBody=state.body
+    fun save() {
+        val state = _uiState.value
+        if (state.saving || state.attaching || state.loading || state.loadError != null ||
+            state.body.isBlank() || (!state.dirty && !state.isNew)
+        ) return
+        _uiState.update { it.copy(saving = true) }
+        viewModelScope.launch { persist(NoteDraft(state.title, state.body), explicit = true) }
+    }
+
+    private fun allowedToSync(): Boolean =
+        access?.notesLock?.state?.value?.restricted != true
+
+    private suspend fun persist(snapshot: NoteDraft, explicit: Boolean): Boolean {
+        try {
+            check(allowedToSync())
+            val expectedDrive = noteChatId
+            check(expectedDrive == null || settings?.preferences?.first()?.storageChatId == expectedDrive)
+            val id = editingFileId
+            when (val result = fileRepository.saveNote(id, route.folderId, snapshot.title.trim(), snapshot.body)) {
+                is AppResult.Success -> {
+                    val oldSlot = draftSlot
+                    editingFileId = result.value
+                    if (oldSlot != null) {
                         draftJob?.cancelAndJoin()
-                        try { draftSlot?.let { draftStore?.clear(it) } }
-                        catch (e: CancellationException) { throw e }
-                        catch (_: Exception) { /* The note itself was saved. */ }
-                        _uiState.update{it.copy(isNew=false,dirty=false)}
-                        val queued=transferRepository.enqueueUpload(result.value)
-                        _uiState.update{it.copy(saving=false)}
-                        when(queued){
-                            is AppResult.Success->{_messages.tryEmit(UiText.Resource(Res.string.note_saved));_saved.trySend(Unit)}
-                            is AppResult.Failure->_messages.tryEmit(UiText.Plain("Saved on this device. Upload couldn't be queued; retry from the file's options."))
+                        try {
+                            draftStore?.clear("$oldSlot:pending")
+                            draftStore?.clear(oldSlot)
+                        } catch (cancel: CancellationException) {
+                            throw cancel
+                        } catch (_: Exception) {
+                            // Local save is committed; draft cleanup must not stop its upload.
                         }
                     }
-                    is AppResult.Failure->{_uiState.update{it.copy(saving=false)};_messages.tryEmit(result.error.toUiText())}
+                    draftSlot = noteChatId?.let { "$it:note:${result.value}" }
+                    acceptSnapshot(snapshot, pending = false)
+                    _uiState.update { it.copy(uploadState = BackupState.NONE) }
+                    observeUpload(result.value)
+                    if (_uiState.value.dirty) scheduleDraft()
+                    enqueueSync(result.value)
+                    if (explicit) _saved.trySend(Unit)
                 }
-            }catch(cancel:CancellationException){throw cancel}
-            catch(_:Exception){
-                _uiState.update{it.copy(saving=false)}
-                _messages.tryEmit(UiText.Plain(if(editingFileId!=null&&!_uiState.value.dirty)"Saved locally, but upload couldn't be queued."else"Couldn't save this note. Your draft is still here."))
+                is AppResult.Failure -> {
+                    val slot = draftSlot
+                    val store = draftStore
+                    if (result.error == AppError.NoteTransferInProgress && id != null && slot != null && store != null) {
+                        if (explicit) {
+                            draftJob?.cancelAndJoin()
+                            store.write("$slot:pending", snapshot)
+                            store.clear(slot)
+                            acceptSnapshot(snapshot, pending = true)
+                            if (_uiState.value.dirty) scheduleDraft()
+                            _saved.trySend(Unit)
+                            watchPending(id)
+                        } else return false
+                    } else {
+                        if (!explicit) _uiState.update { it.copy(uploadState = BackupState.FAILED) }
+                        _messages.tryEmit(result.error.toUiText())
+                    }
+                }
+            }
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            if (!explicit) _uiState.update { it.copy(uploadState = BackupState.FAILED) }
+            _messages.tryEmit(UiText.Resource(Res.string.note_draft_failed))
+        } finally {
+            _uiState.update { it.copy(saving = false) }
+        }
+        return true
+    }
+
+    private fun acceptSnapshot(snapshot: NoteDraft, pending: Boolean) {
+        initialTitle = snapshot.title
+        initialBody = snapshot.body
+        _uiState.update {
+            it.copy(isNew = false, pendingSync = pending, dirty = it.title != initialTitle || it.body != initialBody)
+        }
+    }
+
+    private fun observeUpload(id: String) {
+        uploadJob?.cancel()
+        uploadJob = viewModelScope.launch {
+            val files = flow { emitAll(fileRepository.observeFile(id)) }
+                .catch { SafeLog.w("NoteEditor", "Could not observe note upload", it) }
+            val transfers = flow { emitAll(transferRepository.observeLatestForFile(id)) }
+                .catch { emit(null) }
+            combine(files, transfers) { file, task ->
+                val upload = task?.takeIf { it.type == TransferType.UPLOAD }
+                when (upload?.state) {
+                    TransferState.FAILED -> BackupState.FAILED
+                    TransferState.QUEUED, TransferState.PAUSED -> BackupState.QUEUED
+                    TransferState.RUNNING -> BackupState.UPLOADING
+                    TransferState.CANCELLED -> BackupState.NONE
+                    else -> file?.backupState
+                }
+            }.collect { state ->
+                if (state != null) _uiState.update { it.copy(uploadState = state) }
             }
         }
+    }
+
+    private fun watchPending(id: String) {
+        pendingJob?.cancel()
+        pendingJob = viewModelScope.launch {
+            try {
+                do {
+                    transferRepository.observeUnfinishedForFile(id).first { !it }
+                    _uiState.first { !it.saving }
+                    if (!allowedToSync()) return@launch
+                    _uiState.update { it.copy(saving = true) }
+                    val promoted = try {
+                        val pending = draftSlot?.let { draftStore?.read("$it:pending") } ?: return@launch
+                        persist(pending, explicit = false)
+                    } finally {
+                        _uiState.update { it.copy(saving = false) }
+                    }
+                    if (promoted) return@launch
+                    delay(250)
+                } while (_uiState.value.pendingSync)
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (_: Exception) {
+                _uiState.update { it.copy(uploadState = BackupState.FAILED) }
+                _messages.tryEmit(UiText.Resource(Res.string.note_draft_failed))
+            }
+        }
+    }
+
+    fun retrySync() {
+        val id = editingFileId ?: return
+        if (_uiState.value.saving || !allowedToSync()) return
+        if (_uiState.value.pendingSync) {
+            watchPending(id)
+            return
+        }
+        _uiState.update { it.copy(saving = true) }
+        viewModelScope.launch {
+            try {
+                enqueueSync(id)
+            } finally {
+                _uiState.update { it.copy(saving = false) }
+            }
+        }
+    }
+
+    private suspend fun enqueueSync(id: String) {
+        val queued = try {
+            transferRepository.enqueueUpload(id).isSuccess
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            false
+        }
+        _uiState.update { it.copy(uploadState = if (queued) BackupState.QUEUED else BackupState.FAILED) }
     }
 }

@@ -56,6 +56,9 @@ class TransferRepositoryImpl(
     override fun observeActiveForFile(fileId: String): Flow<TransferTask?> =
         transferDao.observeActiveForFile(fileId).map { it?.toDomain() }
 
+    override fun observeUnfinishedForFile(fileId: String): Flow<Boolean> =
+        transferDao.observeUnfinishedForFile(fileId)
+
     override suspend fun enqueueUpload(fileId: String, priority: Int): AppResult<String> =
         enqueue(fileId, TransferType.UPLOAD, priority)
 

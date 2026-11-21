@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -21,12 +22,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import com.infinity.drive.presentation.components.PageHeader
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,8 +48,10 @@ import androidx.compose.ui.unit.dp
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.infinity.drive.resources.Res
+import com.infinity.drive.domain.model.BackupState
 import com.infinity.drive.resources.common_cancel
 import com.infinity.drive.resources.common_back
+import com.infinity.drive.resources.common_retry
 import com.infinity.drive.resources.note_body_hint
 import com.infinity.drive.presentation.platform.LocalFilePicker
 import com.infinity.drive.presentation.platform.PickResult
@@ -66,6 +72,14 @@ import com.infinity.drive.resources.note_link_url
 import com.infinity.drive.resources.note_new
 import com.infinity.drive.resources.note_quote
 import com.infinity.drive.resources.note_save
+import com.infinity.drive.resources.note_sync_failed
+import com.infinity.drive.resources.note_sync_local
+import com.infinity.drive.resources.note_sync_pending_edit
+import com.infinity.drive.resources.note_sync_saving
+import com.infinity.drive.resources.note_sync_synced
+import com.infinity.drive.resources.note_sync_unsaved
+import com.infinity.drive.resources.note_sync_uploading
+import com.infinity.drive.resources.note_sync_waiting
 import com.infinity.drive.resources.note_strikethrough
 import com.infinity.drive.resources.note_title_hint
 import com.infinity.drive.presentation.common.CollectSnackbarMessages
@@ -118,24 +132,39 @@ fun NoteEditorScreen(
 
     CollectSnackbarMessages(viewModel.messages, snackbarHostState)
     var confirmDiscard by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    var exitAfterSave by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     val owner=androidx.lifecycle.compose.LocalLifecycleOwner.current
     fun requestBack() {
         if (state.saving) return
         when {
             state.loading || state.loadError != null -> onBack()
             state.dirty -> confirmDiscard = true
+            state.pendingSync -> onBack()
             else -> viewModel.leaveEditor(keepDraft = false, onDone = onBack)
         }
     }
     com.infinity.drive.presentation.common.AppBackHandler(true) { requestBack() }
-    LaunchedEffect(viewModel,owner){owner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED){viewModel.saved.collect{onBack()}}}
+    LaunchedEffect(viewModel, owner) {
+        owner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+            viewModel.saved.collect {
+                if (exitAfterSave) {
+                    exitAfterSave = false
+                    onBack()
+                }
+            }
+        }
+    }
     if (confirmDiscard) androidx.compose.material3.AlertDialog(
         onDismissRequest = { confirmDiscard = false },
         title = { Text("Save changes?") },
         text = { Text("Your changes have not been saved.") },
         confirmButton = {
             androidx.compose.material3.TextButton(
-                onClick = { confirmDiscard = false; viewModel.save() },
+                onClick = {
+                    confirmDiscard = false
+                    exitAfterSave = true
+                    viewModel.save()
+                },
                 enabled = state.body.isNotBlank()
             ) { Text(stringResource(Res.string.note_save)) }
         },
@@ -192,7 +221,12 @@ fun NoteEditorScreen(
             if (!state.loading && state.loadError==null) {
                 val canSave = body.text.isNotBlank() && !state.saving && !state.attaching && (state.dirty || state.isNew)
                 FloatingActionButton(
-                    onClick = { if (canSave) viewModel.save() },
+                    onClick = {
+                        if (canSave) {
+                            exitAfterSave = false
+                            viewModel.save()
+                        }
+                    },
                     modifier=Modifier.semantics{if(!canSave)disabled()},
                     containerColor = if (canSave) {
                         MaterialTheme.colorScheme.primaryContainer
@@ -241,6 +275,7 @@ fun NoteEditorScreen(
                 colors = borderlessColors(),
                 modifier = Modifier.fillMaxWidth()
             )
+            NoteSyncStatus(state, onRetry = viewModel::retrySync)
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             MarkdownToolbar(
                 enabled = !state.saving,
@@ -286,6 +321,40 @@ fun NoteEditorScreen(
                     .weight(1f)
                     .padding(bottom = SAVE_BUTTON_CLEARANCE)
             )
+        }
+    }
+}
+
+@Composable
+private fun NoteSyncStatus(state: NoteEditorUiState, onRetry: () -> Unit) {
+    val label = when {
+        state.saving -> Res.string.note_sync_saving
+        state.pendingSync && state.uploadState == BackupState.FAILED -> Res.string.note_sync_failed
+        state.pendingSync -> Res.string.note_sync_pending_edit
+        state.dirty || state.isNew -> Res.string.note_sync_unsaved
+        else -> when (state.uploadState) {
+            BackupState.BACKED_UP -> Res.string.note_sync_synced
+            BackupState.UPLOADING -> Res.string.note_sync_uploading
+            BackupState.QUEUED -> Res.string.note_sync_waiting
+            BackupState.FAILED -> Res.string.note_sync_failed
+            BackupState.NONE, null -> Res.string.note_sync_local
+        }
+    }
+    val canRetry = !state.saving && !state.dirty && !state.isNew &&
+        (state.uploadState == BackupState.FAILED || (!state.pendingSync && state.uploadState == BackupState.NONE))
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 16.dp)
+    ) {
+        Text(
+            text = stringResource(label),
+            style = MaterialTheme.typography.labelMedium,
+            color = if (label == Res.string.note_sync_failed) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite }
+        )
+        if (canRetry) {
+            TextButton(onClick = onRetry) { Text(stringResource(Res.string.common_retry)) }
         }
     }
 }

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="note_sync_saving">Saving on this device…</string>
+    <string name="note_sync_pending_edit">Saved edit waiting to sync</string>
+    <string name="note_sync_unsaved">Unsaved changes</string>
+    <string name="note_sync_local">Saved on this device</string>
+    <string name="note_sync_waiting">Queued for Telegram</string>
+    <string name="note_sync_uploading">Uploading to Telegram…</string>
+    <string name="note_sync_synced">Synced to Telegram</string>
+    <string name="note_sync_failed">Saved on this device. Upload failed.</string>
+</resources>

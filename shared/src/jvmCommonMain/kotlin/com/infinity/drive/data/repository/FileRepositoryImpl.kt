@@ -811,7 +811,7 @@ class FileRepositoryImpl(
         val existing = fileId?.let { fileDao.byId(it) }
         if (fileId != null && existing == null) return AppResult.Failure(AppError.NotFound)
         if (existing != null && transferDao.unfinishedIdsForFiles(listOf(existing.id)).isNotEmpty()) {
-            return AppResult.Failure(AppError.TransferFailed("Wait for the current note upload to finish before saving again."))
+            return AppResult.Failure(AppError.NoteTransferInProgress)
         }
         val file = noteStore.write(name, body, existing?.localPath)
         val now = maxOf(System.currentTimeMillis(), (existing?.modifiedAt ?: 0) + 1)

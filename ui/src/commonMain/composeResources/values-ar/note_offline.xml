@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notes_offline_keep">إتاحة الملاحظة دون اتصال</string>
+    <string name="notes_offline_stop_keeping">إيقاف الاحتفاظ بالملاحظة دون اتصال</string>
+    <string name="notes_offline_ready">متاحة دون اتصال</string>
+    <string name="notes_offline_preparing">جارٍ تجهيز نسخة دون اتصال</string>
+    <string name="notes_offline_missing">النسخة دون اتصال غير متاحة</string>
+    <string name="notes_offline_retry">إعادة محاولة تنزيل الملاحظة</string>
+    <string name="notes_offline_failed">تعذّر تحديث إتاحة الملاحظة دون اتصال. أعد المحاولة.</string>
+</resources>

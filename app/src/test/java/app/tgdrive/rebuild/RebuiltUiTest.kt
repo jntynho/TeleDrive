@@ -857,6 +857,31 @@ class RebuiltUiTest {
         compose.onNode(hasText("Photos") and isSelectable()).assertIsSelected()
     }
 
+    @Test fun notesCanKeepAReadableLocalCopyWithoutChangingTelegramStatus() {
+        val repo = GlobalContext.get().get<com.infinity.drive.domain.repository.FileRepository>()
+        val id = runBlocking {
+            (repo.saveNote(null, null, "Offline test note", "Text available locally")
+                as com.infinity.drive.core.common.AppResult.Success).value
+        }
+        compose.waitUntil(15_000) { compose.onAllNodesWithText("Your library").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Note", substring = false).performScrollTo().performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithContentDescription("Keep note available offline").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithContentDescription("Keep note available offline").performClick()
+        compose.waitUntil(5_000) { runBlocking { repo.getFile(id)?.offlinePinned == true } }
+        org.junit.Assert.assertEquals(BackupState.NONE, runBlocking { repo.getFile(id)?.backupState })
+        org.junit.Assert.assertEquals("Text available locally", runBlocking {
+            (repo.readNote(id) as com.infinity.drive.core.common.AppResult.Success).value
+        })
+
+        compose.onNodeWithContentDescription("Stop keeping note offline").performClick()
+        compose.waitUntil(5_000) { runBlocking { repo.getFile(id)?.offlinePinned == false } }
+        org.junit.Assert.assertEquals("Text available locally", runBlocking {
+            (repo.readNote(id) as com.infinity.drive.core.common.AppResult.Success).value
+        })
+    }
+
     @Test fun dirtyNoteAsksBeforeLeavingAndCancelKeepsTheDraft(){
         val repo=GlobalContext.get().get<com.infinity.drive.domain.repository.FileRepository>()
         val id=runBlocking{(repo.saveNote(null,null,"Audit note","Original text") as com.infinity.drive.core.common.AppResult.Success).value}

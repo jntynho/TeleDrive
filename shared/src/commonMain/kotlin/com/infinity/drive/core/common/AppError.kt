@@ -56,6 +56,8 @@ sealed interface AppError {
 
     data class EncryptionFailure(val stage: String? = null) : AppError
 
+    data object NoteTransferInProgress : AppError
+
     data class TransferFailed(val reason: String? = null) : AppError
 
     data class Unknown(val message: String? = null) : AppError

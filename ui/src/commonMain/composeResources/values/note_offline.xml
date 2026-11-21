@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notes_offline_keep">Keep note available offline</string>
+    <string name="notes_offline_stop_keeping">Stop keeping note offline</string>
+    <string name="notes_offline_ready">Available offline</string>
+    <string name="notes_offline_preparing">Preparing offline copy</string>
+    <string name="notes_offline_missing">Offline copy unavailable</string>
+    <string name="notes_offline_retry">Retry offline download</string>
+    <string name="notes_offline_failed">Couldn’t update offline availability. Try again.</string>
+</resources>

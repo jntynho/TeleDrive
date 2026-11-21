@@ -13,6 +13,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.tgdrive.ui.DriveIcons
 import app.tgdrive.ui.ExpandableLibraryHeader
 import com.infinity.drive.core.common.AppResult
+import com.infinity.drive.core.security.HiddenContentAccess
 import com.infinity.drive.domain.model.*
 import com.infinity.drive.domain.repository.FileRepository
 import com.infinity.drive.domain.repository.TransferRepository
@@ -25,6 +26,13 @@ import com.infinity.drive.resources.common_back
 import com.infinity.drive.resources.notes_create
 import com.infinity.drive.resources.notes_empty
 import com.infinity.drive.resources.notes_local_only
+import com.infinity.drive.resources.notes_offline_failed
+import com.infinity.drive.resources.notes_offline_keep
+import com.infinity.drive.resources.notes_offline_missing
+import com.infinity.drive.resources.notes_offline_preparing
+import com.infinity.drive.resources.notes_offline_ready
+import com.infinity.drive.resources.notes_offline_retry
+import com.infinity.drive.resources.notes_offline_stop_keeping
 import com.infinity.drive.resources.notes_search
 import com.infinity.drive.resources.notes_search_empty
 import com.infinity.drive.resources.notes_settings
@@ -34,7 +42,11 @@ import com.infinity.drive.resources.notes_upload_failed
 import com.infinity.drive.resources.notes_upload_waiting
 import com.infinity.drive.resources.notes_uploading
 import org.jetbrains.compose.resources.stringResource
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
 @Composable
@@ -47,8 +59,10 @@ fun NotesScreen(
     val files = koinInject<FileRepository>()
     val transfers = koinInject<TransferRepository>()
     val trash = koinInject<TrashRepository>()
+    val hiddenAccess = koinInject<HiddenContentAccess>()
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
+    val offlineError = stringResource(Res.string.notes_offline_failed)
     var query by rememberSaveable { mutableStateOf("") }
     var searching by rememberSaveable { mutableStateOf(false) }
     var pendingTrash by remember { mutableStateOf<DriveFile?>(null) }
@@ -113,6 +127,46 @@ fun NotesScreen(
                 contentPadding = PaddingValues(bottom = LocalBottomBarInset.current + 88.dp)
             ) {
                 items(matching, key = { it.id }) { note ->
+                    var updatingOffline by remember(note.id) { mutableStateOf(false) }
+                    val resumableRemoteCopy = note.backupState == BackupState.BACKED_UP &&
+                        note.hasRemoteCopy && note.remoteFileId != null
+                    val latestTransfer = if (note.offlinePinned && !note.hasLocalCopy) {
+                        remember(transfers, note.id) { transfers.observeLatestForFile(note.id) }
+                            .collectAsStateWithLifecycle(initialValue = null).value
+                    } else null
+                    val offlinePending = latestTransfer?.let {
+                        it.type == TransferType.DOWNLOAD && !it.state.isTerminal
+                    } == true
+                    fun updateOffline(keep: Boolean) {
+                        if (updatingOffline) return
+                        updatingOffline = true
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) {
+                                    check(hiddenAccess.canRead(note.id))
+                                    val current = requireNotNull(files.getFile(note.id))
+                                    if (!keep && !current.hasLocalCopy) {
+                                        val transfer = transfers.observeLatestForFile(note.id).first()
+                                        check(transfer == null || transfer.type != TransferType.DOWNLOAD || transfer.state.isTerminal)
+                                    }
+                                    if (keep && !current.hasLocalCopy) {
+                                        check(current.backupState == BackupState.BACKED_UP &&
+                                            current.hasRemoteCopy && current.remoteFileId != null)
+                                    }
+                                    if (current.offlinePinned != keep) files.setOfflinePinned(note.id, keep)
+                                    if (keep && !current.hasLocalCopy) {
+                                        check(transfers.enqueueDownload(note.id) is AppResult.Success)
+                                    }
+                                }
+                            } catch (cancel: CancellationException) {
+                                throw cancel
+                            } catch (_: Exception) {
+                                snackbar.showSnackbar(offlineError)
+                            } finally {
+                                updatingOffline = false
+                            }
+                        }
+                    }
                     val status = when (note.backupState) {
                         BackupState.BACKED_UP -> stringResource(Res.string.notes_upload_done)
                         BackupState.QUEUED -> stringResource(Res.string.notes_upload_waiting)
@@ -141,6 +195,23 @@ fun NotesScreen(
                                     Text(excerpt, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                                 }
                                 Text("${Formatters.date(note.modifiedAt)} · $status")
+                                if (note.offlinePinned) {
+                                    Text(
+                                        stringResource(
+                                            when {
+                                                note.hasLocalCopy -> Res.string.notes_offline_ready
+                                                offlinePending || updatingOffline -> Res.string.notes_offline_preparing
+                                                else -> Res.string.notes_offline_missing
+                                            }
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    if (!note.hasLocalCopy && resumableRemoteCopy && !offlinePending && !updatingOffline) {
+                                        TextButton(onClick = { updateOffline(keep = true) }) {
+                                            Text(stringResource(Res.string.notes_offline_retry))
+                                        }
+                                    }
+                                }
                             }
                         },
                         leadingContent = { Icon(DriveIcons.EditNote, null) },
@@ -154,6 +225,20 @@ fun NotesScreen(
                                             }
                                         }
                                     }) { Text("Upload") }
+                                }
+                                if (note.offlinePinned || note.hasLocalCopy || resumableRemoteCopy) {
+                                    IconButton(
+                                        onClick = { updateOffline(keep = !note.offlinePinned) },
+                                        enabled = !updatingOffline && !offlinePending
+                                    ) {
+                                        Icon(
+                                            if (note.offlinePinned) DriveIcons.CheckCircle else DriveIcons.OfflinePin,
+                                            stringResource(
+                                                if (note.offlinePinned) Res.string.notes_offline_stop_keeping
+                                                else Res.string.notes_offline_keep
+                                            )
+                                        )
+                                    }
                                 }
                                 IconButton({ pendingTrash = note }) { Icon(DriveIcons.Delete, "Move to Trash") }
                             }

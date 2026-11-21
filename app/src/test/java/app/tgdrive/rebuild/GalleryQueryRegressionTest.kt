@@ -48,6 +48,22 @@ class GalleryQueryRegressionTest {
         }
     }
 
+    @Test fun offlineDownloadCannotReplaceAPathFromANewerEdit() = runTest {
+        val db = database()
+        try {
+            val dao = db.fileDao()
+            val row = file("note", name = "Note.md", chat = 1)
+            dao.upsert(row.copy(localPath = "/notes/new.md", modifiedAt = 2))
+            dao.attachDownloadedCopy(row.id, "/offline/old.md", previousPath = null, revision = 1)
+            assertEquals("/notes/new.md", dao.byId(row.id)?.localPath)
+            dao.upsert(row)
+            dao.attachDownloadedCopy(row.id, "/offline/copy.md", previousPath = null, revision = 1)
+            assertEquals("/offline/copy.md", dao.byId(row.id)?.localPath)
+        } finally {
+            db.close()
+        }
+    }
+
     @Test fun albumCoverAndNullChannelQueriesStayInsideTheirChannel()=runTest {
         val db=database()
         try {

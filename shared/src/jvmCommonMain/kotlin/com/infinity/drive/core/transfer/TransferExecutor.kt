@@ -615,7 +615,12 @@ class TransferExecutor(
         }
 
         val folderPath = folderPathResolver.pathOf(entity.folderId)
-        val savedPath = (if(entity.offlinePinned&&transfer.type!=TransferType.RESTORE) offlineWriter(entity.id) else downloadWriter).write(
+        val keepOffline = entity.offlinePinned && transfer.type != TransferType.RESTORE
+        if (keepOffline && entity.name.endsWith(".md", ignoreCase = true) && entity.localPath != null) {
+            transferDao.setCompleted(transfer.id, System.currentTimeMillis())
+            return Outcome.Completed
+        }
+        val savedPath = (if (keepOffline) offlineWriter(entity.id) else downloadWriter).write(
             fileName = entity.name,
             mimeType = entity.mimeType,
             folderPath = folderPath
@@ -635,7 +640,11 @@ class TransferExecutor(
             }
         )
 
-        if(!(transfer.type==TransferType.RESTORE&&entity.offlinePinned&&entity.localPath!=null))fileDao.setLocalPath(fileId, savedPath)
+        if (keepOffline) {
+            fileDao.attachDownloadedCopy(fileId, savedPath, entity.localPath, entity.modifiedAt)
+        } else if (!(transfer.type == TransferType.RESTORE && entity.offlinePinned && entity.localPath != null)) {
+            fileDao.setLocalPath(fileId, savedPath)
+        }
         transferDao.setCompleted(transfer.id, System.currentTimeMillis())
         return Outcome.Completed
     }

@@ -22,6 +22,8 @@ interface TransferRepository {
 
     fun observeLatestForFile(fileId:String):Flow<TransferTask?> = observeActiveForFile(fileId)
 
+    fun observeUnfinishedForFile(fileId: String): Flow<Boolean>
+
     /** Queues an upload of [fileId]'s local copy to the storage chat. */
     suspend fun enqueueUpload(fileId: String, priority: Int = 0): AppResult<String>
 

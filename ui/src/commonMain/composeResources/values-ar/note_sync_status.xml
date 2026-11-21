@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="note_sync_saving">جارٍ الحفظ على هذا الجهاز…</string>
+    <string name="note_sync_pending_edit">تعديل محفوظ بانتظار المزامنة</string>
+    <string name="note_sync_unsaved">تعديلات غير محفوظة</string>
+    <string name="note_sync_local">محفوظة على هذا الجهاز</string>
+    <string name="note_sync_waiting">بانتظار الرفع إلى تيليجرام</string>
+    <string name="note_sync_uploading">جارٍ الرفع إلى تيليجرام…</string>
+    <string name="note_sync_synced">تمت المزامنة مع تيليجرام</string>
+    <string name="note_sync_failed">محفوظة على هذا الجهاز. تعذّر الرفع.</string>
+</resources>

@@ -142,6 +142,9 @@ interface TransferDao {
     )
     suspend fun unfinishedIdsForFiles(fileIds: List<String>): List<String>
 
+    @Query("SELECT EXISTS(SELECT 1 FROM transfers WHERE fileId = :fileId AND state IN ('QUEUED', 'RUNNING', 'PAUSED'))")
+    fun observeUnfinishedForFile(fileId: String): Flow<Boolean>
+
     @Query("SELECT * FROM transfers WHERE state = 'QUEUED' ORDER BY priority DESC, createdAt ASC LIMIT :limit")
     suspend fun nextQueued(limit: Int): List<TransferEntity>
 

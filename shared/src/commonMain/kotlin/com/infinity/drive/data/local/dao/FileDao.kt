@@ -336,6 +336,9 @@ interface FileDao {
     @Query("UPDATE files SET localPath = :localPath WHERE id = :id")
     suspend fun setLocalPath(id: String, localPath: String?)
 
+    @Query("UPDATE files SET localPath = :savedPath WHERE id = :id AND localPath IS :previousPath AND modifiedAt = :revision")
+    suspend fun attachDownloadedCopy(id: String, savedPath: String, previousPath: String?, revision: Long)
+
     @Query(
         """UPDATE files SET trashedAt = :trashedAt, preTrashFolderId = folderId, folderId = NULL
            WHERE id IN (:ids) AND trashedAt IS NULL"""
