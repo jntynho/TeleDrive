@@ -92,7 +92,7 @@ class AndroidStartupPreparation(private val context:Context,private val loader:I
                                 seek.seekTo(.5f,stage)
                                 awaitDraw(host)
                                 scenes++
-                                if(Build.VERSION.SDK_INT>=29&&!lowRam&&renderHardwareFrame(host,glass))gpuFrames++
+                                if(Build.VERSION.SDK_INT>=29&&!lowRam&&renderHardwareFrame(host))gpuFrames++
                                 seek.snapTo(stage)
                             }
                             true
@@ -119,7 +119,7 @@ class AndroidStartupPreparation(private val context:Context,private val loader:I
     }
 
     @RequiresApi(29)
-    private suspend fun renderHardwareFrame(view:View,glass:Boolean):Boolean {
+    private suspend fun renderHardwareFrame(view:View):Boolean {
         if(!view.isHardwareAccelerated||view.width<=0||view.height<=0)return false
         val ratio=minOf(1.0,sqrt(524288.0/(view.width.toDouble()*view.height)))
         val width=(view.width*ratio).toInt().coerceAtLeast(1);val height=(view.height*ratio).toInt().coerceAtLeast(1)
@@ -129,7 +129,6 @@ class AndroidStartupPreparation(private val context:Context,private val loader:I
             val canvas=node.beginRecording(width,height)
             try{
                 canvas.scale(ratio.toFloat(),ratio.toFloat());view.draw(canvas)
-                if(glass&&Build.VERSION.SDK_INT>=33)drawHighlight(canvas)
             }finally{node.endRecording()}
         }catch(error:Exception){node.discardDisplayList();throw error}
         finally{Trace.endSection()}
@@ -167,12 +166,5 @@ class AndroidStartupPreparation(private val context:Context,private val loader:I
                 finally { try { reader?.close() } finally { Trace.endSection() } }
             }
         }
-    }
-    @RequiresApi(33)
-    private fun drawHighlight(canvas:Canvas){
-        val shader=com.infinity.drive.presentation.navigation.liquid.miuix.animation.createHighlightShader()
-        shader.setFloatUniform("size",64f,64f);shader.setColorUniform("color",Color.WHITE)
-        shader.setFloatUniform("radius",60f);shader.setFloatUniform("position",32f,32f)
-        canvas.drawRect(0f,0f,64f,64f,Paint().apply{this.shader=shader;blendMode=BlendMode.PLUS})
     }
 }

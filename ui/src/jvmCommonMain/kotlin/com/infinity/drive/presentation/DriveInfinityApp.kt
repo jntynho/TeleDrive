@@ -2,48 +2,28 @@
 package com.infinity.drive.presentation
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import com.infinity.drive.presentation.components.recordNavigationScene
 import com.infinity.drive.presentation.components.navigationBackdrop
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -60,22 +40,18 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import org.jetbrains.compose.resources.stringResource
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.Lifecycle
@@ -83,6 +59,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -94,10 +71,15 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.intl.LocaleList
+import com.infinity.drive.domain.model.NavigationBarStyle
+import com.infinity.drive.presentation.navigation.activeNavigationStyle
+import com.infinity.drive.presentation.navigation.canBlur
+import com.infinity.drive.presentation.navigation.showsNavigationChrome
+import com.infinity.drive.presentation.platform.LocalLiquidNavigation
+import com.infinity.drive.presentation.platform.LocalPlatformCapabilities
 import com.infinity.drive.domain.model.AppLanguage
 import com.infinity.drive.domain.model.AppTheme
 import com.infinity.drive.presentation.applock.LockScreen
-import com.infinity.drive.presentation.components.LoadingState
 import com.infinity.drive.presentation.platform.LocalAppVersion
 import com.infinity.drive.presentation.platform.LocalUrlOpener
 import com.infinity.drive.presentation.navigation.AppNavHost
@@ -249,8 +231,11 @@ private fun MainScaffold(
     val navigationSettings=org.koin.compose.koinInject<com.infinity.drive.domain.repository.SettingsRepository>()
     val navigationPreferences by navigationSettings.preferences.collectAsStateWithLifecycle(com.infinity.drive.domain.model.UserPreferences())
     val navigationScene=rememberGraphicsLayer()
-    val liquidNavigation=com.infinity.drive.presentation.platform.LocalLiquidNavigation.current
-    val liquidStyle=navigationPreferences.floatingNavigationBar&&navigationPreferences.navigationBarStyle==com.infinity.drive.domain.model.NavigationBarStyle.FLOATING&&liquidNavigation!=null
+    val liquidNavigation = LocalLiquidNavigation.current
+    val style = navigationPreferences.activeNavigationStyle()
+    val useBlur = navigationPreferences.floatingNavigationBar && navigationPreferences.navigationBarBlur &&
+        style.canBlur(liquidNavigation?.supportsGlass == true, LocalPlatformCapabilities.current.supportsBackdropBlur)
+    val useLiquidRenderer = style == NavigationBarStyle.FLOATING && liquidNavigation != null
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
@@ -258,23 +243,29 @@ private fun MainScaffold(
     val navigationKeyboard=androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     LaunchedEffect(backStackEntry?.id){navigationFocus.clearFocus();navigationKeyboard?.hide()}
     var selectedNavIndex by androidx.compose.runtime.saveable.rememberSaveable { mutableIntStateOf(0) }
-    val directTabIndex=TopLevelDestination.entries.indexOfFirst{currentDestination?.hasRoute(it.route::class)==true}
-    // Saved deep destinations retain their owner when restoreState skips the root tab screen.
-    val savedTabOwner=backStackEntry?.savedStateHandle?.get<Int>("navigation-tab-owner")
-    val topLevelIndex=directTabIndex.takeIf{it>=0}?:savedTabOwner?:selectedNavIndex
-    LaunchedEffect(backStackEntry?.id,directTabIndex){
-        val owner=directTabIndex.takeIf{it>=0}?:savedTabOwner?:selectedNavIndex
-        backStackEntry?.savedStateHandle?.set("navigation-tab-owner",owner)
-        selectedNavIndex=owner
+    val directTabIndex = TopLevelDestination.entries.indexOfFirst { currentDestination?.hasRoute(it.route::class) == true }
+    val savedTabOwner = backStackEntry?.savedStateHandle?.get<Int>(TAB_OWNER)
+        ?.takeIf { it in TopLevelDestination.entries.indices }
+    val topLevelIndex = directTabIndex.takeIf { it >= 0 } ?: savedTabOwner ?: selectedNavIndex
+    DisposableEffect(navController) {
+        val updateTabOwner = NavController.OnDestinationChangedListener { controller, destination, _ ->
+            val entry = controller.currentBackStackEntry ?: return@OnDestinationChangedListener
+            val direct = TopLevelDestination.entries.indexOfFirst { destination.hasRoute(it.route::class) }
+            // Record the owner at navigation time, even when a child opens before Compose redraws.
+            val owner = direct.takeIf { it >= 0 }
+                ?: entry.savedStateHandle.get<Int>(TAB_OWNER)?.takeIf { it in TopLevelDestination.entries.indices }
+                ?: selectedNavIndex
+            entry.savedStateHandle[TAB_OWNER] = owner
+            selectedNavIndex = owner
+        }
+        navController.addOnDestinationChangedListener(updateTabOwner)
+        onDispose { navController.removeOnDestinationChangedListener(updateTabOwner) }
     }
     val entryState=backStackEntry?.lifecycle?.currentStateFlow?.collectAsState()?.value
     val navigating=entryState!=Lifecycle.State.RESUMED
 
 
-    val showChrome=onboardingComplete&&currentDestination!=null&&
-        currentDestination.hasRoute(Route.Onboarding::class).not()&&currentDestination.hasRoute(Route.Preview::class).not()&&
-        currentDestination.hasRoute(Route.NoteEditor::class).not()&&currentDestination.hasRoute(Route.Search::class).not()&&
-        currentDestination.hasRoute(Route.RecoveryExport::class).not()
+    val showChrome = onboardingComplete && currentDestination?.showsNavigationChrome() == true
     val keyboardVisible=WindowInsets.ime.getBottom(LocalDensity.current)>0
 
     val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
@@ -331,89 +322,156 @@ private fun MainScaffold(
         onDestinationHandled()
     }
 
-    val audioPlayer=com.infinity.drive.presentation.platform.LocalAudioPlayback.current
-    var measuredChromeHeight by remember { mutableStateOf(BottomBarHeight) }
-    var bottomChromeHeight by remember { mutableStateOf(BottomBarHeight) }
-    LaunchedEffect(measuredChromeHeight,navigating){
-        if(!navigating){withFrameNanos{};bottomChromeHeight=measuredChromeHeight}
+    val showBottomChrome = showChrome && !keyboardVisible
+    val initialChromeHeight = if (useRail) 0.dp else BottomBarHeight
+    var measuredChromeHeight by remember(useRail) { mutableStateOf(initialChromeHeight) }
+    var bottomChromeHeight by remember(useRail) { mutableStateOf(initialChromeHeight) }
+    LaunchedEffect(measuredChromeHeight, navigating) {
+        if (!navigating) bottomChromeHeight = measuredChromeHeight
     }
-    val chromeDensity=androidx.compose.ui.platform.LocalDensity.current
-    val systemBottom=WindowInsets.navigationBars.getBottom(chromeDensity)
-
+    val chromeDensity = LocalDensity.current
+    val systemBottom = WindowInsets.navigationBars.getBottom(chromeDensity)
+    val direction = LocalLayoutDirection.current
+    val startInset = if (direction == LayoutDirection.Ltr) WindowInsets.navigationBars.getLeft(chromeDensity, direction)
+        else WindowInsets.navigationBars.getRight(chromeDensity, direction)
+    val navigateToTab: (Int) -> Unit = { index ->
+        TopLevelDestination.entries.getOrNull(index)?.let { navigateTopLevel(navController, it, index == topLevelIndex) }
+    }
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        val railWidth=if(useRail&&onboardingComplete)80.dp else 0.dp
+        val railWidth = if (useRail && onboardingComplete) 80.dp + with(chromeDensity) { startInset.toDp() } else 0.dp
         CompositionLocalProvider(
             app.tgdrive.ui.LocalNavigationInProgress provides navigating,
             com.infinity.drive.presentation.components.LocalNavigationScene provides navigationScene,
-            LocalBottomBarHeight provides if(onboardingComplete)bottomChromeHeight else 0.dp,
+            LocalBottomBarHeight provides if (onboardingComplete && !keyboardVisible) bottomChromeHeight else 0.dp,
             com.infinity.drive.presentation.components.LocalRevealFileNavigation provides { file:com.infinity.drive.domain.model.DriveFile -> navController.navigateOnce(Route.Files(file.folderId,focusFileId=file.id)) },
             com.infinity.drive.presentation.components.LocalFileFolderNavigation provides { id:String? -> navController.navigateOnce(Route.Files(id)) },
             com.infinity.drive.presentation.navigation.LocalNavigationRailWidth provides railWidth
         ) {
-            AppNavHost(navController=navController,startDestination=startDestination,modifier=(liquidNavigation?.capture(Modifier.fillMaxSize(),liquidStyle&&navigationPreferences.navigationBarBlur&&liquidNavigation.supportsGlass&&showChrome&&!useRail&&!keyboardVisible)?:Modifier.fillMaxSize()).recordNavigationScene(navigationScene,!liquidStyle&&navigationPreferences.navigationBarStyle!=com.infinity.drive.domain.model.NavigationBarStyle.FLOATING&&navigationPreferences.floatingNavigationBar&&navigationPreferences.navigationBarBlur&&navigationPreferences.navigationBarStyle.supportsBlur&&com.infinity.drive.presentation.platform.LocalPlatformCapabilities.current.supportsDynamicColor&&showChrome&&!useRail&&!keyboardVisible).testTag("navigation-host"))
+            val capture = useBlur && showBottomChrome && !useRail
+            val host = Modifier.fillMaxSize()
+            val recordedHost = if (useLiquidRenderer) liquidNavigation?.capture(host, capture) ?: host
+                else host.recordNavigationScene(navigationScene, capture)
+            AppNavHost(navController, startDestination, modifier = recordedHost.testTag("navigation-host"))
         }
-        if(useRail) AnimatedVisibility(visible=showChrome&&!keyboardVisible,
+        if(useRail) AnimatedVisibility(visible=showChrome,
             enter=fadeIn(tween(180)),exit=fadeOut(tween(180)),modifier=Modifier.align(Alignment.CenterStart)) {
-            NavigationRail(modifier=Modifier.width(80.dp).fillMaxHeight(),containerColor=MaterialTheme.colorScheme.surfaceContainer) {
-                TopLevelDestination.entries.forEach { destination ->
-                    val selected=TopLevelDestination.entries.indexOf(destination)==topLevelIndex
-                    NavigationRailItem(selected=selected,onClick={if(!selected)navigateTopLevel(navController,destination)},
-                        icon={Icon(if(selected)destination.selectedIcon else destination.icon,contentDescription=stringResource(destination.labelRes))},
-                        label={Text(stringResource(destination.labelRes))})
+            NavigationRail(modifier=Modifier.width(railWidth).fillMaxHeight(),containerColor=MaterialTheme.colorScheme.surfaceContainer) {
+                TopLevelDestination.entries.forEachIndexed { index, destination ->
+                    val label = stringResource(destination.labelRes)
+                    val showLabels = navigationPreferences.navigationBarLabels
+                    NavigationRailItem(
+                        modifier = Modifier.testTag("navigation-${destination.name.lowercase()}"),
+                        selected = index == topLevelIndex, onClick = { navigateToTab(index) },
+                        icon = { Icon(destination.icon, if (showLabels) null else label) },
+                        label = if (showLabels) ({ Text(label, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }) else null
+                    )
                 }
             }
         }
-        AnimatedVisibility(visible=showChrome,enter=fadeIn(tween(180)),exit=fadeOut(tween(180)),
+        AnimatedVisibility(visible=showBottomChrome,enter=fadeIn(tween(180)),exit=fadeOut(tween(180)),
             modifier=Modifier.align(Alignment.BottomCenter).padding(start=railWidth)) {
-            androidx.compose.foundation.layout.Column(Modifier.onSizeChanged {
-                measuredChromeHeight=with(chromeDensity){(it.height-if(useRail)0 else systemBottom).coerceAtLeast(0).toDp()}
-            }) {
+            androidx.compose.foundation.layout.Column(
+                Modifier.onSizeChanged { size ->
+                    if (showBottomChrome) {
+                        measuredChromeHeight = with(chromeDensity) { (size.height - systemBottom).coerceAtLeast(0).toDp() }
+                    }
+                }.then(if (useRail) Modifier.navigationBarsPadding() else Modifier)
+            ) {
                 CompositionLocalProvider(com.infinity.drive.presentation.platform.LocalOpenAudioPlayer provides { id ->
                     navController.navigateOnce(Route.Preview(fileId=id,categories="AUDIO",sortField=navigationPreferences.audioSortField.name,sortDescending=navigationPreferences.audioSortDirection==com.infinity.drive.domain.model.SortDirection.DESCENDING))
                 }){com.infinity.drive.presentation.audio.LibraryAudioMiniPlayer()}
-                if(!useRail&&!keyboardVisible)CompositionLocalProvider(com.infinity.drive.presentation.components.LocalNavigationScene provides navigationScene){FloatingNavigationBar(preferences=navigationPreferences,selectedIndex=topLevelIndex.takeIf{it>=0}?:selectedNavIndex,onNavigate={navigateTopLevel(navController,it)})}
+                if (!useRail) {
+                    CompositionLocalProvider(com.infinity.drive.presentation.components.LocalNavigationScene provides navigationScene) {
+                        BottomNavigationBar(style, useBlur, navigationPreferences.navigationBarLabels, topLevelIndex, navigateToTab)
+                    }
+                }
             }
         }
     }
 }
 
-/** TG Drive's four native destinations, with stable icons and labels. */
 @Composable
-private fun FloatingNavigationBar(preferences:com.infinity.drive.domain.model.UserPreferences,selectedIndex:Int,onNavigate:(TopLevelDestination)->Unit) {
-    val liquid=com.infinity.drive.presentation.platform.LocalLiquidNavigation.current
-    if(preferences.floatingNavigationBar&&preferences.navigationBarStyle==com.infinity.drive.domain.model.NavigationBarStyle.FLOATING&&liquid!=null){
-        val items=TopLevelDestination.entries.map{com.infinity.drive.presentation.platform.LiquidNavigationItem(it.icon,stringResource(it.labelRes),"navigation-${it.name.lowercase()}")}
-        liquid.Bar(items,selectedIndex,preferences.navigationBarLabels,preferences.navigationBarBlur){i->TopLevelDestination.entries.getOrNull(i)?.let(onNavigate)}
+private fun BottomNavigationBar(
+    style: NavigationBarStyle,
+    blur: Boolean,
+    showLabels: Boolean,
+    selectedIndex: Int,
+    onNavigate: (Int) -> Unit
+) {
+    val liquid = LocalLiquidNavigation.current
+    if (style == NavigationBarStyle.FLOATING && liquid != null) {
+        val items = TopLevelDestination.entries.map {
+            com.infinity.drive.presentation.platform.LiquidNavigationItem(
+                it.icon, stringResource(it.labelRes), "navigation-${it.name.lowercase()}"
+            )
+        }
+        liquid.Bar(items, selectedIndex, showLabels, blur, onNavigate)
         return
     }
-    val style=if(preferences.floatingNavigationBar)preferences.navigationBarStyle else com.infinity.drive.domain.model.NavigationBarStyle.STANDARD
-    val floating=style!=com.infinity.drive.domain.model.NavigationBarStyle.STANDARD
-    val blur=style!=com.infinity.drive.domain.model.NavigationBarStyle.FLOATING&&preferences.floatingNavigationBar&&style.supportsBlur&&preferences.navigationBarBlur&&com.infinity.drive.presentation.platform.LocalPlatformCapabilities.current.supportsDynamicColor
-    androidx.compose.material3.Surface(modifier=Modifier.fillMaxWidth().padding(horizontal=if(floating)20.dp else 0.dp,vertical=if(floating)10.dp else 0.dp).then(if(floating)Modifier.navigationBarsPadding()else Modifier).navigationBackdrop(blur,if(floating)28.dp else 0.dp),
-        shape=androidx.compose.foundation.shape.RoundedCornerShape(if(floating)28.dp else 0.dp),color=if(blur)MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha=.86f)else MaterialTheme.colorScheme.surfaceContainerHigh,
-        shadowElevation=if(floating)8.dp else 0.dp){
-    androidx.compose.material3.NavigationBar(modifier=if(floating)Modifier.height(maxOf(64.dp,(32+32*androidx.compose.ui.platform.LocalDensity.current.fontScale).dp))else Modifier,containerColor=if(floating||blur)androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.background,tonalElevation=0.dp,
-        windowInsets=if(floating)WindowInsets(0,0,0,0)else androidx.compose.material3.NavigationBarDefaults.windowInsets){
-        TopLevelDestination.entries.forEachIndexed{index,destination->
-            val destinationLabel=stringResource(destination.labelRes)
-            NavigationBarItem(modifier=Modifier.testTag("navigation-${destination.name.lowercase()}").semantics{contentDescription=destinationLabel},selected=index==selectedIndex,onClick={onNavigate(destination)},icon={Icon(destination.icon,null)},label=if(preferences.navigationBarLabels){{Text(stringResource(destination.labelRes),style=MaterialTheme.typography.labelSmall)}}else null,
-                colors=androidx.compose.material3.NavigationBarItemDefaults.colors(selectedIconColor=MaterialTheme.colorScheme.primary,selectedTextColor=MaterialTheme.colorScheme.primary,indicatorColor=when(style){com.infinity.drive.domain.model.NavigationBarStyle.MIUIX->MaterialTheme.colorScheme.primaryContainer;com.infinity.drive.domain.model.NavigationBarStyle.FLOATING->MaterialTheme.colorScheme.primary.copy(alpha=.12f);else->androidx.compose.ui.graphics.Color.Transparent},unselectedIconColor=MaterialTheme.colorScheme.onSurfaceVariant,unselectedTextColor=MaterialTheme.colorScheme.onSurfaceVariant))
+    val floating = style != NavigationBarStyle.STANDARD
+    val radius = when (style) {
+        NavigationBarStyle.STANDARD -> 0.dp
+        NavigationBarStyle.FLOATING -> 50.dp
+        NavigationBarStyle.MIUIX -> 28.dp
+    }
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        modifier = Modifier.fillMaxWidth()
+            .then(if (floating) Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp) else Modifier)
+            .navigationBackdrop(blur, radius),
+        shape = RoundedCornerShape(radius),
+        color = if (blur) colors.surfaceContainerHigh.copy(alpha = .88f) else colors.surfaceContainerHigh,
+        shadowElevation = if (floating) 6.dp else 0.dp
+    ) {
+        val fontScale = LocalDensity.current.fontScale
+        val height = (if (floating) 64.dp else BottomBarHeight) +
+            24.dp * if (showLabels) (fontScale - 1f).coerceAtLeast(0f) else 0f
+        val insets = if (floating) WindowInsets(0, 0, 0, 0) else androidx.compose.material3.NavigationBarDefaults.windowInsets
+        androidx.compose.material3.NavigationBar(
+            modifier = Modifier.heightIn(min = height),
+            containerColor = androidx.compose.ui.graphics.Color.Transparent,
+            tonalElevation = 0.dp,
+            windowInsets = insets
+        ) {
+            TopLevelDestination.entries.forEachIndexed { index, destination ->
+                val label = stringResource(destination.labelRes)
+                NavigationBarItem(
+                    modifier = Modifier.testTag("navigation-${destination.name.lowercase()}")
+                        .then(if (showLabels) Modifier else Modifier.semantics { contentDescription = label }),
+                    selected = index == selectedIndex,
+                    onClick = { onNavigate(index) },
+                    icon = { Icon(destination.icon, null) },
+                    label = if (showLabels) ({
+                        Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 2,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    }) else null,
+                    colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
+                        selectedIconColor = colors.onPrimaryContainer,
+                        selectedTextColor = colors.onSurface,
+                        indicatorColor = colors.primaryContainer,
+                        unselectedIconColor = colors.onSurfaceVariant,
+                        unselectedTextColor = colors.onSurfaceVariant
+                    )
+                )
+            }
         }
     }
-}
 }
 
 private fun navigateTopLevel(
     navController: NavHostController,
-    destination: TopLevelDestination
+    destination: TopLevelDestination,
+    alreadySelected: Boolean
 ) {
-    navController.navigateTopLevelOnce(destination.route) {
+    navController.navigateTopLevelOnce(destination.route, alreadySelected) {
         popUpTo(Route.Home) { saveState = true }
         restoreState = true
         launchSingleTop = true
     }
 }
 
+private const val TAB_OWNER = "navigation-tab-owner"
 private const val NAV_READY_TIMEOUT_MS = 5_000L
 private const val NAV_READY_POLL_MS = 50L

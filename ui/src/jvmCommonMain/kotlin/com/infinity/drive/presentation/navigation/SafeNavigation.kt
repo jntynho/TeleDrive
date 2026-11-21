@@ -55,5 +55,16 @@ private fun NavHostController.submit(route:Route?,topLevel:Boolean=false,action:
 
 fun NavHostController.navigateOnce(route:Route)=submit(route){navigate(route)}
 fun NavHostController.navigateOnce(route:Route,builder:NavOptionsBuilder.()->Unit)=submit(route){navigate(route,builder)}
-fun NavHostController.navigateTopLevelOnce(route:Route,builder:NavOptionsBuilder.()->Unit)=submit(route,true){navigate(route,builder)}
+fun NavHostController.navigateTopLevelOnce(
+    route: Route,
+    alreadySelected: Boolean = false,
+    builder: NavOptionsBuilder.() -> Unit
+) {
+    if (alreadySelected) {
+        // Selecting this tab again keeps its current screen and supersedes an earlier tap.
+        queues[this]?.let { it.serial++ }
+    } else {
+        submit(route, true) { navigate(route, builder) }
+    }
+}
 fun NavHostController.popBackStackOnce()=submit(null){popBackStack()}

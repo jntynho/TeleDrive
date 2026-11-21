@@ -339,7 +339,7 @@ private inline fun <reified T:Any> androidx.navigation.NavGraphBuilder.stableCom
 ) {
     composable<T>(enterTransition=enterTransition,exitTransition=exitTransition,popEnterTransition=popEnterTransition,popExitTransition=popExitTransition){entry->
         com.infinity.drive.presentation.common.AppBackHandler(controller.previousBackStackEntry!=null){controller.popBackStackOnce()}
-        val chrome = T::class !in setOf<kotlin.reflect.KClass<*>>(Route.Onboarding::class, Route.Preview::class, Route.NoteEditor::class, Route.Search::class, Route.RecoveryExport::class)
+        val chrome = T::class !in fullScreenRoutes
         // Every page draws behind overlay chrome; reserve occlusion in scroll padding, never the viewport.
         CompositionLocalProvider(LocalBottomBarInset provides if(chrome)LocalBottomBarHeight.current else 0.dp){
             Box(Modifier.fillMaxSize().padding(start=if(chrome)LocalNavigationRailWidth.current else 0.dp)){

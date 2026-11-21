@@ -10,6 +10,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.LayoutDirection
@@ -36,12 +38,17 @@ class LiquidNavigationHostTest {
     private var labels by mutableStateOf(true)
     private var rtl by mutableStateOf(false)
     private var glass by mutableStateOf(true)
+    private var fontScale by mutableFloatStateOf(1f)
 
     @androidx.annotation.RequiresApi(33)
     private fun scene() {
         compose.setContent {
             MaterialTheme {
-                CompositionLocalProvider(LocalLayoutDirection provides if(rtl)LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                val density = LocalDensity.current
+                CompositionLocalProvider(
+                    LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                    LocalDensity provides Density(density.density, fontScale)
+                ) {
                     val navigation=rememberLiquidNavigation()
                     Box(Modifier.fillMaxSize()) {
                         Column(navigation.capture(Modifier.fillMaxSize(),navigation.supportsGlass&&glass)) {
@@ -92,5 +99,28 @@ class LiquidNavigationHostTest {
         compose.runOnIdle{glass=false}
         compose.onNodeWithTag("tab-2").performClick()
         compose.onNodeWithTag("tab-2").assertIsSelected()
+    }
+
+    @androidx.annotation.RequiresApi(33)
+    @Test fun labelsRemainReadableAtLargeFontScaleWithoutShrinkingTheTouchTargets() {
+        scene()
+        val bar = compose.onNodeWithTag("liquid-navigation")
+        val regularHeight = bar.fetchSemanticsNode().size.height
+        compose.runOnIdle { fontScale = 2f }
+        assertTrue("Navigation must grow to fit enlarged labels", bar.fetchSemanticsNode().size.height > regularHeight)
+        compose.onNodeWithTag("tab-2").assertIsDisplayed().performClick().assertIsSelected()
+    }
+
+    @androidx.annotation.RequiresApi(33)
+    @Test fun gestureCanStartOnAnUnselectedTabAndCancelDoesNotNavigate() {
+        scene()
+        val bar = compose.onNodeWithTag("liquid-navigation")
+        val origin = bar.fetchSemanticsNode().boundsInRoot.topLeft
+        val unselected = compose.onNodeWithTag("tab-1").fetchSemanticsNode().boundsInRoot.center - origin
+        val end = compose.onNodeWithTag("tab-3").fetchSemanticsNode().boundsInRoot.center - origin
+        bar.performTouchInput { down(unselected); moveTo(end); cancel() }
+        compose.onNodeWithTag("tab-0").assertIsSelected()
+        bar.performTouchInput { swipe(unselected, end, 500) }
+        compose.onNodeWithTag("tab-3").assertIsSelected()
     }
 }

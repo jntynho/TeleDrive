@@ -22,5 +22,4 @@ enum class TopLevelDestination(
     SETTINGS(Route.Settings, Res.string.nav_settings, { DriveIcons.Settings });
 
     val icon: ImageVector @Composable get() = iconVector()
-    val selectedIcon: ImageVector @Composable get() = icon
 }

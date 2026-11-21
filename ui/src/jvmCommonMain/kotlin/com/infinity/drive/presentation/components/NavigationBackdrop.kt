@@ -18,12 +18,10 @@ import androidx.compose.ui.unit.dp
 val LocalNavigationScene=staticCompositionLocalOf<GraphicsLayer?>{null}
 @Composable
 fun Modifier.recordNavigationScene(scene:GraphicsLayer,enabled:Boolean):Modifier {
-    val navigating=app.tgdrive.ui.LocalNavigationInProgress.current
-    return drawWithContent{
-        if(enabled){
-            if(!navigating||scene.size.width==0)scene.record{this@drawWithContent.drawContent()}
-            if(navigating)drawContent()else drawLayer(scene)
-        }else drawContent()
+    if (!enabled) return this
+    return drawWithContent {
+        scene.record { this@drawWithContent.drawContent() }
+        drawLayer(scene)
     }
 }
 /** Blur the captured library only. Navigation icons/text remain crisp and fully interactive. */
@@ -35,11 +33,12 @@ fun Modifier.navigationBackdrop(enabled:Boolean,cornerRadius:androidx.compose.ui
     if(!enabled||scene==null)return this
     return onGloballyPositioned{position=it.positionInRoot()}.drawWithCache{
         val mask=androidx.compose.ui.graphics.Path().apply{addRoundRect(androidx.compose.ui.geometry.RoundRect(0f,0f,size.width,size.height,androidx.compose.ui.geometry.CornerRadius(cornerRadius.toPx())))}
-        onDrawBehind{
+        backdrop.renderEffect = BlurEffect(18.dp.toPx(), 18.dp.toPx())
+        onDrawBehind {
+            if (scene.size.width == 0 || scene.size.height == 0) return@onDrawBehind
             backdrop.record{
                 translate(-position.x,-position.y){drawLayer(scene)}
             }
-            backdrop.renderEffect=BlurEffect(18.dp.toPx(),18.dp.toPx())
             clipPath(mask){drawLayer(backdrop)}
         }
     }

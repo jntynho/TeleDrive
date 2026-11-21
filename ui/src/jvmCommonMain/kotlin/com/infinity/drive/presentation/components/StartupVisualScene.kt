@@ -1,10 +1,12 @@
 package com.infinity.drive.presentation.components
 
 import app.tgdrive.ui.DriveIcons
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.infinity.drive.domain.model.*
@@ -18,7 +20,11 @@ fun StartupVisualScene(page:Int,library:Boolean,glass:Boolean=false){
         null,null,null,null,null,null,BackupState.NONE,false,false,false,false,null,null,null,null,createdAt=1,modifiedAt=1,addedAt=1) }
     CompositionLocalProvider(LocalStartupProbe provides true){
         Surface(Modifier.fillMaxSize()){
-            Column(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+            val liquid = LocalLiquidNavigation.current
+            val capture = library && glass && liquid?.supportsGlass == true
+            Box {
+                val scene = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)
+                Column((liquid?.capture(scene, capture) ?: scene).padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
                 Text(if(!library)"Welcome to TeleDrive"else when(page){0->"Home";1->"Gallery";2->"Audio";else->"Settings"},style=MaterialTheme.typography.headlineMedium)
                 if(!library){
                     OutlinedTextField("",{},label={Text("Phone number")},readOnly=true,modifier=Modifier.fillMaxWidth())
@@ -36,12 +42,13 @@ fun StartupVisualScene(page:Int,library:Boolean,glass:Boolean=false){
                         }
                     }
                 }
-                Spacer(Modifier.weight(1f))
-                val liquid=LocalLiquidNavigation.current
-                if(library&&liquid!=null)liquid.Bar(listOf(
+                }
+                if (library && liquid != null) Box(Modifier.align(Alignment.BottomCenter)) {
+                    liquid.Bar(listOf(
                     LiquidNavigationItem(DriveIcons.Home,"Home","startup-home"),LiquidNavigationItem(DriveIcons.PhotoLibrary,"Gallery","startup-gallery"),
                     LiquidNavigationItem(DriveIcons.MusicNotes,"Audio","startup-audio"),LiquidNavigationItem(DriveIcons.Settings,"Settings","startup-settings")
-                ),page.coerceIn(0,3),true,glass){}
+                    ), page.coerceIn(0,3), true, capture) {}
+                }
             }
         }
     }

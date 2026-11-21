@@ -58,6 +58,21 @@ class NavigationQueueRegressionTest {
         compose.waitForIdle()
         assertTrue(nav.currentDestination!!.hasRoute<Route.Settings>())
     }
+    @Test fun reselectingTheCurrentTabSupersedesAQueuedSwitch() {
+        compose.mainClock.autoAdvance = false
+        compose.runOnUiThread { top(Route.Gallery()) }
+        compose.mainClock.advanceTimeBy(32)
+        compose.runOnUiThread {
+            top(Route.Audio(true))
+            nav.navigateTopLevelOnce(Route.Gallery(), alreadySelected = true) {
+                fail("Reselecting the current tab must not navigate")
+            }
+        }
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        assertTrue(nav.currentDestination!!.hasRoute<Route.Gallery>())
+    }
+
     @Test fun aSecondOpenOfTheSameRouteDoesNotStackAnotherViewer(){
         compose.mainClock.autoAdvance=false
         compose.runOnUiThread{nav.navigateOnce(Route.Gallery());nav.navigateOnce(Route.Gallery())}
